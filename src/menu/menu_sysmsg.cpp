@@ -1140,10 +1140,10 @@ void kbd_pad_read(void)
             bit++;
         }
     } else if ((u8)get_ControlType(0) == 1) {
-        buttons[0] = Psw[0].control_0x0FC;
-        buttons[1] = Psw[0].field_0x100;
-        buttons[2] = Psw[0].wpad_word2_0x102;
-        buttons[3] = Psw[0].field_0x11e;
+        buttons[0] = Psw[0].fs_block.btn.hold;
+        buttons[1] = Psw[0].fs_block.btn.trig;
+        buttons[2] = Psw[0].fs_block.btn.release;
+        buttons[3] = Psw[0].fs_block.btn.rept;
         button = buttons;
         bit = bits;
         for (i = 4; i != 0; i--) {

@@ -66,8 +66,8 @@
 #include "enemy/fn_8012BDF4.h" /* em_work_die_ck, fn_8012D1A8 */
 #include "enemy/fn_801251D0.h" /* fn_80125FF0, fn_8012A9E8 */
 #include "enemy/enemy_control.h" /* fn_80143BF8 */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 */
-#include "g3d/g3d_calcworld.h" /* addVec3To */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= */
 #include "ef/get_move_work_adrs.h" /* get_move_work_adrs / get_move_work_max */
 #include "enemy/fn_8012EC74.h" /* get_em_scale */
 #include "Pl/pl_hit_sphere.h" /* PlCapsule / PlCapsuleBox / pl_capsule_box_set */
@@ -84,8 +84,6 @@
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 struct EftEntry;
 /* One record of the definition table `eft_def_table`, indexed by `EftSlot::key_0x00`.  `kind_0x00` is
@@ -1081,9 +1079,9 @@ extern "C" EftSlot* eft_slot_spawn(u8 key1, u8 key0, u8 index) {
             slot->field_0x39 = 255;
             slot->field_0x17 = 255;
             slot->field_0x18 = 0;
-            slot->field_0x24 = 0.0f;
-            slot->field_0x28 = 0.0f;
-            slot->field_0x2C = 0.0f;
+            slot->pos_0x24.x = 0.0f;
+            slot->pos_0x24.y = 0.0f;
+            slot->pos_0x24.z = 0.0f;
             slot->field_0x30 = 0.0f;
             slot->field_0x36 = 255;
             slot->field_0x15 = 255;
@@ -1752,15 +1750,12 @@ extern "C" void eft_shape_block_center(EftShapeBlock* block, VEC3* out)
     VEC3 a;
     VEC3 b;
 
-    VEC3_ctor(&mid);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     if (block->kind_0x00 == 0) {
         setVector3(out, block->a_0x04.x, block->a_0x04.y, block->a_0x04.z);
     } else {
         setVector3(&a, block->a_0x04.x, block->a_0x04.y, block->a_0x04.z);
         setVector3(&b, block->b_0x10.x, block->b_0x10.y, block->b_0x10.z);
-        copyVec3(out, &VEC3_SCALE(&VEC3_ADD(&a, &b), 0.5f));
+        *out = *(&((a + b) * 0.5f));
     }
 }
 
@@ -1894,14 +1889,13 @@ extern "C" EftShapeBlock* eft_slot_shape_block_get(EftSlot* slot, u8 key, u8 ind
 extern "C" void eft_slot_shape_move(EftSlot* slot, u8 index)
 {
     EftShapeBlock* block = eft_def_model_block(slot, index);
-    VEC3 zero;
 
     if (block != NULL) {
         eft_shape_block_center(block, &slot->pos_0x24);
         slot->field_0x30 = block->radius_0x1C;
         slot->field_0x36 = index;
     } else {
-        copyVec3(&slot->pos_0x24, setVec3(&zero, 0.0f, 0.0f, 0.0f));
+        slot->pos_0x24 = VEC3(0.0f, 0.0f, 0.0f);
         slot->field_0x30 = 1500.0f;
         slot->field_0x36 = 0xFF;
     }
@@ -1924,12 +1918,9 @@ extern "C" u32 eft_slot_shape_hit_ck(EftSlot* slot, u8 index, VEC3* pos, f32 mar
     EftShapeBlock* block = NULL;
     s32 capsule = 0;
     PlCapsuleBox box;
+
     VEC3 a;
     VEC3 b;
-
-    eft_shape_init((EftShape*)&box);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     if (index != 0xFF) {
         block = eft_def_model_block(slot, index);
         if (block != NULL && block->kind_0x00 == 1) {
@@ -2359,7 +2350,7 @@ extern "C" void eft_slot_track_step(EftSlot* slot)
             bound = NULL;
             target = NULL;
         } else {
-            copyVec3(&slot->pos_0x24, &bound->pos);
+            slot->pos_0x24 = bound->pos;
             slot->field_0x30 = 1200.0f;
             slot->field_0x36 = 0xFF;
         }
@@ -2715,7 +2706,7 @@ extern "C" void eft_slot_area_bind(EftSlot* slot)
         if (slot->field_0x14 == work->area_no && eft_work_wide_ck(slot, work) == 1) {
             if (eft_slot_armed_ck(slot) == 1 || slot->field_0x1E < 0) {
                 slot->field_0x18 = (u32)work;
-                copyVec3(&slot->pos_0x24, &work->pos);
+                slot->pos_0x24 = work->pos;
             }
             break;
         }
@@ -2945,8 +2936,6 @@ extern "C" void eft_slot_linked_state_change(EftSlot* slot, u8 previous, _ENEMY_
     f32 dist;
     u8 i;
 
-    VEC3_ctor(&center);
-    VEC3_ctor(&best_pos);
     slot->field_0x0B = 0;
     eft_slot_link_marks_get(slot, &count, &base);
     i = count;
@@ -2963,11 +2952,11 @@ extern "C" void eft_slot_linked_state_change(EftSlot* slot, u8 previous, _ENEMY_
                 if (i == count) {
                     best = dist;
                     index = i;
-                    copyVec3(&best_pos, &center);
+                    best_pos = center;
                 } else if (best > dist) {
                     best = dist;
                     index = i;
-                    copyVec3(&best_pos, &center);
+                    best_pos = center;
                 }
             }
             eft_slot_shape_move(slot, index);
@@ -2999,7 +2988,7 @@ extern "C" void eft_slot_linked_state_change(EftSlot* slot, u8 previous, _ENEMY_
                     if (take == 1) {
                         best = dist;
                         index = i;
-                        copyVec3(&best_pos, &center);
+                        best_pos = center;
                         best_free = free;
                     }
                 }
@@ -3263,7 +3252,6 @@ extern "C" void eft_slot_arena_state_change(EftSlot* slot, u8 previous, _ENEMY_W
     f32 best;
     f32 dist;
 
-    VEC3_ctor(&center);
     mark = slot->field_0x3A;
     slot->field_0x3A = 0;
     slot->field_0x0A = 0;
@@ -3324,7 +3312,6 @@ extern "C" void eft_slot_shape_block11_set(EftSlot* slot)
  * enemy rests, or a random end block. */
 extern "C" void eft_slot_arena_step(EftSlot* slot)
 {
-    VEC3 center;
     _ENEMY_WORK* works[32];
     s32 i;
     _ENEMY_WORK* work;
@@ -3338,7 +3325,7 @@ extern "C" void eft_slot_arena_step(EftSlot* slot)
     u8 index;
     f32 dist;
 
-    VEC3_ctor(&center);
+    VEC3 center;
     work = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
     n = 0;
@@ -3381,7 +3368,7 @@ extern "C" void eft_slot_arena_step(EftSlot* slot)
         if (slot->field_0x0A == 0) {
             slot->field_0x0A++;
             index = (u16)ran_suu(1) % 3 + 4;
-            if (slot->field_0x24 < 0.0f) {
+            if (slot->pos_0x24.x < 0.0f) {
                 index += 3;
             }
             slot->field_0x36 = index;

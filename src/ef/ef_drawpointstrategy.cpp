@@ -113,8 +113,6 @@ void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) 
     u32 last_size;
     bool first;
     EfDrawParticle* particle;
-    Mtx34 mtx_view;
-    Mtx34 mtx_result;
     f32 progress;
     f32 scale;
     u32 size;
@@ -131,9 +129,9 @@ void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) 
 
     flag = (mNumTexmap != 0);
 
-    MTX34_ctor(&mtx_view);
+    Mtx34 mtx_view;
     ef_pm_get_mtx(pm, &mtx_view);
-    MTX34_ctor(&mtx_result);
+    Mtx34 mtx_result;
     ef_draw_info_view_mtx(&info, &mtx_result);
     mtx34_concat(&mtx_result, &mtx_result, &mtx_view);
     GXLoadPosMtxImm(mtx34_get_ptr(&mtx_result), 0);

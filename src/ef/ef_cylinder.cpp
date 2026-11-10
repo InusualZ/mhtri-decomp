@@ -34,11 +34,11 @@
 #include "ef/ef_torus.h" /* ef_fabsf (rule 2) */
 #include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 #include "fn_8004CAD8.h"       /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterFormCylinder, EfWork, ParticleManager (rule 1) */
 
 /* The 3-float vector `nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
- * API (`ef_vec3_normalize_to`, `assignVec3`, the spawn slot) works on it. */
+ * API (`ef_vec3_normalize_to`, `VEC3::operator=`, the spawn slot) works on it. */
 typedef nw4r::math::VEC3 VEC3; /* size: 0x0C */
 
 /* The six-float parameter block `params`. */
@@ -57,7 +57,7 @@ typedef struct EfCylinderParams {
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 
 /* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
- * have C linkage (`VEC3_ctor` comes from `mh3_pad.h`). */
+ * have C linkage (`VEC3::VEC3()` comes from `mh3_pad.h`). */
 extern "C" {
 extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 }
@@ -87,12 +87,11 @@ void ef_cylinder_emit(nw4r::ef::EmitterFormCylinder* form, EfWork* em, ParticleM
     CHECK_PTR(ef_cylinder_err_params, params);
 
     for (i = 0; i < count; i++) {
-        VEC3 v88, v76, v64, v52, v40;
+        VEC3 v88, v76;
         f32 cs, sn;
         f32 factor, rate, t;
 
-        VEC3_ctor(&v88); /* `mh3_pad.h`'s C-linkage declaration takes nw4r::math::VEC3* */
-        VEC3_ctor(&v76);
+ /* `mh3_pad.h`'s C-linkage declaration takes nw4r::math::VEC3* */
         t = ef_random_float(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {
@@ -106,7 +105,7 @@ void ef_cylinder_emit(nw4r::ef::EmitterFormCylinder* form, EfWork* em, ParticleM
             angle = (params->range_end - params->range_begin) * ef_random_float(&em->progress);
         }
         ef_sin_cos(&cs, &sn, phase + angle);
-        setVec3(&v64, cs, 0.0f, -sn);
+        VEC3 v64(cs, 0.0f, -sn);
         v88.x = size_x * (v64.x * factor);
         if (flags & 0x00020000) {
             v88.y = offset_y;
@@ -114,12 +113,12 @@ void ef_cylinder_emit(nw4r::ef::EmitterFormCylinder* form, EfWork* em, ParticleM
             v88.y = size_y * ((2.0f * ef_random_float(&em->progress)) - 1.0f);
         }
         v88.z = size_z * (v64.z * factor);
-        setVec3(&v52, v88.x, 0.0f, v88.z);
+        VEC3 v52(v88.x, 0.0f, v88.z);
         ef_vec3_normalize_to(&v52, &v52);
-        assignVec3((Vec*)&v40, (Vec*)&v88);
+        VEC3 v40 = v88;
         ef_vec3_normalize_to(&v40, &v40);
         form->CalcVelocity((Vec*)&v76, em, (Vec*)&v88, (Vec*)&v52, (Vec*)&v40, (Vec*)&v64);
-        pm->CreateParticle(form->CalcLife(id, scale, em), v88, v76, spawn_arg,
+        pm->CreateParticle(form->CalcLife(id, scale, em), (const _VEC3&)v88, (const _VEC3&)v76, spawn_arg,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress),
                            &em->spawn_data, em->spawn_extra, em->spawn_flag);
         if (flags & 0x00020000) {

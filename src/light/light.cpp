@@ -12,19 +12,19 @@
  *   body and its callers): every other function and data row of the range (`light_point_*` the ten point-light
  *   records the effects register, `light_spot_*` the two attenuated channels, `light_flare_*` the ten flare models,
  *   `light_em_slot_*` the enemy light-slot table, `light_lobby_*` the lobby lights, `light_demo_*` demo 33's light,
- *   `root_light_setting_get`, `light_static_init`), the record types `LightPoint`, `LightSpot`, `LightFlare`,
- *   `LightPointWork`, and the record views `LightSceneRoot`, `LightPlayerView`, `LightNpcView`.
+ *   `root_light_setting_get`), the record types `LightPoint`, `LightSpot`, `LightFlare`, `LightPointWork` (their
+ *   never_inline constructors are the map's `__ct__` rows after `__sinit`), the copy view `LightPointCopy`, and the
+ *   record views `LightSceneRoot`, `LightPlayerView`, `LightNpcView`.
  * RESIDUALS. light_id_advance: retail materialises the counter's address once (`addi r4,r13,...`) and stores the
- *   wrap through it. light_static_init is retail's `__sinit` (its `.ctors` word 0x8056F384 is not emitted here): the
- *   map spells the inline VEC3 constructors it calls as C names (`setVec3`, `VEC3_ctor`), so a compiler-generated
- *   initializer cannot reproduce its calls; the record constructors after it are plain functions in retail's order.
+ *   wrap through it. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
+ *   `mhchar_construct` (retail calls only that, which is MHchar's own constructor; request vec3-world#3).
  *   light_update, light_em_slot_alloc, light_em_slot_find_free, light_point_nearest_get, light_set_default_select,
  *   light_flare_setup: register allocation only. light_init: the light-setting/object registers and one `addi`
  *   scheduled late. light_flare_update: the camera temporary's stack slot. light_point_scale_set: `mode`'s copy
  *   scheduled one instruction early. light_point_param_get: one dead `b` of an empty case.
  * SHAPES. `light_set_get`/`light_setting_get_light_set` keep the out-pointer form (a by-value LightSet measured
- *   worse); a pointer to the light set held across the loop (`pset`) is retail's register shape; `copyVec3(&v,
- *   &get_camera_pos())` passes the returned temporary directly as retail does.
+ *   worse); a pointer to the light set held across the loop (`pset`) is retail's register shape; the returned
+ *   `get_camera_pos()` temporary is assigned directly as retail does.
  */
 
 #include "types.h"
@@ -49,7 +49,6 @@
 #include "sound/mhchar_model_create.h"
 #include "sound/mhchar_mat_alpha_set.h"
 #include "sound/mhchar_mat_color_set_all.h"
-#include "lobby/mhchar_construct.h"
 #include "ef/fn_800CDB2C.h"
 #include "ef/get_eft_res_name.h"
 #include "ef/get_move_work_adrs.h"
@@ -85,9 +84,11 @@ using namespace nw4r;
 /* One registered point light: its id, position, colour and attenuation (attn = (1 - falloff) / (range *
  * falloff * range), the factor light_point_color_at scales the colour by). size: 0x20 */
 struct LightPoint {
-    /* A member function makes the record a class for MWCC, so `light_point_assign`'s `*dst = *src` copies it member
-     * by member (the vector and the colour as words), as retail does. */
+    /* Tests the record's active flag. */
     bool is_active() const { return active != 0; }
+
+    /* 0x802C26CC (0x34): constructs the position. */
+    LightPoint() __attribute__((never_inline)) {}
 
     /* +0x00 */ u8 active;
     /* +0x01: alignment padding */
@@ -99,9 +100,28 @@ struct LightPoint {
     /* +0x1C */ f32 attn;
 };
 
+/* The copy view of `LightPoint`: the same layout with the position as the constructor-less `_VEC3`, so that
+ * `light_point_assign`'s record copy moves the position and the colour as words, as retail does (a member
+ * function keeps it a class for MWCC). size: 0x20 */
+struct LightPointCopy {
+    bool is_active() const { return active != 0; }
+
+    /* +0x00 */ u8 active;
+    /* +0x01: alignment padding */
+    /* +0x02 */ u16 id;
+    /* +0x04 */ math::_VEC3 pos;
+    /* +0x10 */ GXColor color;
+    /* +0x14 */ f32 range;
+    /* +0x18 */ f32 falloff;
+    /* +0x1C */ f32 attn;
+};
+
 /* A flare model following one of the far point lights; `phase` fades it in (1), holds it (2) and fades it out
  * (3). size: 0x170 */
 struct LightFlare {
+    /* 0x802C2698 (0x34): constructs the model. */
+    LightFlare() __attribute__((never_inline)) {}
+
     /* +0x000 */ u8 phase;
     /* +0x001 */ u8 step;
     /* +0x002 */ u8 active;
@@ -118,6 +138,9 @@ struct LightFlare {
 /* One of the two near point lights fed to a distance-attenuated light object; `intensity` ramps up to the point's
  * range (phase 1), holds (2) and ramps down (3). size: 0x2C */
 struct LightSpot {
+    /* 0x802C2664 (0x34): constructs the point record. */
+    LightSpot() __attribute__((never_inline)) {}
+
     /* +0x00 */ u8 phase;
     /* +0x01 */ u8 active;
     /* +0x02 */ u8 pad_0x02[2];
@@ -128,6 +151,9 @@ struct LightSpot {
 
 /* The module work (`light_point_work`). size: 0x1024 */
 struct LightPointWork {
+    /* 0x802C25D0 (0x94): constructs the point lights, flares and spot channels. */
+    LightPointWork() __attribute__((never_inline)) {}
+
     /* +0x0000 */ u8 state;
     /* +0x0001 */ u8 state_sub;
     /* +0x0002 */ u8 pad_0x0002[2];
@@ -231,11 +257,6 @@ void light_demo_start(u8 demo);
 void light_demo_update(u8 demo);
 u32 light_demo_color_override(_ENEMY_WORK* em, u8 index, GXColor* color);
 s32 light_clamp(s32 value, s32 low, s32 high);
-void light_static_init(void);
-LightPointWork* light_point_work_ctor(LightPointWork* self);
-LightSpot* light_spot_ctor(LightSpot* self);
-LightFlare* light_flare_ctor(LightFlare* self);
-LightPoint* light_point_ctor(LightPoint* self);
 }
 
 #pragma peephole off
@@ -256,7 +277,6 @@ extern "C" void light_id_reset(void)
 void light_init(void)
 {
     GXColor color;
-    math::VEC3 pos;
     g3d::LightObj* objs;
     LightPointWork* w;
     u32 num;
@@ -264,7 +284,7 @@ void light_init(void)
 
     w = &light_point_work;
     color_ctor_white((u32*)&color);
-    VEC3_ctor(&pos);
+    math::VEC3 pos;
     root_light_setting_get((LightSceneRoot*)pRoot);
     GXColor amb = {0xFF, 0xFF, 0xFF, 0xFF};
     memset(w, 0, sizeof(LightPointWork));
@@ -556,7 +576,7 @@ extern "C" s32 light_point_add(u16 id, math::VEC3* pos, GXColor* color, f32 rang
     w->point_num++;
     p->active = 1;
     p->id = id;
-    copyVec3(&p->pos, pos);
+    p->pos = *pos;
     color_rgba_copy((u8*)&p->color, (u8*)color);
     p->range = range;
     p->falloff = falloff;
@@ -978,7 +998,7 @@ extern "C" void light_spot_start(LightPointWork* w, LightPoint* p)
 /* 0x802C0AB0 (0x4C): copies a point light record. */
 extern "C" void light_point_assign(LightPoint* dst, const LightPoint* src)
 {
-    *dst = *src;
+    *reinterpret_cast<LightPointCopy*>(dst) = *reinterpret_cast<const LightPointCopy*>(src);
 }
 
 /* 0x802C0AFC (0x88): lets the spot channel following the point light fade out. */
@@ -1042,7 +1062,7 @@ extern "C" void light_spot_update(LightPointWork* w, g3d::LightObj* objs)
             break;
         }
         if (p != NULL) {
-            copyVec3(&s->point.pos, &p->pos);
+            s->point.pos = p->pos;
             color_rgba_copy((u8*)&s->point.color, (u8*)&p->color);
         }
         light_obj_point_init(&objs[i + 3], &s->point.pos, s->point.color, s->intensity, s->point.falloff);
@@ -1080,7 +1100,6 @@ extern "C" void light_flare_release(LightPointWork* w, LightPoint* p)
 /* 0x802C0E24 (0x298): fades the flares and draws each one between the camera and its point light. */
 extern "C" void light_flare_update(LightPointWork* w)
 {
-    math::MTX34 mtx;
     math::VEC3 ofs;
     math::VEC3 cam;
     GXColor color;
@@ -1090,10 +1109,8 @@ extern "C" void light_flare_update(LightPointWork* w)
     MHchar* chr;
     s16 alpha;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&cam);
-    copyVec3(&cam, &get_camera_pos());
-    MTX34_ctor(&mtx);
+    cam = *(&get_camera_pos());
+    math::MTX34 mtx;
     for (i = 0, flare = w->flare; i < 10; flare++, i++) {
         if (flare->active == 0) {
             continue;
@@ -1134,16 +1151,10 @@ extern "C" void light_flare_update(LightPointWork* w)
             continue;
         }
         if (p != NULL) {
-            math::VEC3 diff;
-            math::VEC3 sum;
-            math::VEC3 out;
-
-            copyVec3(&chr->pos_0x04, &p->pos);
-            subVec3(&diff, &chr->pos_0x04, &cam);
-            copyVec3(&ofs, &diff);
+            chr->pos_0x04 = p->pos;
+            ofs = chr->pos_0x04 - cam;
             vec3_scale_in_place(&ofs, light_flare_pull);
-            addVec3(&sum, &cam, &ofs);
-            copyVec3(&ofs, &sum);
+            ofs = cam + ofs;
             u32 at = light_point_color_at(p, &ofs);
             color_rgba_copy((u8*)&color, (u8*)&at);
             color.a = flare->alpha;
@@ -1153,8 +1164,7 @@ extern "C" void light_flare_update(LightPointWork* w)
             mtx34_copy(&mtx, &get_current_view_mtx());
             mulVecMat(&ofs, &mtx);
             vec3_scale_in_place(&ofs, -1.0f);
-            addVec3(&out, &p->pos, &ofs);
-            copyVec3(&chr->pos_0x04, &out);
+            chr->pos_0x04 = p->pos + ofs;
         } else {
             mhchar_mat_alpha_set(chr, 4, flare->alpha, 0);
         }
@@ -1202,9 +1212,6 @@ struct LightNpcView {
  * the enemies' light objects from the stage cells, fading each towards its new colour. */
 extern "C" void light_update(LightPointWork* w)
 {
-    math::VEC3 vec;
-    math::VEC3 lpos;
-    math::VEC3 cam;
     GXColor color;
     GXColor faded;
     g3d::LightSet set0;
@@ -1236,9 +1243,9 @@ extern "C" void light_update(LightPointWork* w)
 
     get_move_work_adrs(0);
     setting = root_light_setting_get((LightSceneRoot*)pRoot);
-    VEC3_ctor(&vec);
-    VEC3_ctor(&lpos);
-    VEC3_ctor(&cam);
+    math::VEC3 vec;
+    math::VEC3 lpos;
+    math::VEC3 cam;
     if (get_now_mapno() != 0xFF) {
         if (light_map_lobby_ck() == 1) {
             light_lobby_update(w);
@@ -1250,7 +1257,7 @@ extern "C" void light_update(LightPointWork* w)
         if (PlayMode_ck() == 4) {
             max = 1;
         }
-        copyVec3(&cam, &get_camera_pos());
+        cam = *(&get_camera_pos());
         if (light_map_lobby_ck() == 0) {
             objs[3].Clear();
             objs[4].Clear();
@@ -1312,9 +1319,7 @@ extern "C" void light_update(LightPointWork* w)
                     if (under == 1) {
                         u32 cell = stage_cell_get(pl->cell + 3, j);
                         color_rgba_copy((u8*)&color, (u8*)&cell);
-                        math::VEC3 cell_vec;
-                        stage_cell_vec_get(&cell_vec, 3, j);
-                        copyVec3(&lpos, &cell_vec);
+                        lpos = stage_cell_vec_get(3, j);
                         depth = pl->water_y - pl->pos.y;
                         if (depth < 300.0f) {
                             color.r = light_clamp(color.r + 64, 0, 255);
@@ -1328,9 +1333,7 @@ extern "C" void light_update(LightPointWork* w)
                     } else {
                         u32 cell = stage_cell_get(pl->cell, j);
                         color_rgba_copy((u8*)&color, (u8*)&cell);
-                        math::VEC3 cell_vec;
-                        stage_cell_vec_get(&cell_vec, 0, j);
-                        copyVec3(&lpos, &cell_vec);
+                        lpos = stage_cell_vec_get(0, j);
                     }
                     if (j != 0) {
                         light_obj_dir_set(obj, &lpos);
@@ -1360,15 +1363,11 @@ extern "C" void light_update(LightPointWork* w)
                     if (under0 == 0) {
                         u32 cell = stage_cell_get(npc->cell, k);
                         color_rgba_copy((u8*)&color, (u8*)&cell);
-                        math::VEC3 cell_vec;
-                        stage_cell_vec_get(&cell_vec, 0, k);
-                        copyVec3(&lpos, &cell_vec);
+                        lpos = stage_cell_vec_get(0, k);
                     } else {
                         u32 cell = stage_cell_get(npc->cell + 3, k);
                         color_rgba_copy((u8*)&color, (u8*)&cell);
-                        math::VEC3 cell_vec;
-                        stage_cell_vec_get(&cell_vec, 3, k);
-                        copyVec3(&lpos, &cell_vec);
+                        lpos = stage_cell_vec_get(3, k);
                     }
                     if (k != 0) {
                         light_obj_dir_set(obj, &lpos);
@@ -1426,15 +1425,11 @@ extern "C" void light_update(LightPointWork* w)
                         if (under0 == 1 || under1 == 1) {
                             u32 cell = stage_cell_get(c + 3, k);
                             color_rgba_copy((u8*)&color, (u8*)&cell);
-                            math::VEC3 cell_vec;
-                            stage_cell_vec_get(&cell_vec, 3, k);
-                            copyVec3(&lpos, &cell_vec);
+                            lpos = stage_cell_vec_get(3, k);
                         } else {
                             u32 cell = stage_cell_get(c, k);
                             color_rgba_copy((u8*)&color, (u8*)&cell);
-                            math::VEC3 cell_vec;
-                            stage_cell_vec_get(&cell_vec, 0, k);
-                            copyVec3(&lpos, &cell_vec);
+                            lpos = stage_cell_vec_get(0, k);
                         }
                         if (k != 0) {
                             light_obj_dir_set(obj, &lpos);
@@ -1593,15 +1588,9 @@ extern "C" void light_obj_dir_set(g3d::LightObj* obj, math::VEC3* dir)
 {
     math::VEC3 pos;
     math::VEC3 norm;
-    math::VEC3 far;
-    math::VEC3 diff;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&norm);
     vec3_normalize_into(&norm, dir);
-    subVec3(&diff, &norm, &light_dir_center);
-    vec3_scale(&far, &diff, 8000000.0f);
-    copyVec3(&pos, &far);
+    pos = (norm - light_dir_center) * 8000000.0f;
     light_obj_pos_set(obj, &pos);
 }
 
@@ -1660,7 +1649,6 @@ void light_dir_set(math::VEC3* dir)
 void light_area_setup(void)
 {
     math::VEC3 pos;
-    math::VEC3 vec;
     GXColor color;
     u32 cell;
     g3d::LightObj* objs;
@@ -1668,14 +1656,12 @@ void light_area_setup(void)
     s32 n;
     s32 k;
 
-    VEC3_ctor(&pos);
     objs = light_setting_get_light_obj_array(root_light_setting_get((LightSceneRoot*)pRoot));
     for (n = 0, row = 0; n < 2; row += 3, n++) {
         for (k = 0; k < 3; k++) {
             cell = stage_cell_get(row, k);
             color_rgba_copy((u8*)&color, (u8*)&cell);
-            stage_cell_vec_get(&vec, row, k);
-            copyVec3(&pos, &vec);
+            pos = stage_cell_vec_get(row, k);
             light_obj_init(&objs[k + row + 30], &pos, color, 0);
         }
     }
@@ -1737,14 +1723,13 @@ void light_demo_end(void)
 /* 0x802C2338 (0x108): demo 33 moves its point light along the demo's frame table. */
 void light_demo_update(u8 demo)
 {
-    math::VEC3 pos;
     GXColor color;
     f32* table;
     s16 frame;
     u8 i;
 
     if (demo == 33) {
-        setVec3(&pos, -603.0f, 255.0f, -2463.0f);
+        math::VEC3 pos(-603.0f, 255.0f, -2463.0f);
         color.r = 255;
         color.g = 128;
         color.b = 0;
@@ -1801,64 +1786,15 @@ extern "C" s32 light_clamp(s32 value, s32 low, s32 high)
 /* static initialisation                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* 0x802C2530 (0xA0): constructs the module work and sets the light centre and the lobby directions. */
-extern "C" void light_static_init(void)
-{
-    light_point_work_ctor(&light_point_work);
-    setVec3(&light_dir_center, 0.0f, 0.0f, 0.0f);
-    setVec3(&light_lobby_dir[0], 0.0f, 0.0f, 50.0f);
-    setVec3(&light_lobby_dir[1], -50.0f, 70.0f, 20.0f);
-    setVec3(&light_lobby_dir[2], 70.0f, -30.0f, -20.0f);
-    setVec3(&light_lobby_dir[3], 0.0f, 0.0f, 0.0f);
-}
-
-/* 0x802C25D0 (0x94): constructs the work's point lights, flares and spot channels. */
-extern "C" LightPointWork* light_point_work_ctor(LightPointWork* self)
-{
-    LightPoint* p;
-    LightFlare* f;
-    LightSpot* s;
-
-    p = self->point;
-    do {
-        light_point_ctor(p);
-        p++;
-    } while (p < &self->point[10]);
-    f = self->flare;
-    do {
-        light_flare_ctor(f);
-        f++;
-    } while (f < (LightFlare*)self->spot);
-    s = self->spot;
-    do {
-        light_spot_ctor(s);
-        s++;
-    } while (s < (LightSpot*)self->em_slot);
-    return self;
-}
-
-/* 0x802C2664 (0x34): constructs a spot channel's point record. */
-extern "C" LightSpot* light_spot_ctor(LightSpot* self)
-{
-    light_point_ctor(&self->point);
-    return self;
-}
-
-/* 0x802C2698 (0x34): constructs a flare's model. */
-extern "C" LightFlare* light_flare_ctor(LightFlare* self)
-{
-    mhchar_construct(&self->chr);
-    return self;
-}
-
-/* 0x802C26CC (0x34): constructs a point light's position. */
-extern "C" LightPoint* light_point_ctor(LightPoint* self)
-{
-    VEC3_ctor(&self->pos);
-    return self;
-}
-
-/* The module work and the light centre / lobby light directions `light_static_init` sets (.bss). */
+/* The module work and the light centre / lobby light directions; the TU's `__sinit` constructs them in this
+ * order (0x802C2530), then the record constructors follow it (0x802C25D0..0x802C2700).  `pool_data off`: retail's
+ * `__sinit` addresses each object by its own symbol, not one `.bss` base. */
+#pragma pool_data off
 LightPointWork light_point_work;
-math::VEC3 light_dir_center;
-math::VEC3 light_lobby_dir[4];
+math::VEC3 light_dir_center(0.0f, 0.0f, 0.0f);
+math::VEC3 light_lobby_dir[4] = {
+    math::VEC3(0.0f, 0.0f, 50.0f),
+    math::VEC3(-50.0f, 70.0f, 20.0f),
+    math::VEC3(70.0f, -30.0f, -20.0f),
+    math::VEC3(0.0f, 0.0f, 0.0f),
+};

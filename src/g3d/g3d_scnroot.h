@@ -110,7 +110,6 @@ struct FogData {
 extern "C" {
 #endif
 
-void VEC2_ctor(void* p); /* 0x800834F0 - constructs one 8-byte sub-object (ef_particle's parameter record) */
 #ifdef __cplusplus
 void scn_root_apply_anm_scn(nw4r::g3d::ScnRoot* pRoot); /* 0x8008311C - copies the bound scene animation's light, fog and camera settings into the root */
 void scn_root_calc_world(nw4r::g3d::ScnRoot* pRoot); /* 0x80083290 - applies the scene animation, then the world pass */

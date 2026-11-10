@@ -26,7 +26,7 @@
 /* The band header's declarations of the matrix copy/concat helpers (mtx34_copy_ps/mtx34_concat, owner
  * `g3d/g3d_calcview.cpp`). */
 #include "g3d/g3d_calcview.h" /* fn_800710BC/mtx34_copy_ps (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "nw4r/math_types.h" /* nw4r::math::MTX34Trans, owner nw4r/math_types.cpp (rule 2) */
 
@@ -51,20 +51,16 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
         mtx34_copy_ps(pDstMtx, pSrcMtx);
     } else if ((flags & 0x20) != 0) {
         if (fn_800D79A0(mtxId) != 0) {
-            VEC3 v;
-            setVec3(&v, pRec->mMtx.m[0][3], pRec->mMtx.m[1][3], pRec->mMtx.m[2][3]);
+            VEC3 v(pRec->mMtx.m[0][3], pRec->mMtx.m[1][3], pRec->mMtx.m[2][3]);
             nw4r::math::MTX34Trans(pDstMtx, pSrcMtx, &v);
         } else {
-            VEC3 v;
-            setVec3(&v, pSrcScale->x * pRec->mMtx.m[0][3], pSrcScale->y * pRec->mMtx.m[1][3],
-                        pSrcScale->z * pRec->mMtx.m[2][3]);
+            VEC3 v(pSrcScale->x * pRec->mMtx.m[0][3], pSrcScale->y * pRec->mMtx.m[1][3], pSrcScale->z * pRec->mMtx.m[2][3]);
             nw4r::math::MTX34Trans(pDstMtx, pSrcMtx, &v);
         }
     } else if (fn_800D79A0(mtxId) != 0) {
         mtx34_concat(pDstMtx, pSrcMtx, &pRec->mMtx);
     } else {
         MTX34 mtx;
-        MTX34_ctor(&mtx);
         mtx34_copy_ps(&mtx, &pRec->mMtx);
         mtx.m[0][3] *= pSrcScale->x;
         mtx.m[1][3] *= pSrcScale->y;
@@ -74,7 +70,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
 
     if ((flags & 8) != 0) {
         id = world_mtx_attr_scale_one(id);
-        copyVec3(pDstScale, pSrcScale);
+        *pDstScale = *pSrcScale;
     } else {
         id = world_mtx_attr_not_scale_one(id);
         pDstScale->x = pSrcScale->x * pRec->mScale.x;

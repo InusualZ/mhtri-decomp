@@ -16,7 +16,7 @@
 #include "nw4r/math.h"
 #include "g3d/g3d_calcview.h" /* fn_800710BC/mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "nw4r/math_types.h" /* nw4r::math::MTX34Scale / MTX34Trans, owner nw4r/math_types.cpp (rule 2) */
 
@@ -101,7 +101,6 @@ u32 fn_800D7F40(u32 handle);
  * is legal. */
 int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
     f32 sin_, cos_;
-    Mtx34 mtx;
 
     NW4R_POINTER_ASSERT(pMtx, 36, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.");
     NW4R_POINTER_ASSERT(pSrt, 37, "NW4R:Pointer Error\n& srt(=%p) is not valid pointer.");
@@ -129,7 +128,7 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
         pMtx->m[2][2] = 1.0f;
         pMtx->m[2][3] = 0.0f;
     } else {
-        MTX34_ctor(&mtx);
+        Mtx34 mtx;
         mtx.m[0][0] = pSrt->scaleX * cos_;
         mtx.m[0][1] = -pSrt->scaleY * sin_;
         mtx.m[0][2] = 0.0f;
@@ -154,8 +153,6 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
     int handle;
     u32 flag = pNode->flag;
     handle = handleArg;
-    Mtx34 tmpMtx;
-    Vec3 tmpVec;
 
     if ((flag & 0x2) || (flag & 0x4)) {
         if (fn_800D7F40(handleArg)) {
@@ -165,10 +162,10 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
         }
     } else if (flag & 0x20) {
         if (fn_800D7F40(handleArg)) {
-            setVec3(&tmpVec, pNode->mtx.m[0][3], pNode->mtx.m[1][3], pNode->mtx.m[2][3]);
+            Vec3 tmpVec(pNode->mtx.m[0][3], pNode->mtx.m[1][3], pNode->mtx.m[2][3]);
             nw4r::math::MTX34Trans(pMtx, pSrcMtx, &tmpVec);
         } else {
-            MTX34_ctor(&tmpMtx);
+            Mtx34 tmpMtx;
             fn_800D7ED0(&tmpMtx, pScale, &pNode->mtx);
             mtx34_concat(pMtx, pSrcMtx, &tmpMtx);
         }
@@ -188,7 +185,7 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
         pVecOut->x = 1.0f;
     } else {
         handle = world_mtx_attr_not_scale_one(handle);
-        copyVec3(pVecOut, &pNode->pos);
+        *pVecOut = pNode->pos;
     }
 
     if (flag & 0x10) {

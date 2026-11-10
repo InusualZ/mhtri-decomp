@@ -362,7 +362,6 @@ s8 lb_combo_rate_get(LbComboRecipe* recipe, s32 mode);
 void lb_tutorial_page_draw(void);
 void lb_tutorial_note_draw(void);
 s32 lb_tutorial_entry_find(LbTutorialEntry* entry);
-LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd);
 void lb_deli_entry_copy(LbDeliEntry* dst, LbDeliEntry* src);
 void lb_area_select_screen_draw(void);
 void lb_item_gets_box_open(LbScreen13Work* work);
@@ -748,14 +747,13 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
 void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     LbCmdSub0F cmd;
 
-    lb_sub0f_init(&cmd);
     if (isServerSelectState() == 0) {
         em_small_spawn_stat(value, text, id, flag, scale);
         return;
     }
     ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0xF);
     cmd.value_0x04 = value;
-    lb_name_tail_copy(&cmd.text_0x0C, (LbNameTail*)text);
+    lb_name_tail_copy((LbNameTail*)&cmd.text_0x0C, (LbNameTail*)text);
     cmd.id_0x06 = id;
     cmd.flag_0x05 = flag;
     cmd.scale_0x08 = scale;
@@ -775,15 +773,9 @@ void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src) {
     }
 }
 
-/* Clears the sub-0x0F packet's text payload (`em_ground_rec_clear`) and returns the packet. */
-LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd) {
-    em_ground_rec_clear(cmd->text_0x0C.bytes_0x00);
-    return cmd;
-}
-
 /* The link-down half of act 15: hands the packet's own fields straight to the text writer `em_small_spawn_stat`. */
 void lb_text_apply(u8 unused, LbCmdSub0F* cmd) {
-    void* text = cmd->text_0x0C.bytes_0x00;
+    void* text = &cmd->text_0x0C;
 
     em_small_spawn_stat(cmd->value_0x04, text, cmd->id_0x06, cmd->flag_0x05, cmd->scale_0x08);
 }

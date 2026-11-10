@@ -22,7 +22,7 @@
  *   flipcheck: `.text` differs (the rows above); `.data`, `.sdata` and `.sdata2` are emitted and byte-identical.
  * SHAPES. The light family's work block is a view of `_EFT::work_0x38`.  The pool is written as literals: the angle
  *   in `fn_8010CFCC` is one expression passed to `rotVecZ` (0.5 is pooled before 65536/360), `rot.y += 2048.0f` keeps
- *   retail's `fadds` operand order, and `copyVec3` takes `setVec3`'s result.  `fn_8010D1A8` indexes the segment
+ *   retail's `fadds` operand order, and `VEC3::operator=` takes `VEC3(x, y, z)`'s result.  `fn_8010D1A8` indexes the segment
  *   through its own pointer, computes the slope first and scales the result with `*=` (retail's `fmuls` into `f0`
  *   + `fmr`).
  */
@@ -42,7 +42,7 @@
 #include "ef.h"
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 #include "ef/eft_res.h" /* eft_res_slot_get, eft_res_slot_release, eft_res_model_get, eft_res_models_release,
@@ -263,7 +263,7 @@ extern "C" void eft_stun_set(void* source, u32 id, nw4r::math::VEC3* vec, f32 sc
     eft->source_0x30 = source;
     work->mode_0x48 = 1;
     work->id_0x34 = id;
-    copyVec3(&work->vec_0x38, vec);
+    work->vec_0x38 = *vec;
     work->scale_0x44 = scale;
     eft->area_0x44 = ((_EFT_ENEMY_VIEW*)source)->field_0x1e1;
     work->count2_0x30 = 5;
@@ -374,18 +374,15 @@ extern "C" void fn_8010C7B8(_EFT* self)
 /* State 1: the per-frame placement. */
 extern "C" void fn_8010C8F8(_EFT* self)
 {
-    nw4r::math::MTX34 mtxA;
-    nw4r::math::MTX34 mtxB;
-    VEC3 vec;
     _EFT_LIGHT_WORK* work = (_EFT_LIGHT_WORK*)self->work_0x38;
     _EFT_PLW_VIEW* plw;
     _EFT_ENEMY_VIEW* em;
     f32 f31;
     s32 i;
 
-    MTX34_ctor(&mtxA);
-    MTX34_ctor(&mtxB);
-    VEC3_ctor(&vec);
+    nw4r::math::MTX34 mtxA;
+    nw4r::math::MTX34 mtxB;
+    VEC3 vec;
 
     if (self->source_0x30 == NULL) {
         self->state_0x05++;
@@ -514,7 +511,6 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
     VEC3 vec;
     s32 i;
 
-    VEC3_ctor(&vec);
 
     if ((u8)self->area_0x44 != (u8)get_now_areano()) {
         return;
@@ -562,8 +558,6 @@ extern "C" void fn_8010CE80(void* arg)
     f32 f31;
     s16 i;
 
-    MTX34_ctor(&mtxA);
-    MTX34_ctor(&mtxB);
 
     if (enemy != NULL && work->mode_0x48 == 1) {
         if (em_work_die_ck(enemy) == 1) {
@@ -574,7 +568,6 @@ extern "C" void fn_8010CE80(void* arg)
     }
 
     for (i = 0; i < work->count2_0x30; i++) {
-        VEC3 scale;
         f32 s;
         s32 base;
         s32 handle;
@@ -582,7 +575,7 @@ extern "C" void fn_8010CE80(void* arg)
         fn_8010CFCC(self, &mtxB, &mtxA, i);
         fn_8010D12C(&mtxB, &mtxB);
         s = fn_8010D1A8(self, i, f31);
-        setVec3(&scale, s, s, s);
+        VEC3 scale(s, s, s);
         scaleMat34W(&mtxB, &scale);
         base = mhchar_wld_mtx_array_get((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
         handle = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114)->GetResNode(i + 1).mpData;
@@ -598,13 +591,10 @@ extern "C" void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX3
     _EFT_LIGHT_WORK* work = (_EFT_LIGHT_WORK*)self->work_0x38;
     VEC3 v20;
     VEC3 v14;
-    VEC3 v8;
 
-    VEC3_ctor(&v20);
-    VEC3_ctor(&v14);
-    copyVec3(&v14, &work->vec_0x38);
+    v14 = work->vec_0x38;
     mulVecMat(&v14, mtx);
-    copyVec3(&v20, setVec3(&v8, 0.0f, 0.0f, work->scale_0x44 * eft_slot_offset_scales[index]));
+    v20 = VEC3(0.0f, 0.0f, work->scale_0x44 * eft_slot_offset_scales[index]);
     rotVecY(&v20, self->rot_0x24.y + index * 0x3333);
     rotVecZ(&v20, (u16)(s32)(0.5f + (65536.0f * eft_slot_angle_scales[index]) / 360.0f));
     v20.y += 30.0f;
@@ -620,7 +610,6 @@ extern "C" void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b)
 {
     nw4r::math::MTX34 m;
 
-    MTX34_ctor(&m);
     mtx34_copy(&m, &get_current_view_mtx());
     m.m[0][3] = 0.0f;
     m.m[1][3] = 0.0f;

@@ -188,11 +188,6 @@ struct _ENEMY_WORK* em040_leader_find(struct _ENEMY_WORK* self) {
 void em040_init(struct _ENEMY_WORK* self, u8 mode) {
     EmRunPos* keep = &self->run_0xB04;
     nw4r::math::VEC3 v;
-    nw4r::math::VEC3 sp38;
-    nw4r::math::VEC3 sp2C;
-    nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     s32 high;
     s32 placed;
     f32 reach;
@@ -200,7 +195,6 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
     f32 land;
     f32 ground;
 
-    VEC3_ctor(&v);
     high = 0;
     placed = 0;
     self->em040_0x328.tint_done_0x328 = 0;
@@ -236,7 +230,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
     switch (mode) {
     case 0:
         if (self->field_0x00A == 8 && keep->valid_0x0F != 0) {
-            copyVec3(&self->pos, &keep->pos);
+            self->pos = keep->pos;
             self->field_0x1C0 = keep->angle;
             if (keep->flags & 1) {
                 self->field_0x1BC = 0;
@@ -251,8 +245,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
             }
             setVector3(&v, 0.0f, 0.0f, reach);
             rotVecY(&v, self->field_0x1C0);
-            addVec3(&sp38, &self->pos, &v);
-            copyVec3(&self->em040_0x328.peak_0x340, &sp38);
+            self->em040_0x328.peak_0x340 = self->pos + v;
             if (self->pos.y - self->field_0x20C < 250.0f && self->pos.y > self->field_0x20C) {
                 top = 250.0f + self->field_0x20C;
             } else {
@@ -269,8 +262,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
             if (high == 0) {
                 setVector3(&v, 0.0f, 0.0f, land);
                 rotVecY(&v, self->field_0x1C0);
-                addVec3(&sp2C, &self->em040_0x328.peak_0x340, &v);
-                copyVec3(&self->em040_0x328.land_0x334, &sp2C);
+                self->em040_0x328.land_0x334 = self->em040_0x328.peak_0x340 + v;
                 ground = GetGroundHit(&self->em040_0x328.land_0x334, 0xDFFB, self->area_no);
                 if (ground < 250.0f + self->em040_0x328.peak_0x340.y) {
                     self->em040_0x328.land_0x334.y = ground;
@@ -279,9 +271,9 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
                     self->em040_0x328.escape_0x329 = 1;
                 }
             } else {
-                copyVec3(&self->em040_0x328.land_0x334, &self->em040_0x328.peak_0x340);
+                self->em040_0x328.land_0x334 = self->em040_0x328.peak_0x340;
             }
-            copyVec3(&self->pos, &self->em040_0x328.land_0x334);
+            self->pos = self->em040_0x328.land_0x334;
             if (self->em040_0x328.escape_0x329 == 1) {
                 em_act_arm_unless_down(self, 11, 56);
                 em_state_refresh(self);
@@ -292,7 +284,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
     case 2:
         if (self->field_0x00A == 8) {
             if (keep->valid_0x0F == 0) {
-                copyVec3(&keep->pos, &self->pos);
+                keep->pos = self->pos;
                 keep->angle = self->field_0x1C0;
                 keep->flags = 0;
                 if (self->field_0x1BC != 0) {
@@ -319,7 +311,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
                     self->em040_0x328.se_alt_0x32F = 1;
                 }
             } else {
-                copyVec3(&self->pos, &keep->pos);
+                self->pos = keep->pos;
                 self->field_0x1C0 = keep->angle;
                 if (keep->flags & 1) {
                     self->field_0x1BC = 0;
@@ -340,8 +332,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
             }
             setVector3(&v, 0.0f, 0.0f, reach);
             rotVecY(&v, self->field_0x1C0);
-            addVec3(&sp20, &self->pos, &v);
-            copyVec3(&self->em040_0x328.peak_0x340, &sp20);
+            self->em040_0x328.peak_0x340 = self->pos + v;
             if (self->pos.y - self->field_0x20C < 250.0f && self->pos.y > self->field_0x20C) {
                 top = 250.0f + self->field_0x20C;
             } else {
@@ -358,8 +349,7 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
             if (high == 0) {
                 setVector3(&v, 0.0f, 0.0f, land);
                 rotVecY(&v, self->field_0x1C0);
-                addVec3(&sp14, &self->em040_0x328.peak_0x340, &v);
-                copyVec3(&self->em040_0x328.land_0x334, &sp14);
+                self->em040_0x328.land_0x334 = self->em040_0x328.peak_0x340 + v;
                 ground = GetGroundHit(&self->em040_0x328.land_0x334, 0xDFFB, self->area_no);
                 if (ground < 250.0f + self->em040_0x328.peak_0x340.y) {
                     self->em040_0x328.land_0x334.y = ground;
@@ -368,11 +358,10 @@ void em040_init(struct _ENEMY_WORK* self, u8 mode) {
                     self->em040_0x328.escape_0x329 = 1;
                 }
             } else {
-                copyVec3(&self->em040_0x328.land_0x334, &self->em040_0x328.peak_0x340);
+                self->em040_0x328.land_0x334 = self->em040_0x328.peak_0x340;
             }
-            subVec3(&sp8, &self->pos, &self->em040_0x328.land_0x334);
-            copyVec3(em040_drift(self), &sp8);
-            copyVec3(&self->pos, &self->em040_0x328.land_0x334);
+            *(em040_drift(self)) = self->pos - self->em040_0x328.land_0x334;
+            self->pos = self->em040_0x328.land_0x334;
             if (self->em040_0x328.escape_0x329 == 1) {
                 keep->flags |= 4;
             }
@@ -527,25 +516,8 @@ void em040_act1_dispatch(struct _ENEMY_WORK* self) {
 void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
     nw4r::math::VEC3 unused;
     nw4r::math::VEC3 se_pos;
-    nw4r::math::VEC3 spB0;
-    nw4r::math::VEC3 spA4;
-    nw4r::math::VEC3 sp98;
-    nw4r::math::VEC3 sp8C;
-    nw4r::math::VEC3 sp80;
-    nw4r::math::VEC3 sp74;
-    nw4r::math::VEC3 sp68;
-    nw4r::math::VEC3 sp5C;
-    nw4r::math::VEC3 sp50;
-    nw4r::math::VEC3 sp44;
-    nw4r::math::VEC3 sp38;
-    nw4r::math::VEC3 sp2C;
-    nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     struct _ENEMY_WORK* leader;
 
-    VEC3_ctor(&unused);
-    VEC3_ctor(&se_pos);
     leader = self->em040_0x328.leader_0x330;
     em_hit_arm_set(self);
     switch (self->state) {
@@ -553,9 +525,7 @@ void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
         self->state += 1;
         em_fall_height_get(self);
         em_fall_start(self);
-        subVec3(&spA4, &self->em040_0x328.land_0x334, &self->pos);
-        addVec3(&spB0, em040_drift(self), &spA4);
-        copyVec3(&self->move_0x1A0, &spB0);
+        self->move_0x1A0 = *(em040_drift(self)) + (self->em040_0x328.land_0x334 - self->pos);
         em_move_vec2_clr(self);
         if (kind == 0) {
             self->timer_0x020 = 24;
@@ -575,8 +545,7 @@ void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
         em_busy_set(self);
         em_motion_timer_arm(self);
         if (self->area_no == get_now_areano() && leader != NULL && leader->active != 0 && leader->team == 9) {
-            addVec3(&sp98, &self->pos, &self->move_0x1A0);
-            copyVec3(&se_pos, &sp98);
+            se_pos = self->pos + self->move_0x1A0;
             if (self->em040_0x328.se_alt_0x32F == 0) {
                 shell_se_req(leader->se_0xB14, &se_pos, 0x22, self->field_0x01A);
             } else {
@@ -586,18 +555,13 @@ void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
         break;
     case 1:
         self->field_0x1BC += 0x1555;
-        addVec3To(em040_drift(self), &self->offset_0x30C.vec_0x310);
-        subVec3(&sp80, &self->em040_0x328.land_0x334, &self->pos);
-        addVec3(&sp8C, em040_drift(self), &sp80);
-        copyVec3(&self->move_0x1A0, &sp8C);
-        addVec3To(&self->offset_0x30C.vec_0x310, &self->vec_0x31C);
+        *(em040_drift(self)) += self->offset_0x30C.vec_0x310;
+        self->move_0x1A0 = *(em040_drift(self)) + (self->em040_0x328.land_0x334 - self->pos);
+        self->offset_0x30C.vec_0x310 += self->vec_0x31C;
         if (--self->timer_0x020 < 0) {
             self->state += 1;
-            subVec3(&sp74, &self->em040_0x328.peak_0x340, &self->em040_0x328.land_0x334);
-            copyVec3(em040_drift(self), &sp74);
-            subVec3(&sp5C, &self->em040_0x328.land_0x334, &self->pos);
-            addVec3(&sp68, em040_drift(self), &sp5C);
-            copyVec3(&self->move_0x1A0, &sp68);
+            *(em040_drift(self)) = self->em040_0x328.peak_0x340 - self->em040_0x328.land_0x334;
+            self->move_0x1A0 = *(em040_drift(self)) + (self->em040_0x328.land_0x334 - self->pos);
             em_move_vec2_clr(self);
             if (kind == 0) {
                 self->timer_0x020 = 21;
@@ -614,14 +578,12 @@ void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
                 / (f32)self->timer_0x020 - 0.5f * self->vec_0x31C.y * (f32)self->timer_0x020;
             self->field_0x1BC = (u16)-(u16)(s32)(0.5f + (65536.0f * (15.0f * (f32)self->timer_0x020)) / 360.0f);
             if (self->area_no == get_now_areano() && leader != NULL && leader->active != 0 && leader->team == 9) {
-                addVec3(&sp50, &self->pos, &self->move_0x1A0);
-                copyVec3(&se_pos, &sp50);
+                se_pos = self->pos + self->move_0x1A0;
                 se_req_pos_ps(leader->se_0xB14, 0x28, 2, &se_pos);
             }
         } else if (self->area_no == get_now_areano() && leader != NULL && leader->active != 0
                    && leader->team == 9) {
-            addVec3(&sp44, &self->pos, &self->move_0x1A0);
-            copyVec3(&se_pos, &sp44);
+            se_pos = self->pos + self->move_0x1A0;
             if (self->em040_0x328.se_alt_0x32F == 0) {
                 shell_se_req(leader->se_0xB14, &se_pos, 0x22, self->field_0x01A);
             } else {
@@ -633,21 +595,16 @@ void em040_act2_leap(struct _ENEMY_WORK* self, u8 kind) {
         break;
     case 2:
         self->field_0x1BC += 0xAAB;
-        addVec3To(em040_drift(self), &self->offset_0x30C.vec_0x310);
-        subVec3(&sp2C, &self->em040_0x328.land_0x334, &self->pos);
-        addVec3(&sp38, em040_drift(self), &sp2C);
-        copyVec3(&self->move_0x1A0, &sp38);
-        addVec3To(&self->offset_0x30C.vec_0x310, &self->vec_0x31C);
+        *(em040_drift(self)) += self->offset_0x30C.vec_0x310;
+        self->move_0x1A0 = *(em040_drift(self)) + (self->em040_0x328.land_0x334 - self->pos);
+        self->offset_0x30C.vec_0x310 += self->vec_0x31C;
         if (--self->timer_0x020 < 0) {
-            copyVec3(&self->pos, &self->em040_0x328.land_0x334);
+            self->pos = self->em040_0x328.land_0x334;
             setVector3(em040_drift(self), 0.0f, 0.0f, 0.0f);
-            subVec3(&sp14, &self->em040_0x328.land_0x334, &self->pos);
-            addVec3(&sp20, em040_drift(self), &sp14);
-            copyVec3(&self->move_0x1A0, &sp20);
+            self->move_0x1A0 = *(em040_drift(self)) + (self->em040_0x328.land_0x334 - self->pos);
             em_hit_window_clear_all(self);
             if (self->area_no == get_now_areano() && leader != NULL && leader->active != 0 && leader->team == 9) {
-                addVec3(&sp8, &self->pos, &self->move_0x1A0);
-                copyVec3(&se_pos, &sp8);
+                se_pos = self->pos + self->move_0x1A0;
                 se_req_pos_ps(leader->se_0xB14, 0x28, 2, &se_pos);
             }
             if (self->em040_0x328.escape_0x329 == 1) {
@@ -974,25 +931,21 @@ void em040_action_dispatch(struct _ENEMY_WORK* self) {
 void em040_motion_events(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 tmp;
     nw4r::math::MTX34 mtx;
     struct _ENEMY_WORK* leader;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     em_get_mot_no(self);
     if ((em_act_ck_c1(self, 11, 0) == 1 || em_act_ck_c1(self, 11, 5) == 1 || em_act_ck_c1(self, 11, 56) == 1)
         && self->em040_0x328.escape_0x329 == 0) {
         switch (self->field_0x00A) {
         case 0:
         case 2:
-            copyVec3(&ofs, setVec3(&tmp, 0.0f, 50.0f, 0.0f));
+            ofs = VEC3(0.0f, 50.0f, 0.0f);
             eft_em_spawn_tinted_ex(self, 0, 0, &ofs, 1.5f, -1, 0);
             get_joint_wmat_em(self, 0, &mtx);
             mtx34_trans_get(&mtx, &pos);
             mulVecMat(&ofs, &mtx);
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             se_req_pos_ps(self->se_0xB14, 1, 2, &pos);
             break;
         case 4:
@@ -1072,14 +1025,13 @@ void em040_gauge_update(void) {}
  * rotation and the leap/angle flags. */
 void em040_area_keep_set(struct _ENEMY_MINI_WORK* mini, nw4r::math::VEC3* pos, struct EmAreaKeepSrc* src, u8 flags) {
     EmRunPos* keep = (EmRunPos*)mini->data_0x34;
-    nw4r::math::VEC3 tmp;
 
     if (mini->team_0x03 == 8) {
         if (flags & 0x10) {
-            copyVec3(&keep->pos, setVec3(&tmp, 0.0f, 100.0f, 0.0f));
+            keep->pos = VEC3(0.0f, 100.0f, 0.0f);
             keep->angle = 0;
         } else {
-            copyVec3(&keep->pos, pos);
+            keep->pos = *pos;
             keep->angle = src->rot_0x04;
         }
         keep->flags = 0;

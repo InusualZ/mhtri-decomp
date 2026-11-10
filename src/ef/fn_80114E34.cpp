@@ -11,15 +11,15 @@
  * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
  *   GUESS (the data, map `lbl_805A00B8`..`lbl_805A01E0`, `lbl_806A4538`): `eft020_effect_ids`,
  *   `eft020_effect_counts`, `eft020_rgb_keys_aN`/`_bN`, `eft020_rgb_key_tables_a`/`_b`, `eft020_origin`,
- *   `EftOriginVec3`.  The map's `fn_801153B8` is MWCC's `__sinit_\fn_80114E34_cpp` (rename filed; it follows the file
+ *   `nw4r::math::VEC3`.  The map's `fn_801153B8` is MWCC's `__sinit_\fn_80114E34_cpp` (rename filed; it follows the file
  *   name).
  * RESIDUALS. none in bytes: every row and section matches (`.bss` 0xC of the claimed 0x10, the tail the link's 8-byte
  *   fill).  The `__sinit` row reads 0 in the report until the map names it.
  * SHAPES. `fn_80115100` caches `source_0x30` in a typed local per case (`plw`, `enemy`; case 2 reloads it), tests
  *   `(s32)self->type_0x02 != 9` (`cmpwi`), passes `work->color[i]` by value with no local copy, and declares
  *   `i, dead, flags, work, plw, enemy` in that order.
- *   The origin vector is a file-scope `EftOriginVec3` whose constructor calls `setVec3`: MWCC emits `__sinit` (a tail
- *   call to `setVec3`), its `.ctors` word and the 0.0f/-5.0f pool.
+ *   The origin vector is a file-scope `nw4r::math::VEC3` whose constructor calls `VEC3(x, y, z)`: MWCC emits `__sinit` (a tail
+ *   call to `VEC3(x, y, z)`), its `.ctors` word and the 0.0f/-5.0f pool.
  *   The spawners sit above the static origin, so the pool reads 1.0f, 0.5f, 0.0f, -5.0f; `ef_inst_spawn_joint`
  *   passes an uninitialised `f32` as the scale (retail reached the creator without a prototype).
  *   `fn_80114E34` takes `u8` parameters with explicit `(u8)` casts, and its float guard is `scale <= 0.0f`
@@ -44,7 +44,7 @@
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80114E34_types.h"
 
@@ -98,7 +98,6 @@ extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count
 
 extern "C" u8 GameMode_ck(void);
 
-extern "C" void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 
 /* fn_8011722C comes from its owner's header (rule 2). */
 
@@ -211,15 +210,6 @@ u8* eft020_rgb_key_tables_b[10] = {
     eft020_rgb_keys_b6, NULL,
 };
 }
-
-/* A vector built through `setVec3` (0x80041E8C), so a file-scope one is constructed by `__sinit`.  size: 0xC */
-struct EftOriginVec3 : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    EftOriginVec3(f32 x, f32 y, f32 z)
-    {
-        setVec3(this, x, y, z);
-    }
-};
 
 /* The actor record the spawners hang an eft020 record off.  One record, several views: +0x016 is `pl.h`'s
  * `_PLW::area_0x16`, +0x1E1 the area both the player and the enemy record carry, +0x1A4 `pl.h`'s
@@ -351,7 +341,7 @@ extern "C" void eft020_actor_spawn(void* actor, u8 kind, u8 type, f32 scale)
 }
 
 /* The effect origin, 5 units below the player's joint; MWCC's `__sinit` builds it. */
-static EftOriginVec3 eft020_origin(0.0f, -5.0f, 0.0f);
+static nw4r::math::VEC3 eft020_origin(0.0f, -5.0f, 0.0f);
 
 #pragma peephole off
 
@@ -417,7 +407,6 @@ extern "C" void fn_80114FAC(_EFT* self)
     s32 n;
     _EFT_WORK_A* work;
 
-    MTX34_ctor(&mtx);
     work = (_EFT_WORK_A*)self->work_0x38;
     self->state_0x05++;
     if (self->type_0x02 == 0) {
@@ -461,8 +450,6 @@ extern "C" void fn_80114FAC(_EFT* self)
 /* Moves the record's effects each frame and tints them from the shared key tables. */
 extern "C" void fn_80115100(_EFT* self)
 {
-    nw4r::math::VEC3 v;
-    nw4r::math::MTX34 mtx;
     s32 i;
     s32 dead;
     s32 flags;
@@ -472,8 +459,8 @@ extern "C" void fn_80115100(_EFT* self)
 
     dead = 0;
     work = (_EFT_WORK_A*)self->work_0x38;
-    VEC3_ctor(&v);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 v;
+    nw4r::math::MTX34 mtx;
     flags = 1;
     switch (self->mode_0x08) {
     case 0:
@@ -483,9 +470,9 @@ extern "C" void fn_80115100(_EFT* self)
             return;
         }
         plw = (_PLW*)self->source_0x30;
-        copyVec3(&v, &eft020_origin);
+        v = eft020_origin;
         get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(&plw->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
-        addVec3To(&self->pos_0x18, &v);
+        self->pos_0x18 += v;
         if (Pl_master_ck(plw) == 1) {
             flags = eft_stage_spawn_flag(plw) | 1;
         }

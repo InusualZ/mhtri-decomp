@@ -44,7 +44,7 @@
 #include "g3d/g3d_scnroot.h" /* fn_80082BCC (rule 2) */
 #include "sound/fn_800D7F54.h"
 #include "ef/ef_particlemanager.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 #include "ef/eft002.h" /* eft_effect_foreach_pm_scale (rule 2) */
@@ -474,7 +474,6 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     nw4r::math::VEC3 v;
     _EFT* effect;
 
-    VEC3_ctor(&v);
     effect = fn_80114A1C(pos, (u8)area, (u8)type);
     if (effect == 0) {
         return;
@@ -482,19 +481,19 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
 
     switch (type) {
     case 0: {
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 12, 1.0f, 1.0f);
         return;
     }
     case 1: {
         _EFT019_WORK* work;
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 12, 1.5f, 1.5f);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_a_0x44 = work->scale_b_0x48 = 1.0f;
@@ -502,36 +501,36 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 2: {
         _EFT019_WORK* work;
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 12, 1.9f, 1.9f);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
         return;
     }
     case 14: {
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 13, 1.0f, 1.0f);
         return;
     }
     case 15: {
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 13, 1.5f, 1.5f);
         return;
     }
     case 16: {
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 13, 2.25f, 2.25f);
         return;
     }
@@ -544,10 +543,10 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 28: {
         _EFT019_WORK* work;
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 12, 0.7f, 0.7f);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
@@ -555,20 +554,20 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
     case 29: {
         _EFT019_WORK* work;
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 13, 0.7f, 0.7f);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
         return;
     }
     case 57: {
-        copyVec3(&v, &get_camera_direction());
+        v = *(&get_camera_direction());
         vec3_normalize_into(&v, &v);
         vec3_scale_in_place(&v, -5.0f);
-        addVec3To(pos, &v);
+        *pos += v;
         eft019_set_core(pos, area, 58, 0.85f, 0.85f);
         break;
     }
@@ -717,33 +716,32 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
     _EFT* effect;
     _EFT019_WORK* work;
 
-    VEC3_ctor(&v);
     effect = fn_80114A1C(pos, (u8)area, (u8)type);
     if (effect != 0) {
         work = (_EFT019_WORK*)effect->work_0x38;
         switch (type) {
         case 0: {
-            copyVec3(&v, &get_camera_direction());
+            v = *(&get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, -5.0f);
-            addVec3To(pos, &v);
+            *pos += v;
             eft019_set_core(pos, area, 12, 1.0f, 1.0f);
             break;
         }
         case 1: {
-            copyVec3(&v, &get_camera_direction());
+            v = *(&get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, -5.0f);
-            addVec3To(pos, &v);
+            *pos += v;
             eft019_set_core(pos, area, 12, 1.5f, 1.5f);
             work->scale_a_0x44 = work->scale_b_0x48 = 1.0f;
             break;
         }
         case 2: {
-            copyVec3(&v, &get_camera_direction());
+            v = *(&get_camera_direction());
             vec3_normalize_into(&v, &v);
             vec3_scale_in_place(&v, -5.0f);
-            addVec3To(pos, &v);
+            *pos += v;
             eft019_set_core(pos, area, 12, 1.9f, 1.9f);
             work->scale_a_0x44 = work->scale_b_0x48 = 0.7f;
             break;
@@ -857,8 +855,6 @@ void fn_80112D1C(_EFT* self)
 
 void fn_80112D58(_EFT* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 dir;
     _EFT019_WORK* work;
     struct EfPmManager* pm;
     void* emitter;
@@ -871,8 +867,8 @@ void fn_80112D58(_EFT* self)
         self->timer_0x0C = 2;
         return;
     }
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&dir);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 dir;
     work = (_EFT019_WORK*)self->work_0x38;
     snd = eft_control.field_0x04;
     self->state_0x05++;
@@ -1252,7 +1248,7 @@ void fn_80112D58(_EFT* self)
         SetRootMtxTrans(work->effects[i], &self->pos_0x18);
     }
     if ((u32)(self->type_0x02 - 0x66) <= 1) {
-        copyVec3(&dir, &get_camera_direction());
+        dir = *(&get_camera_direction());
         vec3_normalize_into(&dir, &dir);
         vec3_scale_in_place(&dir, -5.0f);
         for (i = 1; i < work->count; i++) {
@@ -1320,7 +1316,6 @@ void fn_8011392C(_EFT* self)
 {
     u8 done = 0;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
     _EFT019_WORK* work;
     _PLW* src;
     nw4r::ef::EffectSystem* sys;
@@ -1332,8 +1327,7 @@ void fn_8011392C(_EFT* self)
     u8* keys;
     s32 frame;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     work = (_EFT019_WORK*)self->work_0x38;
     src = (_PLW*)self->source_0x30;
     sys = (nw4r::ef::EffectSystem*)eft_control.field_0x04;
@@ -1373,7 +1367,7 @@ void fn_8011392C(_EFT* self)
             change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
             break;
         }
-        copyVec3(&pos, &self->pos_0x18);
+        pos = self->pos_0x18;
         pos.y += 50.0f * work->scale_a_0x44;
         eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
         return;
@@ -1460,7 +1454,7 @@ void fn_8011392C(_EFT* self)
             self->state_0x05++;
             return;
         }
-        copyVec3(&pos, &self->pos_0x18);
+        pos = self->pos_0x18;
         switch (self->type_0x02) {
         case 0x0C:
             pos.y += 50.0f * work->scale_a_0x44;
@@ -1489,8 +1483,8 @@ void fn_8011392C(_EFT* self)
         }
         eft_res_models_spawn(self, (void**)&work->effects[0], 1, 1, NULL);
         {
-            nw4r::math::VEC3 cam;
-            EFT_CAMERA_POS(&cam);
+            nw4r::math::_VEC3 cam;
+            EFT_CAMERA_POS((nw4r::math::VEC3*)&cam);
             if (cam.y < 0.0f) {
                 eft_res_models_spawn(self, (void**)&work->effects[1], 1, 1, NULL);
             }
@@ -1692,8 +1686,8 @@ void fn_8011392C(_EFT* self)
             return;
         }
         {
-            nw4r::math::VEC3 cam;
-            EFT_CAMERA_POS(&cam);
+            nw4r::math::_VEC3 cam;
+            EFT_CAMERA_POS((nw4r::math::VEC3*)&cam);
             if (cam.y < 0.0f) {
                 change_color_eff(work->effects[0], &self->pos_0x18, work->color_0x4C[0]);
                 eft_res_models_spawn(self, (void**)work->effects, 1, work->count, NULL);
@@ -1764,7 +1758,7 @@ void fn_8011392C(_EFT* self)
         } else {
             effect_retire(work->effects[0], 0);
         }
-        copyVec3(&pos, &self->pos_0x18);
+        pos = self->pos_0x18;
         pos.y += 50.0f * work->scale_a_0x44;
         eft_res_models_spawn(self, (void**)work->effects, 1, work->count, &pos);
         return;
@@ -1809,7 +1803,7 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
     if (effect != 0) {
         effect->field_0x03 = 19;
         effect->type_0x02 = 6;
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
         effect->area_0x44 = area;
         effect->source_0x30 = 0;
         effect->dispatch_0x34 = fn_80112D1C;
@@ -1821,31 +1815,30 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
 #pragma fp_contract off
 void fn_801148E4(_EFT* self)
 {
-    f32 v[3];
+    nw4r::math::VEC3 v;
     f32 max[2];
     _GXColor color;
     s32 handle;
     f32 rx;
     f32 ry;
 
-    VEC3_ctor((nw4r::math::VEC3*)v);
     if (self->area_0x44 == get_now_areano() && self->timer_0x0C > 0) {
         screen_size_float_get((struct _MH_VEC2*)max);
         handle = scn_root_get_current_camera(pRoot);
-        camera_world_to_screen((nw4r::g3d::Camera*)&handle, (u8*)v, &self->pos_0x18);
-        if (v[2] <= 0.0f || v[2] >= 1.0f || v[0] < 0.0f ||
-            v[0] > max[0] || v[1] < 0.0f || v[1] > max[1]) {
+        camera_world_to_screen((nw4r::g3d::Camera*)&handle, (u8*)&v, &self->pos_0x18);
+        if (v.z <= 0.0f || v.z >= 1.0f || v.x < 0.0f ||
+            v.x > max[0] || v.y < 0.0f || v.y > max[1]) {
             /* the projected point is off-screen: the impact makes no sound */
         } else {
-            rx = v[0] - max[0] / 2.0f;
-            ry = v[1] - max[1] / 2.0f;
-            v[0] = rx / max[0];
-            v[1] = ry / max[1];
+            rx = v.x - max[0] / 2.0f;
+            ry = v.y - max[1] / 2.0f;
+            v.x = rx / max[0];
+            v.y = ry / max[1];
             color.r = 0xFF;
             color.g = 0;
             color.b = 0;
             draw_sprite_start(ry, rx);
-            draw_sprite_set(128, 3, 32, v[0], v[1], color, self->timer_0x0C);
+            draw_sprite_set(128, 3, 32, v.x, v.y, color, self->timer_0x0C);
         }
     }
     self->state_0x05++;
@@ -1874,7 +1867,7 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
     effect->timer_0x0C = 0;
     effect->field_0x10 = 0;
     effect->type_0x02 = type;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->area_0x44 = area;
     eft_state_flags_set(effect, 0, 0);
     effect->release_0x40 = fn_80112CE0;
@@ -1895,9 +1888,6 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     nw4r::math::VEC3 pos;
     _CP_VECTOR rot;
 
-    VEC3_ctor(&axis);
-    VEC3_ctor(&spin);
-    VEC3_ctor(&pos);
     mhchar_joint_mtx_get(&((_EFT019_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 7, mtx);
     mtx34_trans_get(mtx, &pos);
     axis.x = -mtx->m[0][2];
@@ -1909,7 +1899,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     setVector3(&spin, -10.0f, -10.0f, 87.0f);
     rotVecX(&spin, rot.x);
     rotVecY(&spin, rot.y);
-    addVec3To(&pos, &spin);
+    pos += spin;
     cpSetRotMatrix(&rot, mtx);
     mtx34_set_trans(mtx, &pos);
 }

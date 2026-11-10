@@ -135,10 +135,6 @@ void fn_80129984(struct _ENEMY_WORK* self);
 u32 fn_8012B5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_target_refresh(void);
 
-/* 0x80125F54 - r3 is the caller's `EmSelRec`; the body zeroes its +0x08 vector (`VEC3_ctor(out + 8)`) and returns
- * the same pointer. */
-void* em_ground_rec_clear(void* out);
-
 #ifdef __cplusplus
 }
 #endif

@@ -8,7 +8,7 @@
 #include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the effect record and the player work the handlers take

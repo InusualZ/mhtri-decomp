@@ -14,7 +14,7 @@ extern "C" {
 
 /* `ef/fn_801173AC.cpp`'s eft024 kind-1 state-1 handler. */
 void fn_801173AC(void* self);
-/* `VEC3_ctor` (0x80043EA8) is `src/mh3_pad.cpp`'s and is declared in `mh3_pad.h`, which the
+/* `VEC3::VEC3()` (0x80043EA8) is `src/mh3_pad.cpp`'s and is declared in `mh3_pad.h`, which the
  * consumers of this band include (docs/plan.md 6.5 rule 2: a band header declares no owned symbol). */
 
 /* 0x800CFA90 / 0x800CFAD0 - `ef/system_core.cpp`'s move-work record table and its record count; `Pl/fn_80273B14.cpp`

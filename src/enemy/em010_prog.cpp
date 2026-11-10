@@ -34,7 +34,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/ENEMY_DATA.h"
 #include "enemy/ENEMY_MINI_WORK.h"
@@ -87,7 +87,6 @@
 
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define em_ground_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))em_ground_ck)
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 #define em_act_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 
@@ -118,21 +117,14 @@ struct Em010ProgTbl {
     /* +0x68 */ u32 pad_0x68;
 };
 
-/* A point and its per-frame step, built by MWCC's `__sinit`: each vector is set through `setVec3` into a temporary
- * and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit`: each vector is constructed into a temporary
+ * and copied (`EmSeShift`).  size: 0x18 */
 struct Em010VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (x, y, z) and (dx, dy, dz). */
-    Em010VecPair(f32 x, f32 y, f32 z, f32 dx, f32 dy, f32 dz)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&pos, setVec3(&a, x, y, z));
-        assignVec3_c1(&step, setVec3(&b, dx, dy, dz));
-    }
+    Em010VecPair(f32 x, f32 y, f32 z, f32 dx, f32 dy, f32 dz) : pos(x, y, z), step(dx, dy, dz) {}
 };
 
 /* The nine vector pairs (`.bss`, defined at the end); the sound records point at them. */
@@ -602,13 +594,12 @@ u32 em010_area_entry_target_set(_ENEMY_WORK* self) {
 }
 
 void em010_init(_ENEMY_WORK* self, u8 kind) {
-    VEC3 origin;
     u8 a;
     u8 b;
     u32 running;
     u8 map;
 
-    setVec3(&origin, 0.0f, 0.0f, 0.0f);
+    VEC3 origin(0.0f, 0.0f, 0.0f);
     self->field_0x835 = 1;
     switch (kind) {
     case 0:
@@ -705,7 +696,7 @@ void em010_frame_update(_ENEMY_WORK* self) {
                 (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
             if (data != 0) {
                 if (self->field_0x46C == data->field_0x17) {
-                    copyVec3(&self->aim, &data->vec_0x24);
+                    self->aim = data->vec_0x24;
                 }
                 if (self->field_0x011 == 0) {
                     if (data->work_0x18 != 0 && data->work_0x18->area_no == self->area_no
@@ -1184,7 +1175,6 @@ void em010_act2_9(_ENEMY_WORK* self, u8 a, u8 b) {
 void em010_act2_10(_ENEMY_WORK* self, u8 a, u8 b) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1541,9 +1531,7 @@ void em010_act7_2(_ENEMY_WORK* self, u8 a) {
 
 void em010_act7_4(_ENEMY_WORK* self) {
     EmSpawnRec rec;
-    VEC3 vec;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1553,7 +1541,7 @@ void em010_act7_4(_ENEMY_WORK* self) {
     case 1:
         if (em_frame_check(self, 0, 44.0f, 0.0f) == 1) {
             rec.id = 0x14;
-            copyVec3(&rec.pos, setVec3(&vec, 0.0f, 0.0f, -20.0f));
+            rec.pos = VEC3(0.0f, 0.0f, -20.0f);
             rec.field_0x10 = 0;
             rec.field_0x12 = 0;
             rec.field_0x14 = 0;
@@ -3470,7 +3458,6 @@ void em010_action_dispatch(_ENEMY_WORK *self) {
 void em010_effect_spawn(_ENEMY_WORK* self, u8 a, u8 b, s32 c, s32 d, f32 e) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch ((s32) a) {
     case 0:
         eft009_spawn_at_joint(self, (u32) c, (u32) b, d, e);
@@ -3488,8 +3475,6 @@ void em010_motion_events(_ENEMY_WORK* self) {
     VEC3 unused;
     VEC3 pos;
 
-    VEC3_ctor(&unused);
-    VEC3_ctor(&pos);
     switch (em_get_mot_no(self)) {
     case 3:
         if (em_after_frame_check(self, 0, 42.0f, 0.0f) == 1) {

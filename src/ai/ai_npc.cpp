@@ -5,7 +5,7 @@
  *   `ai_torch_ck`, `ai_taru_*_ck`, `ai_demo_stop_ck`).  C++; every C-named row is `extern "C"` so objdiff pairs it by
  *   the map's name (playbook 42).
  * RANGE. .text 0x802C2700-0x802D9EA4 (357 functions, every one with a body); extab, extabindex, .ctors 0x8056F388
- *   (`ainpc_w_sinit`, which runs `ainpc_w_construct`), .data 0x805D3A88-0x805D54A0, .bss 0x806BD360-0x806BD808
+ *   (`__sinit`, which runs `_AINPC_W`'s constructor), .data 0x805D3A88-0x805D54A0, .bss 0x806BD360-0x806BD808
  *   (`ainpc_w`), .sdata, .sbss, .sdata2.  `jumptable_805D5428` is the 14-entry table MWCC emits for `ai_npc_level_rank_get`.
  * FLAGS. `cflags_main` (configure.py) with a file-wide `#pragma optimization_level 4` (the switch-range lowering
  *   `subi; cmplwi` of `ai_npc_step20_arm`; no row regresses).  `#pragma peephole off` from 0x802C2700 to the end of
@@ -38,7 +38,7 @@
  *   ai_npc_tuning_get, ai_npc_item_stock_get, ai_npc_beside_player_ck, ai_npc_player_idle_count,
  *   ai_npc_element_pick_update/_plan_decide/_report_update/_frame, ainpc_element_report_set, ai_npc_status_preview,
  *   ai_npc_bonus_add, ai_npc_item_step_ck, ai_npc_counter_window_get, ai_npc_talk, ai_npc_tutorial_talk,
- *   ainpc_area_buff_apply, ainpc_w_construct, ainpc_w_sinit; the tables ai_npc_gather_motion_tbl, ai_npc_hop_tbl,
+ *   ainpc_area_buff_apply; the tables ai_npc_gather_motion_tbl, ai_npc_hop_tbl,
  *   ai_npc_leap_tbl, ai_npc_vault_tbl, ai_npc_hop_back_tbl, ai_npc_flurry_frames, ai_npc_spin_frames,
  *   ai_npc_status_motion_tbl(2), ai_npc_tuning_tbl, ai_npc_item_count_tbl, ai_npc_time_left_chance_tbl,
  *   ai_npc_motion_variant_tbl, result_hunt_rank_tbl, result_time_rank_tbl, result_rank_points_tbl,
@@ -66,6 +66,12 @@
  *  - `fn_802D3398`: retail re-reads `*row` at the top of the second loop's body;
  *  - `fn_802D2F7C`: retail adds the row offset to the table base (`addi; mulli; add`), ours multiplies first;
  *  - `ai_taru_move_ck`: retail loads +0x450 into r0 before `extsb r3,r0`;
+ *  - `_AINPC_W()` (map row `__ct__Q216view_fn_802D0F348_AINPC_WFv`, the namespaced view's mangling): `MHchar`'s
+ *    implicit constructor and the VEC3 at +0x32C are constructed and `mhchar_construct`/`em_land_data_init` run in the
+ *    body after the vectors, where retail constructs the model first and the land record (+0x324) in member order
+ *    (requests vec3-world#3, #4); ai_npc_water_landing_ck, ai_npc_step9/56/85_arm, fn_802D1710: a `LandData` local
+ *    constructs its VEC3 implicitly before the explicit `em_land_data_init` (vec3-world#4).  The record's `__sinit`
+ *    sits mid-range in retail (0x802D9E14, before 0x802D9EA4) but at the object's end here;
  *  - data: `.data` 0x9D4 of 0x1A18 and `.sdata2` 0x1DC of 0x208 emitted (the tables are declared, never defined),
  *    `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; the jump tables are emitted
  *    anonymous, so objdiff leaves the map's `jumptable_*` rows unpaired (playbook 23);
@@ -125,7 +131,7 @@ extern "C" void ai_npc_wait_arm_alt(LightArm* self);
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "pl.h"                /* `_PLW` - the record's +0x650/+0x652 the motion switch reads */
 #include "Pl/fn_8027D684.h"    /* `fn_8027D76C` (rule 2: the owner's header) */
-#include "Pl/fn_8028F66C.h"    /* `copyVec3`, `fn_8012A624`, `fn_80291B08` */
+#include "Pl/fn_8028F66C.h"    /* `VEC3::operator=`, `fn_8012A624`, `fn_80291B08` */
 #include "fn_8004CAD8.h"       /* `rotVecY`, `subVec3`, `addVec3` */
 #include "sound/fn_800D7F54.h" /* `fn_800DCC24` */
 #include "ai/ainpc.h"
@@ -230,7 +236,7 @@ u32 fn_802D3B34(struct _AINPC_W* self, s32 a, s32 b);
 u16 fn_802D30F8(u16 a, u16 b, u16 c);
 void fn_802D3210(struct _AINPC_W* self, u32* out);
 
-/* `pl.h` pulls `ef.h` in, which declares `setVec3`/`VEC3_ctor` with their owner's type
+/* `pl.h` pulls `ef.h` in, which declares `VEC3(x, y, z)`/`VEC3::VEC3()` with their owner's type
  * (`nw4r::math::VEC3*`), the same record this file's locals use. */
 
 /* Callees whose owner is a registered unit but whose header does not declare them yet: each spelling
@@ -371,7 +377,7 @@ u16 ai_get_motion_no(struct _AINPC_W* self);
 #include "Pl/pl_area_buff_apply.h"
 #include "enemy/em_model.h"                /* em_roster_area_use_take, em_weight_table_pick (rule 2) */
 #include "stage/stage_climate_kind_get.h"
-#include "fn_8004CAD8/mtx.h"                /* MTX34_ctor (rule 2) */
+#include "fn_8004CAD8/mtx.h"                /* MTX34::MTX34() (rule 2) */
 #include "ef/eft013_npc_motion_spawn.h"
 #include "ef/eft_npc_aura_create.h"
 #include "sound/se_npc_faint_play.h"
@@ -564,7 +570,7 @@ void ainpc_init(void)
     self->pos_0x178.x = 0.0f;
     self->pos_0x178.y = 0.0f;
     self->pos_0x178.z = 0.0f;
-    copyVec3(&self->pos_0x184, &self->pos_0x178);
+    self->pos_0x184 = self->pos_0x178;
     self->vec_0x190.x = 0;
     self->vec_0x190.y = 0;
     self->vec_0x190.z = 0;
@@ -1026,8 +1032,8 @@ void ai_npc_step5_arm(_AINPC_W* self, u8 arg)
                 self->vec_0x190.x = fn_802D30F8(0, (u16)self->vec_0x190.x, 0x600);
             }
             if (arg == 1 && self->pos_0x1D4.y > ai_npc_hop_tbl[2]) {
-                addVec3To(&self->pos_0x178, &self->pos_0x1D4);
-                addVec3To(&self->pos_0x1D4, &self->pos_0x1E0);
+                self->pos_0x178 += self->pos_0x1D4;
+                self->pos_0x1D4 += self->pos_0x1E0;
             }
         }
         break;
@@ -1039,12 +1045,10 @@ void ai_npc_step5_arm(_AINPC_W* self, u8 arg)
 void ai_npc_step6_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     u8 state;
 
-    VEC3_ctor(&dir);
     state = self->state;
     switch (state) {
     case 0:
@@ -1073,8 +1077,7 @@ void ai_npc_step6_arm(_AINPC_W* self, u8 arg)
                 fn_802D2ABC(self, 2, 0x15, 0);
             }
         } else {
-            subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x1B0 - self->pos_0x178;
             calcVecAngXY(&dir, &pitch, &yaw);
             self->vec_0x190.y = fn_802D30F8(yaw, (u16)self->vec_0x190.y, 0x600);
             if (arg == 1) {
@@ -1122,8 +1125,6 @@ void ai_npc_step9_arm(_AINPC_W* self)
     LandData land;
     f32 height;
     u8 state;
-
-    em_land_data_init(&land);
     state = self->state;
     switch (state) {
     case 0:
@@ -1137,12 +1138,12 @@ void ai_npc_step9_arm(_AINPC_W* self)
                 self->pos_0x178.x = self->pos_0x1B0.x;
                 self->pos_0x178.z = self->pos_0x1B0.z;
             } else {
-                copyVec3(&self->pos_0x178, &self->pos_0x1B0);
+                self->pos_0x178 = self->pos_0x1B0;
                 if (pl_ground_check_all_layers(self, &self->pos_0x178, &land, &height, -5) == 1) {
                     self->pos_0x178.y = self->field_0x19C = height;
                 }
             }
-            copyVec3(&self->pos_0x184, &self->pos_0x178);
+            self->pos_0x184 = self->pos_0x178;
             self->field_0x3C6 = 0;
             fn_802D3CCC(self, 1);
             if (land.field_0x00 & 1) {
@@ -1248,7 +1249,6 @@ void ai_npc_step13_arm(_AINPC_W* self, u8 arg)
     nw4r::math::VEC3 pos;
     u8 state;
 
-    VEC3_ctor(&pos);
     state = self->state;
     switch (state) {
     case 0:
@@ -1794,14 +1794,12 @@ extern "C" void ai_npc_step31_arm(struct _AINPC_W* self, u8 arg) {
  * yaw, and the per-frame pass integrates the effect vector and the stage timer. */
 extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
     nw4r::math::VEC3 shot;
-    VEC3_ctor(&shot);
     shot.x = lbl_8079A670;
     shot.y = lbl_8079A670;
     shot.z = lbl_8079A6A4;
     switch (self->state) {
     case 0: {
         u16* row;
-        nw4r::math::VEC3 out;
         self->state++;
         switch (arg) {
         case 0:
@@ -1819,20 +1817,17 @@ extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
             fn_802D2B88(self, 1);
         }
         rotVecY(&shot, self->field_0x194);
-        addVec3(&out, &self->vec_0x178, &shot);
-        copyVec3(&self->vec_0x3E0, &out);
+        self->vec_0x3E0 = self->vec_0x178 + shot;
         self->field_0x3EC = (u16)self->field_0x194;
         self->field_0x3EE = 0;
         fn_800DCC24(self->sound_0x498, 0, 0);
         break;
     }
     case 1: {
-        nw4r::math::VEC3 out;
         self->field_0x3EC += 0x1d1;
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
-        subVec3(&out, &self->vec_0x3E0, &shot);
-        copyVec3(&self->vec_0x178, &out);
+        self->vec_0x178 = self->vec_0x3E0 - shot;
         if (arg >= 5) {
             self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x600);
         }
@@ -1849,12 +1844,10 @@ extern "C" void ai_npc_step32_arm(struct _AINPC_W* self, u8 arg) {
         break;
     }
     case 2: {
-        nw4r::math::VEC3 out;
         self->field_0x3EC += 0x1d1;
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
-        subVec3(&out, &self->vec_0x3E0, &shot);
-        copyVec3(&self->vec_0x178, &out);
+        self->vec_0x178 = self->vec_0x3E0 - shot;
         if (ai_npc_motion_end_ck(self) == 1) {
             if (self->sub_step == 0) {
                 fn_802D2ABC(self, 1, lbl_805D4784[arg * ROW7_WORDS + ROW7_SE], self->field_0x1EC);
@@ -2033,7 +2026,6 @@ extern "C" void ai_npc_step47_arm(struct _AINPC_W* self, u8 arg) {
 extern "C" void ai_npc_step56_arm(struct _AINPC_W* self) {
     LandData land;
     f32 ground;
-    em_land_data_init(&land);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2058,7 +2050,7 @@ extern "C" void ai_npc_step56_arm(struct _AINPC_W* self) {
     case 2:
         self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x1000);
         if (ai_npc_motion_end_ck(self) == 1) {
-            copyVec3(&self->vec_0x178, &self->vec_0x1B0);
+            self->vec_0x178 = self->vec_0x1B0;
             if (pl_ground_check_all_layers((struct _PLW*)self, &self->vec_0x178, &land, &ground, -5) == 1) {
                 /* One `lfs` and two stores in retail: the traveller's distance and the
                  * height it settles at are the same value. */
@@ -2153,7 +2145,6 @@ extern "C" void ai_npc_step82_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 vec;
 
-    VEC3_ctor(&vec);
     fn_802D3A2C(self, 2);
     fn_802D29B8(self, 2);
     switch (self->state) {
@@ -2202,9 +2193,7 @@ extern "C" void ai_npc_step82_arm(struct _AINPC_W* self, u32 flag)
 extern "C" void ai_npc_step83_arm(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 vec;
-    nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&vec);
     fn_802D3A2C(self, 2);
     fn_802D29B8(self, 2);
     fn_802D3CD4(self, 1);
@@ -2230,9 +2219,9 @@ extern "C" void ai_npc_step83_arm(struct _AINPC_W* self)
         self->state += 1;
         fn_802D2B98(self, 2);
         self->field_0x002 = 0;
-        copyVec3(&vec, setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4));
+        vec = VEC3(lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
         rotVecY(&vec, self->field_0x194);
-        addVec3To(&vec, &self->vec_0x178);
+        vec += self->vec_0x178;
         vec.y = self->field_0x19C;
         AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
         self->field_0x1AC = lbl_80792598[(s16)fn_802D66B8(self)];
@@ -2275,11 +2264,7 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 vec;
     LandData land;
-    nw4r::math::VEC3 offset;
     f32 height;
-
-    VEC3_ctor(&vec);
-    em_land_data_init(&land);
     fn_802D3A2C(self, 2);
     fn_802D84D0(self, 2);
     switch (self->state) {
@@ -2287,7 +2272,7 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
         self->state += 1;
         ai_npc_variant_set(self, 0);
         ai_npc_motion_set(self, 54, 0, 0);
-        copyVec3(&self->vec_0x178, &self->plw_0x16C->vec_0x03C);
+        self->vec_0x178 = self->plw_0x16C->vec_0x03C;
         self->field_0x194 = self->plw_0x16C->field_0x058;
         self->field_0x1AC = 14;
         fn_802D2B88(self, 2);
@@ -2307,9 +2292,9 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
             }
             self->field_0x002 = 0;
         } else if (frames == 2) {
-            copyVec3(&vec, setVec3(&offset, 0.0f, 0.0f, 143.0f));
+            vec = VEC3(0.0f, 0.0f, 143.0f);
             rotVecY(&vec, self->field_0x194);
-            addVec3To(&vec, &self->vec_0x178);
+            vec += self->vec_0x178;
             if (fn_8027DCE0(self->plw_0x16C, 0) == 1) {
                 AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
             }
@@ -2317,7 +2302,7 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
         break;
     }
     case 2:
-        copyVec3(&self->vec_0x178, &self->plw_0x16C->vec_0x03C);
+        self->vec_0x178 = self->plw_0x16C->vec_0x03C;
         self->field_0x194 = self->plw_0x16C->field_0x058;
         if (fn_8027DCE0(self->plw_0x16C, 0) == 0) {
             if (pl_ground_check_all_layers((struct _PLW*)self, &self->vec_0x178, &land, &height, -5) == 1) {
@@ -2334,10 +2319,7 @@ extern "C" void ai_npc_step85_arm(struct _AINPC_W* self)
 extern "C" void ai_npc_step86_arm(struct _AINPC_W* self, u8 flag)
 {
     nw4r::math::VEC3 vec;
-    nw4r::math::VEC3 front;
-    nw4r::math::VEC3 back;
 
-    VEC3_ctor(&vec);
     fn_802D3A2C(self, 2);
     switch (self->state) {
     case 0:
@@ -2348,17 +2330,17 @@ extern "C" void ai_npc_step86_arm(struct _AINPC_W* self, u8 flag)
         self->vec_0x024.y = lbl_8079A674;
         self->vec_0x024.z = lbl_8079A674;
         if ((flag & 0xFF) == 0) {
-            copyVec3(&vec, setVec3(&front, 0.0f, 0.0f, 143.0f));
+            vec = VEC3(0.0f, 0.0f, 143.0f);
         } else {
             self->vec_0x178.y = self->field_0x19C;
-            copyVec3(&vec, setVec3(&back, lbl_8079A670, lbl_8079A670, lbl_8079A6C4));
+            vec = VEC3(lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
         }
         if (ai_npc_flag_ck(self, 2) != 0) {
             break;
         }
         fn_802D2B88(self, 2);
         rotVecY(&vec, self->field_0x194);
-        addVec3To(&vec, &self->vec_0x178);
+        vec += self->vec_0x178;
         AINPC_FX_SPAWN((struct _PLW*)self, 42, &vec, lbl_8079A678, 0);
         break;
     case 1: {
@@ -2826,14 +2808,12 @@ void ai_npc_step_dispatch(_AINPC_W* self)
 extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
-    nw4r::math::VEC3 diff;
     u32 ang_a;
     u32 ang_b;
     f32 near_limit;
     f32 far_limit;
     s32 armed;
 
-    VEC3_ctor(&start);
     near_limit = lbl_8079A670;
     far_limit = near_limit;
     armed = 0;
@@ -2884,8 +2864,7 @@ extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
             ai_npc_base_state_set(self, 0);
             break;
         }
-        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
-        copyVec3(&start, &diff);
+        start = self->vec_0x1B0 - self->vec_0x178;
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194, 2048);
         break;
@@ -2900,14 +2879,12 @@ extern "C" void ai_npc_m2_step0_arm(struct _AINPC_W* self, u32 flag)
 extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
-    nw4r::math::VEC3 diff;
     u32 ang_a;
     u32 ang_b;
     f32 limit;
     s32 armed;
     s32 limit2;
 
-    VEC3_ctor(&start);
     limit = lbl_8079A670;
     armed = 0;
     switch (self->state) {
@@ -2944,8 +2921,7 @@ extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
                 break;
             }
         }
-        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
-        copyVec3(&start, &diff);
+        start = self->vec_0x1B0 - self->vec_0x178;
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
                                         distance > lbl_8079A6E0 ? (u16)1536 : (u16)2560);
@@ -2960,11 +2936,9 @@ extern "C" void ai_npc_m2_step2_arm(struct _AINPC_W* self, u32 flag)
 extern "C" void ai_npc_m2_step5_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
-    nw4r::math::VEC3 diff;
     u32 ang_a;
     u32 ang_b;
 
-    VEC3_ctor(&start);
     fn_802D29B8(self, 2);
     switch (self->state) {
     case 0:
@@ -2984,8 +2958,7 @@ extern "C" void ai_npc_m2_step5_arm(struct _AINPC_W* self, u32 flag)
         self->field_0x1AC = 90;
         break;
     case 1:
-        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
-        copyVec3(&start, &diff);
+        start = self->vec_0x1B0 - self->vec_0x178;
         calcVecAngXY(&start, &ang_a, &ang_b);
         if ((flag & 0xFF) == 1) {
             f32 distance = calcDistanceSqXZ(&self->vec_0x178, &self->vec_0x1B0);
@@ -3013,13 +2986,11 @@ extern "C" void ai_npc_m2_step5_arm(struct _AINPC_W* self, u32 flag)
 extern "C" void ai_npc_m2_step7_arm(struct _AINPC_W* self, u32 flag)
 {
     nw4r::math::VEC3 start;
-    nw4r::math::VEC3 diff;
     u32 ang_a;
     u32 ang_b;
     s32 armed;
     s32 limit;
 
-    VEC3_ctor(&start);
     armed = 0;
     switch (self->state) {
     case 0:
@@ -3047,8 +3018,7 @@ extern "C" void ai_npc_m2_step7_arm(struct _AINPC_W* self, u32 flag)
             ai_npc_base_state_set(self, 0);
             break;
         }
-        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
-        copyVec3(&start, &diff);
+        start = self->vec_0x1B0 - self->vec_0x178;
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
                                         distance > lbl_8079A6E0 ? (u16)2048 : (u16)4096);
@@ -3062,11 +3032,9 @@ extern "C" void ai_npc_m2_step7_arm(struct _AINPC_W* self, u32 flag)
 extern "C" void ai_npc_m2_step9_arm(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 start;
-    nw4r::math::VEC3 diff;
     u32 ang_a;
     u32 ang_b;
 
-    VEC3_ctor(&start);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -3097,8 +3065,7 @@ extern "C" void ai_npc_m2_step9_arm(struct _AINPC_W* self)
             ai_npc_base_state_set(self, 0);
             break;
         }
-        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
-        copyVec3(&start, &diff);
+        start = self->vec_0x1B0 - self->vec_0x178;
         calcVecAngXY(&start, &ang_a, &ang_b);
         ang_b -= 16384;
         if (distance > lbl_8079A6E0) {
@@ -3123,7 +3090,6 @@ extern "C" {
 void ai_npc_m2_step10_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     f32 dist;
@@ -3133,7 +3099,6 @@ void ai_npc_m2_step10_arm(_AINPC_W* self, u8 arg)
     u16 turn;
     u8 state;
 
-    VEC3_ctor(&dir);
     limit = 0.0f;
     armed = 0;
     state = self->state;
@@ -3165,8 +3130,7 @@ void ai_npc_m2_step10_arm(_AINPC_W* self, u8 arg)
             break;
         }
         fn_802D3210(self, (u32*)&self->vec_0x190);
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         ::calcVecAngXY(&dir, &pitch, &yaw);
         if (::calcDistanceSqXZ(&self->pos_0x178, &self->pos_0x1B0) > 10000.0f) {
             turn = 0xA00;
@@ -3196,7 +3160,6 @@ void ai_npc_m2_step10_arm(_AINPC_W* self, u8 arg)
 void ai_npc_m2_step11_arm(_AINPC_W* self, u32 arg)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     f32 dist;
@@ -3204,7 +3167,6 @@ void ai_npc_m2_step11_arm(_AINPC_W* self, u32 arg)
     u16 turn;
     u8 state;
 
-    VEC3_ctor(&dir);
     armed = 0;
     state = self->state;
     switch (state) {
@@ -3234,8 +3196,7 @@ void ai_npc_m2_step11_arm(_AINPC_W* self, u32 arg)
             break;
         }
         fn_802D3210(self, (u32*)&self->vec_0x190);
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         ::calcVecAngXY(&dir, &pitch, &yaw);
         if (::calcDistanceSqXZ(&self->pos_0x178, &self->pos_0x1B0) > 10000.0f) {
             turn = 0xA00;
@@ -3305,14 +3266,12 @@ void ai_npc_m2_step19_arm(_AINPC_W* self)
 {
     nw4r::math::VEC3 dir;
     _CP_VECTOR rot;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     f32 dist;
     u16 turn;
     u8 state;
 
-    VEC3_ctor(&dir);
     state = self->state;
     switch (state) {
     case 0:
@@ -3347,8 +3306,7 @@ void ai_npc_m2_step19_arm(_AINPC_W* self)
             ai_npc_base_state_set(self, 2);
             break;
         }
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         ::calcVecAngXY(&dir, &pitch, &yaw);
         yaw -= 0x4000;
         if (dist > 10000.0f) {
@@ -3372,13 +3330,11 @@ void ai_npc_m2_step19_arm(_AINPC_W* self)
 void ai_npc_m2_step20_arm(_AINPC_W* self)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     f32 dist;
     u8 state;
 
-    VEC3_ctor(&dir);
     state = self->state;
     switch (state) {
     case 0:
@@ -3398,8 +3354,7 @@ void ai_npc_m2_step20_arm(_AINPC_W* self)
             fn_802D2ABC(self, 1, 0x1D, 0);
             break;
         }
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         ::calcVecAngXY(&dir, &pitch, &yaw);
         self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, 0x200);
         break;
@@ -3411,13 +3366,11 @@ void ai_npc_m2_step20_arm(_AINPC_W* self)
 void ai_npc_m2_step21_arm(_AINPC_W* self)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     f32 dist;
     u8 state;
 
-    VEC3_ctor(&dir);
     state = self->state;
     switch (state) {
     case 0:
@@ -3432,8 +3385,7 @@ void ai_npc_m2_step21_arm(_AINPC_W* self)
         break;
     case 1:
         fn_802D3210(self, (u32*)&self->vec_0x190);
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         ::calcVecAngXY(&dir, &pitch, &yaw);
         if (++self->sub_step < 10) {
             yaw += 0x800;
@@ -3563,7 +3515,6 @@ void ai_npc_m3_step0_arm(_AINPC_W* self, u8 arg)
     nw4r::math::VEC3 pos;
     u8 state;
 
-    VEC3_ctor(&pos);
     state = self->state;
     switch (state) {
     case 0:
@@ -3713,8 +3664,6 @@ void ai_npc_m3_step5_arm(_AINPC_W* self, u8 arg)
     u16 spin;
     u8 state;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     state = self->state;
     switch (state) {
     case 0:
@@ -3772,13 +3721,10 @@ void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     u8 state;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&offset);
     state = self->state;
     switch (state) {
     case 0:
@@ -3827,8 +3773,7 @@ void ai_npc_m3_step6_arm(_AINPC_W* self, u8 arg)
                 break;
             }
         } else if (ai_npc_frame_ck(self, 2, 94.0f, 0.0f) == 1) {
-            subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x1B0 - self->pos_0x178;
             ::calcVecAngXY(&dir, &pitch, &yaw);
             self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, 0x200);
             switch (arg) {
@@ -3879,13 +3824,10 @@ void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     u8 state;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&offset);
     state = self->state;
     switch (state) {
     case 0:
@@ -3942,8 +3884,7 @@ void ai_npc_m3_step7_arm(_AINPC_W* self, u8 arg)
                 ai_npc_base_state_set(self, 2);
             }
         } else if (ai_npc_frame_ck(self, 2, 94.0f, 0.0f) == 1) {
-            subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x1B0 - self->pos_0x178;
             ::calcVecAngXY(&dir, &pitch, &yaw);
             self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, 0x200);
             if (arg == 1) {
@@ -4138,12 +4079,10 @@ void ai_npc_m3_step14_arm(_AINPC_W* self)
 void ai_npc_m3_step18_arm(_AINPC_W* self)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     f32 dist;
     u16 i;
     u8 state;
 
-    VEC3_ctor(&dir);
     state = self->state;
     switch (state) {
     case 0:
@@ -4172,8 +4111,7 @@ void ai_npc_m3_step18_arm(_AINPC_W* self)
             ai_npc_base_state_set(self, 0);
             break;
         }
-        subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-        copyVec3(&dir, &diff);
+        dir = self->pos_0x1B0 - self->pos_0x178;
         self->vec_0x190.y = fn_802D30F8(::calcVecAng3(&dir), self->vec_0x190.y, 0x800);
         break;
     }
@@ -4185,12 +4123,10 @@ void ai_npc_m3_step18_arm(_AINPC_W* self)
 void ai_npc_m3_step19_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
     u8 state;
 
-    VEC3_ctor(&dir);
     self->field_0x450 = 1;
     state = self->state;
     switch (state) {
@@ -4218,8 +4154,7 @@ void ai_npc_m3_step19_arm(_AINPC_W* self, u8 arg)
                 ai_npc_base_state_set(self, 2);
             }
         } else {
-            subVec3(&diff, &self->pos_0x1B0, &self->pos_0x178);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x1B0 - self->pos_0x178;
             ::calcVecAngXY(&dir, &pitch, &yaw);
             self->vec_0x190.y = fn_802D30F8(yaw, self->vec_0x190.y, 0x400);
             if (arg == 1) {
@@ -4354,8 +4289,6 @@ void ai_npc_m4_step1_arm(_AINPC_W* self, u8 arg)
     nw4r::math::VEC3 offset;
     u8 state;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&offset);
     fn_802D3A2C(self, 2);
     state = self->state;
     switch (state) {
@@ -4410,8 +4343,6 @@ void ai_npc_m4_step2_arm(_AINPC_W* self)
     nw4r::math::VEC3 offset;
     u8 state;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&offset);
     fn_802D3A2C(self, 2);
     state = self->state;
     switch (state) {
@@ -4644,7 +4575,6 @@ void ai_npc_m4_step10_arm(_AINPC_W* self, u8 arg)
     nw4r::math::VEC3 offset;
     u8 state;
 
-    VEC3_ctor(&offset);
     setVector3(&offset, 0.0f, 50.0f, 0.0f);
     state = self->state;
     switch (state) {
@@ -4906,11 +4836,11 @@ void ai_npc_m5_step2_arm(_AINPC_W* self)
         if (--self->timer_0x1AC < 0) {
             fn_802D3684(self);
             fn_802D6B98(self);
-            copyVec3(&self->pos_0x178, &self->plw_0x16C->vec_0x03C);
-            if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
+            self->pos_0x178 = self->plw_0x16C->vec_0x03C;
+            if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->land_0x324, &height, -5) == 1) {
                 self->pos_0x178.y = self->field_0x19C = height;
             }
-            copyVec3(&self->pos_0x184, &self->pos_0x178);
+            self->pos_0x184 = self->pos_0x178;
             fn_802D2B98(self, 2);
             if (self->plw_0x16C->kind_0x09 == 3) {
                 ai_npc_variant_set(self, 2);
@@ -4953,11 +4883,11 @@ void ai_npc_m5_step3_arm(_AINPC_W* self)
             fn_802D35B4(self, 1);
             if (self->gauge_0x1F0 == self->gauge_max_0x1F4) {
                 self->state++;
-                copyVec3(&self->pos_0x178, &self->plw_0x16C->vec_0x03C);
-                if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &height, -5) == 1) {
+                self->pos_0x178 = self->plw_0x16C->vec_0x03C;
+                if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->land_0x324, &height, -5) == 1) {
                     self->pos_0x178.y = self->field_0x19C = height;
                 }
-                copyVec3(&self->pos_0x184, &self->pos_0x178);
+                self->pos_0x184 = self->pos_0x178;
                 fn_802D2B98(self, 2);
                 if (self->plw_0x16C->kind_0x09 == 3) {
                     ai_npc_variant_set(self, 2);
@@ -4982,7 +4912,6 @@ void ai_npc_m5_step5_arm(_AINPC_W* self, u8 arg)
     nw4r::math::VEC3 pos;
     u8 state;
 
-    VEC3_ctor(&pos);
     fn_802D3A2C(self, 2);
     fn_802D84D0(self, 2);
     state = self->state;
@@ -5009,7 +4938,7 @@ void ai_npc_m5_step5_arm(_AINPC_W* self, u8 arg)
             }
             se_npc_faint_play();
         } else if (ai_npc_frame_ck(self, 0, 22.0f, 0.0f) != 0) {
-            copyVec3(&pos, &self->pos_0x178);
+            pos = self->pos_0x178;
             if (self->pos_0x178.y < self->field_0x1A0 && self->pos_0x178.y > self->field_0x1A0 - 40.0f) {
                 pos.y = self->field_0x1A0;
             }
@@ -5094,8 +5023,6 @@ u32 ai_npc_water_landing_ck(_AINPC_W* self)
     u32 zone;
     f32 height;
     u8 area;
-
-    em_land_data_init(&land);
     area = self->area;
     if (area == 0xFF) {
         return 0;
@@ -5118,7 +5045,6 @@ void ai_npc_m6_step0_arm(_AINPC_W* self)
     f32 ground;
     u8 state;
 
-    VEC3_ctor(&pos);
     state = self->state;
     switch (state) {
     case 0:
@@ -5211,7 +5137,7 @@ void ai_npc_m7_step0_arm(_AINPC_W* self)
             self->state++;
             fn_802D2B98(self, 2);
             setVector3(&self->pos_0x178, 5.57f, 20.0f, -306.9f);
-            copyVec3(&self->pos_0x184, &self->pos_0x178);
+            self->pos_0x184 = self->pos_0x178;
             self->vec_0x190.y = 0xDD55;
             ai_npc_motion_set(self, 10, 0, 0);
         }
@@ -5221,7 +5147,7 @@ void ai_npc_m7_step0_arm(_AINPC_W* self)
             self->state++;
             ai_npc_motion_set(self, 2, 0, 0);
             setVector3(&self->pos_0x178, -279.5f, 20.0f, -56.9f);
-            copyVec3(&self->pos_0x184, &self->pos_0x178);
+            self->pos_0x184 = self->pos_0x178;
         }
         break;
     case 3:
@@ -5311,10 +5237,7 @@ void ai_npc_target_player_set(_AINPC_W* self)
     nw4r::math::VEC3 b;
     nw4r::math::VEC3 c;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
-    VEC3_ctor(&c);
-    copyVec3(&self->pos_0x1B0, &plw->vec_0x03C);
+    self->pos_0x1B0 = plw->vec_0x03C;
 }
 
 /* 0x802CB900 (0x50): whether two points are no farther apart than `limit`. */
@@ -5342,9 +5265,7 @@ extern "C" {
  * `out`; returns the count (1 when the nearest is kept). */
 u8 ai_npc_enemy_scan(_AINPC_W* self, u8 flags, u8* out)
 {
-    nw4r::math::VEC3 spots[32];
-    nw4r::math::VEC3 from;
-    nw4r::math::VEC3* spot;
+
     f32 dist;
     f32 nearest;
     s16 max;
@@ -5354,18 +5275,14 @@ u8 ai_npc_enemy_scan(_AINPC_W* self, u8 flags, u8* out)
 
     enemy = (_ENEMY_WORK*)::get_move_work_adrs(3);
     max = ::get_move_work_max(3);
-    spot = spots;
-    do {
-        VEC3_ctor(spot);
-        spot++;
-    } while (spot < &spots[32]);
-    VEC3_ctor(&from);
+    nw4r::math::VEC3 spots[32];
+    nw4r::math::VEC3 from;
     nearest = 0.0f;
     count = 0;
     if (flags & 8) {
-        copyVec3(&from, &self->plw_0x16C->vec_0x03C);
+        from = self->plw_0x16C->vec_0x03C;
     } else {
-        copyVec3(&from, &self->pos_0x178);
+        from = self->pos_0x178;
     }
     for (i = 0; i < max; i++, enemy++) {
         if (enemy->active == 0) {
@@ -5640,10 +5557,6 @@ void ai_npc_buff_item_use(_AINPC_W* self)
  * desert formation); when the formation's roll allows, sets the move target beside it and claims it. */
 u32 ai_npc_gather_spot_find(_AINPC_W* self)
 {
-    nw4r::math::VEC3 spot;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 target;
     f32 radius;
     u32 word;
     u32 pitch;
@@ -5653,8 +5566,8 @@ u32 ai_npc_gather_spot_find(_AINPC_W* self)
     f32 height;
 
     ::get_move_work_adrs(3);
-    VEC3_ctor(&spot);
-    VEC3_ctor(&dir);
+    nw4r::math::VEC3 spot;
+    nw4r::math::VEC3 dir;
     if (::ai_skill_ck((::_AINPC_W*)self, 0x13) == 1) {
         return 0;
     }
@@ -5688,15 +5601,13 @@ u32 ai_npc_gather_spot_find(_AINPC_W* self)
         self->field_0x364 = word;
         if (fn_802D4020(self) == 1) {
             self->field_0x358 = 1;
-            subVec3(&diff, &self->pos_0x178, &spot);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x178 - spot;
             ::calcVecAngXY(&dir, &pitch, &yaw);
             setVector3(&dir, 0.0f, 0.0f, 0.6f * radius);
             ::rotVecX(&dir, pitch);
             ::rotVecY(&dir, yaw);
-            addVec3(&target, &spot, &dir);
-            copyVec3(&self->pos_0x1B0, &target);
-            copyVec3(&self->pos_0x368, &spot);
+            self->pos_0x1B0 = spot + dir;
+            self->pos_0x368 = spot;
             return 1;
         }
         em_roster_area_use_take(self->area, &spot, self->field_0x364);
@@ -5789,12 +5700,6 @@ void ai_npc_move_target_set(_AINPC_W* self)
 {
     _ENEMY_WORK* enemies;
     _ENEMY_WORK* enemy;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 offset2;
-    nw4r::math::VEC3 base;
-    nw4r::math::VEC3 hit;
-    nw4r::math::VEC3 target;
-    nw4r::math::VEC3 target2;
     f32 reach;
     f32 scale;
     s32 hits;
@@ -5803,10 +5708,10 @@ void ai_npc_move_target_set(_AINPC_W* self)
     s8 spread;
 
     enemies = (_ENEMY_WORK*)::get_move_work_adrs(3);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&offset2);
-    VEC3_ctor(&base);
-    VEC3_ctor(&hit);
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 offset2;
+    nw4r::math::VEC3 base;
+    nw4r::math::VEC3 hit;
     if (self->field_0x376 != 0) {
         return;
     }
@@ -5823,11 +5728,11 @@ void ai_npc_move_target_set(_AINPC_W* self)
             self->field_0x378 = 1;
         }
         reach = 500.0f + self->field_0x37C;
-        copyVec3(&base, &self->plw_0x16C->vec_0x03C);
+        base = self->plw_0x16C->vec_0x03C;
         break;
     case 4:
         if (self->field_0x447 == 1 && self->field_0x377 == 1) {
-            if (pl_area_spot_valid_ck(self->area, &self->pos_0x178, self->field_0x326) == 1 &&
+            if (pl_area_spot_valid_ck(self->area, &self->pos_0x178, self->land_0x324.field_0x02) == 1 &&
                 (s8)self->field_0x448 < 5) {
                 self->field_0x447 = 2;
             }
@@ -5875,7 +5780,7 @@ void ai_npc_move_target_set(_AINPC_W* self)
             self->field_0x378 = 1;
         }
         reach += self->field_0x37C;
-        copyVec3(&base, &enemy->pos);
+        base = enemy->pos;
         break;
     default:
         return;
@@ -5885,7 +5790,7 @@ void ai_npc_move_target_set(_AINPC_W* self)
     }
     setVector3(&offset, 0.0f, 0.0f, reach);
     ::rotVecY(&offset, bearing);
-    copyVec3(&offset2, &offset);
+    offset2 = offset;
     bearing = ::calcVecAng2(&enemy->pos, &self->plw_0x16C->vec_0x03C);
     to_self = ::calcVecAng2(&enemy->pos, &self->pos_0x178);
     if (to_self > bearing) {
@@ -5893,8 +5798,7 @@ void ai_npc_move_target_set(_AINPC_W* self)
     } else {
         ::rotVecY(&offset, -self->field_0x380);
     }
-    addVec3(&target, &base, &offset);
-    copyVec3(&self->pos_0x1B0, &target);
+    self->pos_0x1B0 = base + offset;
     if (self->variant == 2) {
         if (self->field_0x1CC == 4) {
             scale = ::get_em_chg_scale(enemy);
@@ -5918,8 +5822,7 @@ void ai_npc_move_target_set(_AINPC_W* self)
         } else {
             ::rotVecY(&offset2, self->field_0x380);
         }
-        addVec3(&target2, &base, &offset2);
-        copyVec3(&self->pos_0x1B0, &target2);
+        self->pos_0x1B0 = base + offset2;
         if (self->variant == 2) {
             self->pos_0x1B0.y -= 2.0f * reach;
         }
@@ -5985,7 +5888,7 @@ void ai_npc_enemy_track(_AINPC_W* self, u32 aim)
         } else if ((u8)aim == 1 && self->field_0x1C8 != 0) {
             ai_npc_weak_point_pos_get(self, (struct EmWeakPoint*)self->field_0x1C8, enemy, &self->pos_0x1B0);
         } else {
-            copyVec3(&self->pos_0x1B0, &enemy->pos);
+            self->pos_0x1B0 = enemy->pos;
         }
     }
 }
@@ -5994,13 +5897,10 @@ void ai_npc_enemy_track(_AINPC_W* self, u32 aim)
 void ai_npc_target_ahead_set(_AINPC_W* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 target;
 
-    VEC3_ctor(&offset);
     setVector3(&offset, 0.0f, 0.0f, 800.0f);
     ::rotVecY(&offset, self->plw_0x16C->field_0x058);
-    addVec3(&target, &self->plw_0x16C->vec_0x03C, &offset);
-    copyVec3(&self->pos_0x1B0, &target);
+    self->pos_0x1B0 = self->plw_0x16C->vec_0x03C + offset;
 }
 
 /* 0x802CD04C (0x1C0): the counter-attack watch: while the player is down (+0x492 with a hold, or act group 6) it
@@ -6058,8 +5958,6 @@ u32 ai_npc_carve_spot_find(_AINPC_W* self)
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 spare;
     nw4r::math::VEC3 spot;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 target;
     f32 radius;
     u32 pitch;
     u32 yaw;
@@ -6067,9 +5965,6 @@ u32 ai_npc_carve_spot_find(_AINPC_W* self)
     f32 reach;
     f32 height;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&spare);
-    VEC3_ctor(&spot);
     if (::ai_skill_ck((::_AINPC_W*)self, 0x13) == 1) {
         return 0;
     }
@@ -6103,15 +5998,13 @@ u32 ai_npc_carve_spot_find(_AINPC_W* self)
         self->field_0x35E = 450;
         if (fn_802D4020(self) == 1) {
             self->field_0x35C = 1;
-            subVec3(&diff, &self->pos_0x178, &spot);
-            copyVec3(&dir, &diff);
+            dir = self->pos_0x178 - spot;
             ::calcVecAngXY(&dir, &pitch, &yaw);
             setVector3(&dir, 0.0f, 0.0f, 0.8f * radius);
             ::rotVecX(&dir, pitch);
             ::rotVecY(&dir, yaw);
-            addVec3(&target, &spot, &dir);
-            copyVec3(&self->pos_0x1B0, &target);
-            copyVec3(&self->pos_0x368, &spot);
+            self->pos_0x1B0 = spot + dir;
+            self->pos_0x368 = spot;
             return 1;
         }
         em_roster_area_use_take(self->area, &spot, self->field_0x364);
@@ -6214,7 +6107,7 @@ void ai_npc_player_watch(_AINPC_W* self)
     if ((::Pl_act_ck(plw, 0, 60) == 1 || ::Pl_act_ck(plw, 0, 80) != 0) && plw->flag_0x30E != 0 &&
         self->field_0x445 == 0 && self->field_0x451 == 0) {
         self->field_0x451 = 1;
-        copyVec3(&self->pos_0x454, &plw->vec_0x03C);
+        self->pos_0x454 = plw->vec_0x03C;
     }
 }
 
@@ -6231,7 +6124,7 @@ void ai_npc_target_refresh(_AINPC_W* self)
             ai_npc_enemy_track(self, 1);
             break;
         case 9:
-            copyVec3(&self->pos_0x1B0, &self->pos_0x454);
+            self->pos_0x1B0 = self->pos_0x454;
             break;
         }
     }
@@ -6421,10 +6314,8 @@ void ai_npc_plan42_arm(_AINPC_W* self)
 void ai_npc_plan43_arm(_AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 target;
     f32 reach;
 
-    VEC3_ctor(&offset);
     switch (self->field_0x1D0) {
     case 0:
         self->field_0x1D0++;
@@ -6488,8 +6379,7 @@ void ai_npc_plan43_arm(_AINPC_W* self, u8 arg)
         case 5:
             setVector3(&offset, 0.0f, 0.0f, 1000.0f);
             ::rotVecY(&offset, (u16)(self->plw_0x16C->field_0x058 + 0x8000));
-            addVec3(&target, &self->pos_0x178, &offset);
-            copyVec3(&self->pos_0x1B0, &target);
+            self->pos_0x1B0 = self->pos_0x178 + offset;
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
             if (arg == 0) {
@@ -6583,7 +6473,6 @@ void ai_npc_plan49_arm(_AINPC_W* self)
     nw4r::math::VEC3 offset;
     u32 angle;
 
-    VEC3_ctor(&offset);
     switch (self->field_0x1D0) {
     case 0:
         if (self->field_0x451 == 0) {
@@ -6638,7 +6527,6 @@ void ai_npc_plan50_arm(_AINPC_W* self)
     nw4r::math::VEC3 offset;
     u32 angle;
 
-    VEC3_ctor(&offset);
     switch (self->field_0x1D0) {
     case 0:
         if (self->field_0x451 == 0) {
@@ -6695,7 +6583,7 @@ void ai_npc_plan7_arm(_AINPC_W* self)
     case 0:
         if (self->field_0x38E != 0) {
             fn_802D4230(self, 50.0f);
-            copyVec3(&self->pos_0x1B0, &self->plw_0x16C->vec_0x03C);
+            self->pos_0x1B0 = self->plw_0x16C->vec_0x03C;
             fn_802D2A00(self, 2, 3, 0);
         } else if (self->field_0x1C0 > 600.0f) {
             fn_802D4230(self, 50.0f);
@@ -6734,7 +6622,7 @@ void ai_npc_plan11_arm(_AINPC_W* self)
     case 0:
         if (self->field_0x38E != 0) {
             fn_802D4230(self, 50.0f);
-            copyVec3(&self->pos_0x1B0, &self->plw_0x16C->vec_0x03C);
+            self->pos_0x1B0 = self->plw_0x16C->vec_0x03C;
             fn_802D2A00(self, 2, 0x12, 0);
         }
         fn_802D4230(self, 50.0f);
@@ -6765,7 +6653,7 @@ void ai_npc_plan9_arm(_AINPC_W* self, u8 arg)
         fn_802D2A00(self, 2, 9, 0);
         break;
     case 1:
-        copyVec3(&self->pos_0x1B0, &self->plw_0x16C->vec_0x03C);
+        self->pos_0x1B0 = self->plw_0x16C->vec_0x03C;
         fn_802D2A00(self, 2, 5, 0);
         self->field_0x1D0++;
         break;
@@ -6791,7 +6679,7 @@ void ai_npc_plan18_arm(_AINPC_W* self, u8 arg)
         self->field_0x1D0++;
         break;
     case 1:
-        copyVec3(&self->pos_0x1B0, &self->plw_0x16C->vec_0x03C);
+        self->pos_0x1B0 = self->plw_0x16C->vec_0x03C;
         fn_802D2A00(self, 2, 0x10, 0);
         self->field_0x1D0++;
         break;
@@ -7054,13 +6942,12 @@ EmWeakPoint* ai_npc_weak_point_pick(_AINPC_W* self, u8 any_height)
     _ENEMY_WORK* enemy;
     EmWeakPoint* point;
     EmWeakPoint* best;
-    nw4r::math::VEC3 pos;
     f32 nearest;
     f32 dist;
 
     enemy = (_ENEMY_WORK*)::get_move_work_adrs(3);
     best = NULL;
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     nearest = 0.0f;
     if (self->enemy_index == 0xFF) {
         return NULL;
@@ -7107,16 +6994,11 @@ EmWeakPoint* ai_npc_weak_point_pick(_AINPC_W* self, u8 any_height)
 void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* enemy, nw4r::math::VEC3* out)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 joint;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 sum;
     u32 pitch;
     u32 yaw;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&joint);
-    VEC3_ctor(&dir);
+    nw4r::math::VEC3 joint;
+    nw4r::math::VEC3 dir;
     if (point->joint == 1000) {
         out->x = point->offset.x;
         out->y = point->offset.y;
@@ -7124,7 +7006,7 @@ void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* 
         return;
     }
     if ((u32)point->joint >= ((MHchar*)enemy->char_0x024)->get_joint_num()) {
-        copyVec3(out, &enemy->pos);
+        *out = enemy->pos;
         return;
     }
     ::get_joint_wmat_em(enemy, point->joint, &mtx);
@@ -7132,14 +7014,12 @@ void ai_npc_weak_point_pos_get(_AINPC_W* self, EmWeakPoint* point, _ENEMY_WORK* 
     joint.y = point->offset.y;
     joint.z = point->offset.z;
     ::mulVecMatAddTrans(&joint, &mtx);
-    subVec3(&diff, &self->pos_0x178, &joint);
-    copyVec3(&dir, &diff);
+    dir = self->pos_0x178 - joint;
     ::calcVecAngXY(&dir, &pitch, &yaw);
     setVector3(&dir, 0.0f, 0.0f, point->radius);
     ::rotVecX(&dir, pitch);
     ::rotVecY(&dir, yaw);
-    addVec3(&sum, &joint, &dir);
-    copyVec3(out, &sum);
+    *out = joint + dir;
 }
 #pragma opt_common_subs reset
 
@@ -7547,32 +7427,11 @@ void u16_add_sat(u16* dst, s32 value)
 
 namespace view_fn_802D0F34 {
 
-extern "C" {
-
-/* 0x802D9E20 (0x84): constructs the record's members: the model, its vectors and its land record. */
-_AINPC_W* ainpc_w_construct(_AINPC_W* self)
+/* The vectors are the members' own constructors; the model's and the land record's are C functions here. */
+_AINPC_W::_AINPC_W()
 {
-    mhchar_construct(&self->model);
-    VEC3_ctor(&self->pos_0x178);
-    VEC3_ctor(&self->pos_0x184);
-    VEC3_ctor(&self->pos_0x1B0);
-    VEC3_ctor(&self->pos_0x1D4);
-    VEC3_ctor(&self->pos_0x1E0);
-    ::em_land_data_init((LandData*)&self->field_0x324);
-    VEC3_ctor(&self->pos_0x368);
-    VEC3_ctor(&self->pos_0x3E0);
-    VEC3_ctor(&self->pos_0x454);
-    VEC3_ctor(&self->drift_vel);
-    return self;
 }
 
-/* 0x802D9E14 (0xC): the static initializer `.ctors` runs: constructs `ainpc_w`. */
-void ainpc_w_sinit(void)
-{
-    ainpc_w_construct(&AINPC_VIEW);
-}
-
-}  /* extern "C" */
 
 }  /* namespace view_fn_802D0F34 */
 
@@ -7924,17 +7783,14 @@ void fn_802CE170(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 tmp;
 
-    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
     {
-        nw4r::math::VEC3 offset;
         s32 angle = calcVecAng2(&self->vec_0x1B0, &self->vec_0x178);
 
         setVector3(&tmp, 0.0f, 0.0f, 800.0f);
         rotVecY(&tmp, angle);
-        addVec3(&offset, &self->vec_0x178, &tmp);
-        copyVec3(&self->vec_0x1B0, &offset);
+        self->vec_0x1B0 = self->vec_0x178 + tmp;
         self->field_0x389 = 0;
         fn_802D4230(self, 30.0f);
         fn_802D2A00(self, 3, 0x12, 0);
@@ -8296,7 +8152,6 @@ void fn_802D0358(struct _AINPC_W* self, u8 arg)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
     {
@@ -8335,7 +8190,6 @@ void fn_802D04CC(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 <= 400.0f) {
@@ -8374,7 +8228,6 @@ void fn_802D063C(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 <= 400.0f) {
@@ -8742,9 +8595,7 @@ void fn_802CFBF4(struct _AINPC_W* self)
 void fn_802CFC94(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 tmp;
-    nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 > 800.0f) {
@@ -8755,8 +8606,7 @@ void fn_802CFC94(struct _AINPC_W* self)
 
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecY(&tmp, angle);
-            addVec3(&offset, &self->vec_0x178, &tmp);
-            copyVec3(&self->vec_0x1B0, &offset);
+            self->vec_0x1B0 = self->vec_0x178 + tmp;
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
             fn_802D2A00(self, 2, 4, 0);
@@ -8784,25 +8634,20 @@ void fn_802CFC94(struct _AINPC_W* self)
 void fn_802CFE20(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 tmp;
-    nw4r::math::VEC3 delta;
-    nw4r::math::VEC3 offset;
     u32 x, z;
 
-    VEC3_ctor(&tmp);
     switch (self->step) {
     case 0:
         if (self->field_0x1C0 > 800.0f) {
             fn_802D4230(self, 1100.0f);
             fn_802D2A00(self, 2, 0xF, 0);
         } else {
-            subVec3(&delta, &self->vec_0x178, &self->vec_0x1B0);
-            copyVec3(&tmp, &delta);
+            tmp = self->vec_0x178 - self->vec_0x1B0;
             calcVecAngXY(&tmp, &x, &z);
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecX(&tmp, x);
             rotVecY(&tmp, z);
-            addVec3(&offset, &self->vec_0x178, &tmp);
-            copyVec3(&self->vec_0x1B0, &offset);
+            self->vec_0x1B0 = self->vec_0x178 + tmp;
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
             fn_802D2A00(self, 2, 0xF, 0);
@@ -9103,8 +8948,6 @@ void fn_802D15DC(struct _AINPC_W* self)
     u32 flags;
     s32 blocked;
 
-    VEC3_ctor(&probe);
-    VEC3_ctor(&current);
     flags = 0x20;
     blocked = 0;
     if (self->field_0x3CA > 0) {
@@ -9120,9 +8963,9 @@ void fn_802D15DC(struct _AINPC_W* self)
     if ((u32)(self->motion - 4) > 1 && blocked == 0) {
         flags |= 0xC0;
     }
-    copyVec3(&probe, &self->pos_0x184);
+    probe = self->pos_0x184;
     probe.y = probe.y + lbl_8079A7A8;
-    copyVec3(&current, &self->pos_0x178);
+    current = self->pos_0x178;
     current.y = current.y + lbl_8079A7A8;
     self->field_0x3C8 = (u8)coll_wall_slide(&probe, &current, lbl_8079A7A8, &self->pos_0x178, 0xFFFF, flags, 1,
                                         self->area);
@@ -9134,11 +8977,9 @@ void fn_802D1710(struct _AINPC_W* self)
 {
     ::LandData base;
     f32 value;
-
-    em_land_data_init(&base);
     self->field_0x3CE = 0;
     if (self->field_0x3D0 <= 0 && ai_npc_flag_ck(self, 2) == 0) {
-        if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &value, -6) == 1) {
+        if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->land_0x324, &value, -6) == 1) {
             self->field_0x19C = value;
             switch (self->variant) {
             case 0:
@@ -9156,7 +8997,7 @@ void fn_802D1710(struct _AINPC_W* self)
                 }
                 break;
             }
-        } else if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->field_0x324, &value, 1) == 1) {
+        } else if (pl_ground_check_all_layers(self, &self->pos_0x178, &self->land_0x324, &value, 1) == 1) {
             self->field_0x19C = value;
             switch (self->variant) {
             case 2:
@@ -9203,9 +9044,7 @@ void fn_802D1954(struct _AINPC_W* self)
 {
     _PLW* plw;
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 position;
 
-    VEC3_ctor(&offset);
     plw = self->plw_0x16C;
     if (ai_npc_mode1_ck(self) != 1) {
         if (fn_802D94A0(self) == 1 && plw->area_0x16 == 0) {
@@ -9215,8 +9054,7 @@ void fn_802D1954(struct _AINPC_W* self)
         eft_rot_vec_copy(&self->vec_0x190, (_CP_VECTOR*)&plw->param_0x54);
         setVector3(&offset, lbl_8079A7AC, lbl_8079A670, lbl_8079A7B0);
         rotVecY(&offset, self->vec_0x190.y);
-        addVec3(&position, &plw->vec_0x03C, &offset);
-        copyVec3(&self->pos_0x178, copyVec3(&self->pos_0x184, &position));
+        self->pos_0x178 = self->pos_0x184 = plw->vec_0x03C + offset;
         switch (plw->kind_0x09) {
         default:
             ai_npc_variant_set(self, 0);
@@ -9324,7 +9162,7 @@ void fn_802D1D90(struct _AINPC_W* self)
     _PLW* plw = self->plw_0x16C;
     u8 i;
 
-    copyVec3(&self->pos_0x184, &self->pos_0x178);
+    self->pos_0x184 = self->pos_0x178;
     self->field_0x3C4 = 0;
     self->field_0x417 = 0;
     self->field_0x450 = 0;
@@ -9369,17 +9207,17 @@ void fn_802D1D90(struct _AINPC_W* self)
     fn_802D6888(self);
     fn_802D1FFC(self);
     self->model.move(0);
-    copyVec3(&self->pos_0x178, &self->model.pos_0x04);
+    self->pos_0x178 = self->model.pos_0x04;
     switch (self->variant) {
     case 1:
         break;
     default:
-        vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, lbl_8079A7B4,
+        vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->land_0x324.vec_0x08, lbl_8079A7B4,
                      &self->pos_0x178);
         break;
     case 2:
         if (self->pos_0x184.y < lbl_8079A688 + self->field_0x19C) {
-            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->pos_0x32C, lbl_8079A73C,
+            vec3_move_damp(&self->pos_0x184, &self->pos_0x178, &self->land_0x324.vec_0x08, lbl_8079A73C,
                          &self->pos_0x178);
         }
         break;
@@ -9401,7 +9239,7 @@ void fn_802D1FFC(struct _AINPC_W* self)
     self->model.field_0x28 = self->vec_0x190.x;
     self->model.field_0x2C = self->vec_0x190.y;
     self->model.field_0x30 = self->vec_0x190.z;
-    copyVec3(&self->model.pos_0x04, &self->pos_0x178);
+    self->model.pos_0x04 = self->pos_0x178;
 }
 
 #pragma peephole on
@@ -9442,7 +9280,6 @@ void fn_802D214C(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&offset);
     setVector3(&offset, lbl_8079A670, lbl_8079A68C, lbl_8079A670);
     if (self->motion != 5) {
         s16 count = self->field_0x21C;
@@ -9988,18 +9825,17 @@ void fn_802D3210(struct _AINPC_W* self, u32* angles)
 {
     nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&offset);
-    copyVec3(&offset, &self->pos_0x1D4);
+    offset = self->pos_0x1D4;
     rotVecX(&offset, angles[0]);
     rotVecY(&offset, angles[1]);
-    addVec3To(&self->pos_0x178, &offset);
+    self->pos_0x178 += offset;
 }
 
 /* 0x802D327C - the stored variant, then the same offset walk from +0x1D4. */
 void fn_802D327C(struct _AINPC_W* self, u32* angles)
 {
     fn_802D3210(self, angles);
-    addVec3To(&self->pos_0x1D4, &self->pos_0x1E0);
+    self->pos_0x1D4 += self->pos_0x1E0;
 }
 
 /* 0x802D32B4 - rolls one of the six-byte attack rows the skill table points at, weighted by the
@@ -10371,13 +10207,13 @@ u32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
     }
     if (moved == 1) {
         if (copy == 1) {
-            copyVec3(&self->pos_0x1B0, &self->pos_0x178);
+            self->pos_0x1B0 = self->pos_0x178;
             fn_802D3CB8(self);
             return 0;
         }
         if ((self->field_0x358 != 0 || self->field_0x35C != 0) &&
             ::calcDistanceSqXZ(&self->pos_0x178, &self->pos_0x1B0) < lbl_8079A6E0) {
-            copyVec3(&self->pos_0x1B0, &self->pos_0x178);
+            self->pos_0x1B0 = self->pos_0x178;
             fn_802D3CB8(self);
             return 0;
         }
@@ -10637,11 +10473,10 @@ void fn_802D4238(struct _AINPC_W* self)
  * drops it by the entry's offset and maps the attack kind onto the effect id the emitter takes. */
 void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f32 scale)
 {
-    nw4r::math::VEC3 pos;
     u8 code = kind;
 
-    VEC3_ctor(&pos);
-    if ((self->field_0x324 & 0x4000) != 0) {
+    nw4r::math::VEC3 pos;
+    if ((self->land_0x324.field_0x00 & 0x4000) != 0) {
         return;
     }
     if (a1 != 0) {
@@ -10650,9 +10485,9 @@ void fn_802D4248(struct _AINPC_W* self, u8 a1, u8 kind, u32 joint, s32 effect, f
     if (joint != 0xFF) {
         self->model.get_joint_wpos(joint, &pos);
     } else {
-        copyVec3(&pos, &self->pos_0x178);
+        pos = self->pos_0x178;
     }
-    if ((self->field_0x324 & 6) != 0) {
+    if ((self->land_0x324.field_0x00 & 6) != 0) {
         pos.y = lbl_8079A7B8 + self->field_0x1A0;
         switch (code) {
         case 0:
@@ -10732,7 +10567,6 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
 {
     nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&offset);
     if (self->in_area != 0) {
         if ((fn_802CCE04(self) == 1) && ((self->field_0x352 % 45) == 0)) {
             setVector3(&offset, -20.0f, 30.0f, 0.0f);
@@ -10769,21 +10603,21 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xE:
             if ((ai_npc_frame_ck(self, 0, 10.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 44.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 80.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 106.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 130.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 152.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 8, 0, 1.2f);
                 } else {
                     fn_802D4248(self, 0, 0, 8, 0, 1.2f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 66.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 94.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 120.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 142.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 162.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0xC, 0, 1.2f);
                 } else {
                     fn_802D4248(self, 0, 0, 0xC, 0, 1.2f);
                 }
             }
             if (ai_npc_frame_ck(self, 0, 216.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x23, 0xFF, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 6, 0xFF, 0, ai_npc_f32_0_7);
@@ -10793,7 +10627,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0x10:
             if (ai_npc_frame_ck(self, 0, 36.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x23, 0xFF, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 6, 0xFF, 0, ai_npc_f32_0_7);
@@ -10801,7 +10635,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 }
             }
             if (ai_npc_frame_ck(self, 0, 70.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x23, 0xFF, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 6, 0xFF, 0, 0.4f);
@@ -10826,14 +10660,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 fn_802D4248(self, 0, 0, 0xE, 0, 1.5f);
             }
             if ((ai_npc_frame_ck(self, 0, 34.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 54.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 8, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 0, 8, 0, 1.0f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 46.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 66.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0xC, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 0, 0xC, 0, 1.0f);
@@ -10842,7 +10676,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0x18:
             if ((ai_npc_frame_ck(self, 0, 16.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 50.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x11, 4, 0, 1.0f);
                 } else {
                     fn_802D4248(self, 0, 0, 4, 0, 1.0f);
@@ -10885,14 +10719,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0x28:
             if ((ai_npc_frame_ck(self, 0, 12.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 40.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 68.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 94.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 116.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 138.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x14, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0x12, 0x14, 0, 0.8f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 26.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 54.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 82.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 104.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 128.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0x12, 0x12, 0, 0.8f);
@@ -10930,7 +10764,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             }
             break;
         case 0x3B:
-            if (((self->field_0x324 & 1) != 0) && (ai_npc_frame_ck(self, 0, 2.0f, 0.0f) == 1)) {
+            if (((self->land_0x324.field_0x00 & 1) != 0) && (ai_npc_frame_ck(self, 0, 2.0f, 0.0f) == 1)) {
                 fn_802D4248(self, 0, 0x2B, 4, 0, 1.0f);
             }
             break;
@@ -10982,14 +10816,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xC8:
             if ((ai_npc_frame_ck(self, 0, 6.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 20.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 38.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x14, 0, 0.5f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x14, 0, 0.5f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 14.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 28.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 44.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x12, 0, 0.5f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.5f);
@@ -11008,14 +10842,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xCC:
             if ((ai_npc_frame_ck(self, 0, 12.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 18.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 28.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 36.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 44.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 52.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 60.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 68.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x14, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x14, 0, 0.8f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 16.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 24.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 32.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 40.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 48.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 58.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 64.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.8f);
@@ -11027,7 +10861,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 fn_802D4248(self, 0, 0x2B, 0xFF, 0, 0.5f);
             }
             if ((ai_npc_frame_ck(self, 0, 70.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 118.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.8f);
@@ -11036,14 +10870,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xCE:
             if ((ai_npc_frame_ck(self, 0, 24.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 32.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 50.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 58.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 64.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x14, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x14, 0, 0.8f);
                 }
             }
             if ((ai_npc_frame_ck(self, 0, 14.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 28.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 38.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 46.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 54.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 62.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.8f);
@@ -11055,7 +10889,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
                 fn_802D4248(self, 0, 0x2B, 0xFF, 0, 0.5f);
             }
             if ((ai_npc_frame_ck(self, 0, 78.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 98.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x30, 0x12, 0, 0.4f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.4f);
@@ -11064,7 +10898,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xD0:
             if (ai_npc_frame_ck(self, 0, 30.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x2A, 0xFF, 0, 0.5f);
                 } else {
                     fn_802D4248(self, 0, 0x29, 0xFF, 0, 1.0f);
@@ -11073,7 +10907,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xD1:
             if (ai_npc_frame_ck(self, 0, 28.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 0x2A, 0xFF, 0, 0.5f);
                 } else {
                     fn_802D4248(self, 0, 0x29, 0xFF, 0, 1.0f);
@@ -11082,14 +10916,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xD2:
             if ((ai_npc_frame_ck(self, 0, 26.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 60.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 84.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 106.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x14, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x14, 0, 0.8f);
                 }
             }
             if (ai_npc_frame_ck(self, 0, 44.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.8f);
@@ -11098,14 +10932,14 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             break;
         case 0xD3:
             if ((ai_npc_frame_ck(self, 0, 26.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 60.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 84.0f, 0.0f) == 1) || (ai_npc_frame_ck(self, 0, 106.0f, 0.0f) == 1)) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x12, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x12, 0, 0.8f);
                 }
             }
             if (ai_npc_frame_ck(self, 0, 44.0f, 0.0f) == 1) {
-                if ((self->field_0x324 & 6) != 0) {
+                if ((self->land_0x324.field_0x00 & 6) != 0) {
                     fn_802D4248(self, 0, 1, 0x14, 0, 0.8f);
                 } else {
                     fn_802D4248(self, 0, 0, 0x14, 0, 0.8f);
@@ -11169,7 +11003,7 @@ void ai_npc_motion_dispatch(_AINPC_W* self)
             case 102:
             case 105:
             case 106:
-                if (((self->field_0x324 & 6) != 0) && ((19.5f + self->pos_0x178.y) < self->field_0x1A0) && ((system_w.field_0x0c & 0xF) == 0)) {
+                if (((self->land_0x324.field_0x00 & 6) != 0) && ((19.5f + self->pos_0x178.y) < self->field_0x1A0) && ((system_w.field_0x0c & 0xF) == 0)) {
                     fn_802D4248(self, 0, 3, 0xFF, 0, 0.9f);
                 }
                 break;
@@ -12148,10 +11982,9 @@ void fn_802D9400(struct _AINPC_W* self)
     struct AINPCSpawnPos* spawn = &ai_npc_spawn_pos_tbl[self->field_0x484];
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     self->field_0x1A4 = spawn->area;
     vec_to_mh_vec3(&pos, &spawn->pos);
-    copyVec3(&self->vec_0x178, copyVec3(&self->prev_pos, &pos));
+    self->vec_0x178 = self->prev_pos = pos;
     self->field_0x190 = 0;
     self->field_0x194 = spawn->yaw;
     self->rot_z = 0;
@@ -12225,7 +12058,7 @@ void ainpc_move(void)
         return;
     }
     if (self->drift_active != 0) {
-        addVec3To(&self->pos_0x178, &self->drift_vel);
+        self->pos_0x178 += self->drift_vel;
         fn_802D15DC(self);
         fn_802D1710(self);
         fn_802D1FFC(self);
@@ -12306,7 +12139,11 @@ struct AinpcPageState {
 }; /* size: 0x50 */
 
 /* This unit's own `.bss` (0x806BD360-0x806BD808), defined at the foot of the file, after every use.
- * `ainpc_w` is constructed by the `.ctors` word `ainpc_w_sinit` (a tail call into the record's constructor
- * `ainpc_w_construct`, not reconstructed here). */
+ * `ainpc_w` is defined through the record view that carries its constructor; the TU's `__sinit`
+ * (0x802D9E14) runs it. */
+namespace view_fn_802D0F34 {
+extern "C" {
 _AINPC_W ainpc_w;                      /* +0x806BD360 */
+}
+}
 

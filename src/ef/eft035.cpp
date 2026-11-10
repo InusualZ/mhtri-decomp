@@ -31,9 +31,9 @@
 #include "ef/fn_800CDB2C.h"
 #include "enemy/ENEMY_WORK.h"
 #include "pl.h"
-#include "fn_8004CAD8.h"               /* MTX34_ctor */
-#include "Pl/fn_8028F66C.h"            /* copyVec3 */
-#include "g3d/g3d_calcworld.h"         /* addVec3To */
+#include "fn_8004CAD8.h"               /* MTX34::MTX34() */
+#include "Pl/fn_8028F66C.h"            /* VEC3::operator= */
+#include "g3d/g3d_calcworld.h"         /* VEC3::operator+= */
 #include "sound/fn_800D7F54.h"         /* em015_denki_eft_se_req, se_req_pos_ps */
 #include "stage/stg_w.h"               /* get_now_areano */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset - owner Runtime.PPCEABI.H/memset.c */
@@ -274,7 +274,6 @@ u8* eft035_color_keys_7[2] = { eft035_color_keys_7_0, eft035_color_keys_7_1 };
 }
 
 /* The by-value spelling of the out-pointer vector subtraction (the result pointer is the hidden first argument). */
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
 
 #pragma peephole off
 #pragma optimization_level 4
@@ -310,7 +309,7 @@ void eft035_set(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* r
     eft->source_0x30 = self;
     eft->field_0x10 = 1;
     eft->timer_0x0C = 0;
-    copyVec3(&eft->pos_0x18, pos);
+    eft->pos_0x18 = *pos;
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;
@@ -348,7 +347,7 @@ void eft035_set2(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* 
     eft->source_0x30 = self;
     eft->field_0x10 = 1;
     eft->timer_0x0C = 0;
-    copyVec3(&eft->pos_0x18, pos);
+    eft->pos_0x18 = *pos;
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;
@@ -455,14 +454,11 @@ static void eft035_start(_EFT* self)
  * seeds its three random scales and runs the per-type setup. */
 extern "C" void fn_802F26B4(_EFT* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 vec_a;
-    nw4r::math::VEC3 vec_b;
     Eft035Work* work = (Eft035Work*)self->work_0x38;
 
-    VEC3_ctor(&vec_a);
-    VEC3_ctor(&vec_b);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 vec_a;
+    nw4r::math::VEC3 vec_b;
+    nw4r::math::MTX34 mtx;
 
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
 
@@ -489,7 +485,7 @@ extern "C" void fn_802F26B4(_EFT* self)
         break;
     }
 
-    copyVec3(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
+    work->slots_0x08[0].model_0x0C->pos_0x04 = self->pos_0x18;
     work->slots_0x08[0].model_0x0C->field_0x28 = (u16)(ran_suu(0) + self->rot_0x24.x);
     work->slots_0x08[0].model_0x0C->field_0x2C = (u16)(ran_suu(0) + self->rot_0x24.y);
     work->slots_0x08[0].model_0x0C->field_0x30 = (u16)(ran_suu(0) + self->rot_0x24.z);
@@ -506,14 +502,11 @@ extern "C" void fn_802F26B4(_EFT* self)
  * is in the current area, then the position and rotation seeds. */
 extern "C" void fn_802F288C(_EFT* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 vec_a;
-    nw4r::math::VEC3 vec_b;
     Eft035Work* work = (Eft035Work*)self->work_0x38;
 
-    VEC3_ctor(&vec_a);
-    VEC3_ctor(&vec_b);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 vec_a;
+    nw4r::math::VEC3 vec_b;
+    nw4r::math::MTX34 mtx;
 
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
 
@@ -527,7 +520,7 @@ extern "C" void fn_802F288C(_EFT* self)
         se_req_pos_ps(source->se_0xB14, 31, 2, &self->pos_0x18);
     }
     self->timer_0x0C = 0;
-    copyVec3(&work->slots_0x08[0].model_0x0C->pos_0x04, &self->pos_0x18);
+    work->slots_0x08[0].model_0x0C->pos_0x04 = self->pos_0x18;
     work->slots_0x08[0].model_0x0C->field_0x28 = self->rot_0x24.x;
     work->slots_0x08[0].model_0x0C->field_0x2C = self->rot_0x24.y;
     work->slots_0x08[0].model_0x0C->field_0x30 = self->rot_0x24.z;
@@ -546,9 +539,6 @@ extern "C" void fn_802F2988(_EFT* self)
     _ENEMY_WORK* source;
     s32 i;
 
-    VEC3_ctor(&vec_a);
-    VEC3_ctor(&vec_b);
-    MTX34_ctor(&mtx);
     source = (_ENEMY_WORK*)self->source_0x30;
     self->state_0x05++;
     switch (self->type_0x02) {
@@ -560,7 +550,7 @@ extern "C" void fn_802F2988(_EFT* self)
                 fn_802F3950(self);
                 return;
             }
-            copyVec3(&work->models_0x08[i]->pos_0x04, &self->pos_0x18);
+            work->models_0x08[i]->pos_0x04 = self->pos_0x18;
             work->models_0x08[i]->field_0x28 = 0;
             work->models_0x08[i]->field_0x2C = self->rot_0x24.y;
             work->models_0x08[i]->field_0x30 = 0;
@@ -572,7 +562,7 @@ extern "C" void fn_802F2988(_EFT* self)
                 fn_802F3950(self);
                 return;
             }
-            copyVec3(&work->models_0x08[i]->pos_0x04, &self->pos_0x18);
+            work->models_0x08[i]->pos_0x04 = self->pos_0x18;
             work->models_0x08[i]->field_0x28 = 0;
             work->models_0x08[i]->field_0x2C = self->rot_0x24.y;
             work->models_0x08[i]->field_0x30 = 0;
@@ -588,7 +578,7 @@ extern "C" void fn_802F2988(_EFT* self)
             fn_802F3950(self);
             return;
         }
-        copyVec3(&work->models_0x08[0]->pos_0x04, &self->pos_0x18);
+        work->models_0x08[0]->pos_0x04 = self->pos_0x18;
         work->models_0x08[0]->field_0x28 = 0;
         work->models_0x08[0]->field_0x2C = self->rot_0x24.y;
         work->models_0x08[0]->field_0x30 = 0;
@@ -602,7 +592,7 @@ extern "C" void fn_802F2988(_EFT* self)
             fn_802F3950(self);
             return;
         }
-        copyVec3(&work->models_0x08[0]->pos_0x04, &self->pos_0x18);
+        work->models_0x08[0]->pos_0x04 = self->pos_0x18;
         work->models_0x08[0]->field_0x28 = 0;
         work->models_0x08[0]->field_0x2C = self->rot_0x24.y;
         work->models_0x08[0]->field_0x30 = 0;
@@ -669,7 +659,7 @@ extern "C" void fn_802F2CB0(_EFT* self)
             break;
         }
         self->timer_0x0C = 2;
-        copyVec3(&work->slots_0x08[work->count_0x00].model_0x0C->pos_0x04, &self->pos_0x18);
+        work->slots_0x08[work->count_0x00].model_0x0C->pos_0x04 = self->pos_0x18;
         work->slots_0x08[work->count_0x00].model_0x0C->field_0x28 = (u16)(self->rot_0x24.x + ran_suu(0));
         work->slots_0x08[work->count_0x00].model_0x0C->field_0x2C = (u16)(self->rot_0x24.y + ran_suu(0));
         work->slots_0x08[work->count_0x00].model_0x0C->field_0x30 = (u16)(self->rot_0x24.z + ran_suu(0));
@@ -793,9 +783,6 @@ extern "C" void fn_802F3358(_EFT* self)
     f32 z;
     _GXColor col;
 
-    VEC3_ctor(&cam);
-    VEC3_ctor(&cam_pos);
-    VEC3_ctor(&diff);
     work = (Eft035Work2*)self->work_0x38;
     self->timer_0x0C++;
     switch (self->type_0x02) {
@@ -809,8 +796,8 @@ extern "C" void fn_802F3358(_EFT* self)
         alpha_keys = eft035_alpha_keys_4;
         sub_from = 0;
         sub_to = 2;
-        copyVec3(&cam_pos, &get_camera_pos());
-        copyVec3(&diff, &VEC3_SUB(&self->pos_0x18, &cam_pos));
+        cam_pos = *(&get_camera_pos());
+        diff = *(&(self->pos_0x18 - cam_pos));
         if (vec3_len((f32*)&diff) > 1000.0f) {
             count = work->count_0x00;
         } else {

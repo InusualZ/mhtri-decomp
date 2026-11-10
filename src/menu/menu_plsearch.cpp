@@ -4232,7 +4232,7 @@ void gallery_demo_load_step(Q_MoveWork* work) {
             work->demo_timer_0x0004 = 0;
             work->demo_sub_0x0001++;
             stage_area_enter(work->map_0xED, work->sub_0xEA);
-            copyVec3(&work->entry_pos_0x128, stage_entry_pos_get(work->map_0xED, work->sub_0xEA));
+            work->entry_pos_0x128 = *stage_entry_pos_get(work->map_0xED, work->sub_0xEA);
             work->entry_angle_0x134 = stage_entry_angle_get(work->map_0xED, work->sub_0xEA);
             light_point_all_clear();
             camera_area_reset();

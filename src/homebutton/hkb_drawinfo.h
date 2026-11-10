@@ -27,9 +27,9 @@ public:
         u8 invisiblePaneCalculateMtx : 1; /* +0x0 */
     };
 
-    /* +0x04 */ math::MTX34 mViewMtx;
+    /* +0x04 */ math::_MTX34 mViewMtx;
     /* +0x34 */ ut::Rect mViewRect;
-    /* +0x44 */ math::VEC2 mLocationAdjustScale;
+    /* +0x44 */ math::_VEC2 mLocationAdjustScale;
     /* +0x4C */ f32 mGlobalAlpha;
     /* +0x50 */ Flag mFlag;
 };

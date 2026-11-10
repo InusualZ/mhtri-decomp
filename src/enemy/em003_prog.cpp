@@ -62,7 +62,7 @@
 #include "unsplit/enemy.h"
 #include "enemy/enemy_control.h" /* em_spawn_request (the owner's header, rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "ef.h"              /* VEC3_ctor */
+#include "ef.h"              /* VEC3::VEC3() */
 #include "ef/fn_80105314.h"
 #include "draw_shape.h"      /* draw_shape_arm */
 #include "enemy/fn_801251D0.h"
@@ -96,7 +96,7 @@
 #include "enemy/fn_8012EC74.h" /* get_em_chg_scale */
 #include "Pl/hit_w.h" /* get_hit_id */
 #include "ef/eft007.h" /* eft007_part_set */
-#include "g3d/g3d_calcworld.h" /* addVec3To */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= */
 #include "ef/vec3_div.h"
 #include "ef/fn_800CDB2C.h" /* move_work_state_ck */
 #include "menu/get_hit_id.h"
@@ -122,8 +122,7 @@
 /* the action test and the death test answer through `cmplwi` (u32) */
 #define em_act_ck_view1 ((u32 (*)(_ENEMY_WORK*, u8, u8))em_act_ck)
 #define em_die_ck_view1 ((u32 (*)(_ENEMY_WORK*))em_die_ck)
-/* the static initialiser hands `setVec3`'s returned pointer straight on */
-#define assignVec3_view1 ((void (*)(nw4r::math::VEC3*, VEC3*))assignVec3)
+/* the static initialiser hands `VEC3(x, y, z)`'s returned pointer straight on */
 #define em_fall_start_f ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 /* the offset step reports whether the move landed */
 #define em_move_offset_step_update_v ((u32 (*)(_ENEMY_WORK*, void*))em_move_offset_step_update)
@@ -303,21 +302,14 @@ extern "C" Em003ProgTbl em003_prog_tbl = {
     {0, 0, 0, 0, 0, 0},
 };
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x8015D764): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`; the action-10 sound records point at the first vector.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x8015D764): each vector is constructed into
+ * a temporary and copied (`EmSeShift`); the action-10 sound records point at the first vector.  size: 0x18 */
 struct Em003VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, 0) and (0, dy, 0). */
-    Em003VecPair(f32 y, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_view1(&pos, setVec3(&a, 0.0f, y, 0.0f));
-        assignVec3_view1(&step, setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em003VecPair(f32 y, f32 dy) : pos(0.0f, y, 0.0f), step(0.0f, dy, 0.0f) {}
 };
 
 /* The three vector pairs (`.bss`, defined at the end). */
@@ -488,7 +480,6 @@ void em003_init(_ENEMY_WORK* self, u8 arg1) {
     VEC3 pos;
     Em003UserData* helper;
 
-    VEC3_ctor(&pos);
     if (arg1 != 0) {
         em_motion_param_set(self, 0.0f, 0);
         em_motion_param_set(self, 1.0f, 0xA);
@@ -957,7 +948,6 @@ void em003_act1_4(_ENEMY_WORK *self, u8 arg1) {
     VEC3 vec;
     s32 temp_r0;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -1121,7 +1111,6 @@ void em003_act1_9(_ENEMY_WORK *self, u8 arg1) {
     VEC3 vec;
     s32 temp_r0;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -1482,7 +1471,6 @@ void em003_act2_3(_ENEMY_WORK *self, u8 arg1) {
 void em003_act2_slide(_ENEMY_WORK *self, u8 arg1) {
     EmSpawnRec rec;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2488,7 +2476,6 @@ void em003_act4_8(_ENEMY_WORK *self, u8 arg1) {
 void em003_act4_10(_ENEMY_WORK *self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2622,7 +2609,6 @@ void em003_act7_2(_ENEMY_WORK* self, u8 arg1) {
     int angle_b;
     s8 hit;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2846,7 +2832,6 @@ void em003_act7_8(_ENEMY_WORK *self) {
 void em003_act7_9(_ENEMY_WORK *self, u8 arg1, u8 arg2, u8 arg3) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2895,8 +2880,6 @@ void em003_act7_10(_ENEMY_WORK *self, u8 arg1) {
     VEC3 sp14;
     VEC3 vec;
 
-    VEC3_ctor(&sp14);
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2920,8 +2903,8 @@ void em003_act7_10(_ENEMY_WORK *self, u8 arg1) {
             setVector3(&vec, 0.0f, 0.0f, 230.0f * get_em_chg_scale(self));
             rotVecY(&sp14, self->field_0x1C0);
             rotVecY(&vec, self->field_0x1C0);
-            addVec3To(&sp14, &self->pos);
-            addVec3To(&vec, &self->pos);
+            sp14 += self->pos;
+            vec += self->pos;
             shell_set_func_ptr->method_0x30(self, 7, &sp14, &vec, 1.0f, 0xFFFF, shell_set_func_ptr);
             eft_spawn_type11(self, &self->pos, 4, 1.8f);
         }
@@ -2992,7 +2975,6 @@ void em003_act7_13(_ENEMY_WORK* self, u8 arg1, u8 arg2, u8 arg3) {
     VEC3 vec;
     s32 winding;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3089,7 +3071,6 @@ void em003_act7_15(_ENEMY_WORK *self) {
 void em003_act7_19(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -3128,7 +3109,6 @@ void em003_act7_20(_ENEMY_WORK* self, u8 arg1) {
     int angle_b;
     s8 hit;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3370,7 +3350,7 @@ EmSeEntry em003_se_seq_18[2] = {
     {0xFF, {0, 0, 0}, 0},
 };
 
-EmSeRecord em003_se_rec_23_2 = {112, 0, 2, 0, 0, {0, 8, 2, 0}, (const EmSeOffset*)&em003_se_shift_a.pos};
+EmSeRecord em003_se_rec_23_2 = {112, 0, 2, 0, 0, {0, 8, 2, 0}, (const EmSeOffset*)&em003_se_shift_a.pos.v};
 
 EmSeOffset em003_se_ofs_0 = {-50.0f, -10.0f};
 EmSeRecord em003_se_rec_23_3 = {0, 0, 0, 0, 0, {0, 2, 1, 0}, &em003_se_ofs_0};
@@ -3468,7 +3448,7 @@ EmSeEntry em003_se_seq_8E[2] = {
     {0xFF, {0, 0, 0}, 0},
 };
 
-EmSeRecord em003_se_rec_84_2 = {112, 0, 2, 0, 0, {0, 8, 2, 0}, (const EmSeOffset*)&em003_se_shift_a.pos};
+EmSeRecord em003_se_rec_84_2 = {112, 0, 2, 0, 0, {0, 8, 2, 0}, (const EmSeOffset*)&em003_se_shift_a.pos.v};
 
 EmSeRecord em003_se_rec_84_3 = {0, 0, 0, 0, 0, {0, 2, 1, 0}, &em003_se_ofs_0};
 
@@ -3531,7 +3511,7 @@ EmSeEntry em003_se_seq_B7[2] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em003_se_rec_B8_1 = {67, 0, 4, 4, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em003_se_shift_c.pos};
+EmSeRecord em003_se_rec_B8_1 = {67, 0, 4, 4, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em003_se_shift_c.pos.v};
 
 EmSeOffset em003_se_ofs_1 = {-5.0f, 60.0f};
 EmSeRecord em003_se_rec_B8_3 = {26, 0, 6, 0, 0, {0, 3, 4, 0}, &em003_se_ofs_1};
@@ -3797,12 +3777,8 @@ void em003_act12_dispatch(_ENEMY_WORK *self) {
 
 void em003_act13_0(_ENEMY_WORK *self) {
     VEC3 target;
-    VEC3 vel;
-    VEC3 step;
-    VEC3 delta;
     u8 temp_r0;
 
-    VEC3_ctor(&target);
     em_frame_flag_set(self);
     switch (self->state) {
     case 0x0:
@@ -3846,10 +3822,7 @@ void em003_act13_0(_ENEMY_WORK *self) {
                 self->state_0x006 += 1;
                 em_move_vec_clr(self);
                 setVector3(&target, -806.5184f, 790.0f, 116.2548f);
-                subVec3(&delta, &target, &self->pos);
-                vec3_div(&step, &delta, 18.0f);
-                vec3_scale(&vel, &step, 2.0f);
-                copyVec3(&self->offset_0x30C.vec_0x310, &vel);
+                self->offset_0x30C.vec_0x310 = ((target - self->pos) / 18.0f) * 2.0f;
             }
             break;
         case 0x1:
@@ -3913,7 +3886,7 @@ void em003_act13_1(_ENEMY_WORK *self) {
         self->state++;
         em_fall_start_f(self, em_fall_height_get(self));
         setVector3(&self->pos, 3167.29f, 1880.22f, 9638.54f);
-        copyVec3(&self->prev_pos, &self->pos);
+        self->prev_pos = self->pos;
         self->field_0x1BC = 0;
         self->field_0x1C0 = 0xC44;
         self->field_0x1C4 = 0;
@@ -3983,7 +3956,6 @@ void em003_action_run(_ENEMY_WORK *self) {
 void em003_alt_mode_fx(_ENEMY_WORK *self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     if ((em_alt_mode_ck(self) == 1) && ((system_w.field_0x0c % 20) == 0)) {
         setVector3(&vec, 0.0f, 30.0f, 140.0f);
         eft_spawn_type10(self, 1, 0x18, &vec, 1.0f);
@@ -3993,7 +3965,6 @@ void em003_alt_mode_fx(_ENEMY_WORK *self) {
 void em003_ground_impact_fx(_ENEMY_WORK *self, u8 arg1) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     if (self->em003_0x328.tick == 0) {
         setVector3(&vec, 0.0f, 0.0f, 100.0f);
         em_ground_impact_set(self, arg1, 1, 0.65f, &vec);
@@ -4005,7 +3976,6 @@ void em003_ground_impact_fx(_ENEMY_WORK *self, u8 arg1) {
 void em003_effect_spawn(_ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s32 angle, f32 scale) {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (mode) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -4120,7 +4090,7 @@ void em003_effect_spawn(_ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s32 angl
     case 1:
         if ((self->field_0x228 & 6) == 0) {
             if (joint == 0xFF) {
-                copyVec3(&pos, &self->pos);
+                pos = self->pos;
             } else {
                 get_joint_wpos_em(self, joint, &pos);
             }
@@ -4142,7 +4112,6 @@ void em003_motion_events(_ENEMY_WORK *self) {
     VEC3 vec;
     u16 temp_r3;
 
-    VEC3_ctor(&vec);
     em003_alt_mode_fx(self);
     temp_r3 = em_get_mot_no(self);
     switch (temp_r3) {
@@ -4870,11 +4839,9 @@ void Em003UserData::Attach() {
 
 /* 0x8015D208 (0x80): fills a spawn record: effect type 26 at (0, -20, 30), the kind and the two angles. */
 void em003_spawn_rec_set(EmSpawnRec* out, u8 kind, u16 angle_a, u16 angle_b) {
-    VEC3 pos;
-
-    setVec3(&pos, 0.0f, -20.0f, 30.0f);
+    VEC3 pos(0.0f, -20.0f, 30.0f);
     out->id = 26;
-    copyVec3(&out->pos, &pos);
+    out->pos = pos;
     out->field_0x10 = kind;
     out->field_0x12 = angle_a;
     out->field_0x14 = angle_b;

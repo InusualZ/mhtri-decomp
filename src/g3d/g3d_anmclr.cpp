@@ -25,7 +25,7 @@
  *   (operator&) and 0x800647A0 (operator=(const GXColor&)) are the compiler's weak copies.  color_ctor_white
  *   (0x80064834) is Color's default constructor kept under the map's C stem: `g3d/g3d_anmscn.cpp`'s result
  *   constructors and `light/light.cpp` call it by that name and no C++ spelling of their sites keeps their bytes
- *   until math::VEC3 owns the constructor the map calls VEC3_ctor (request dat-anmclr#1).
+ *   until math::VEC3 owns the constructor the map calls VEC3::VEC3() (request dat-anmclr#1).
  *   anm_typename_AnmObjMatClr is the `.rodata` record by its string.  The six placing stubs (place_*) stand for
  *   the dead-stripped functions whose references ordered the copies.
  * RESIDUALS. The six placing stubs are 24 B of `.text` the link dead-strips (a tail call carries no unwind entry, so

@@ -20,7 +20,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 /* The player body sub-object `_PLW.physics_0x13C` points at: its `MHchar` sits at +4 (the view
  * `ef/fn_80114E34.cpp` states for the same offset). size: 0x144 (lower bound). */

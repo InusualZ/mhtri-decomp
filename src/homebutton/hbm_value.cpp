@@ -1598,7 +1598,7 @@ void HbmPaneManager::create(MEMAllocator* allocator, HbmEventHandler* handler) {
         mpRoot->setDrawInfo(&mDrawInfo);
     }
     mDrawInfo.mViewRect = mpLyt->GetLayoutRect();
-    nw4r::math::MTX34 viewMtx;
+    nw4r::math::_MTX34 viewMtx;
     PSMTXIdentity(viewMtx.m);
     mDrawInfo.mViewMtx = viewMtx;
     mpLyt->CalculateMtx(mDrawInfo);
@@ -1737,11 +1737,11 @@ void HbmPaneManager::v_0x03C() {
     hbmGetScreenRect4x3((VuVec4*)&standard);
     nw4r::ut::Rect wide;
     hbmGetScreenRect16x9((VuVec4*)&wide);
-    nw4r::math::VEC2 scale;
+    nw4r::math::_VEC2 scale;
     scale.x = (wide.right - wide.left) / (standard.right - standard.left);
     scale.y = 1.0f;
     mpLyt->mpRootPane->mScale = scale;
-    nw4r::math::VEC2 adjust;
+    nw4r::math::_VEC2 adjust;
     adjust.x = (standard.right - standard.left) / (wide.right - wide.left);
     adjust.y = 1.0f;
     mDrawInfo.mLocationAdjustScale = adjust;
@@ -1753,11 +1753,11 @@ void HbmPaneManager::v_0x03C() {
 void HbmPaneManager::v_0x040() {
     mbStandardAspect = 1;
     hbmGetScreenRect4x3((VuVec4*)&mScreenRect);
-    nw4r::math::VEC2 scale;
+    nw4r::math::_VEC2 scale;
     scale.x = 1.0f;
     scale.y = 1.0f;
     mpLyt->mpRootPane->mScale = scale;
-    nw4r::math::VEC2 adjust;
+    nw4r::math::_VEC2 adjust;
     adjust.x = 1.0f;
     adjust.y = 1.0f;
     mDrawInfo.mLocationAdjustScale = adjust;
@@ -1782,20 +1782,20 @@ void HbmPaneManager::v_0x044() {
  * flipped. */
 void HbmPaneManager::calcDrawMtx(nw4r::math::MTX34* out, const nw4r::lyt::DrawInfo& drawInfo,
                                  const nw4r::math::MTX34* mtx) {
-    nw4r::math::MTX34 flipped;
+    nw4r::math::_MTX34 flipped;
     nw4r::math::MTX34* result;
     if (drawInfo.mFlag.mulViewDraw) {
         PSMTXConcat(drawInfo.mViewMtx.m, mtx->m, flipped.m);
         flipped.m[0][1] = -flipped.m[0][1];
         flipped.m[1][1] = -flipped.m[1][1];
         flipped.m[2][1] = -flipped.m[2][1];
-        result = &flipped;
+        result = (nw4r::math::MTX34*)&flipped;
     } else {
         PSMTXCopy(mtx->m, flipped.m);
         flipped.m[0][1] = -flipped.m[0][1];
         flipped.m[1][1] = -flipped.m[1][1];
         flipped.m[2][1] = -flipped.m[2][1];
-        result = &flipped;
+        result = (nw4r::math::MTX34*)&flipped;
     }
     PSMTXCopy(result->m, out->m);
 }

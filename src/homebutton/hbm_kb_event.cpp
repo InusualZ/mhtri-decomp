@@ -1220,7 +1220,7 @@ s32 fn_80563834(KbObject* self, void* value)
 #pragma pop
 
 /* A point built in place, as the panes' translations take it.  size: 0x8 */
-struct HkbPoint : public nw4r::math::VEC2 {
+struct HkbPoint : public nw4r::math::_VEC2 {
     HkbPoint(f32 px, f32 py) {
         x = px;
         y = py;
@@ -1228,9 +1228,9 @@ struct HkbPoint : public nw4r::math::VEC2 {
 }; /* size: 0x8 */
 
 /* Places a pane at `pos` in its plane. */
-static inline void hkbPaneSetTranslate(nw4r::lyt::Pane* pane, const nw4r::math::VEC2& pos)
+static inline void hkbPaneSetTranslate(nw4r::lyt::Pane* pane, const nw4r::math::_VEC2& pos)
 {
-    nw4r::math::VEC3 translate;
+    nw4r::math::_VEC3 translate;
     translate.x = pos.x;
     translate.y = pos.y;
     translate.z = 0.0f;

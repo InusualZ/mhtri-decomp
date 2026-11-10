@@ -5,7 +5,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* The mangled callees take `_ENEMY_WORK*`/`_CP_VECTOR*`, so the tags are forward-declared and the calls cast

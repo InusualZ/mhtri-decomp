@@ -71,7 +71,7 @@ struct EmPopGround {
 struct EmPopSparePlace {
     /* +0x00 */ u16 valid_0x00;       /* nonzero when the placement is used */
     /* +0x02 */ u8 pad_0x02[2];
-    /* +0x04 */ nw4r::math::VEC3 pos_0x04;
+    /* +0x04 */ nw4r::math::_VEC3 pos_0x04;
     /* +0x10 */ _CP_VECTOR rot_0x10;
     /* +0x1C */ f32 radius_0x1C;
     /* +0x20 */ f32 height_0x20;
@@ -116,6 +116,8 @@ struct EmPopEntry {
     /* +0x2D */ u8 area_0x2D;           /* the area the point is filed under (the caller's second argument) */
     /* +0x2E */ u8 pad_0x2E[2];
     /* +0x30 */ u32 item_0x30;
+
+    EmPopEntry(); /* 0x803BE4A4, menu/get_pop_dat_ptr.cpp: constructs `pos_0x00` */
 };
 
 /* One roster record.  Written by the allocator (`state_0x000 = 1`), read by every

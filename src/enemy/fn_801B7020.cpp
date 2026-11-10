@@ -57,6 +57,7 @@
 #include "stage/shell_set_func_ptr.h"
 
 #include "enemy/ENEMY_MINI_WORK.h"
+#include "enemy/ENEMY_WORK.h" /* EmGroundRec (rule 1) */
 #include "enemy/enemy_control.h"
 #include "enemy/em_common.h"
 #include "enemy/em_motion_param_set.h"
@@ -77,18 +78,6 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
 /* ------------------------------------------------------------------------------------------------ */
 /* this range's view of the records it reads                                                         */
 /* ------------------------------------------------------------------------------------------------ */
-
-/* The 0x20-byte out record `em_ground_rec_clear` prepares and `em_ground_rec_find` fills: the mode byte at +0x03
- * (`em036_ground_variant_roll`), the position at +0x08 and the u32 at +0x18 `em036_init` narrows to u16.
- * size: 0x20 */
-struct EmSelRec {
-    /* +0x00 */ u8 unused_0x00[0x03];
-    /* +0x03 */ u8 mode;          /* 0 or 2: the random threshold `em036_ground_variant_roll` picks */
-    /* +0x04 */ u8 unused_0x04[0x04];
-    /* +0x08 */ nw4r::math::VEC3 vec_0x08; /* the ground position `em036_area_start_set` places the work at */
-    /* +0x14 */ u8 unused_0x14[0x04];
-    /* +0x18 */ u32 value_0x18;   /* the id `em036_init` latches into the work's +0x32E */
-};
 
 /* The enemy work record, as this range's accesses measure it.  `state` (+0x05) is the per-motion step
  * every dispatcher in the range switches on, `timer_0x020` the countdown they run down, and the
@@ -155,38 +144,27 @@ struct EmProgWork {
     /* +0xB14 */ u32 field_0xB14;
 };
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x801B985C): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x801B985C): each vector is constructed into
+ * a temporary and copied (`EmSeShift`).  size: 0x18 */
 struct Em036VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, 0, z) and (0, 0, 0). */
-    Em036VecPair(f32 z)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3((Vec*)&pos, (Vec*)setVec3(&a, 0.0f, 0.0f, z));
-        assignVec3((Vec*)&step, (Vec*)setVec3(&b, 0.0f, 0.0f, 0.0f));
-    }
+    Em036VecPair(f32 z) : pos(0.0f, 0.0f, z), step(0.0f, 0.0f, 0.0f) {}
 };
 
 /* The vector pair (`.bss`, defined at the end); a sound record points at it. */
 extern Em036VecPair em036_vec_pair;
 
 /* `vec3_sub_assign` subtracts `b` from `self` in place (`ef/ef_postfield.cpp`, whose header clashes with `mh3_pad.h`'s
- * `VEC3_ctor`/`setVec3`). */
+ * `VEC3::VEC3()`/`VEC3(x, y, z)`). */
 extern "C" {
 void vec3_sub_assign(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-/* 0x80051EE0 (`fn_8004CAD8.cpp`): r3 `out`, r4 `in`, f1 the scale it keeps in f31 while `VEC3_ctor` zeroes `out`;
+/* 0x80051EE0 (`fn_8004CAD8.cpp`): r3 `out`, r4 `in`, f1 the scale it keeps in f31 while `VEC3::VEC3()` zeroes `out`;
  * the tree spells it with three and four arguments, so it is declared here. */
-void vec3_scale(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 }
 
-/* `em_move_vec_set` (`enemy/em_common.cpp`) called with the vector by value: the caller copies it into a stack
- * temporary and passes that temporary's address. */
-#define em_move_vec_set_c1 ((void (*)(struct _ENEMY_WORK*, nw4r::math::VEC3))em_move_vec_set)
 
 /* The shell job slot +0x3C, called without its table argument. */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
@@ -304,21 +282,20 @@ void em036_floor_clamp(EmProgWork* self) {
 void em036_forward_move_set(EmProgWork* self) {
     nw4r::math::VEC3 rot;
 
-    VEC3_ctor(&rot);
     rot.x = 0.0f;
     rot.y = 0.0f;
     rot.z = 45.0f;
     rotVecY(&rot, self->field_0x1C0);
-    em_move_vec_set_c1((struct _ENEMY_WORK*)self, rot);
+    nw4r::math::_VEC3 arg = rot;
+    em_move_vec_set((struct _ENEMY_WORK*)self, &arg);
 }
 
 /* 0x801B7118 (0xDC): picks the random-motion kind for ground record `id`: 0 = no record, 1/2 = the kind the
  * record's mode chooses (mode 0: the 10 % branch, mode 2: the 60 % branch). */
 s32 em036_ground_variant_roll(u16 id) {
-    EmSelRec rec;
+    EmGroundRec rec;
     s32 roll;
 
-    em_ground_rec_clear(&rec);
     if (move_work_state_ck() == 0) {
         return 0;
     }
@@ -326,10 +303,10 @@ s32 em036_ground_variant_roll(u16 id) {
         return 0;
     }
     roll = (u16)ran_suu(0) % 100;
-    if (rec.mode == 2) {
+    if (rec.field_0x03 == 2) {
         return (roll < 60) + 1;
     }
-    if (rec.mode == 0) {
+    if (rec.field_0x03 == 0) {
         return (roll < 10) + 1;
     }
     return 0;
@@ -338,13 +315,12 @@ s32 em036_ground_variant_roll(u16 id) {
 /* 0x801B71F4 (0x1AC): latches the selection record, then either rolls the random kind (modes 1 and 4) or restarts
  * the motion set, and picks the walk-in distance from the kind. */
 void em036_init(EmProgWork* self, u8 mode) {
-    EmSelRec rec;
+    EmGroundRec rec;
     s32 pick;
 
-    em_ground_rec_clear(&rec);
     self->field_0x32C = 0;
     if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
-        self->field_0x32E = (u16)rec.value_0x18;
+        self->field_0x32E = (u16)rec.field_0x18;
     } else {
         self->field_0x32E = 0;
     }
@@ -645,9 +621,7 @@ void em036_act2_dispatch(EmProgWork* self) {
  * scales the normalised vector to the target into the run-in slot. */
 void em036_act3_0(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
-    nw4r::math::VEC3 out;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -656,13 +630,12 @@ void em036_act3_0(EmProgWork* self, u8 mode) {
         em_mot_set((struct _ENEMY_WORK*)self, 2, 20, 0);
         em_approach_start((struct _ENEMY_WORK*)self, (s32)(u8)mode == 1 ? -450.0f : -80.0f, 8);
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
-        copyVec3(&vec, &self->target);
+        vec = self->target;
         vec.y += 60.0f;
         vec3_sub_assign(&vec, &self->pos);
         if (vec3_length_sq((const f32*)&vec) > 0.001f) {
             vec3_normalize_into(&vec, &vec);
-            vec3_scale(&out, &vec, 8.0f);
-            copyVec3(&self->vec_0x310, &out);
+            self->vec_0x310 = vec * 8.0f;
         }
         self->timer_0x020 = 240;
         break;
@@ -757,9 +730,7 @@ void em036_act3_3(EmProgWork* self) {
 /* 0x801B7E34 (0x144): the charge's run-in vector with a 150-frame hold and no approach speed. */
 void em036_act3_4(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
-    nw4r::math::VEC3 out;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -767,13 +738,12 @@ void em036_act3_4(EmProgWork* self, u8 mode) {
         em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 2, 20, 0);
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
-        copyVec3(&vec, &self->target);
+        vec = self->target;
         vec.y += 60.0f;
         vec3_sub_assign(&vec, &self->pos);
         if (vec3_length_sq((const f32*)&vec) > 0.001f) {
             vec3_normalize_into(&vec, &vec);
-            vec3_scale(&out, &vec, 10.0f);
-            copyVec3(&self->vec_0x310, &out);
+            self->vec_0x310 = vec * 10.0f;
         }
         self->timer_0x020 = 150;
         break;
@@ -814,7 +784,7 @@ void em036_act3_6(EmProgWork* self) {
             em_mot_set((struct _ENEMY_WORK*)self, 3, 20, 0);
         }
         rotVecY(&self->vec_0x310, self->field_0x1C0);
-        copyVec3(&self->vec_0x31C, &self->vec_0x310);
+        self->vec_0x31C = self->vec_0x310;
         break;
     case 1:
         em_turn_to_target((struct _ENEMY_WORK*)self, 0x1000);
@@ -851,10 +821,7 @@ void em036_act3_6(EmProgWork* self) {
  * state 3/10 with the latched rotation. */
 void em036_act3_9(EmProgWork* self) {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 out;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0:
         self->state++;
@@ -862,10 +829,8 @@ void em036_act3_9(EmProgWork* self) {
         em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 1, 4, 0);
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
-        subVec3(&diff, &self->target, &self->pos);
-        copyVec3(&dir, &diff);
-        vec3_scale(&out, &dir, 0.1f);
-        copyVec3(&self->vec_0x310, &out);
+        dir = self->target - self->pos;
+        self->vec_0x310 = dir * 0.1f;
         self->timer_0x020 = 10;
         break;
     case 1:
@@ -937,7 +902,7 @@ void em036_act3_11(EmProgWork* self) {
             em_mot_set((struct _ENEMY_WORK*)self, 3, 20, 0);
         }
         rotVecY(&self->vec_0x310, self->field_0x1C0);
-        copyVec3(&self->vec_0x31C, &self->vec_0x310);
+        self->vec_0x31C = self->vec_0x310;
         break;
     case 1:
         em_turn_to_target((struct _ENEMY_WORK*)self, 0x1000);
@@ -1032,11 +997,9 @@ void em036_act3_13(EmProgWork* self) {
  * 60 above the target's, ending once both the approach and the height are done (or after 240 frames). */
 void em036_act3_15(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
-    nw4r::math::VEC3 out;
     f32 speed;
     f32 gap;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1051,13 +1014,12 @@ void em036_act3_15(EmProgWork* self, u8 mode) {
         }
         em_approach_start((struct _ENEMY_WORK*)self, speed, 8);
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
-        copyVec3(&vec, &self->target);
+        vec = self->target;
         vec.y += 60.0f;
         vec3_sub_assign(&vec, &self->pos);
         if (vec3_length_sq((const f32*)&vec) > 0.001f) {
             vec3_normalize_into(&vec, &vec);
-            vec3_scale(&out, &vec, 8.0f);
-            copyVec3(&self->vec_0x310, &out);
+            self->vec_0x310 = vec * 8.0f;
         }
         self->timer_0x020 = 240;
         break;
@@ -1189,11 +1151,9 @@ void em036_act7_1(EmProgWork* self, u8 mode) {
 /* 0x801B8C70 (0x1F8): the shot: the 14/2/0 window, a turn at frames 20..100, the shell (kind 16, or 21..23 by mode)
  * with its muzzle effect at frame 126, then the 15 and 16 windows. */
 void em036_act7_3(EmProgWork* self, u8 mode) {
-    VEC3 pos;
     EmSpawnRec rec;
     u32 kind;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1207,7 +1167,7 @@ void em036_act7_3(EmProgWork* self, u8 mode) {
         }
         if (em_frame_check((struct _ENEMY_WORK*)self, 0, 126.0f, 0.0f) == 1) {
             rec.id = 24;
-            copyVec3(&rec.pos, setVec3(&pos, 0.0f, -25.0f, -20.0f));
+            rec.pos = VEC3(0.0f, -25.0f, -20.0f);
             rec.field_0x10 = 0;
             rec.field_0x12 = 0;
             rec.field_0x14 = 0;
@@ -1516,12 +1476,7 @@ void em036_act12_0(EmProgWork* self) {
 void em036_act12_1(EmProgWork* self) {
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 sum;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 out;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1530,17 +1485,14 @@ void em036_act12_1(EmProgWork* self) {
         em_mot_set((struct _ENEMY_WORK*)self, 1, 0, 0);
         setVector3(&ofs, 0.0f, 300.0f, -50.0f);
         rotVecY(&ofs, self->field_0x1C0);
-        addVec3(&sum, &self->aim, &ofs);
-        copyVec3(&self->pos, &sum);
+        self->pos = self->aim + ofs;
         em_reaction_req((struct _ENEMY_WORK*)self, 5, 6, 0);
         em_target_pos_set((struct _ENEMY_WORK*)self, 0);
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
-        subVec3(&diff, &self->target, &self->pos);
-        copyVec3(&dir, &diff);
+        dir = self->target - self->pos;
         if (vec3_length_sq((const f32*)&dir) > 0.001f) {
             vec3_normalize_into(&dir, &dir);
-            vec3_scale(&out, &dir, 4.0f);
-            copyVec3(&self->vec_0x310, &out);
+            self->vec_0x310 = dir * 4.0f;
         }
         break;
     case 1:
@@ -1661,9 +1613,8 @@ s32 em036_state_ck(void) {
 /* 0x801B96C4 (0xC4): the area start: action 12, sub-state 1 for the random motion (0 otherwise), the motion
  * parameters reset and the work placed on its ground record. */
 void em036_area_start_set(EmProgWork* self, u8* action, u8* sub) {
-    EmSelRec rec;
+    EmGroundRec rec;
 
-    em_ground_rec_clear(&rec);
     em_fall_height_get((struct _ENEMY_WORK*)self);
     em_fall_start((struct _ENEMY_WORK*)self);
     *action = 12;
@@ -1675,7 +1626,7 @@ void em036_area_start_set(EmProgWork* self, u8* action, u8* sub) {
     em_motion_param_set((struct _ENEMY_WORK*)self, 0.0f, 0);
     em_motion_param_set((struct _ENEMY_WORK*)self, 1.0f, 30);
     if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
-        copyVec3(&self->pos, &rec.vec_0x08);
+        self->pos = rec.pos_0x08;
     }
 }
 

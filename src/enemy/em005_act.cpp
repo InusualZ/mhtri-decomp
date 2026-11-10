@@ -24,7 +24,7 @@
  *  - `em005_route_point_pick`: the count/target/index registers rotate (r29/r27/r28 in retail); 119 declaration
  *    orders and four loop shapes measured, none reaches retail's colouring;
  *  - `__sinit_\em005_act_cpp`: retail builds each capsule end point through an out-of-line constructor/copy
- *    constructor pair (`setVec3` returning `this`, then `assignVec3` from that result: `mr r4,r3`) and places those
+ *    constructor pair (`VEC3(x, y, z)` returning `this`, then `VEC3::operator=` from that result: `mr r4,r3`) and places those
  *    temporaries below the vector pairs'; the inline pair written here copies from the temporary's address
  *    (`addi r4,r1,N`) and orders the slots the other way.
  *   Data: `Em005UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
@@ -81,8 +81,6 @@
 #include "enemy/em_any_player_seen_ck.h"
 #include "enemy/em_patrol_step.h"
 #include "lobby/fn_801E0ADC.h"
-#include "ef/eft_capsule_ctor.h"
-#include "ef/eft_shape_init.h"
 #include "Pl/pl_hit_sphere.h"
 #include "Pl/fn_8028F66C.h"
 #include "Pl/plw.h"
@@ -103,37 +101,24 @@
  * load, retail loads it last. */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
 
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 
-/* A point and its per-frame step, built by MWCC's `__sinit`: each vector is set through `setVec3` into a temporary
- * and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit`: each vector is constructed into a temporary
+ * and copied (`EmSeShift`).  size: 0x18 */
 struct Em005VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, 0) and (0, dy, 0). */
-    Em005VecPair(f32 y, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&pos, setVec3(&a, 0.0f, y, 0.0f));
-        assignVec3_c1(&step, setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em005VecPair(f32 y, f32 dy) : pos(0.0f, y, 0.0f), step(0.0f, dy, 0.0f) {}
 };
 
-/* One capsule end point: built through `setVec3` and copied into place with `assignVec3`.  size: 0x0C */
+/* One capsule end point: constructed from its coordinates and copied into place with the vector's copy constructor.
+ * size: 0x0C */
 struct Em005CapsulePoint {
     /* +0x00 */ VEC3 pos;
 
-    Em005CapsulePoint(f32 x, f32 y, f32 z)
-    {
-        setVec3(&pos, x, y, z);
-    }
-    Em005CapsulePoint(const Em005CapsulePoint& other)
-    {
-        assignVec3_c1(&pos, (VEC3*)&other.pos);
-    }
+    Em005CapsulePoint(f32 x, f32 y, f32 z) : pos(x, y, z) {}
+    Em005CapsulePoint(const Em005CapsulePoint& other) : pos(other.pos) {}
 };
 
 /* One capsule of the three-capsule table: its two end points and the radius.  size: 0x1C */
@@ -500,7 +485,6 @@ void em005_work_clear(_ENEMY_WORK* self) {
 
 void em005_init(struct _ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->field_0x010) {
     default:
         self->action_0x328.armed_0x328.field_0x330 = 0xFF;
@@ -807,7 +791,6 @@ void em005_act0_run(_ENEMY_WORK* self) {
 
 void em005_act1_slam(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 sp8;
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1105,8 +1088,6 @@ void em005_act2_charge(struct _ENEMY_WORK* self, u8 side, u8 range, u8 fast) {
     nw4r::math::VEC3 offset;
     u32 angle;
 
-    VEC3_ctor(&point);
-    VEC3_ctor(&offset);
     switch (self->state) {
     case 0:
         em_move_mode_set(self, 0);
@@ -1142,29 +1123,19 @@ void em005_act2_charge(struct _ENEMY_WORK* self, u8 side, u8 range, u8 fast) {
             }
             rotVecY(&offset, angle);
             {
-                nw4r::math::VEC3 sum;
-                addVec3(&sum, &self->vec_0x36C, &offset);
-                copyVec3(&point, &sum);
+                point = self->vec_0x36C + offset;
             }
             if (calcDistanceSqXZ(&point, &self->pos) > 9000000.0f) {
                 setVector3(&offset, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&offset, calcVecAng2(&self->pos, &point));
                 {
-                    nw4r::math::VEC3 sum;
-                    addVec3(&sum, &self->pos, &offset);
-                    copyVec3(&point, &sum);
+                    point = self->pos + offset;
                 }
             }
             em_move_vec_clr(self);
             {
                 f32 scale = get_em_base_scale(self);
-                nw4r::math::VEC3 move;
-                nw4r::math::VEC3 step;
-                nw4r::math::VEC3 diff;
-                subVec3(&diff, &point, &self->pos);
-                vec3_div(&step, &diff, 22.0f);
-                vec3_scale(&move, &step, scale);
-                copyVec3(&self->offset_0x30C.vec_0x310, &move);
+                self->offset_0x30C.vec_0x310 = ((point - self->pos) / 22.0f) * scale;
             }
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s16)(calcVecAng2(&point, &self->vec_0x36C) - self->field_0x1C0);
@@ -1201,29 +1172,19 @@ void em005_act2_charge(struct _ENEMY_WORK* self, u8 side, u8 range, u8 fast) {
             }
             rotVecY(&offset, angle);
             {
-                nw4r::math::VEC3 sum;
-                addVec3(&sum, &self->vec_0x36C, &offset);
-                copyVec3(&point, &sum);
+                point = self->vec_0x36C + offset;
             }
             if (calcDistanceSqXZ(&point, &self->pos) > 9000000.0f) {
                 setVector3(&offset, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&offset, calcVecAng2(&self->pos, &point));
                 {
-                    nw4r::math::VEC3 sum;
-                    addVec3(&sum, &self->pos, &offset);
-                    copyVec3(&point, &sum);
+                    point = self->pos + offset;
                 }
             }
             em_move_vec_clr(self);
             {
                 f32 scale = get_em_base_scale(self);
-                nw4r::math::VEC3 move;
-                nw4r::math::VEC3 step;
-                nw4r::math::VEC3 diff;
-                subVec3(&diff, &point, &self->pos);
-                vec3_div(&step, &diff, 22.0f);
-                vec3_scale(&move, &step, scale);
-                copyVec3(&self->offset_0x30C.vec_0x310, &move);
+                self->offset_0x30C.vec_0x310 = ((point - self->pos) / 22.0f) * scale;
             }
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s16)(calcVecAng2(&point, &self->vec_0x36C) - self->field_0x1C0);
@@ -1245,12 +1206,12 @@ void em005_act2_charge(struct _ENEMY_WORK* self, u8 side, u8 range, u8 fast) {
             if (fast == 1) {
                 em_mot_speed_set(self, 1.1f);
             }
-            addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+            self->pos += self->offset_0x30C.vec_0x310;
         }
         break;
     case 3:
         em_turn_in_window(self, 0.0f, 22.0f, self->timer_0x020);
-        addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+        self->pos += self->offset_0x30C.vec_0x310;
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             switch (side) {
@@ -2578,23 +2539,11 @@ void em005_act4_leap(struct _ENEMY_WORK* self, u8 mode) {
 void em005_act4_charge(struct _ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 sp8C;
     nw4r::math::VEC3 sp80;
-    nw4r::math::VEC3 sp74;
-    nw4r::math::VEC3 sp68;
-    nw4r::math::VEC3 sp5C;
-    nw4r::math::VEC3 sp50;
-    nw4r::math::VEC3 sp44;
-    nw4r::math::VEC3 sp38;
-    nw4r::math::VEC3 sp2C;
-    nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     f32 temp_f31;
     f32 temp_f31_2;
     u32 var_r3;
     u32 var_r30;
     u32 var_r30_2;
-    VEC3_ctor(&sp8C);
-    VEC3_ctor(&sp80);
     switch (self->state) {
     case 0:
         em_move_mode_set(self, 0);
@@ -2614,20 +2563,15 @@ void em005_act4_charge(struct _ENEMY_WORK* self, u8 mode) {
             }
             setVector3(&sp80, 0.0f, 0.0f, 1100.0f);
             rotVecY(&sp80, var_r30);
-            addVec3(&sp74, &self->vec_0x36C, &sp80);
-            copyVec3(&sp8C, &sp74);
+            sp8C = self->vec_0x36C + sp80;
             if (calcDistanceSqXZ(&sp8C, &self->pos) > 9000000.0f) {
                 setVector3(&sp80, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&sp80, calcVecAng2(&self->pos, &sp8C));
-                addVec3(&sp68, &self->pos, &sp80);
-                copyVec3(&sp8C, &sp68);
+                sp8C = self->pos + sp80;
             }
             em_move_vec_clr(self);
             temp_f31 = get_em_base_scale(self);
-            subVec3(&sp44, &sp8C, &self->pos);
-            vec3_div(&sp50, &sp44, 30.0f);
-            vec3_scale(&sp5C, &sp50, temp_f31);
-            copyVec3(&self->offset_0x30C.vec_0x310, &sp5C);
+            self->offset_0x30C.vec_0x310 = ((sp8C - self->pos) / 30.0f) * temp_f31;
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s32) (s16) (calcVecAng2(&sp8C, &self->vec_0x36C) - self->field_0x1C0);
             return;
@@ -2647,20 +2591,15 @@ void em005_act4_charge(struct _ENEMY_WORK* self, u8 mode) {
             }
             setVector3(&sp80, 0.0f, 0.0f, 1100.0f);
             rotVecY(&sp80, var_r30_2);
-            addVec3(&sp38, &self->vec_0x36C, &sp80);
-            copyVec3(&sp8C, &sp38);
+            sp8C = self->vec_0x36C + sp80;
             if (calcDistanceSqXZ(&sp8C, &self->pos) > 9000000.0f) {
                 setVector3(&sp80, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&sp80, calcVecAng2(&self->pos, &sp8C));
-                addVec3(&sp2C, &self->pos, &sp80);
-                copyVec3(&sp8C, &sp2C);
+                sp8C = self->pos + sp80;
             }
             em_move_vec_clr(self);
             temp_f31_2 = get_em_base_scale(self);
-            subVec3(&sp8, &sp8C, &self->pos);
-            vec3_div(&sp14, &sp8, 30.0f);
-            vec3_scale(&sp20, &sp14, temp_f31_2);
-            copyVec3(&self->offset_0x30C.vec_0x310, &sp20);
+            self->offset_0x30C.vec_0x310 = ((sp8C - self->pos) / 30.0f) * temp_f31_2;
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s32) (s16) (calcVecAng2(&sp8C, &self->vec_0x36C) - self->field_0x1C0);
             return;
@@ -2675,14 +2614,14 @@ void em005_act4_charge(struct _ENEMY_WORK* self, u8 mode) {
             } else {
                 em_mot_set(self, 0xD0, 0, 0);
             }
-            addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+            self->pos += self->offset_0x30C.vec_0x310;
             return;
         }
         break;
     case 3:
         if (em_frame_check(self, 3, 0.0f, 30.0f) == 1) {
             em_turn_in_window(self, 0.0f, 30.0f, self->timer_0x020);
-            addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+            self->pos += self->offset_0x30C.vec_0x310;
         }
         if (em_frame_check(self, 1, 30.0f, 0.0f) == 1) {
             em_turn_to_target(self, (u32) (u16) (s32) (0.5f + ((65536.0f * (0.2f * get_em_base_scale(self))) / 360.0f)));
@@ -2750,7 +2689,6 @@ void em005_act7_swing(struct _ENEMY_WORK* self, u8 mode) {
 
 void em005_act7_fireball(struct _ENEMY_WORK* self, u8 mode) {
     EmSpawnRec sp8;
-    em_spawn_rec_init(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3448,11 +3386,8 @@ void em005_act7_rush(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
 void em005_act7_flip_aim(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
     nw4r::math::VEC3 sp34;
     struct EmRotWord3 rot;
-    nw4r::math::VEC3 sp1C;
-    nw4r::math::VEC3 sp10;
     u32 spC;
     u32 sp8;
-    VEC3_ctor(&sp34);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -3466,20 +3401,19 @@ void em005_act7_flip_aim(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
         self->vec_0x31C.z = 3.0f * get_em_base_scale(self);
         return;
     case 1:
-        subVec3(&sp1C, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp34, &sp1C);
+        sp34 = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp34, &spC, &sp8);
         if (spC < 0x38EU) {
             spC = 0x38E;
         } else if (spC > 0x3C72U) {
             spC = 0x3C72;
         }
-        copyVec3(&sp34, &self->offset_0x30C.vec_0x310);
+        sp34 = self->offset_0x30C.vec_0x310;
         rotVecX(&sp34, spC);
         rotVecY(&sp34, self->field_0x1C0);
         em_hit_arm_set(self);
         self->field_0x1BC = (u32) em_angle_approach((u16) spC, (u16) self->field_0x1BC, 0);
-        addVec3To(&self->pos, &sp34);
+        self->pos += sp34;
         self->offset_0x30C.vec_0x310.z += self->vec_0x31C.z;
         if (self->offset_0x30C.vec_0x310.z > (100.0f * get_em_base_scale(self))) {
             self->offset_0x30C.vec_0x310.z = 100.0f * get_em_base_scale(self);
@@ -3492,20 +3426,19 @@ void em005_act7_flip_aim(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
         }
         break;
     case 2:
-        subVec3(&sp10, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp34, &sp10);
+        sp34 = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp34, &spC, &sp8);
         if (spC < 0x38EU) {
             spC = 0x38E;
         } else if (spC > 0x3C72U) {
             spC = 0x3C72;
         }
-        copyVec3(&sp34, &self->offset_0x30C.vec_0x310);
+        sp34 = self->offset_0x30C.vec_0x310;
         rotVecX(&sp34, spC);
         rotVecY(&sp34, self->field_0x1C0);
         em_hit_arm_set(self);
         self->field_0x1BC = (u32) em_angle_approach((u16) spC, (u16) self->field_0x1BC, 0x100);
-        addVec3To(&self->pos, &sp34);
+        self->pos += sp34;
         self->offset_0x30C.vec_0x310.z += self->vec_0x31C.z;
         if (self->offset_0x30C.vec_0x310.z > (100.0f * get_em_base_scale(self))) {
             self->offset_0x30C.vec_0x310.z = 100.0f * get_em_base_scale(self);
@@ -3563,7 +3496,6 @@ void em005_act7_flip_aim(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
 
 void em005_act7_fire_spread(struct _ENEMY_WORK* self, u8 mode) {
     EmSpawnRec sp8;
-    em_spawn_rec_init(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3631,8 +3563,6 @@ void em005_act7_charge(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
     nw4r::math::VEC3 offset;
     u32 angle;
 
-    VEC3_ctor(&point);
-    VEC3_ctor(&offset);
     switch (self->state) {
     case 0:
         em_move_mode_set(self, 0);
@@ -3656,29 +3586,19 @@ void em005_act7_charge(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
             setVector3(&offset, 0.0f, 0.0f, 600.0f);
             rotVecY(&offset, angle);
             {
-                nw4r::math::VEC3 sum;
-                addVec3(&sum, &self->vec_0x36C, &offset);
-                copyVec3(&point, &sum);
+                point = self->vec_0x36C + offset;
             }
             if (calcDistanceSqXZ(&point, &self->pos) > 9000000.0f) {
                 setVector3(&offset, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&offset, calcVecAng2(&self->pos, &point));
                 {
-                    nw4r::math::VEC3 sum;
-                    addVec3(&sum, &self->pos, &offset);
-                    copyVec3(&point, &sum);
+                    point = self->pos + offset;
                 }
             }
             em_move_vec_clr(self);
             {
                 f32 scale = get_em_base_scale(self);
-                nw4r::math::VEC3 move;
-                nw4r::math::VEC3 step;
-                nw4r::math::VEC3 diff;
-                subVec3(&diff, &point, &self->pos);
-                vec3_div(&step, &diff, 22.0f);
-                vec3_scale(&move, &step, scale);
-                copyVec3(&self->offset_0x30C.vec_0x310, &move);
+                self->offset_0x30C.vec_0x310 = ((point - self->pos) / 22.0f) * scale;
             }
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s16)(calcVecAng2(&point, &self->vec_0x36C) - self->field_0x1C0);
@@ -3703,29 +3623,19 @@ void em005_act7_charge(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
             setVector3(&offset, 0.0f, 0.0f, 600.0f);
             rotVecY(&offset, angle);
             {
-                nw4r::math::VEC3 sum;
-                addVec3(&sum, &self->vec_0x36C, &offset);
-                copyVec3(&point, &sum);
+                point = self->vec_0x36C + offset;
             }
             if (calcDistanceSqXZ(&point, &self->pos) > 9000000.0f) {
                 setVector3(&offset, 0.0f, 0.0f, 3000.0f);
                 rotVecY(&offset, calcVecAng2(&self->pos, &point));
                 {
-                    nw4r::math::VEC3 sum;
-                    addVec3(&sum, &self->pos, &offset);
-                    copyVec3(&point, &sum);
+                    point = self->pos + offset;
                 }
             }
             em_move_vec_clr(self);
             {
                 f32 scale = get_em_base_scale(self);
-                nw4r::math::VEC3 move;
-                nw4r::math::VEC3 step;
-                nw4r::math::VEC3 diff;
-                subVec3(&diff, &point, &self->pos);
-                vec3_div(&step, &diff, 22.0f);
-                vec3_scale(&move, &step, scale);
-                copyVec3(&self->offset_0x30C.vec_0x310, &move);
+                self->offset_0x30C.vec_0x310 = ((point - self->pos) / 22.0f) * scale;
             }
             self->offset_0x30C.vec_0x310.y = 0.0f;
             self->timer_0x020 = (s16)(calcVecAng2(&point, &self->vec_0x36C) - self->field_0x1C0);
@@ -3742,12 +3652,12 @@ void em005_act7_charge(struct _ENEMY_WORK* self, u8 mode, u8 sub) {
                 em_mot_set(self, 0xF5, 0, 0);
                 break;
             }
-            addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+            self->pos += self->offset_0x30C.vec_0x310;
         }
         break;
     case 3:
         em_turn_in_window(self, 0.0f, 22.0f, self->timer_0x020);
-        addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+        self->pos += self->offset_0x30C.vec_0x310;
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             switch (mode) {
@@ -4263,7 +4173,6 @@ void em005_act12_run(struct _ENEMY_WORK* self) {
 void em005_act13_fly_in(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 spot;
     u32 have_spot;
-    VEC3_ctor(&spot);
     have_spot = 0;
     switch (self->state) {
     case 0:
@@ -4287,8 +4196,8 @@ void em005_act13_fly_in(struct _ENEMY_WORK* self) {
             self->state++;
             em_fall_height_get(self);
             em_fall_start(self);
-            copyVec3(&self->action_0x328.vec_0x334, &self->vec_0x36C);
-            copyVec3(&self->vec_0x36C, &spot);
+            self->action_0x328.vec_0x334 = self->vec_0x36C;
+            self->vec_0x36C = spot;
             em_fly_start(self, (void*)em005_fly_tbl);
             em_approach_start(self, 0.0f, 0x19);
             em_fall_height_get(self);
@@ -4305,7 +4214,7 @@ void em005_act13_fly_in(struct _ENEMY_WORK* self) {
     case 1:
         if (em_approach_step(self, 0, 0) == 1) {
             self->state++;
-            copyVec3(&self->vec_0x36C, &self->action_0x328.vec_0x334);
+            self->vec_0x36C = self->action_0x328.vec_0x334;
             em_mot_set(self, 0x1A, 0x0A, 0);
         } else {
             em_fly_step(self, 2, (void*)em005_fly_tbl);
@@ -4347,11 +4256,9 @@ void em005_act13_fly_in(struct _ENEMY_WORK* self) {
 
 void em005_act13_dive(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp1C;
-    nw4r::math::VEC3 sp10;
     u32 angle_x;
     u32 angle_y;
     u32 var_r30;
-    VEC3_ctor(&sp1C);
     switch (self->state) {
     case 0:
         self->state++;
@@ -4364,14 +4271,13 @@ void em005_act13_dive(struct _ENEMY_WORK* self) {
         setVector3(&sp1C, 0.0f, 0.0f, 500.0f);
         angle_y = calcVecAng2(&self->vec_0x36C, &self->pos);
         rotVecY(&sp1C, angle_y);
-        addVec3To(&self->vec_0x36C, &sp1C);
+        self->vec_0x36C += sp1C;
         return;
     case 1:
         em_hit_arm_set(self);
         em_fall_height_get(self);
         em_move_offset_step_update_v(self, &self->field_0x1BC);
-        subVec3(&sp10, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp1C, &sp10);
+        sp1C = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp1C, &angle_x, &angle_y);
         angle_x += 0x400;
         if (angle_x > 0x3000) {
@@ -4516,8 +4422,6 @@ void em005_act13_side_step(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 unused_b;
     u32 angle;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
     switch (self->state) {
     case 0:
         self->state++;
@@ -4642,11 +4546,8 @@ void em005_act13_roar(struct _ENEMY_WORK* self) {
 void em005_act13_flip(struct _ENEMY_WORK* self, u32 mode) {
     nw4r::math::VEC3 sp34;
     struct EmRotWord3 rot;
-    nw4r::math::VEC3 sp1C;
-    nw4r::math::VEC3 sp10;
     u32 spC;
     u32 sp8;
-    VEC3_ctor(&sp34);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -4659,8 +4560,7 @@ void em005_act13_flip(struct _ENEMY_WORK* self, u32 mode) {
         self->vec_0x31C.z = 3.0f * get_em_base_scale(self);
         return;
     case 1:
-        subVec3(&sp1C, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp34, &sp1C);
+        sp34 = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp34, &spC, &sp8);
         if (spC < 0x38EU) {
             spC = 0x38E;
@@ -4668,12 +4568,12 @@ void em005_act13_flip(struct _ENEMY_WORK* self, u32 mode) {
             spC = 0x3C72;
         }
         em_turn_to_target(self, 0x200);
-        copyVec3(&sp34, &self->offset_0x30C.vec_0x310);
+        sp34 = self->offset_0x30C.vec_0x310;
         rotVecX(&sp34, spC);
         rotVecY(&sp34, self->field_0x1C0);
         em_hit_arm_set(self);
         self->field_0x1BC = (u32) em_angle_approach((u16) spC, (u16) self->field_0x1BC, 0);
-        addVec3To(&self->pos, &sp34);
+        self->pos += sp34;
         self->offset_0x30C.vec_0x310.z += self->vec_0x31C.z;
         if (self->offset_0x30C.vec_0x310.z > (100.0f * get_em_base_scale(self))) {
             self->offset_0x30C.vec_0x310.z = 100.0f * get_em_base_scale(self);
@@ -4686,8 +4586,7 @@ void em005_act13_flip(struct _ENEMY_WORK* self, u32 mode) {
         }
         break;
     case 2:
-        subVec3(&sp10, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp34, &sp10);
+        sp34 = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp34, &spC, &sp8);
         if (spC < 0x38EU) {
             spC = 0x38E;
@@ -4695,12 +4594,12 @@ void em005_act13_flip(struct _ENEMY_WORK* self, u32 mode) {
             spC = 0x3C72;
         }
         em_turn_to_target(self, 0x200);
-        copyVec3(&sp34, &self->offset_0x30C.vec_0x310);
+        sp34 = self->offset_0x30C.vec_0x310;
         rotVecX(&sp34, spC);
         rotVecY(&sp34, self->field_0x1C0);
         em_hit_arm_set(self);
         self->field_0x1BC = (u32) em_angle_approach((u16) spC, (u16) self->field_0x1BC, 0x100);
-        addVec3To(&self->pos, &sp34);
+        self->pos += sp34;
         self->offset_0x30C.vec_0x310.z += self->vec_0x31C.z;
         if (self->offset_0x30C.vec_0x310.z > (100.0f * get_em_base_scale(self))) {
             self->offset_0x30C.vec_0x310.z = 100.0f * get_em_base_scale(self);
@@ -4803,7 +4702,6 @@ f32 em005_demo_fly_keys[68] = {
 
 void em005_act13_demo(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 spot;
-    VEC3_ctor(&spot);
     switch (self->state) {
     case 0:
         self->state++;
@@ -5069,7 +4967,6 @@ void em005_body_spark(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
     u32 tilt;
 
-    VEC3_ctor(&pos);
     if (em_alt_mode_ck(self) != 0) {
         tilt = (u16)calcVecAngX(&self->vec_0x76C);
         if ((u16)(tilt + 0x8000U) > 0x671B) {
@@ -5097,7 +4994,6 @@ void em005_body_spark(struct _ENEMY_WORK* self) {
 void em005_step_eft_set(struct _ENEMY_WORK* self, u8 kind, u8 id, u32 joint, s32 delta, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         switch (id) {
@@ -5131,7 +5027,7 @@ void em005_step_eft_set(struct _ENEMY_WORK* self, u8 kind, u8 id, u32 joint, s32
         break;
     case 1:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -5141,7 +5037,7 @@ void em005_step_eft_set(struct _ENEMY_WORK* self, u8 kind, u8 id, u32 joint, s32
         break;
     case 2:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -5156,7 +5052,6 @@ void em005_motion_events(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 spot;
     u32 area_flag;
     u8 flags;
-    VEC3_ctor(&spot);
     em005_body_spark(self);
     switch (em_get_mot_no(self)) {
     case 0x8:
@@ -5570,22 +5465,16 @@ void em005_tev_color_update(struct _ENEMY_WORK* self) {
 u32 em005_ally_near_ck(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
-    nw4r::math::VEC3 d;
-    nw4r::math::VEC3 c;
     struct _ENEMY_WORK* other;
     f32 dist;
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     other = em_ally_find(self, 0x1C, 0);
     if (other != NULL && em_act11_wait_ck(other) == 1) {
         if (arg1 == 0) {
             return 1;
         }
-        copyVec3(&b, setVec3(&d, 0.0f, 0.0f,
-        600.0f * get_em_chg_scale(self)));
+        b = VEC3(0.0f, 0.0f, 600.0f * get_em_chg_scale(self));
         rotVecY(&b, self->field_0x1C0);
-        addVec3(&c, &self->pos, &b);
-        copyVec3(&a, &c);
+        a = self->pos + b;
         dist = calcDistanceSqXZ(&a, &other->pos);
         if (dist < (400.0f * get_em_chg_scale(self)) * (400.0f * get_em_chg_scale(self))) {
             return 1;
@@ -5604,8 +5493,6 @@ u32 em005_act13_early_ck(struct _ENEMY_WORK* self) {
 u32 em005_capsule_point_ck(u8 index, nw4r::math::VEC3* point) {
     nw4r::math::CAPSULE capsule;
     PlCapsuleBox box;
-    eft_capsule_ctor(&capsule);
-    eft_shape_init((struct EftShape*)&box);
     if (index >= 3) {
         return 0;
     }
@@ -5634,7 +5521,6 @@ u8 em005_route_point_pick(struct _ENEMY_WORK* self, u32 first, u8 count, nw4r::m
     s32 i;
     u8 num;
 
-    VEC3_ctor(&pos);
     i = 0;
     id = first;
     num = count;
@@ -5659,7 +5545,6 @@ u32 em005_state_query(struct _ENEMY_WORK* self, u32 arg1) {
     nw4r::math::VEC3 pos;
     u32 t;
     u8 sel;
-    VEC3_ctor(&pos);
     sel = (u8)arg1;
     switch (sel) {
     case 0:
@@ -5822,10 +5707,9 @@ s32 em005_area_change_ck(struct _ENEMY_WORK* self, u16 timer) {
 }
 
 void em005_spawn_rec_fill(EmSpawnRec* rec, u8 a1, u16 a2, u16 a3) {
-    nw4r::math::VEC3 pos;
-    setVec3(&pos, 0.0f, -20.0f, 50.0f);
+    nw4r::math::VEC3 pos(0.0f, -20.0f, 50.0f);
     rec->id = 29;
-    copyVec3(&rec->pos, &pos);
+    rec->pos = pos;
     rec->field_0x10 = a1;
     rec->field_0x12 = a2;
     rec->field_0x14 = a3;

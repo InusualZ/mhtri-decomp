@@ -198,15 +198,11 @@ extern "C" void* word_copy_return_dst(void* out, const void* src);
 extern "C" void scene_current_camera_set(u8 value);
 extern "C" void filter_panel_upper_set(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void filter_panel_lower_set(s32 a, s32 count, u32* colours, f32 param);
-extern "C" void camera_posture_info_ctor(s32* out);
 extern "C" s32 fn_8007A1B8(const void* a, s32 b, void* c, void* d, s32 e, s32 f, void* g);
 extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the argument
  * narrows with `extsb` in retail); `ef/fn_800CDB2C.h` declares it the same way. */
 extern "C" void fn_800DD38C(void);
 extern "C" u32 mhchar_frame_check(void* chr, s32 a, s32 b, f32 c, f32 d);
-extern "C" void eft_capsule_ctor(nw4r::math::VEC3* out);
-extern "C" void eft_vec_ctor(nw4r::math::VEC3* out);
-extern "C" void mhchar_construct(void* out);
 extern "C" f32 lb_item_list_step_get(void);  /* f32, the owner's return type (`lobby/lb_menu_pos_tbl.cpp`): retail converts it with `__cvt_fp2unsigned` */
 extern "C" f32 lb_item_list_depth_get(u32 index);
 extern "C" s32 getItemListSelection(void);
@@ -244,7 +240,7 @@ extern "C" s32 camera_lobby_frame(StageAreaObj* area);
 extern "C" s32 camera_event_reset(StageAreaObj* area);
 extern "C" s32 camera_event_update(StageAreaObj* area);
 extern "C" void camera_dcm_buffers_clear(void);
-extern "C" void get_camera_target_pos(nw4r::math::VEC3* out);
+extern "C" nw4r::math::VEC3 get_camera_target_pos(void);
 extern "C" u32 camera_underwater_ck(void);
 extern "C" void camera_view_apply(s32 a, StageAreaObj* area, void* vec, f32 pitch, f32 span);
 extern "C" void camera_view_angles_update(StageAreaObj* area);

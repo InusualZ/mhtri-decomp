@@ -266,14 +266,6 @@ typedef struct CharmakeColorFuncs {
     /* +0x4 */ u32 (*name_ok)(char* name);
 } CharmakeColorFuncs; /* size: 0x8 */
 
-/* A light direction built through `setVec3`, so the file-scope table is constructed by `__sinit`.  size: 0xC */
-struct CharmakeLightDir : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    CharmakeLightDir(f32 x, f32 y, f32 z) {
-        setVec3(this, x, y, z);
-    }
-};
-
 extern "C" {
 /* The character make's work (allocated by `charmake_init`). */
 CharmakeWork* charmake_work;
@@ -329,11 +321,11 @@ DemoEquipSet demoEquip[3];
 char charmake_name_buffer[0x18];
 
 /* The four light directions. */
-CharmakeLightDir charmake_light_dirs[4] = {
-    CharmakeLightDir(0.0f, 0.0f, 50.0f),
-    CharmakeLightDir(-50.0f, 70.0f, 40.0f),
-    CharmakeLightDir(70.0f, -30.0f, -50.0f),
-    CharmakeLightDir(0.0f, 100.0f, 0.0f),
+nw4r::math::VEC3 charmake_light_dirs[4] = {
+    nw4r::math::VEC3(0.0f, 0.0f, 50.0f),
+    nw4r::math::VEC3(-50.0f, 70.0f, 40.0f),
+    nw4r::math::VEC3(70.0f, -30.0f, -50.0f),
+    nw4r::math::VEC3(0.0f, 100.0f, 0.0f),
 };
 
 /* 0x80443554 (0x4C): picks palette cell `index` of colour kind `kind` (1 the inner wear, else the hair). */
@@ -457,7 +449,7 @@ void set_charmake_r_no(u8 index, u8 value) {
 static void charmake_light_set(void) {
     GXColor* color;
     s32 i;
-    CharmakeLightDir* dir;
+    nw4r::math::VEC3* dir;
 
     set_amblight(0, (GXColor){ 0x1A, 0x1A, 0x1A, 0xFF });
     color = charmake_light_colors;
@@ -544,17 +536,16 @@ static void charmake_camera_goal_set(CharmakeWork* work, u8 index) {
 static void charmake_camera_init(CharmakeWork* work) {
     nw4r::g3d::Camera camera;
     s32 handle;
-    nw4r::g3d::Camera::PostureInfo posture;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(0);
     word_copy_return_dst(&camera, &handle);
-    camera_posture_info_ctor(&posture);
+    nw4r::g3d::Camera::PostureInfo posture;
     work->camera = 0;
     charmake_camera_goal_set(work, 0);
-    copyVec3(&work->eye, &work->eye_goal);
-    copyVec3(&work->at, &work->at_goal);
+    work->eye = work->eye_goal;
+    work->at = work->at_goal;
     posture.mType = 2;
-    copyVec3((nw4r::math::VEC3*)&posture.mTargetX, &work->at);
+    posture.mTarget = work->at;
     posture.mUnk28 = 0.0f;
     camera.SetPosition(work->eye);
     camera.SetPosture(posture);
@@ -571,11 +562,10 @@ static void charmake_camera_toggle(CharmakeWork* work) {
 static void charmake_camera_step(CharmakeWork* work) {
     nw4r::g3d::Camera camera;
     s32 handle;
-    nw4r::g3d::Camera::PostureInfo posture;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(0);
     word_copy_return_dst(&camera, &handle);
-    camera_posture_info_ctor(&posture);
+    nw4r::g3d::Camera::PostureInfo posture;
     camera_posture_get(&camera, &posture);
     work->eye.x += (work->eye_goal.x - work->eye.x) / 10.0f;
     work->eye.y += (work->eye_goal.y - work->eye.y) / 10.0f;
@@ -583,7 +573,7 @@ static void charmake_camera_step(CharmakeWork* work) {
     work->at.x += (work->at_goal.x - work->at.x) / 10.0f;
     work->at.y += (work->at_goal.y - work->at.y) / 10.0f;
     work->at.z += (work->at_goal.z - work->at.z) / 10.0f;
-    copyVec3((nw4r::math::VEC3*)&posture.mTargetX, &work->at);
+    posture.mTarget = work->at;
     camera.SetPosition(work->eye);
     camera.SetPosture(posture);
 }
@@ -600,9 +590,9 @@ static void charmake_turn_step(CharmakeWork* work) {
     turn = 0;
     switch ((u8)get_ControlType(0)) {
     case 1:
-        if (pad->control_0x104 & 0x400) {
+        if (pad->fs_block.btn.stick_hold & 0x400) {
             turn = 1;
-        } else if (pad->control_0x104 & 0x800) {
+        } else if (pad->fs_block.btn.stick_hold & 0x800) {
             turn = 2;
         }
         break;

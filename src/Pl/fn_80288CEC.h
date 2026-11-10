@@ -11,13 +11,16 @@
 
 #ifdef __cplusplus
 
-/* The 0x24-byte record the box builders fill: three 0xC-byte vectors.  `copyVec3` copies one
+/* The 0x24-byte record the box builders fill: three 0xC-byte vectors.  `VEC3::operator=` copies one
  * 0xC-byte record and `subVec3` writes `vec_0x0C - vec_0x00` into the third, so +0x00/+0x0C are
  * the two endpoints and +0x18 their difference.  size: 0x24 */
 struct PlBox {
     /* +0x00 */ nw4r::math::VEC3 vec_0x00;
     /* +0x0C */ nw4r::math::VEC3 vec_0x0C;
     /* +0x18 */ nw4r::math::VEC3 vec_0x18;
+
+    /* 0x8012A8F8 (0x40): constructs the three vectors (one out-of-line copy, emitted in `enemy/em_common.cpp`). */
+    PlBox() __attribute__((never_inline)) {}
 };
 
 

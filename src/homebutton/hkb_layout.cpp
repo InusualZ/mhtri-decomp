@@ -554,7 +554,7 @@ void Picture::DrawSelf(const DrawInfo& drawInfo) {
 
     bool bUseVtxCol = mpMaterial->SetupGX(detail::IsModulateVertexColor(mVtxColors, mGlbAlpha), mGlbAlpha);
     detail::SetVertexFormat(bUseVtxCol, mTexCoordAry.GetSize());
-    detail::DrawQuad(GetVtxPos(), mSize, mTexCoordAry.GetSize(), mTexCoordAry.GetArray(),
+    detail::DrawQuad(AsVEC2(GetVtxPos()), mSize, mTexCoordAry.GetSize(), mTexCoordAry.GetArray(),
                      bUseVtxCol ? mVtxColors : NULL, mGlbAlpha);
 }
 

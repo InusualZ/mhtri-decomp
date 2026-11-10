@@ -35,7 +35,7 @@
 #include "ef.h"
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -87,7 +87,6 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
 /* The unmangled `fn_XXXXXXXX` callees: inside a linkage block they need no per-declaration spelling. */
 extern "C" {
 void vec3_scale_in_place(nw4r::math::VEC3* v, f32 s);
-void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void eft_res_slot_release(void* self);
 u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
 u32 eft_water_state_ck(void* self);
@@ -117,7 +116,6 @@ extern "C" void fn_8010BDE4(_EFT* self)
     s32 base_c;
     s32 i;
 
-    MTX34_ctor(&mtx);
 
     self->state_0x05++;
     scale = (eft_water_state_ck(self) == 1) ? 0.5f : 1.0f;
@@ -162,11 +160,9 @@ extern "C" void fn_8010C0E0(_EFT* self)
 {
     _EFT_FRAME_WORK* work = (_EFT_FRAME_WORK*)self->work_0x38;
     nw4r::math::MTX34 mtx;
-    VEC3 vec;
     s32 i;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&vec);
+    VEC3 vec;
 
     if (work->entries[0].state_0x00 == 3 && work->entries[1].state_0x00 == 3) {
         self->state_0x05++;
@@ -192,14 +188,14 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].state_0x00++;
                 rotVecY(&work->entries[i].vecB_0x14, self->rot_0x24.y);
                 rotLocalMatY(work->entries[i].angle_0x30, &mtx);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
+                work->entries[i].vecC_0x20 += work->entries[i].vecB_0x14;
                 mtx34_set_trans(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             } else {
                 mtx34_set_trans(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                work->entries[i].vecC_0x20 += work->entries[i].vecA_0x08;
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
             break;
@@ -214,8 +210,8 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
                 vec3_scale_in_place(&work->entries[i].vecA_0x08, work->scale_b_0x98);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                work->entries[i].vecC_0x20 += work->entries[i].vecB_0x14;
+                work->entries[i].vecC_0x20 += work->entries[i].vecA_0x08;
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
@@ -232,8 +228,8 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
                 vec3_scale_in_place(&work->entries[i].vecA_0x08, work->scale_b_0x98);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
-                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                work->entries[i].vecC_0x20 += work->entries[i].vecB_0x14;
+                work->entries[i].vecC_0x20 += work->entries[i].vecA_0x08;
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
                 work->entries[i].angle_0x2c = work->entries[i].angle_0x2c + work->entries[i].step_0x38;
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);

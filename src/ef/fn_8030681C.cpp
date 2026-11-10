@@ -472,7 +472,6 @@ extern "C" void eft041_move(_EFT* self)
     u32 pos_num;
     u32 i;
 
-    VEC3_ctor(&pos);
     pos_tbl = NULL;
     if ((mapno == 2 || mapno == 13) && self->area_0x44 == 10) {
         pos_tbl = eft041_place_pos_tbl;
@@ -525,7 +524,7 @@ extern "C" void eft041_move(_EFT* self)
             break;
         }
 
-        copyVec3(&pos, &work->models[i].model->pos_0x04);
+        pos = work->models[i].model->pos_0x04;
         pos.y -= 20.0f;
         eft004_set(0, &pos, 4.0f, 0, self->area_0x44);
     }
@@ -589,7 +588,7 @@ void eft042_set2(_ENEMY_WORK* source, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR
             }
             break;
         }
-        copyVec3(&eft->pos_0x18, pos);
+        eft->pos_0x18 = *pos;
         eft_rot_vec_copy(&eft->rot_0x24, rot);
         eft->source_0x30 = source;
         eft->timer_0x0C = 0;
@@ -657,7 +656,7 @@ extern "C" void eft042_set_placed(void* source, u8 type, nw4r::math::VEC3* pos, 
     _EFT* eft = eft042_slot_get_typed(type, area);
 
     if (eft != NULL) {
-        copyVec3(&eft->pos_0x18, pos);
+        eft->pos_0x18 = *pos;
         eft_rot_vec_copy(&eft->rot_0x24, rot);
         eft->source_0x30 = NULL;
         eft->source_0x30 = source;
@@ -798,9 +797,6 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
     u32 col;
     s32 i;
 
-    VEC3_ctor(&unused);
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     self->state_0x05++;
 
     switch (self->type_0x02) {
@@ -892,7 +888,7 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
         rotLocalMatZ(source->field_0x1C4, &mtx);
         vec_to_mh_vec3(&offset, &eft042_offset_tbl[self->type_0x02]);
         mulVecMat(&offset, &mtx);
-        addVec3To(&self->pos_0x18, &offset);
+        self->pos_0x18 += offset;
         switch (self->type_0x02) {
         case 3:
             col = get_stg_eft_col(self->area_0x44, 0);
@@ -919,7 +915,7 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
             self->field_0x17 = 1;
             break;
         }
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         work->models[0]->field_0x2C = self->rot_0x24.y;
         break;
     case 6:
@@ -987,7 +983,7 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
             break;
         }
         eft_rot_vec_copy(&work->models[0]->rot_0x28, &self->rot_0x24);
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         work->created = NULL;
         break;
     case 14:
@@ -996,7 +992,7 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
             return;
         }
         eft_rot_vec_copy(&work->models[0]->rot_0x28, &self->rot_0x24);
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         work->color.r = 255;
         work->color.g = 255;
         work->color.b = 255;
@@ -1028,7 +1024,7 @@ extern "C" void eft042_model_create_kind0(_EFT* self)
         }
         self->rot_0x24.x += 0xC000;
         eft_rot_vec_copy(&work->models[0]->rot_0x28, &self->rot_0x24);
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         work->color.r = 221;
         work->color.g = 175;
         work->color.b = 137;
@@ -1051,7 +1047,6 @@ extern "C" void eft042_model_create_kind1(_EFT* self)
     _ENEMY_WORK* source = (_ENEMY_WORK*)self->source_0x30;
     nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&offset);
     self->state_0x05++;
 
     if (res_eft_model_create(work->model, eft042_model_id_tbl[self->type_0x02], 0) == NULL) {
@@ -1068,7 +1063,7 @@ extern "C" void eft042_model_create_kind1(_EFT* self)
 
     setVector3(&offset, -5.0f, 10.0f, 0.0f);
     rotVecY(&offset, self->rot_0x24.y);
-    copyVec3(&work->v_0x0C.offset, &offset);
+    work->v_0x0C.offset = offset;
     work->field_0x18 = 2.5f;
 
     if ((u32)eft_water_state_ck(self) == 1) {
@@ -1099,7 +1094,7 @@ extern "C" void eft042_model_create_kind2(_EFT* self)
         return;
     }
 
-    copyVec3(&work->models[0].model->pos_0x04, &self->pos_0x18);
+    work->models[0].model->pos_0x04 = self->pos_0x18;
     eft_rot_vec_copy((_CP_VECTOR*)&work->models[0].model->field_0x28, &self->rot_0x24);
     work->models[0].model->field_0x2C += 16384;
     work->models[0].model->field_0x28 += ran_suu(0);
@@ -1174,8 +1169,6 @@ extern "C" void eft042_move_kind0(_EFT* self)
     u8* alpha;
     s32 i;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     work = (Eft042WorkKind0*)self->work_0x38;
     source = (_ENEMY_WORK*)self->source_0x30;
 
@@ -1319,7 +1312,7 @@ extern "C" void eft042_move_kind0(_EFT* self)
         break;
     case 7:
         get_joint_wpos_em(source, eft042_joint_tbl[self->type_0x02], &self->pos_0x18);
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         eft_rot_vec_copy(&work->models[0]->rot_0x28, (_CP_VECTOR*)&source->field_0x1BC);
         work->models[0]->setMatColor(0, GX_COLOR0A0, work->color, false);
         work->models[0]->move(0);
@@ -1425,8 +1418,6 @@ extern "C" void eft042_move_kind1(_EFT* self)
     Eft042WorkKind1* work;
     Eft042Kind1Source* source;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     work = (Eft042WorkKind1*)self->work_0x38;
     source = (Eft042Kind1Source*)self->source_0x30;
 
@@ -1440,7 +1431,7 @@ extern "C" void eft042_move_kind1(_EFT* self)
             self->state_0x05++;
         } else {
             work->v_0x0C.offset.y -= work->field_0x18;
-            addVec3To(&self->pos_0x18, &work->v_0x0C.offset);
+            self->pos_0x18 += work->v_0x0C.offset;
             self->rot_0x24.x -= 2185;
             mtx34_identity(&mtx);
             rotLocalMatY(self->rot_0x24.y, &mtx);
@@ -1465,7 +1456,6 @@ extern "C" void eft042_move_kind2(_EFT* self)
     _GXColor color;
     s32 mode;
 
-    MTX34_ctor(&mtx);
     work = (Eft042Work*)self->work_0x38;
     source = (_PLW*)self->source_0x30;
 
@@ -1542,7 +1532,7 @@ extern "C" void eft042_end(_EFT* self)
         if (--self->timer_0x0C > 0) {
             work->v_0x0C.color.a -= self->demo_flag_0x08;
             get_joint_wpos_em(source, eft042_joint_tbl[self->type_0x02], &self->pos_0x18);
-            copyVec3(&work->model->pos_0x04, &self->pos_0x18);
+            work->model->pos_0x04 = self->pos_0x18;
             eft_rot_vec_copy(&work->model->rot_0x28, (_CP_VECTOR*)&source->field_0x1BC);
             work->model->setMatColor(0, GX_COLOR0A0, work->v_0x0C.color, false);
             work->model->move(0);

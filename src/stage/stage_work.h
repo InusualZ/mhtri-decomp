@@ -13,24 +13,16 @@
 #include "nw4r/math.h"
 #include "g3d/g3d_obj.h"              /* nw4r::g3d::AnmObj */
 #include "sound/mhchar.h"             /* MHchar */
-#include "mh3_pad/vec3.h"             /* VEC3_ctor, setVec3 (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "ef/effect.h"                /* eft_vec_ctor (rule 2) */
-#include "ef/eft_capsule_ctor.h"      /* eft_capsule_ctor (rule 2) */
-#include "lobby/mhchar_construct.h"   /* mhchar_construct (rule 2) */
+#include "Pl/pl_hit_sphere.h"         /* PlSphere (rule 1) */
 
 struct _BODY_DATA;
-
-/* A `VEC3` the stage data constructs: the default and the three-float constructors are the out-of-line
- * `VEC3_ctor` / `setVec3` calls retail's constructors make. */
-struct StageVec3 : VEC3 {
-    StageVec3() { VEC3_ctor(this); }
-    StageVec3(f32 x, f32 y, f32 z) { setVec3(this, x, y, z); }
-}; /* size: 0xC */
 
 /* One 48-byte row of an area record: three light colours and the three light positions. */
 struct StageAreaRow {
     /* +0x00 */ u32 words[3];
-    /* +0x0C */ StageVec3 vecs[3];
+    /* +0x0C */ VEC3 vecs[3];
 
     StageAreaRow() __attribute__((never_inline)) {}
 }; /* size: 0x30 */
@@ -55,7 +47,7 @@ typedef struct StageLight {
     /* +0x00 */ StageAmbient ambient;
     /* +0x06 */ u8 pad_0x06[2];
     /* +0x08 */ StageLightSet set;
-    /* +0x40 */ VEC3 dir;
+    /* +0x40 */ nw4r::math::_VEC3 dir;
 } StageLight; /* size: 0x4C */
 
 /* One fog record `stage_fog_apply` hands to the scene fog: the fog type, its range and colour. */
@@ -86,7 +78,7 @@ struct StageChar {
     /* +0x15C */ u32 anim_count;
     /* +0x160 */ u8 pad_0x160[4];
 
-    StageChar() { mhchar_construct(&chr); }
+    StageChar() {}
 }; /* size: 0x164 */
 
 /* One of the two area load slots: the four models of a loaded area and their resources. */
@@ -129,9 +121,9 @@ typedef struct StageBody {
 struct StagePart {
     /* +0x00 */ u8 state;
     /* +0x01 */ u8 joint_done[3];
-    /* +0x04 */ StageVec3 joint_base[3];   /* the joints' rest positions */
+    /* +0x04 */ VEC3 joint_base[3];   /* the joints' rest positions */
     /* +0x28 */ u32 joint_angle[3][3];
-    /* +0x4C */ StageVec3 joint_pos[3];
+    /* +0x4C */ VEC3 joint_pos[3];
     /* +0x70 */ u32 joint_rot[3][3];
     /* +0x94 */ s16 joint_time[3];
     /* +0x9A */ u8 field_0x9A;
@@ -159,19 +151,15 @@ typedef struct StagePartDef {
     /* +0x26 */ u8 pad_0x26[2];
 } StagePartDef; /* size: 0x28 */
 
-/* The sphere of an area effect emitter; its constructor is the out-of-line `eft_vec_ctor`. */
-struct StageEftSphere {
-    /* +0x00 */ nw4r::math::VEC3 center;
-    /* +0x0C */ f32 radius;
-
-    StageEftSphere() { eft_vec_ctor(&center); }
+/* The sphere of an area effect emitter (its position is built by `PlSphere`'s out-of-line constructor). size: 0x10 */
+struct StageEftSphere : public PlSphere {
 }; /* size: 0x10 */
 
-/* The capsule of an area effect emitter; its constructor is the out-of-line `eft_capsule_ctor`. */
+/* The capsule of an area effect emitter; its constructor is the out-of-line `CAPSULE::CAPSULE()`. */
 struct StageEftCapsule {
     /* +0x00 */ nw4r::math::CAPSULE capsule;
 
-    StageEftCapsule() { eft_capsule_ctor(&capsule); }
+    StageEftCapsule() {}
 }; /* size: 0x1C */
 
 /* One of the four area effect emitters `eft_scnbox_load` fills from the area's scenario box file (the
@@ -201,13 +189,13 @@ struct StageWork {
     /* +0x0BC7 */ StageAmbient ambient;
     /* +0x0BCD */ u8 pad_0x0BCD[3];
     /* +0x0BD0 */ StageLightSet light;
-    /* +0x0C08 */ StageVec3 light_dir;
+    /* +0x0C08 */ VEC3 light_dir;
     /* +0x0C14 */ u8 flags;
     /* +0x0C15 */ u8 joint_state[2][4];     /* the joint visibility state of the two models (map, area) */
     /* +0x0C1D */ u8 pad_0x0C1D[3];
     /* +0x0C20 */ StageArea areas[15];
     /* +0x2804 */ f32 field_0x2804;
-    /* +0x2808 */ StageVec3 field_0x2808;
+    /* +0x2808 */ VEC3 field_0x2808;
     /* +0x2814 */ f32 anim_rate;
     /* +0x2818 */ f32 anim_rate_target;
     /* +0x281C */ u8 bitmask[15];

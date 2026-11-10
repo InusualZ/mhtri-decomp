@@ -86,7 +86,7 @@
  *     compiler emits the vtable stores, the base constructor call and the deleting tail).
  *   G3dIndMtxCallbackStd::SetNrmMapMtx: saves one register more than retail (`_savegpr_25` for `_savegpr_26`, the
  *     index stays in r4 in retail) and reuses the light direction it loaded for the first row where retail reloads
- *     it for setVec3 (tried: every store through `mtx[idx]`, a light-direction reference, the operand order; scoped
+ *     it for VEC3(x, y, z) (tried: every store through `mtx[idx]`, a light-direction reference, the operand order; scoped
  *     common_subs/propagation/lifetimes/scheduling/optimization_level pragmas - none better; `peephole on` is the best).
  *   The map splits 0x800884AC, 0x80088560 and 0x80088700 out of their callers' rows: each is a static function its
  *     caller tail-branches into, and dtk's analysis had merged it into the caller.
@@ -97,9 +97,9 @@
  *     keeps g3d_light.cpp's and g3d_scnroot.cpp's copies.
  * SHAPES. G3dLightTable's members are the LightSetting (built in the initialiser list over the table's own
  *   buffers) and a LightObj array, so the compiler emits the `__construct_array` call and the constructor's unwind
- *   actions; the camera table's matrices are G3dCameraMtx34/G3dCameraMtx44, whose inline constructors call
- *   MTX34_ctor/MTX44_ctor, so the compiler writes the member array loops (retail's register pairing).
- *   MTX34_ctor is defined `inline` (empty) just ahead of G3dIndMtxCallbackStd's constructor, which compiles under
+ *   actions; the camera table's matrices are nw4r::math::MTX34/nw4r::math::MTX44, whose inline constructors call
+ *   MTX34::MTX34()/MTX44_ctor, so the compiler writes the member array loops (retail's register pairing).
+ *   MTX34::MTX34() is defined `inline` (empty) just ahead of G3dIndMtxCallbackStd's constructor, which compiles under
  *   `dont_inline`: the call stays, and its unwind range starts at the first mtx34_identity call as retail's.
  *   g3d_light_table_load_light_set predeclares its locals in the order that gives retail's colouring.
  *   `#pragma fp_contract off` around g3d_state_load_mat_chan: retail keeps `fmuls` + `fadds` for the scaled
@@ -132,7 +132,7 @@
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResGenMode (rule 2) */
 #include "g3d/g3d_anmchr.h"    /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_anmscn.h"   /* the cluster declarations, owned by g3d/g3d_anmscn.cpp (rule 2) */
-#include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
+#include "fn_8004CAD8.h"       /* mtx34_identity/MTX34::MTX34(), owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
 #include "g3d/g3d_draw1mat1shp.h" /* GDWriteXFCmd / g3d_gd_set_chan_mat_color / FPow (rule 2) */
 #include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
@@ -147,7 +147,7 @@
 #include "RVLGX/GXAttr.h"
 #include "RVLGX/GXLight.h"
 #include "g3d/g3d_calcview.h"    /* mtx34_concat (rule 2) */
-#include "mh3_pad.h"             /* setVec3 (rule 2) */
+#include "mh3_pad.h"             /* VEC3(x, y, z) (rule 2) */
 #include "nw4r/fn_805012C4.h"    /* nw4r::math::MTX34Zero (rule 2) */
 #include "font/gx_tex_obj_copy.h" /* gx_tex_obj_copy (rule 2) */
 #include "RVLGX/GXTexture.h"
@@ -176,7 +176,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The SDK entry points the target reaches with their own `lis`/`addi`; mtx34_identity/MTX34_ctor and
+/* The SDK entry points the target reaches with their own `lis`/`addi`; mtx34_identity/MTX34::MTX34() and
  * fn_80075390..fn_80075620 come from their owners' headers above. */
 extern "C" void fn_80501658(void* p);
 
@@ -429,8 +429,6 @@ extern "C" {
 extern G3dViewMtxArrays g3d_state_view_mtx_arrays;
 extern G3dCurrentMtxReset g3d_state_current_mtx_reset;
 extern G3dIndMtxCallback* g3d_state_ind_mtx_hook;
-extern s8 g3d_state_nrm_mtx_scratch_init;   /* the scratch matrix below is constructed */
-extern Mat33 g3d_state_nrm_mtx_scratch;     /* g3d_view_mtx_arrays_nrm_mtx's result without a normal array */
 
 } /* extern "C" */
 
@@ -438,14 +436,6 @@ extern Mat33 g3d_state_nrm_mtx_scratch;     /* g3d_view_mtx_arrays_nrm_mtx's res
 /* The camera matrix table and the state invalidation                                               */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* A matrix of the camera table: the compiler-generated member and array construction calls MTX34_ctor/MTX44_ctor
- * (retail's matrix constructors) on each element.  size: 0x30 / 0x40 */
-struct G3dCameraMtx34 : nw4r::math::MTX34 {
-    G3dCameraMtx34() { MTX34_ctor(this); }
-};
-struct G3dCameraMtx44 : nw4r::math::MTX44 {
-    G3dCameraMtx44() { MTX44_ctor(this); }
-};
 
 /* The camera matrix table (`g3d_state_camera_table`): a cached inverse of the current camera matrix and, per camera,
  * its view matrix, its projection and the two texture projection matrices built from it.  size: 0x1A34 */
@@ -454,11 +444,11 @@ struct G3dCameraTable {
 
     /* +0x0000 */ u16 flags;            /* bit 0: invCameraMtx is the current camera's inverse */
     /* +0x0002 */ u16 currentCamera;
-    /* +0x0004 */ G3dCameraMtx34 invCameraMtx;
-    /* +0x0034 */ G3dCameraMtx34 cameraMtx[32];
-    /* +0x0634 */ G3dCameraMtx44 projMtx[32];
-    /* +0x0E34 */ G3dCameraMtx34 projTexMtx[32];
-    /* +0x1434 */ G3dCameraMtx34 envTexMtx[32];
+    /* +0x0004 */ nw4r::math::MTX34 invCameraMtx;
+    /* +0x0034 */ nw4r::math::MTX34 cameraMtx[32];
+    /* +0x0634 */ nw4r::math::MTX44 projMtx[32];
+    /* +0x0E34 */ nw4r::math::MTX34 projTexMtx[32];
+    /* +0x1434 */ nw4r::math::MTX34 envTexMtx[32];
 };
 
 /* The fog data a `G3dFog` handle points at: `GXSetFog`'s arguments and the range adjustment `fog_set_gp` hands to
@@ -530,11 +520,11 @@ public:
 extern "C" {
 
 /* The environment map's scale and offset: texture coordinates from the [-1, 1] view directions. */
-static const nw4r::math::MTX34 g3d_tex_env_scale_mtx = {{
+static const f32 g3d_tex_env_scale_mtx[3][4] = {
     {0.5f, 0.0f, 0.0f, 0.5f},
     {0.0f, -0.5f, 0.0f, 0.5f},
     {0.0f, 0.0f, 0.0f, 1.0f},
-}};
+};
 
 } /* extern "C" */
 
@@ -549,7 +539,6 @@ void g3d_tex_proj_env(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight);
 void g3d_tex_proj_projection(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight);
 void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight);
 void g3d_tex_proj_identity(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight);
-G3dIndMtxOp* g3d_ind_mtx_op_init(G3dIndMtxOp* pSelf, nw4r::g3d::ResMatIndMtxAndScale ind);
 void g3d_ind_mtx_op_load(G3dIndMtxOp* pSelf);
 void g3d_ind_mtx_op_set(G3dIndMtxOp* pSelf, s32 id, nw4r::math::MTX34* pMtx);
 void fn_80085344(StateValidFlag* pSelf);
@@ -968,19 +957,13 @@ void g3d_tex_proj_env(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             nw4r::math::VEC3 up;
             nw4r::math::VEC3 xAxis;
             nw4r::math::VEC3 yAxis;
-            VEC3_ctor(&dir);
-            VEC3_ctor(&up);
-            VEC3_ctor(&xAxis);
-            VEC3_ctor(&yAxis);
             nw4r::g3d::LightObj* pLight = g3d_state_get_light_obj(lightIdx);
             light_obj_get_light_dir(pLight, &dir);
             nw4r::math::MTX34* pInvCamera = g3d_state_get_inv_camera_mtx();
             if (light_obj_is_point_light(pLight) || (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z)) {
                 light_obj_get_light_pos(pLight, &dir);
                 mtx34_rotate_vec3(&dir, pInvCamera, &dir);
-                nw4r::math::VEC3 neg;
-                vec3_negate(&neg, &dir);
-                copyVec3(&dir, &neg);
+                dir = -dir;
                 if (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z) {
                     dir.y = -1.0f;
                 }
@@ -1013,7 +996,7 @@ void g3d_tex_proj_env(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             pM->m[2][2] = -dir.z;
             mtx34_concat(pM, pM, pInvCamera);
             pM->m[0][3] = pM->m[1][3] = pM->m[2][3] = 0.0f;
-            mtx34_concat(pM, &g3d_tex_env_scale_mtx, pM);
+            mtx34_concat(pM, (const nw4r::math::MTX34*)g3d_tex_env_scale_mtx, pM);
         } else {
             mtx34_copy_ps(pM, g3d_state_get_env_tex_mtx());
         }
@@ -1043,15 +1026,6 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
         nw4r::math::VEC3 half;
         nw4r::math::VEC3 up;
         nw4r::math::VEC3 eye;
-        nw4r::math::VEC3 dir;
-        nw4r::math::VEC3 camDir;
-        nw4r::math::VEC3 xAxis;
-        nw4r::math::VEC3 yAxis;
-        nw4r::math::VEC3 negPos;
-        nw4r::math::VEC3 negDir;
-        VEC3_ctor(&half);
-        VEC3_ctor(&up);
-        VEC3_ctor(&eye);
         nw4r::math::MTX34* pCamera = g3d_state_get_camera_mtx();
         eye.x = -pCamera->m[2][0];
         eye.y = -pCamera->m[2][1];
@@ -1059,14 +1033,13 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
         nw4r::math::MTX34* pInvCamera = g3d_state_get_inv_camera_mtx();
         s32 lightIdx = g3d_state_get_light_set_entry(refLight);
         if ((u8)lightIdx <= 127 && light_obj_is_enable(g3d_state_get_light_obj(lightIdx))) {
-            VEC3_ctor(&dir);
+            nw4r::math::VEC3 dir;
             nw4r::g3d::LightObj* pLight = g3d_state_get_light_obj(lightIdx);
             light_obj_get_light_dir(pLight, &dir);
             if (light_obj_is_point_light(pLight) || (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z)) {
                 light_obj_get_light_pos(pLight, &dir);
                 mtx34_rotate_vec3(&dir, pInvCamera, &dir);
-                vec3_negate(&negPos, &dir);
-                copyVec3(&dir, &negPos);
+                dir = -dir;
                 if (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z) {
                     dir.y = -1.0f;
                 }
@@ -1076,8 +1049,7 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             if (!light_obj_is_specular_light(pLight)) {
                 C_VECHalfAngle(vec3_to_vec(&eye), vec3_to_vec(&dir), vec3_to_vec(&half));
             } else {
-                vec3_negate(&negDir, &dir);
-                copyVec3(&half, &negDir);
+                half = -dir;
             }
             if (abs_f32(half.x) < 0.000001f && abs_f32(half.z) < 0.000001f) {
                 up.x = up.y = 0.0f;
@@ -1095,15 +1067,15 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             up.x = pRefCamera->m[1][0];
             up.y = pRefCamera->m[1][1];
             up.z = pRefCamera->m[1][2];
-            setVec3(&camDir, -pRefCamera->m[2][0], -pRefCamera->m[2][1], -pRefCamera->m[2][2]);
+            nw4r::math::VEC3 camDir(-pRefCamera->m[2][0], -pRefCamera->m[2][1], -pRefCamera->m[2][2]);
             C_VECHalfAngle(vec3_to_vec(&eye), vec3_to_vec(&camDir), vec3_to_vec(&half));
         } else {
             mtx34_copy_ps(pM, g3d_state_get_env_tex_mtx());
             return;
         }
         vec3_normalize_into(&half, &half);
-        VEC3_ctor(&xAxis);
-        VEC3_ctor(&yAxis);
+        nw4r::math::VEC3 xAxis;
+        nw4r::math::VEC3 yAxis;
         vec3_cross((f32*)&xAxis, (const f32*)&up, (const f32*)&half);
         vec3_normalize_into(&xAxis, &xAxis);
         vec3_cross((f32*)&yAxis, (const f32*)&half, (const f32*)&xAxis);
@@ -1130,24 +1102,18 @@ void g3d_tex_proj_identity(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
     }
 }
 
-/* Reads the material's three indirect matrices into the operation, one flag bit per matrix found. */
-G3dIndMtxOp* g3d_ind_mtx_op_init(G3dIndMtxOp* pSelf, nw4r::g3d::ResMatIndMtxAndScale ind) {
-    nw4r::math::MTX34* pMtx = pSelf->mtx;
-    do {
-        MTX34_ctor(pMtx);
-        pMtx++;
-    } while (pMtx < &pSelf->mtx[3]);
-    pSelf->flags = 0;
-    if (ind.GXGetIndTexMtx(GX_ITM_0, &pSelf->mtx[0])) {
-        pSelf->flags |= 1;
+/* 0x80085160 (0xD8): reads the material's three indirect matrices into the operation, one flag bit per matrix found. */
+G3dIndMtxOp::G3dIndMtxOp(nw4r::g3d::ResMatIndMtxAndScale ind) {
+    flags = 0;
+    if (ind.GXGetIndTexMtx(GX_ITM_0, &mtx[0])) {
+        flags |= 1;
     }
-    if (ind.GXGetIndTexMtx(GX_ITM_1, &pSelf->mtx[1])) {
-        pSelf->flags |= 2;
+    if (ind.GXGetIndTexMtx(GX_ITM_1, &mtx[1])) {
+        flags |= 2;
     }
-    if (ind.GXGetIndTexMtx(GX_ITM_2, &pSelf->mtx[2])) {
-        pSelf->flags |= 4;
+    if (ind.GXGetIndTexMtx(GX_ITM_2, &mtx[2])) {
+        flags |= 4;
     }
-    return pSelf;
 }
 
 /* Writes the operation's flagged matrices to the display list. */
@@ -1738,9 +1704,8 @@ u8 fn_80086AA0(StateByte3* pSelf) {
 /* Loads the material's indirect matrices: the display list, then the operation the callback may edit. */
 void g3d_state_load_mat_ind_mtx(nw4r::g3d::ResMatIndMtxAndScale ind, G3dIndMtxCallback* pCallback) {
     if (ind.IsValid()) {
-        G3dIndMtxOp op;
         g3d_state_load_mat_ind_mtx_dl(ind);
-        g3d_ind_mtx_op_init(&op, ind);
+        G3dIndMtxOp op(ind);
         pCallback->Exec(&op);
         g3d_ind_mtx_op_load(&op);
     }
@@ -1861,7 +1826,6 @@ void g3d_state_load_tex_coord_gen(nw4r::g3d::ResMatTexCoordGen texCoordGen) {
  * SRT transform, an identity matrix only once while it stays the identity. */
 void g3d_state_load_tex_srt(const nw4r::g3d::ResTexSrt srt) {
     nw4r::math::MTX34 m;
-    MTX34_ctor(&m);
     for (u32 i = 0; i < 8; i++) {
         if (srt.IsExist(i)) {
             BOOL bIdentity = TRUE;
@@ -1889,7 +1853,6 @@ void g3d_state_load_tex_srt(const nw4r::g3d::ResTexSrt srt) {
                     g3d_calc_tex_mtx(&m, bIdentity, &srt.ref().texSrt[i], srt.GetTexSrtFlag(i), srt.GetTexMtxMode());
                 } else {
                     nw4r::math::MTX34 srtMtx;
-                    MTX34_ctor(&srtMtx);
                     g3d_calc_tex_mtx(&srtMtx, TRUE, &srt.ref().texSrt[i], srt.GetTexSrtFlag(i), srt.GetTexMtxMode());
                     g3d_swap_f32(&srtMtx.m[0][2], &srtMtx.m[0][3]);
                     g3d_swap_f32(&srtMtx.m[1][2], &srtMtx.m[1][3]);
@@ -1900,7 +1863,6 @@ void g3d_state_load_tex_srt(const nw4r::g3d::ResTexSrt srt) {
             if (bIdentity) {
                 if (!g3d_bits_test(&g3d_state_tex_mtx_flags.flags, i)) {
                     nw4r::math::MTX34 identity;
-                    MTX34_ctor(&identity);
                     g3d_bits_set(&g3d_state_tex_mtx_flags.flags, i);
                     mtx34_identity(&identity);
                     GXLoadTexMtxImm((const f32(*)[4])mtx34_get_ptr(&identity), 0x40 + i * 3, 0);
@@ -2108,12 +2070,9 @@ Mat33* g3d_view_mtx_arrays_nrm_mtx(G3dViewMtxArrays* pSelf, u32 idx) {
     if (pSelf->pViewNrmMtx != NULL) {
         return &pSelf->pViewNrmMtx[idx];
     }
-    if (g3d_state_nrm_mtx_scratch_init == 0) {
-        MTX33_ctor(&g3d_state_nrm_mtx_scratch);
-        g3d_state_nrm_mtx_scratch_init = 1;
-    }
-    mtx34_to_mtx33((nw4r::math::MTX33*)&g3d_state_nrm_mtx_scratch, g3d_view_mtx_arrays_pos_mtx(pSelf, idx));
-    return &g3d_state_nrm_mtx_scratch;
+    static nw4r::math::MTX33 scratch;
+    mtx34_to_mtx33(&scratch, g3d_view_mtx_arrays_pos_mtx(pSelf, idx));
+    return (Mat33*)&scratch;
 }
 
 } /* extern "C" */
@@ -2424,19 +2383,10 @@ void g3d_tex_obj_cache_invalidate(G3dTexObjCache* pSelf) {
 
 } /* extern "C" */
 
-/* MTX34's empty constructor, visible so the callback's matrix construction gets no unwind range (its kept copy is
- * 0x8005050C). */
-extern "C" inline void MTX34_ctor(nw4r::math::MTX34* out) {}
-
 #pragma push
 #pragma dont_inline on
 /* 0x800887B4 (0x94): constructs the callback with three identity matrices, none enabled. */
 G3dIndMtxCallbackStd::G3dIndMtxCallbackStd() {
-    nw4r::math::MTX34* pMtx = mtx;
-    do {
-        MTX34_ctor(pMtx);
-        pMtx++;
-    } while (pMtx < &mtx[3]);
     mtx34_identity(&mtx[0]);
     mtx34_identity(&mtx[1]);
     mtx34_identity(&mtx[2]);
@@ -2471,8 +2421,7 @@ void G3dIndMtxCallbackStd::SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC
             mtx[idx].m[0][1] = 0.5f * -pLightDir->y;
             mtx[idx].m[0][2] = 0.5f * -pLightDir->z;
             if (method == nw4r::g3d::ResMatMiscData::NORMAL_MAP_SPEC) {
-                nw4r::math::VEC3 half;
-                setVec3(&half, pLightDir->x, pLightDir->y, pLightDir->z - 1.0f);
+                nw4r::math::VEC3 half(pLightDir->x, pLightDir->y, pLightDir->z - 1.0f);
                 vec3_normalize_into(&half, &half);
                 mtx[idx].m[1][0] = 0.5f * -half.x;
                 mtx[idx].m[1][1] = 0.5f * -half.y;

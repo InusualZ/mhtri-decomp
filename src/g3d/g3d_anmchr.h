@@ -88,6 +88,9 @@ struct ChrAnmResult {
     /* +0x04 */ math::VEC3 s;
     /* +0x10 */ math::VEC3 rawR;
     /* +0x1C */ math::MTX34 rt;
+
+    /* 0x80061068 (0x44): retail's out-of-line constructor (the members' constructors, in order). */
+    ChrAnmResult() __attribute__((never_inline)) {}
 };
 
 /* The animation's play policy: what a frame past the end folds back to. */

@@ -131,7 +131,6 @@ extern "C" void menu_target_marker_follow(_EFT* self) {
     LbMenuScratch* scratch;
     s32 i;
 
-    VEC3_ctor(&pos);
     work = (MenuFxWorkB*)self->work_0x38;
     scratch = (LbMenuScratch*)self->source_0x30;
     plw = scratch->plw_0x000;
@@ -163,13 +162,13 @@ extern "C" void menu_target_marker_follow(_EFT* self) {
             if (other->slot_active == 0) {
                 return;
             }
-            copyVec3(&pos, (VEC3*)&other->field_0x03C);
+            pos = *(VEC3*)&other->field_0x03C;
             pos.y += 200.0f;
         } else {
             _LB_NPC* npc = (_LB_NPC*)row->model_0x04;
 
             if (npc != NULL && npc->field_0x000 != 0) {
-                copyVec3(&pos, &npc->pos_0x10);
+                pos = npc->pos_0x10;
                 pos.y += lb_npc_model_height_get(
                     ((_LB_NPC*)scratch->rows_0x00C[scratch->index_0x14C].model_0x04)->model_0x050->model_0x002);
                 pos.y += 50.0f;
@@ -184,7 +183,7 @@ extern "C" void menu_target_marker_follow(_EFT* self) {
     work->bob_phase_0x08 += 0x200;
     self->rot_0x24.y += 0xFF;
     for (i = 0; i < work->count; i++) {
-        copyVec3(&((MenuFxWork*)work)->models[i]->pos_0x04, copyVec3(&self->pos_0x18, &pos));
+        *(&((MenuFxWork*)work)->models[i]->pos_0x04) = self->pos_0x18 = pos;
         eft_rot_vec_copy(&((MenuFxWork*)work)->models[i]->rot_0x28, &self->rot_0x24);
         ((MenuFxWork*)work)->models[i]->move(0);
     }

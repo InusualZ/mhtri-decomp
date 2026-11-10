@@ -4,7 +4,7 @@
  * `.text` 0x803AA4A4..0x803AB3BC, `extab` 0x80018A6C..0x80018B0C, `extabindex` 0x80038E08..0x80038EF8,
  * `.ctors` 0x8056F3B0..0x8056F3B4, `.data` 0x805F2940..0x805F2A38, `.sdata` 0x807935D0..0x807935D8 and
  * `.sdata2` 0x8079C4C0..0x8079C50C.  The cut at 0x803AB3BC is the `.data` emission-order seam: the static
- * initialiser `quest_zone_tbl_init` (0x803AB1F0, the `.ctors` word's target) is the unit's last function and
+ * initialiser `__sinit_\quest_item_slot_cpp` (0x803AB1F0, the `.ctors` word's target) is the unit's last function and
  * every `.data` object it fills is address-taken nowhere else.  The rest of the band is `quest/quest_entry.cpp`.
  *
  * NAME - GUESS.  No `__FILE__` string; `quest_item_slot` is taken from the unit's largest family (the five-slot
@@ -12,21 +12,17 @@
  *
  * The zone tables: five `.data` objects of one `u8` head and two or three (position, reach, flag) triples whose
  * positions the initialiser writes (GUESS: arena/zone spots; the heads and the reach/flag bytes are the `.data`
- * image's own).  The initialiser is an ordinary function here, so this object carries no `.ctors` word (its
- * `.ctors` claim is the target's); `assignVec3` is the `out = in` vector copy at 0x80051490, called
- * through `ef.h`'s `Vec*` declaration (the `enemy` units declare the same address with `VEC3*`: an open type split).
+ * image's own).  The positions are `VEC3` members built by the compiler's `__sinit` (a `VEC3(x, y, z)`
+ * temporary copy-constructed into each member) and its `.ctors` word.
  *
  * RESIDUAL.
  *   * `quest_item_pair_copy_cell`/`_block`/`_row` 89-94 %: callee-saved colouring (target `rec`=r29, `dst`/
  *     `flagged`=r30, `kind`=r31; ours a cyclic shift), plus `quest_item_slot_find`'s mask/load scheduling.
  *   * `quest_item_slot_add` 92.50 %: target's `extsh` temp, unsigned `cmplwi r3,5` and preserved loop counter.
  *     Kept: the `Q_ItemCount* slot` declaration inside the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
- *   * `.ctors`: the object carries no `.ctors` word (the initialiser is an ordinary function), so the claim's
- *     four bytes are the target's; `.data` and `.sdata2` match byte for byte.
  *
- * SHAPES: the zone objects are defined after `quest_zone_tbl_init` and only declared before it - defined first,
- * MWCC addresses them through one section anchor (`lis`/`addi` once, `r30` base) where the target loads each
- * object's own address; `quest_item_slots_use` is one `switch` with `default:` first and an inner `switch
+ * SHAPES: the zone objects are defined after every function body under `#pragma pool_data off`, so the
+ * `__sinit` loads each object's own address (pooled, MWCC addresses them from one `r30` section base); `quest_item_slots_use` is one `switch` with `default:` first and an inner `switch
  * (result)` over 0-2 / 3; `quest_id_head_ck`/`_tail_ck` compare `(u16)(id + 0xFFFF)` against 2 / 3.
  */
 
@@ -52,7 +48,7 @@
 #include "enemy/fn_8013F764.h"   /* em_kind_release - owned by enemy/fn_8013F764.cpp (rule 2) */
 #include "Pl/pl_act_stage_latch_set.h"  /* pl_act_stage_latch_set, my_player_work_get - owned by Pl/fn_80273B14.cpp (rule 2) */
 #include "Pl/fn_80288CEC.h"   /* pl_warp_start - owned by Pl/fn_80288CEC.cpp (rule 2) */
-#include "mh3_pad.h"          /* setVec3 (rule 2) */
+#include "mh3_pad.h"          /* the owner header (rule 2) */
 #include "stage/stg_w.h"        /* stage_map_area_count_get - owned by stage/stg_w.cpp (rule 2) */
 #include "sound/fn_800D7F54.h"  /* snd_item_fail_play - owned by sound/fn_800D7F54.cpp (rule 2) */
 #include "Pl/Pl_master_ck.h"    /* Pl_master_ck - owned by Pl/pl_master.cpp (rule 2) */
@@ -60,7 +56,7 @@
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */
 #include "Runtime.PPCEABI.H/memcpy.h"  /* memcpy (owner: the Runtime.PPCEABI.H lib) */
 #include "nw4r/math.h"
-#include "ef.h"                /* assignVec3 (0x80051490, no registered owner), `Vec` */
+#include "ef.h"                /* VEC3::operator= (0x80051490, no registered owner), `Vec` */
 
 /* The roll `quest_item_slots_use` indexes by the low three bits of a random draw: 0 takes the slots, 1 a
  * fixed item, 2 nothing (`.sdata` 0x807935D0..0x807935D8). */
@@ -571,71 +567,43 @@ u32 quest_item_work_notify(s32 idx) {
 }
 
 /* The quest zone tables (GUESS names and field names): one object per zone group - a head byte and the
- * (position, reach, flag) triples `quest_zone_tbl_init` fills the positions of.  `Q_ZoneSet3` has three
+ * (position, reach, flag) triples whose positions `__sinit` builds.  `Q_ZoneSet3` has three
  * triples, `Q_ZoneSet2` two (its last triple has no flag byte: the object ends at the reach). */
 struct Q_ZoneSet3 {
     /* +0x00 */ u8 head_0x00;
-    /* +0x04 */ Vec pos_0x04;
+    /* +0x04 */ nw4r::math::VEC3 pos_0x04;
     /* +0x10 */ f32 reach_0x10;
     /* +0x14 */ u8 flag_0x14;
-    /* +0x18 */ Vec pos_0x18;
+    /* +0x18 */ nw4r::math::VEC3 pos_0x18;
     /* +0x24 */ f32 reach_0x24;
     /* +0x28 */ u8 flag_0x28;
-    /* +0x2C */ Vec pos_0x2C;
+    /* +0x2C */ nw4r::math::VEC3 pos_0x2C;
     /* +0x38 */ f32 reach_0x38;
     /* +0x3C */ u8 flag_0x3C;
 };  /* size: 0x40 */
 
 struct Q_ZoneSet2 {
     /* +0x00 */ u8 head_0x00;
-    /* +0x04 */ Vec pos_0x04;
+    /* +0x04 */ nw4r::math::VEC3 pos_0x04;
     /* +0x10 */ f32 reach_0x10;
     /* +0x14 */ u8 flag_0x14;
-    /* +0x18 */ Vec pos_0x18;
+    /* +0x18 */ nw4r::math::VEC3 pos_0x18;
     /* +0x24 */ f32 reach_0x24;
 };  /* size: 0x28 */
 
-extern Q_ZoneSet3 quest_zone_a;
-extern Q_ZoneSet2 quest_zone_b;
-extern Q_ZoneSet3 quest_zone_c;
-extern Q_ZoneSet2 quest_zone_d;
-extern Q_ZoneSet2 quest_zone_e;
-
-/* Fills the positions of the five zone tables (the `.ctors` entry of this band). */
-void quest_zone_tbl_init(void) {
-    nw4r::math::VEC3 t0;
-    nw4r::math::VEC3 t1;
-    nw4r::math::VEC3 t2;
-    nw4r::math::VEC3 t3;
-    nw4r::math::VEC3 t4;
-    nw4r::math::VEC3 t5;
-    nw4r::math::VEC3 t6;
-    nw4r::math::VEC3 t7;
-    nw4r::math::VEC3 t8;
-    nw4r::math::VEC3 t9;
-    nw4r::math::VEC3 t10;
-    nw4r::math::VEC3 t11;
-
-    assignVec3(&quest_zone_a.pos_0x04, (Vec*)setVec3(&t0, -2020.0f, -25.0f, -1724.0f));
-    assignVec3(&quest_zone_a.pos_0x18, (Vec*)setVec3(&t1, 5858.5f, -12.0f, -324.0f));
-    assignVec3(&quest_zone_a.pos_0x2C, (Vec*)setVec3(&t2, 0.0f, 0.0f, 0.0f));
-    assignVec3(&quest_zone_b.pos_0x04, (Vec*)setVec3(&t3, 5517.0f, -25.0f, -384.0f));
-    assignVec3(&quest_zone_b.pos_0x18, (Vec*)setVec3(&t4, 0.0f, 0.0f, 0.0f));
-    assignVec3(&quest_zone_c.pos_0x04, (Vec*)setVec3(&t5, -4353.0f, -50.0f, 805.0f));
-    assignVec3(&quest_zone_c.pos_0x18, (Vec*)setVec3(&t6, 1350.0f, -50.0f, -840.0f));
-    assignVec3(&quest_zone_c.pos_0x2C, (Vec*)setVec3(&t7, 0.0f, 0.0f, 0.0f));
-    assignVec3(&quest_zone_d.pos_0x04, (Vec*)setVec3(&t8, 3800.0f, -1200.0f, 850.0f));
-    assignVec3(&quest_zone_d.pos_0x18, (Vec*)setVec3(&t9, 0.0f, 0.0f, 0.0f));
-    assignVec3(&quest_zone_e.pos_0x04, (Vec*)setVec3(&t10, -244.399002f, -25.0f, 2122.48389f));
-    assignVec3(&quest_zone_e.pos_0x18, (Vec*)setVec3(&t11, 0.0f, 0.0f, 0.0f));
-}
-
 /* `.data` 0x805F2940..0x805F2A38 (`splits.txt`): the five objects tile the claim (0x40 + 0x28 + 0x40 + 0x28
- * + 0x28).  The vectors are zero here; `quest_zone_tbl_init` fills them. */
-Q_ZoneSet3 quest_zone_a = { 0, { 0.0f, 0.0f, 0.0f }, 650.0f, 12, { 0.0f, 0.0f, 0.0f }, 500.0f, 0xFF,
-                            { 0.0f, 0.0f, 0.0f }, 0.0f, 0 };
-Q_ZoneSet2 quest_zone_b = { 9, { 0.0f, 0.0f, 0.0f }, 400.0f, 0xFF, { 0.0f, 0.0f, 0.0f }, 0.0f };
-Q_ZoneSet3 quest_zone_c = { 0, { 0.0f, 0.0f, 0.0f }, 550.0f, 3, { 0.0f, 0.0f, 0.0f }, 500.0f, 0xFF,
-                            { 0.0f, 0.0f, 0.0f }, 0.0f, 0 };
-Q_ZoneSet2 quest_zone_d = { 0, { 0.0f, 0.0f, 0.0f }, 370.0f, 0xFF, { 0.0f, 0.0f, 0.0f }, 0.0f };
-Q_ZoneSet2 quest_zone_e = { 6, { 0.0f, 0.0f, 0.0f }, 268.0f, 0xFF, { 0.0f, 0.0f, 0.0f }, 0.0f };
+ * + 0x28).  The positions are built by the unit's `__sinit` (a temporary `VEC3(x, y, z)` copy-constructed
+ * into each member); the rest of each object is the static `.data` image. */
+#pragma pool_data off
+Q_ZoneSet3 quest_zone_a = { 0, nw4r::math::VEC3(-2020.0f, -25.0f, -1724.0f), 650.0f, 12,
+                            nw4r::math::VEC3(5858.5f, -12.0f, -324.0f), 500.0f, 0xFF,
+                            nw4r::math::VEC3(0.0f, 0.0f, 0.0f), 0.0f, 0 };
+Q_ZoneSet2 quest_zone_b = { 9, nw4r::math::VEC3(5517.0f, -25.0f, -384.0f), 400.0f, 0xFF,
+                            nw4r::math::VEC3(0.0f, 0.0f, 0.0f), 0.0f };
+Q_ZoneSet3 quest_zone_c = { 0, nw4r::math::VEC3(-4353.0f, -50.0f, 805.0f), 550.0f, 3,
+                            nw4r::math::VEC3(1350.0f, -50.0f, -840.0f), 500.0f, 0xFF,
+                            nw4r::math::VEC3(0.0f, 0.0f, 0.0f), 0.0f, 0 };
+Q_ZoneSet2 quest_zone_d = { 0, nw4r::math::VEC3(3800.0f, -1200.0f, 850.0f), 370.0f, 0xFF,
+                            nw4r::math::VEC3(0.0f, 0.0f, 0.0f), 0.0f };
+Q_ZoneSet2 quest_zone_e = { 6, nw4r::math::VEC3(-244.399002f, -25.0f, 2122.48389f), 268.0f, 0xFF,
+                            nw4r::math::VEC3(0.0f, 0.0f, 0.0f), 0.0f };

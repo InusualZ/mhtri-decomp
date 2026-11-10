@@ -54,7 +54,6 @@
 #include "enemy/em_se_tbl_play_alt.h"
 #include "enemy/em_turn_seq_start.h"
 #include "enemy/em_turn_seq_step.h"
-#include "enemy/em_ground_rec_clear.h"
 #include "ef/eft_slot.h"
 #include "ef/eft_slot_shape_block_get.h"
 #include "ef/eft009.h"
@@ -540,8 +539,6 @@ void em027_area_pos_set(struct _ENEMY_WORK* self, _ENEMY_DATA* data) {
     u8 index;
     EftShapeBlockView* shape;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     index = 0;
     data_area = data->field_0x14;
     area = self->area_no;
@@ -834,7 +831,6 @@ s32 em027_ground_variant_roll(u16 id) {
     EmGroundRec rec;
     s32 pct;
 
-    em_ground_rec_clear(&rec);
     if (move_work_state_ck() == 0) {
         return 0;
     }
@@ -865,7 +861,6 @@ void em027_init(struct _ENEMY_WORK* self, u8 mode) {
     _ENEMY_DATA* data;
     s8 variant;
 
-    em_ground_rec_clear(&rec);
     if ((s32) (self->field_0x1C8 & 8) != 0) {
         em_status_bits_set(self, 0x80);
     }
@@ -970,7 +965,7 @@ void em027_init(struct _ENEMY_WORK* self, u8 mode) {
         break;
     }
     if ((data != NULL) && (self->area_no == data->field_0x14)) {
-        copyVec3(&self->aim, &data->vec_0x24);
+        self->aim = data->vec_0x24;
     }
     self->resume_mode_0xB04 = 0;
 }
@@ -1025,7 +1020,7 @@ void em027_frame_update(struct _ENEMY_WORK* self) {
     data = (_ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
     if (data != NULL) {
         if (self->area_no == data->field_0x14) {
-            copyVec3(&self->aim, &data->vec_0x24);
+            self->aim = data->vec_0x24;
         }
         switch (data->field_0x08) {
         case 0:
@@ -2542,17 +2537,8 @@ void em027_act13_4(struct _ENEMY_WORK* self) {
 
 void em027_act13_5(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 sp5C;
-    nw4r::math::VEC3 sp50;
-    nw4r::math::VEC3 sp44;
-    nw4r::math::VEC3 sp38;
-    nw4r::math::VEC3 sp2C;
-    nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     EmAilmentFx* fx;
 
-    VEC3_ctor(&offset);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2613,10 +2599,10 @@ void em027_act13_5(struct _ENEMY_WORK* self) {
         if ((system_w.field_0x0c & 0x1F) == 0x10) {
             fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
             if (fx != NULL) {
-                copyVec3(&offset, setVec3(&sp5C, fx->x, fx->y, fx->z));
+                offset = VEC3(fx->x, fx->y, fx->z);
                 eft013_em_place(self, &offset, fx->joint, fx->scale, 0xA);
             } else {
-                copyVec3(&offset, setVec3(&sp50, 0.0f, 100.0f, 0.0f));
+                offset = VEC3(0.0f, 100.0f, 0.0f);
                 eft013_em_place(self, &offset, 2, 2.0f, 0xA);
             }
         }
@@ -2630,10 +2616,10 @@ void em027_act13_5(struct _ENEMY_WORK* self) {
         if ((system_w.field_0x0c & 0x1F) == 0x10) {
             fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
             if (fx != NULL) {
-                copyVec3(&offset, setVec3(&sp44, fx->x, fx->y, fx->z));
+                offset = VEC3(fx->x, fx->y, fx->z);
                 eft013_em_place(self, &offset, fx->joint, fx->scale, 0xA);
             } else {
-                copyVec3(&offset, setVec3(&sp38, 0.0f, 100.0f, 0.0f));
+                offset = VEC3(0.0f, 100.0f, 0.0f);
                 eft013_em_place(self, &offset, 2, 2.0f, 0xA);
             }
         }
@@ -2648,10 +2634,10 @@ void em027_act13_5(struct _ENEMY_WORK* self) {
         if ((system_w.field_0x0c & 0x1F) == 0x10) {
             fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
             if (fx != NULL) {
-                copyVec3(&offset, setVec3(&sp2C, fx->x, fx->y, fx->z));
+                offset = VEC3(fx->x, fx->y, fx->z);
                 eft013_em_place(self, &offset, fx->joint, fx->scale, 0xA);
             } else {
-                copyVec3(&offset, setVec3(&sp20, 0.0f, 100.0f, 0.0f));
+                offset = VEC3(0.0f, 100.0f, 0.0f);
                 eft013_em_place(self, &offset, 2, 2.0f, 0xA);
             }
         }
@@ -2667,11 +2653,11 @@ void em027_act13_5(struct _ENEMY_WORK* self) {
         if ((system_w.field_0x0c & 0x1F) == 0x10) {
             fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
             if (fx != NULL) {
-                copyVec3(&offset, setVec3(&sp14, fx->x, fx->y, fx->z));
+                offset = VEC3(fx->x, fx->y, fx->z);
                 eft013_em_place(self, &offset, fx->joint, fx->scale, 0xA);
                 break;
             }
-            copyVec3(&offset, setVec3(&sp8, 0.0f, 100.0f, 0.0f));
+            offset = VEC3(0.0f, 100.0f, 0.0f);
             eft013_em_place(self, &offset, 2, 2.0f, 0xA);
         }
         break;
@@ -3018,7 +3004,6 @@ void em027_action_dispatch(struct _ENEMY_WORK* self) {
 void em027_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, s32 joint, s32 delta, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         eft009_spawn_at_joint(self, joint, type, delta, scale);
@@ -3036,8 +3021,6 @@ void em027_motion_events(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 shift;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&shift);
     if (self->team == 29) {
         return;
     }

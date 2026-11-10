@@ -11,7 +11,7 @@
 #include "unsplit/g3d.h"
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 

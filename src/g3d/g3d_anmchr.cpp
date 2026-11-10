@@ -96,7 +96,7 @@
 #include "MTX/PSMTXQuat.h"      /* PSMTXQuat, owner MTX/mtx.c (leaf header, rule 2) */
 #include "MTX/QUATMtx.h"      /* QUATMtx, QUATSlerp, owner NAND/nand.c (leaf header, rule 2) */
 #include "nw4r/fn_805012C4.h"   /* nw4r::math::MTX33Identity, MTX34Zero (rule 2) */
-#include "mh3_pad/vec3.h"   /* VEC3_ctor (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
@@ -557,15 +557,6 @@ extern "C" f32 math_flog_checked(f32 x)
         return nw4r::math::detail::FLog(x);
     }
     return -(0.0f / 0.0f);
-}
-
-/* 0x80061068 (0x44): constructs a character animation result (scale, rotation vector and matrix). */
-extern "C" nw4r::g3d::ChrAnmResult* chr_anm_result_init(nw4r::g3d::ChrAnmResult* pSelf)
-{
-    VEC3_ctor(&pSelf->s);
-    VEC3_ctor(&pSelf->rawR);
-    MTX34_ctor(&pSelf->rt);
-    return pSelf;
 }
 
 /* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
@@ -1696,7 +1687,6 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
     dVector4Set(&blendQuat.x, 0.0f, 0.0f, 0.0f, 1.0f);
     f32 quatWeight = 0.0f;
     nw4r::math::MTX33 firstRot;
-    MTX33_ctor(&firstRot);
     f32 invSum = math_reciprocal(sumWeight);
     pResult->flags = 0xFFFFFFFF;
     pResult->s.x = 0.0f;
@@ -1706,7 +1696,6 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
     u32 myFlags;
     for (int i = 0; i < mChildrenArraySize; i++) {
         ChrAnmResult childResult;
-        chr_anm_result_init(&childResult);
         AnmObjChrRes* pChild = mpChildrenArray[i];
         f32 weight = mpWeightArray[i];
         if (pChild != NULL && weight != 0.0f && pChild->TestExistence(idx)) {
@@ -1789,7 +1778,7 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
         pResult->s.z = math_fexp(logSz);
     }
     if (bQuatRot) {
-        nw4r::math::VEC3 trans;
+        nw4r::math::_VEC3 trans;
         trans.x = pResult->rt.m[0][3];
         trans.y = pResult->rt.m[1][3];
         trans.z = pResult->rt.m[2][3];

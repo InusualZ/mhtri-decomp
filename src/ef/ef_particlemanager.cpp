@@ -56,7 +56,7 @@
  *   base's implicit constructor (its weak copy is dropped for `ef/ef_effect.cpp`'s) and stores this unit's table;
  *   `SendClosing` is the key function.  `EfPmManager` is the class under the tag the C-linkage functions and their
  *   consumers spell; the parameter sub-objects are constructed by their C-named functions from the body.
- * SHAPES. The static matrices are `EfPmStaticMtx` objects (an `MTX34` whose constructor calls `MTX34_ctor`), so the
+ * SHAPES. The static matrices are `EfPmStaticMtx` objects (an `MTX34` whose constructor calls `MTX34::MTX34()`), so the
  *   compiler emits `__sinit_\ef_particlemanager_cpp` and the anonymous `.ctors` word.
  * SHAPES. The header accessors, the field functions and the small vector helpers are C-linkage `inline` functions
  *   marked `never_inline`, declared ahead of the first definition in their headers' order (res_emitter.h, the ut
@@ -86,7 +86,7 @@
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h"
 #include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8.h" /* the vector and matrix helpers (rule 2) */
 #include "ef/ef_vec3_normalize_to.h" /* ef_vec3_normalize_to (rule 2) */
 #include "ef/ef_emitter_tex_flags.h" /* ef_emitter_get_mtx (rule 2) */
@@ -101,7 +101,7 @@
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
 #include "vec3_scale.h" /* vec3_scale (rule 2) */
 #include "nw4r/fn_805012C4.h" /* nw4r::ut::List_GetNext (rule 2) */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "g3d/fn_8005AA28.h" /* mtx34_trans_apply (rule 2) */
 #include "ef/ef_particle_get_move_dir.h" /* ef_particle_get_move_dir (rule 2) */
 #include "ef/ef_pf_calc_particle.h" /* ef_pf_calc_particle (rule 2) */
@@ -120,7 +120,6 @@ void fn_800A45DC(void* list, void* node);
 void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
 void fn_800A6554(void* em, void* self);
-void VEC2_ctor(void* self);
 void color_rgba_copy(void* dst, const void* src);
 void mtx34_mult_vec3(void* dst, const void* a, const void* b);
 s32 ef_get_life_status(void* self);
@@ -151,7 +150,7 @@ struct EfPmParticle : EfPmParticleHead {
      * position and velocity), nonzero on success.  Declared only. */
     virtual void slot_0x08();
     virtual void slot_0x0C();
-    virtual s32 Initialize(u16 life, nw4r::math::VEC3 pos, nw4r::math::VEC3 vel, EfPmManager* manager, s32 param0,
+    virtual s32 Initialize(u16 life, nw4r::math::_VEC3 pos, nw4r::math::_VEC3 vel, EfPmManager* manager, s32 param0,
                            f32 scale, s32 param1, s32 param2);
     /* +0x20 */ u8 animParams[0x20];  /* the block the curve tracks write at their target offset */
     /* +0x40 */ nw4r::math::VEC3 rotate; /* the signed-curve target (track target 0x20) */
@@ -187,6 +186,7 @@ struct EfResource;
 
 /* The setter block at manager +0x6C (the `stateA.b` sub-object). */
 struct EfPmStateB {
+    EfPmStateB(); /* 0x800AB6FC */
     /* +0x00 */ u8 dirMode;
     /* +0x01 */ u8 colorPri[4];
     /* +0x05 */ u8 colorSec[4];
@@ -196,13 +196,13 @@ struct EfPmStateB {
 }; /* size: 0x1C */
 
 struct EfPmStateAA {
-    /* +0x00 */ f32 a;
-    /* +0x04 */ f32 b;
+    /* +0x00 */ nw4r::math::VEC2 ab;
     /* +0x08 */ nw4r::math::VEC3 vec;
 }; /* size: 0x14 */
 
 /* The scalar/vec block constructed at manager +0x58. */
 struct EfPmStateA {
+    EfPmStateA(); /* 0x800AB6BC */
     /* +0x00 */ EfPmStateAA aa;
     /* +0x14 */ EfPmStateB b;
 }; /* size: 0x30 */
@@ -234,7 +234,8 @@ public:
     /* +0x28 */ u32 flags;
     /* +0x2C */ nw4r::ef::DrawStrategy* drawStrategy;
     /* +0x30 */ u8 pad_0x30[0x08];
-    /* +0x38 */ EfPmList list;
+    /* +0x38 */ EfEffActivityList list;
+    /* +0x54 */ s32 activeCount;      /* the last particle the frame walk calculated (cleared by the ager) */
     /* +0x58 */ EfPmStateA stateA;
     /* +0x88 */ s8 inheritTranslate;  /* the share of the emitter's translation the matrix inherits, in % */
     /* +0x89 */ u8 pad_0x89;
@@ -251,9 +252,9 @@ public:
 struct EfPmManager : nw4r::ef::ParticleManager {
 }; /* size: 0xBC */
 
-/* A static matrix the static initialiser constructs through `MTX34_ctor`. */
+/* A static matrix the static initialiser constructs through `MTX34::MTX34()`. */
 struct EfPmStaticMtx : nw4r::math::MTX34 {
-    EfPmStaticMtx() { MTX34_ctor(this); }
+    EfPmStaticMtx() {}
 }; /* size: 0x30 */
 
 /* A direction/rate parameter block (its rate at +0x04, its vector at +0x08). */
@@ -356,7 +357,7 @@ struct EfPmEffectSystem {
 }; /* size: 0x0C */
 
 /* The calc hooks an effect may carry: called with the manager, its list and the first particle of the walk. */
-typedef void (*EfPmCalcHook)(EfPmManager* manager, EfPmList* list, EfPmParticle* first);
+typedef void (*EfPmCalcHook)(EfPmManager* manager, EfEffActivityList* list, EfPmParticle* first);
 
 /* The effect an emitter belongs to: its effect system at +0x20, the two calc hooks at +0x4C/+0x50. */
 struct EfPmEffect {
@@ -369,6 +370,7 @@ struct EfPmEffect {
 
 /* The three-vec block used by the particle transform paths. */
 struct EfPmVecBlock {
+    EfPmVecBlock(); /* 0x800ADE98 */
     /* +0x00 */ nw4r::math::VEC3 a;
     /* +0x0C */ nw4r::math::VEC3 b;
     /* +0x18 */ nw4r::math::VEC3 c;
@@ -485,8 +487,6 @@ struct EfPmFieldOwner {
 /* --------------------------------------------------------------------------------------------- */
 
 /* Forward declarations of this unit's functions (defined below in address order). */
-extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self);
-extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self);
 extern "C" s32 fn_800AB740(EfPmManager* self, EfPmParticle* target);
 extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target);
 extern "C" s32 fn_800AB9F4(EfPmManager* self);
@@ -511,11 +511,9 @@ extern "C" inline __attribute__((never_inline)) u16 ef_emres_num_ptcl_track(void
 extern "C" inline __attribute__((never_inline)) u32 ef_emres_num_ptcl_track_init(void* self);
 extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_tbl(void* self);
 extern "C" inline __attribute__((never_inline)) u8* ef_emres_get_ptcl_track_at(void* self, u32 index);
-extern "C" inline __attribute__((never_inline)) EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self);
 extern "C" inline __attribute__((never_inline)) void* ef_list_get_last(const nw4r::ut::List* list);
 extern "C" inline __attribute__((never_inline)) nw4r::math::VEC3* fn_800AD0CC(EfPmParticle* self, nw4r::math::VEC3* add);
 extern "C" inline __attribute__((never_inline)) void fn_800AD514(void* a, void* b, f32 f);
-extern "C" inline __attribute__((never_inline)) void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f);
 extern "C" inline __attribute__((never_inline)) s32 fn_800ADA24(nw4r::math::VEC3* out, EfPmDirParam* p, const nw4r::math::VEC3* v);
 extern "C" inline __attribute__((never_inline)) s32 ef_field_vortex(nw4r::math::VEC3* out, EfPmFieldVortexParam* p, const nw4r::math::VEC3* pos);
 extern "C" inline __attribute__((never_inline)) s32 ef_field_newton(nw4r::math::VEC3* out, const EfPmFieldNewtonParam* p, const nw4r::math::VEC3* pos);
@@ -527,14 +525,10 @@ extern "C" inline __attribute__((never_inline)) s32 ef_field_random(nw4r::math::
                            const nw4r::math::MTX34* mtx);
 extern "C" inline __attribute__((never_inline)) s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* p);
 extern "C" {
-static inline __attribute__((never_inline)) void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
+static inline __attribute__((never_inline)) nw4r::math::VEC3 ef_pm_calc_emitter_pos(BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
                             const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
                             const nw4r::math::VEC3* pos);
 }
-/* The emitter-position helper called by value: its result is a frame temporary below every named local. */
-#define ef_pm_calc_emitter_pos_byval                                                                            \
-    ((nw4r::math::VEC3(*)(BOOL, const nw4r::math::MTX34*, const nw4r::math::MTX34*, const nw4r::math::MTX34*, \
-                          const nw4r::math::VEC3*))ef_pm_calc_emitter_pos)
 
 /* The resource-table accessors: the table's count, its first array base and its third u16. */
 extern "C" u16 ef_emres_num_ptcl_track(void* self) {
@@ -560,12 +554,8 @@ extern "C" u8* ef_emres_get_ptcl_track_at(void* self, u32 index) {
     return ((u8**)base)[(u16)index];
 }
 
-/* Zero the three-vec block used by the particle transform paths. */
-extern "C" EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self) {
-    VEC3_ctor(&self->a);
-    VEC3_ctor(&self->b);
-    VEC3_ctor(&self->c);
-    return self;
+/* 0x800ADE98 (0x40): constructs the three vectors of the particle transform block. */
+EfPmVecBlock::EfPmVecBlock() {
 }
 
 /* Returns the list's last element (the previous of none), or null. */
@@ -591,9 +581,9 @@ extern "C" void fn_800AD514(void* a, void* b, f32 f) {
     nw4r::math::MTX34RotAxisFIdx((nw4r::math::MTX34*)a, (const nw4r::math::VEC3*)b, 40.743664f * f);
 }
 
-/* The reciprocal-rate wrapper: `out = in * (1 / f)`. */
-extern "C" void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) {
-    vec3_scale(out, in, 1.0f / f);
+/* 0x800AD9C0 (0xC): returns this record divided by `f` (scaled by its reciprocal). */
+nw4r::math::VEC3 nw4r::math::VEC3::operator/(f32 f) const {
+    return *this * (1.0f / f);
 }
 
 /* Scale the parameter's rate by `1.0f - rate` onto the matrix. */
@@ -607,13 +597,10 @@ extern "C" s32 fn_800ADA24(nw4r::math::VEC3* out, EfPmDirParam* p, const nw4r::m
 #pragma fp_contract off
 extern "C" s32 ef_field_vortex(nw4r::math::VEC3* out, EfPmFieldVortexParam* p, const nw4r::math::VEC3* pos) {
     nw4r::math::VEC3 axis;
-    nw4r::math::VEC3 radial;
-    EfRotation rotation;
     f32 power;
-    VEC3_ctor(&axis);
-    ef_vec3_from_rotation((const EfRotation*)vec3_copy_construct(&rotation, &p->rotation), &axis);
+    ef_vec3_from_rotation((const EfRotation*)&static_cast<const nw4r::math::VEC3&>(nw4r::math::VEC3((const nw4r::math::_VEC3&)p->rotation)), &axis);
     p->distance = p->distance * p->distance;
-    VEC3_ctor(&radial);
+    nw4r::math::VEC3 radial;
     vec3_scale_by(&radial.x, &axis.x, vec3_dot(&axis.x, &pos->x));
     PSVECSubtract(&radial.x, &pos->x, &radial.x);
     f32 lenSq = vec3_length_sq(&radial.x);
@@ -660,11 +647,8 @@ extern "C" s32 ef_field_magnet(nw4r::math::VEC3* out, const EfPmFieldPoint* p, c
  * its power. */
 extern "C" s32 ef_field_spin(nw4r::math::VEC3* out, const EfPmFieldRotation* p, const nw4r::math::VEC3* pos) {
     nw4r::math::VEC3 axis;
-    EfRotation rotation;
+    ef_vec3_from_rotation((const EfRotation*)&static_cast<const nw4r::math::VEC3&>(nw4r::math::VEC3((const nw4r::math::_VEC3&)p->rotation)), &axis);
     nw4r::math::MTX34 m;
-    VEC3_ctor(&axis);
-    ef_vec3_from_rotation((const EfRotation*)vec3_copy_construct(&rotation, (void*)&p->rotation), &axis);
-    MTX34_ctor(&m);
     fn_800AD514(&m, &axis, p->power);
     mtx34_mult_vec3(out, &m, pos);
     PSVECSubtract(&out->x, &out->x, &pos->x);
@@ -677,10 +661,6 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
                            const EfPmFieldOwner* owner, const EfPmParticle* ptcl, u32 tick, u16 seed,
                            const nw4r::math::VEC3* velocity, const nw4r::math::VEC3* prevVelocity,
                            const nw4r::math::MTX34* mtx) {
-    nw4r::math::MTX34 frame;
-    nw4r::math::VEC3 base;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 prev;
     f32 s;
     f32 c;
     u32 hash = ef_anim_name_hash(seed, header->id, tick, 0);
@@ -693,17 +673,16 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
     }
 
     if ((p->flags & 1) != 0) {
-        VEC3_ctor(&base);
+        nw4r::math::VEC3 base;
         switch (p->baseMode) {
         case 0:
-            copyVec3(&base, velocity);
+            base = *velocity;
             break;
         case 1:
             if (ptcl->age == 0) {
-                copyVec3(&base, velocity);
+                base = *velocity;
             } else {
-                vec3_div(&prev, (nw4r::math::VEC3*)prevVelocity, ptcl->accelScale);
-                copyVec3(&base, &prev);
+                base = *(nw4r::math::VEC3*)prevVelocity / ptcl->accelScale;
             }
             break;
         }
@@ -723,17 +702,17 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
         }
         vec3_scale_by(&out->x, &out->x, p->power);
     } else {
-        VEC3_ctor(&dir);
+        nw4r::math::VEC3 dir;
         if (ptcl->age == 0) {
-            copyVec3(&dir, velocity);
+            dir = *velocity;
         } else {
-            copyVec3(&dir, prevVelocity);
+            dir = *prevVelocity;
         }
         mtx34_mult_vec3(&dir, mtx, &dir);
         if (ef_vec3_normalize_to(&dir, &dir) == 0) {
             dir.y = 1.0f;
         }
-        MTX34_ctor(&frame);
+        nw4r::math::MTX34 frame;
         ef_mtx34_from_y_axis(frame.m[0], &dir.x);
         if (0.0f != p->diffusion) {
             f32 unit = (f32)(hash >> 16) / 65535.0f;
@@ -778,8 +757,7 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
 
 /* 0x800AD9CC (0x58): the gravity field: `out` is the field's direction scaled by its power. */
 extern "C" s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* p) {
-    EfRotation rotation;
-    ef_vec3_from_rotation((const EfRotation*)vec3_copy_construct(&rotation, (void*)&p->rotation), out);
+    ef_vec3_from_rotation((const EfRotation*)&static_cast<const nw4r::math::VEC3&>(nw4r::math::VEC3((const nw4r::math::_VEC3&)p->rotation)), out);
     vec3_scale_in_place(out, p->power);
     return 1;
 }
@@ -787,23 +765,23 @@ extern "C" s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* 
 /* 0x800ADA5C (0x370): the position `pos` relative to the emitter: through the local-to-emitter matrix, or through
  * the local-to-global one minus the emitter's global origin. */
 extern "C" {
-static void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
+static nw4r::math::VEC3 ef_pm_calc_emitter_pos(BOOL emitterSpace, const nw4r::math::MTX34* mtxLocalToEmitter,
                             const nw4r::math::MTX34* mtxLocalToGlobal, const nw4r::math::MTX34* mtxEmitterToGlobal,
                             const nw4r::math::VEC3* pos) {
 #line 194
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxLocalToEmitter, "NW4R:Pointer Error\nmtxLocalToEmitter(=%p) is not valid pointer.");
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxLocalToGlobal, "NW4R:Pointer Error\nmtxLocalToGlobal(=%p) is not valid pointer.");
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", mtxEmitterToGlobal, "NW4R:Pointer Error\nmtxEmitterToGlobal(=%p) is not valid pointer.");
-    VEC3_ctor(result);
+    nw4r::math::VEC3 result;
     if (emitterSpace) {
-        mtx34_mult_vec3(result, mtxLocalToEmitter, pos);
-        return;
+        mtx34_mult_vec3(&result, mtxLocalToEmitter, pos);
+        return result;
     }
-    nw4r::math::VEC3 origin;
-    mtx34_mult_vec3(result, mtxLocalToGlobal, pos);
-    setVec3(&origin, 0.0f, 0.0f, 0.0f);
+    mtx34_mult_vec3(&result, mtxLocalToGlobal, pos);
+    nw4r::math::VEC3 origin(0.0f, 0.0f, 0.0f);
     mtx34_mult_vec3(&origin, mtxEmitterToGlobal, &origin);
-    PSVECSubtract(&result->x, &result->x, &origin.x);
+    PSVECSubtract(&result.x, &result.x, &origin.x);
+    return result;
 }
 }
 
@@ -814,24 +792,16 @@ EfPmStaticMtx ef_pm_mtx_local_to_emitter;
 
 #pragma dont_inline on
 /* 0x800AB664 (0x58): builds the manager: the base, its table, its particle list, its parameters and its matrix. */
-nw4r::ef::ParticleManager::ParticleManager() {
-    fn_800A3FFC(&list, 0x14);
-    fn_800AB6BC(&stateA);
-    MTX34_ctor(&mtx);
+nw4r::ef::ParticleManager::ParticleManager() : list(0x14) {
 }
 #pragma dont_inline reset
 
-/* Construct the scalar/vec block at manager +0x58. */
-extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self) {
-    VEC2_ctor(self);
-    VEC3_ctor(&self->aa.vec);
-    fn_800AB6FC(&self->b);
-    return self;
+/* 0x800AB6BC (0x40): constructs the scalar/vector block at manager +0x58. */
+EfPmStateA::EfPmStateA() {
 }
 
-extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self) {
-    VEC3_ctor(&self->vec);
-    return self;
+/* 0x800AB6FC (0x34): constructs the setter block's vector. */
+EfPmStateB::EfPmStateB() {
 }
 
 /* 0x800AB730 (0xC): hands the closing manager to its emitter. */
@@ -869,9 +839,9 @@ extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target) {
 /* Walk the list, retiring every created particle. */
 extern "C" s32 fn_800AB9F4(EfPmManager* self) {
     s32 total = 0;
-    EfPmParticle* node = self->list.head;
+    EfPmParticle* node = (EfPmParticle*)self->list.mActiveList.head;
     while (node != NULL) {
-        EfPmParticle* next = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+        EfPmParticle* next = *(EfPmParticle**)((u8*)node + self->list.mActiveList.linkOffset + 4);
         if (node->state == 1)
             total += ef_pm_retire_particle(self, node);
         node = next;
@@ -890,8 +860,8 @@ s32 nw4r::ef::ParticleManager::Initialize(Emitter* aParent, EmitterResource* aRe
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", resource, "NW4R:Pointer Error\nresource(=%p) is not valid pointer.");
     ef_ref_object_init(self);
     ef_activity_list_clear(&self->list);
-    self->stateA.aa.a = 1.0f;
-    self->stateA.aa.b = 1.0f;
+    self->stateA.aa.ab.x = 1.0f;
+    self->stateA.aa.ab.y = 1.0f;
     self->stateA.aa.vec.x = 0.0f;
     self->stateA.aa.vec.y = 0.0f;
     self->stateA.aa.vec.z = 0.0f;
@@ -909,7 +879,7 @@ s32 nw4r::ef::ParticleManager::Initialize(Emitter* aParent, EmitterResource* aRe
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder, "NW4R:Pointer Error\nmManagerEM->mManagerEF->mManagerES->mDrawStrategyBuilder(=%p) is not valid pointer.");
     EfPmDrawStrategyBuilder* builder = ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder;
     self->drawStrategy = builder->GetDrawStrategy(desc->drawType);
-    self->list.activeCount = 0;
+    self->activeCount = 0;
     fn_800AC0E4(self, &desc->setter);
     return 1;
 }
@@ -925,7 +895,7 @@ extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, co
     color_rgba_copy(self->stateA.b.colorPri, b);
     color_rgba_copy(self->stateA.b.colorSec, c);
     self->stateA.b.scale = f;
-    copyVec3(&self->stateA.b.vec, (const nw4r::math::VEC3*)d);
+    self->stateA.b.vec = *((const nw4r::math::VEC3*)d);
 }
 
 /* Delete-like helper: free only a live object. */
@@ -946,7 +916,7 @@ EfPmParticle* nw4r::ef::ParticleManager::CreateParticle(u16 life, const nw4r::ma
     if (p == NULL) {
         return NULL;
     }
-    if (p->Initialize(life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
+    if (p->Initialize(life, (const nw4r::math::_VEC3&)*pos, (const nw4r::math::_VEC3&)*vel, self, param0, scale, param1, param2) == 0) {
         return NULL;
     }
     p->life += lifeAdd;
@@ -963,7 +933,7 @@ EfPmParticle* nw4r::ef::ParticleManager::CreateParticle(u16 life, const nw4r::ma
 void nw4r::ef::ParticleManager::Calc() {
     EfPmManager* self = (EfPmManager*)this;
     EfPmParticle* first = (EfPmParticle*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list,
-                                                                  (void*)self->list.activeCount);
+                                                                  (void*)self->activeCount);
     u8* names;
     if (first == NULL) {
         return;
@@ -977,74 +947,60 @@ void nw4r::ef::ParticleManager::Calc() {
     }
 
     nw4r::math::MTX34 pmMtx;
-    MTX34_ctor(&pmMtx);
     ef_pm_get_mtx(self, &pmMtx);
     nw4r::math::MTX34 pmInv;
-    MTX34_ctor(&pmInv);
     mtx34_inverse(&pmInv, &pmMtx);
     nw4r::math::MTX34 emMtx;
-    MTX34_ctor(&emMtx);
     ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emMtx);
-    nw4r::math::VEC3 axisSum;
-    setVec3(&axisSum, emMtx.m[0][2] + (emMtx.m[0][0] + emMtx.m[0][1]),
-            emMtx.m[1][2] + (emMtx.m[1][0] + emMtx.m[1][1]), emMtx.m[2][2] + (emMtx.m[2][0] + emMtx.m[2][1]));
+    nw4r::math::VEC3 axisSum(emMtx.m[0][2] + (emMtx.m[0][0] + emMtx.m[0][1]), emMtx.m[1][2] + (emMtx.m[1][0] + emMtx.m[1][1]), emMtx.m[2][2] + (emMtx.m[2][0] + emMtx.m[2][1]));
     f32 emScale = 0.57735026f * vec3_len(&axisSum.x);
     nw4r::math::MTX34 localToEm;
-    MTX34_ctor(&localToEm);
     mtx34_concat(&localToEm, &pmInv, &emMtx);
     nw4r::math::MTX34 emToLocal;
-    MTX34_ctor(&emToLocal);
     mtx34_inverse(&emToLocal, &localToEm);
-    nw4r::math::MTX34 pmRot;
-    ef_mtx34_copy(&pmRot, &pmInv);
+    _MTX34 pmRot;
+    ef_mtx34_copy((MTX34*)&pmRot, &pmInv);
     pmRot.m[0][3] = 0.0f;
     pmRot.m[1][3] = 0.0f;
     pmRot.m[2][3] = 0.0f;
     nw4r::math::MTX34 pmRotInv;
-    MTX34_ctor(&pmRotInv);
-    mtx34_inverse(&pmRotInv, &pmRot);
-    nw4r::math::MTX34 emToLocalRot;
-    ef_mtx34_copy(&emToLocalRot, &emToLocal);
+    mtx34_inverse(&pmRotInv, (MTX34*)&pmRot);
+    _MTX34 emToLocalRot;
+    ef_mtx34_copy((MTX34*)&emToLocalRot, &emToLocal);
     emToLocalRot.m[0][3] = 0.0f;
     emToLocalRot.m[1][3] = 0.0f;
     emToLocalRot.m[2][3] = 0.0f;
-    nw4r::math::MTX34 localToEmRot;
-    ef_mtx34_copy(&localToEmRot, &localToEm);
+    _MTX34 localToEmRot;
+    ef_mtx34_copy((MTX34*)&localToEmRot, &localToEm);
     localToEmRot.m[0][3] = 0.0f;
     localToEmRot.m[1][3] = 0.0f;
     localToEmRot.m[2][3] = 0.0f;
 
     while (p != NULL) {
-        EfPmParticle* next = *(EfPmParticle**)((u8*)p + self->list.linkOffset + 4);
+        EfPmParticle* next = *(EfPmParticle**)((u8*)p + self->list.mActiveList.linkOffset + 4);
         if (p->state == 1 && p->retireFlag == 0) {
             p->retireFlag = 1;
             if (p->life != 0) {
                 ef_effect_set_calc_flag(((EfPmEmitterView*)self->managerEM)->effect, 1);
             }
-            nw4r::math::VEC3 pos;
-            nw4r::math::VEC3 vel;
-            nw4r::math::VEC3 moveDir;
             EfDrawParticleManager* handle;
-            assignVec3((Vec*)&pos, (Vec*)&p->accel);
-            assignVec3((Vec*)&vel, (Vec*)&p->velocity);
-            VEC3_ctor(&moveDir);
+            nw4r::math::VEC3 pos = p->accel;
+            nw4r::math::VEC3 vel = p->velocity;
+            nw4r::math::VEC3 moveDir;
             ef_particle_get_move_dir((EfDrawParticle*)p, &moveDir);
-            copyVec3(&p->prevPos, &p->accel);
+            p->prevPos = p->accel;
             ef_pm_handle(&handle, self);
             if ((ef_emitter_tex_flags(&handle)[3] & 1) == 0 && p->lifeTime <= p->age) {
                 ef_pm_retire_particle(self, p);
             } else {
-                nw4r::math::VEC3 addVel;
-                nw4r::math::VEC3 addPos;
-                EfPmVecBlock pfTransform;
                 s32 i;
                 BOOL hasPostField;
                 EfPmPostField* pf;
                 EffectHandle* pfEffect;
-                setVec3(&addVel, 0.0f, 0.0f, 0.0f);
-                setVec3(&addPos, 0.0f, 0.0f, 0.0f);
+                nw4r::math::VEC3 addVel(0.0f, 0.0f, 0.0f);
+                nw4r::math::VEC3 addPos(0.0f, 0.0f, 0.0f);
                 hasPostField = FALSE;
-                fn_800ADE98(&pfTransform);
+                EfPmVecBlock pfTransform;
                 pfEffect = NULL;
                 i = (p->age == 0) ? 0 : ef_emres_num_ptcl_track_init(self->resource);
                 for (; (u16)i < ef_emres_num_ptcl_track(self->resource); i++) {
@@ -1121,8 +1077,6 @@ void nw4r::ef::ParticleManager::Calc() {
                         break;
                     case 7: {
                         EfPmFieldRecord field;
-                        nw4r::math::VEC3 rel;
-                        nw4r::math::VEC3 out;
                         memcpy(&field,
                                (u8*)track + track->keyBytes + sizeof(EfPmTrack) + track->randomBytes +
                                    track->randomTableBytes + track->nameTableBytes,
@@ -1130,11 +1084,11 @@ void nw4r::ef::ParticleManager::Calc() {
                         if (track->keyBytes != 0) {
                             ef_anim_curve_f32((const u8*)track, &field.power, tick, seed, mode);
                         }
-                        VEC3_ctor(&rel);
+                        nw4r::math::VEC3 rel;
                         if (target == 6 || (u8)(target + 0xFE) <= 2) {
-                            copyVec3(&rel, &ef_pm_calc_emitter_pos_byval(field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos));
+                            rel = ef_pm_calc_emitter_pos(field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos);
                         }
-                        setVec3(&out, 0.0f, 0.0f, 0.0f);
+                        nw4r::math::VEC3 out(0.0f, 0.0f, 0.0f);
                         switch (target) {
                         case 1:
                             fn_800ADA24(&out, (EfPmDirParam*)&field, &vel);
@@ -1144,7 +1098,7 @@ void nw4r::ef::ParticleManager::Calc() {
                             break;
                         case 7:
                             ef_field_random(&out, (EfPmFieldRandomParam*)&field, (EfPmFieldHeader*)track,
-                                            (EfPmFieldOwner*)track, p, tick, seed, &vel, &moveDir, &emToLocalRot);
+                                            (EfPmFieldOwner*)track, p, tick, seed, &vel, &moveDir, (MTX34*)&emToLocalRot);
                             break;
                         case 6:
                             ef_field_spin(&out, (EfPmFieldRotation*)&field, &rel);
@@ -1162,10 +1116,8 @@ void nw4r::ef::ParticleManager::Calc() {
                             EfPmEmitterView* em = (EfPmEmitterView*)self->managerEM;
                             if (-(0.0f / 0.0f) != em->tailOrigin.x) {
                                 nw4r::math::MTX34 m;
-                                nw4r::math::VEC3 origin;
-                                MTX34_ctor(&m);
                                 ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &m);
-                                setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
+                                nw4r::math::VEC3 origin(m.m[0][3], m.m[1][3], m.m[2][3]);
                                 PSVECSubtract(&out.x, &origin.x, &((EfPmEmitterView*)self->managerEM)->tailOrigin.x);
                                 vec3_scale_in_place(&out, field.power);
                             }
@@ -1174,22 +1126,22 @@ void nw4r::ef::ParticleManager::Calc() {
                         }
                         switch (field.space) {
                         case 1:
-                            mtx34_mult_vec3(&out, &localToEmRot, &out);
+                            mtx34_mult_vec3(&out, (MTX34*)&localToEmRot, &out);
                             break;
                         case 0:
-                            mtx34_mult_vec3(&out, &pmRot, &out);
+                            mtx34_mult_vec3(&out, (MTX34*)&pmRot, &out);
                             break;
                         case 3:
                             vec3_scale_in_place(&out, emScale);
-                            mtx34_mult_vec3(&out, &pmRot, &out);
+                            mtx34_mult_vec3(&out, (MTX34*)&pmRot, &out);
                             break;
                         }
                         switch (field.addTo) {
                         case 0:
-                            addVec3To(&addVel, &out);
+                            addVel += out;
                             break;
                         case 1:
-                            addVec3To(&addPos, &out);
+                            addPos += out;
                             break;
                         }
                         break;
@@ -1218,45 +1170,39 @@ void nw4r::ef::ParticleManager::Calc() {
 
                 for (;;) {
                 if (hasPostField) {
-                    nw4r::math::VEC3 newVel;
                     u8 killed;
-                    assignVec3((Vec*)&newVel, (Vec*)&p->velocity);
-                    addVec3To(&newVel, &addVel);
+                    nw4r::math::VEC3 newVel = p->velocity;
+                    newVel += addVel;
                     killed = 0;
                     s32 moved = ef_pf_calc_particle((EfDrawParticle*)p, (EfPostFieldTransform*)&pfTransform,
                                                     (EfPostFieldInfo*)pf, pfEffect, &emMtx, &pmInv, &pos,
-                                                    addPos, &newVel, &killed);
+                                                    (const nw4r::math::_VEC3&)addPos, &newVel, &killed);
                     if (killed != 0) {
                         ef_pm_retire_particle(self, p);
                         break;
                     }
                     if (moved != 0) {
-                        copyVec3(&p->velocity, &newVel);
+                        p->velocity = newVel;
                         fn_800AD0CC(p, &addPos);
                         fn_800AD0CC(p, &p->velocity);
                     }
                     if ((pf->wrapFlags & 1) != 0) {
                         nw4r::math::MTX34 region;
-                        nw4r::math::MTX34 rot;
-                        nw4r::math::MTX34 regionInv;
-                        nw4r::math::VEC3 emPos;
-                        nw4r::math::VEC3 local;
                         BOOL wrapped;
-                        MTX34_ctor(&region);
                         mtx34_identity(&region);
                         ef_mtx34_scale_columns(region.m[0], &pf->wrapScale.x, region.m[0]);
-                        MTX34_ctor(&rot);
+                        nw4r::math::MTX34 rot;
                         ef_mtx34_rotate_xyz(rot.m[0], pf->wrapRotate.x, pf->wrapRotate.y, pf->wrapRotate.z);
                         mtx34_concat(&region, &rot, &region);
                         mtx34_trans_apply(&region, &pf->wrapTranslate, &region);
                         if ((pf->wrapFlags & 2) != 0) {
-                            setVec3(&emPos, emMtx.m[0][3], emMtx.m[1][3], emMtx.m[2][3]);
+                            nw4r::math::VEC3 emPos(emMtx.m[0][3], emMtx.m[1][3], emMtx.m[2][3]);
                             mtx34_trans_apply(&region, &emPos, &region);
                         }
                         mtx34_concat(&region, &pmInv, &region);
-                        MTX34_ctor(&regionInv);
+                        nw4r::math::MTX34 regionInv;
                         mtx34_inverse(&regionInv, &region);
-                        VEC3_ctor(&local);
+                        nw4r::math::VEC3 local;
                         mtx34_mult_vec3(&local, &regionInv, &p->accel);
                         wrapped = FALSE;
                         if (local.x > 1.0f) {
@@ -1285,7 +1231,7 @@ void nw4r::ef::ParticleManager::Calc() {
                         }
                     }
                 } else {
-                    addVec3To(&p->velocity, &addVel);
+                    p->velocity += addVel;
                     fn_800AD0CC(p, &addPos);
                     fn_800AD0CC(p, &p->velocity);
                 }
@@ -1297,7 +1243,7 @@ void nw4r::ef::ParticleManager::Calc() {
         p = next;
     }
 
-    self->list.activeCount = (s32)ef_list_get_last((nw4r::ut::List*)&self->list);
+    self->activeCount = (s32)ef_list_get_last((nw4r::ut::List*)&self->list);
     if (((EfPmEmitterView*)self->managerEM)->effect->postCalc != NULL) {
         ((EfPmEmitterView*)self->managerEM)->effect->postCalc(self, &self->list, first);
     }
@@ -1331,26 +1277,25 @@ void nw4r::ef::ParticleManager::Draw(const DrawInfo& aInfo) {
     if ((ed->setter.flags & 0x400) != 0 || (((EfPmEmitterView*)this->managerEM)->flags & 2) != 0) {
         return;
     }
-    EfDrawInfo local;
-    ef_draw_info_copy(&local, (const EfDrawInfo*)&aInfo);
+    /* the copy is built by `ef_draw_info_copy` alone: the storage runs no constructor */
+    EfDrawInfoImage local;
+    ef_draw_info_copy((EfDrawInfo*)&local, (const EfDrawInfo*)&aInfo);
     f32 offset = ((EfPmDrawSetting*)ef_resource_draw_setting(this->resource))->depthOffset;
     if (0.0f != offset) {
         nw4r::math::MTX34 m;
-        nw4r::math::VEC3 origin;
-        MTX34_ctor(&m);
         ef_emitter_get_mtx((EfDrawEmitter*)this->managerEM, &m);
-        setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
-        ef_draw_info_set_depth_offset(&local, offset, &origin);
+        nw4r::math::VEC3 origin(m.m[0][3], m.m[1][3], m.m[2][3]);
+        ef_draw_info_set_depth_offset((EfDrawInfo*)&local, offset, &origin);
     }
 #line 719
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", this->drawStrategy, "NW4R:Pointer Error\nmDrawStrategy(=%p) is not valid pointer.");
-    this->drawStrategy->Draw(local, (EfDrawParticleManager*)this);
+    this->drawStrategy->Draw(*(EfDrawInfo*)&local, (EfDrawParticleManager*)this);
 }
 
 /* Sets the draw info's depth offset and the point it is measured from. */
 extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin) {
     self->depth_offset = offset;
-    copyVec3(&self->depth_origin, origin);
+    self->depth_origin = *origin;
 }
 
 /* 0x800AE2A4 (0xBC): copies the draw info field by field. */
@@ -1368,7 +1313,7 @@ extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src)
     dst->fog_far_z = src->fog_far_z;
     *(u32*)&dst->fog_color = *(const u32*)&src->fog_color; /* the colour moves as one word (a ut::Color copy) */
     dst->depth_offset = src->depth_offset;
-    assignVec3((Vec*)&dst->depth_origin, (Vec*)&src->depth_origin);
+    dst->depth_origin = src->depth_origin;
     *(u32*)&dst->mat_color = *(const u32*)&src->mat_color; /* the colour moves as one word (a ut::Color copy) */
     *(u32*)&dst->amb_color = *(const u32*)&src->amb_color; /* the colour moves as one word (a ut::Color copy) */
     return dst;
@@ -1382,7 +1327,6 @@ extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
     NW4R_POINTER_ASSERT("ef_particlemanager.cpp", out, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.");
     if (self->mtxDirty != 0) {
         nw4r::math::MTX34 emitterMtx;
-        MTX34_ctor(&emitterMtx);
         ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
         u32 flags = self->flags;
         ef_calc_inherit_mtx(&self->mtx, &emitterMtx, (flags & 1) != 0, (flags & 2) != 0, self->inheritTranslate,
@@ -1395,8 +1339,8 @@ extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
 
 /* Walk the list, aging every particle. */
 extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
-    self->list.activeCount = 0;
-    EfPmParticle* node = self->list.head;
+    self->activeCount = 0;
+    EfPmParticle* node = (EfPmParticle*)self->list.mActiveList.head;
     while (node != NULL) {
         if (arg1 == 0 || node->life != 0) {
             if (node->life != 0)
@@ -1404,17 +1348,17 @@ extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
             if (ef_get_life_status(node) == 1 && node->retireFlag == 1)
                 node->retireFlag = 0;
         }
-        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+        node = *(EfPmParticle**)((u8*)node + self->list.mActiveList.linkOffset + 4);
     }
 }
 
 /* Walk the list, promoting every retired particle. */
 extern "C" void fn_800AE5B0(EfPmManager* self) {
-    EfPmParticle* node = self->list.head;
+    EfPmParticle* node = (EfPmParticle*)self->list.mActiveList.head;
     while (node != NULL) {
         if (ef_get_life_status(node) == 1 && node->retireFlag == 3)
             node->retireFlag = 1;
-        node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
+        node = *(EfPmParticle**)((u8*)node + self->list.mActiveList.linkOffset + 4);
     }
 }
 
@@ -1423,8 +1367,6 @@ extern "C" void fn_800AE5B0(EfPmManager* self) {
 extern "C" void fn_800AE628(EfPmManager* self) {
     nw4r::math::MTX34 emitterMtx;
     nw4r::math::MTX34 pmMtx;
-    MTX34_ctor(&emitterMtx);
-    MTX34_ctor(&pmMtx);
     ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emitterMtx);
     ef_pm_get_mtx(self, &pmMtx);
     mtx34_inverse(&emitterMtx, &emitterMtx);
@@ -1468,10 +1410,9 @@ extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* co
             colorSec[2] = (colorSec[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
             colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
         } else {
-            nw4r::math::VEC3 world;
             nw4r::math::MTX34* mtx = ef_pm_particle_mtx(pp->manager);
             f32 dist;
-            VEC3_ctor(&world);
+            nw4r::math::VEC3 world;
             mtx34_mult_vec3(&world, mtx, &pp->accel);
             PSVECSubtract(&world.x, &world.x, &self->stateA.b.vec.x);
             dist = vec3_len(&world.x);

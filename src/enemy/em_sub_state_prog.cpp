@@ -475,7 +475,6 @@ void eft037_dispatch(_EFT* self) {
 /* Builds every model's UV model for the map and area, places the models at the area's positions with only their
  * listed joint visible, then runs the first move. */
 void eft037_model_create(_EFT* self) {
-    VEC3 pos;
     u8 mapno;
     u32 i;
     f32* table;
@@ -489,7 +488,7 @@ void eft037_model_create(_EFT* self) {
     s32 k;
 
     table = NULL;
-    VEC3_ctor(&pos);
+    VEC3 pos;
     mapno = get_now_mapno();
     work = (Eft037Work*)self->work_0x38;
     plain = 0;
@@ -661,7 +660,7 @@ void eft037_model_create(_EFT* self) {
         work->models_0x004[i].model_0x00->field_0x2C = 0;
         work->models_0x004[i].model_0x00->field_0x28 = 0;
         vec_to_mh_vec3(&pos, (struct Vec*)&table[i * 3]);
-        copyVec3(&work->models_0x004[i].model_0x00->pos_0x04, &pos);
+        work->models_0x004[i].model_0x00->pos_0x04 = pos;
         work->models_0x004[i].model_0x00->ready = 1;
         if (work->models_0x004[i].model_0x00->pos_0x04.y >= 60000.0f) {
             work->models_0x004[i].band_0x08 = 5;
@@ -709,9 +708,6 @@ void eft037_move(_EFT* self) {
     Eft037Work* work;
     u8* skip;
     u8 mapno;
-    VEC3 offset;
-    VEC3 center;
-    VEC3 cam_pos;
     u32 near;
     u32 i;
     u32 j;
@@ -723,9 +719,9 @@ void eft037_move(_EFT* self) {
     work = (Eft037Work*)self->work_0x38;
     skip = NULL;
     mapno = get_now_mapno();
-    VEC3_ctor(&offset);
-    VEC3_ctor(&center);
-    VEC3_ctor(&cam_pos);
+    VEC3 offset;
+    VEC3 center;
+    VEC3 cam_pos;
     near = 0;
     fade_frames = 15;
     if (getItemListSelection() == 1) {
@@ -760,9 +756,8 @@ void eft037_move(_EFT* self) {
         }
     }
     if (work->kind_0x308 == 3) {
-        VEC3 point;
-        copyVec3(&center, setVec3(&point, -300.0f, 550.0f, 240.0f));
-        copyVec3(&cam_pos, &get_camera_pos());
+        center = VEC3(-300.0f, 550.0f, 240.0f);
+        cam_pos = *(&get_camera_pos());
         if (camera_mode_cur_get() == 1) {
             radius = 600.0f;
         } else {

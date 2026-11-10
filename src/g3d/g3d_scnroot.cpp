@@ -64,8 +64,8 @@
 #include "g3d/g3d_camera.h"    /* camera_init, MTX44_ctor, the camera accessors (rule 2) */
 #include "g3d/g3d_camera_types.h" /* nw4r::g3d::Camera, AnmScn::GetCamera's by-value handle (rule 1) */
 #include "g3d/g3d_state.h"     /* the light, camera and fog setters (rule 2) */
-#include "fn_8004CAD8/mtx.h"   /* MTX34_ctor (rule 2) */
-#include "mh3_pad.h"           /* VEC3_ctor, word_copy_return_dst (rule 2) */
+#include "fn_8004CAD8/mtx.h"   /* MTX34::MTX34() (rule 2) */
+#include "mh3_pad.h"           /* VEC3::VEC3(), word_copy_return_dst (rule 2) */
 #include "g3d/g3d_obj.h"       /* nw4r::g3d::AnmScn (rule 1) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "nw4r/math_geometry.h" /* nw4r::math::Frustum (rule 2) */
@@ -318,7 +318,6 @@ void ScnRoot::SetGlbSettings()
     u16 width = 0;
     u16 center = 0;
     nw4r::math::MTX44 projMtx;
-    MTX44_ctor(&projMtx);
     bool calculated = false;
     for (i = 0; i < 32; i++) {
         fog_ctor((s32)&fog, mFog[i]);
@@ -386,22 +385,8 @@ extern "C" void scn_root_calc_material(ScnRoot* pRoot)
     pRoot->G3dProc(ScnRoot::G3DPROC_CALC_MAT, 0, NULL);
 }
 
-/* 0x800832F8 (0x30): constructs a vector and returns it. */
-extern "C" nw4r::math::VEC3* vec3_ctor_return(nw4r::math::VEC3* pVec)
-{
-    VEC3_ctor(pVec);
-    return pVec;
-}
-
-/* The math types' empty constructors, visible so the compiler knows the camera record's constructor does not throw
- * (their kept copies are 0x8005050C, 0x80075390 and 0x80043EA8). */
-extern "C" inline void MTX34_ctor(nw4r::math::MTX34* out) {}
-extern "C" inline void MTX44_ctor(nw4r::math::MTX44* pMtx) {}
-extern "C" inline void VEC3_ctor(nw4r::math::VEC3* out) {}
-
-/* 0x800834F0 (0x4): constructs an 8-byte vector (leaves it unset). */
-/* untyped: opaque handle - callers pass their own 8-byte vector records */
-extern "C" inline void VEC2_ctor(void* p)
+/* 0x800832F8 (0x30): constructs the plane's normal. */
+nw4r::math::PLANE::PLANE()
 {
 }
 
@@ -413,14 +398,6 @@ inline void nw4r::g3d::G3dObj::operator delete(void* pBlock) /* untyped: byte ra
 /* 0x80083488 (0x68): constructs a camera record's matrix and vector members. */
 inline CameraData::CameraData()
 {
-    MTX34_ctor((nw4r::math::MTX34*)mViewMtx);
-    MTX44_ctor((nw4r::math::MTX44*)mProjMtx);
-    VEC3_ctor((nw4r::math::VEC3*)&mPosX);
-    VEC3_ctor((nw4r::math::VEC3*)&mTargetX);
-    VEC3_ctor((nw4r::math::VEC3*)&mUpX);
-    VEC3_ctor((nw4r::math::VEC3*)&mUnk98);
-    VEC2_ctor(&mViewportX);
-    VEC2_ctor(&mViewportW);
 }
 
 #pragma push
@@ -468,7 +445,6 @@ IScnObjGather::CullingStatus ScnObjGather::Add(ScnObj* pObj, bool opa, bool xlu)
         pObj->GetScnObjOption(ScnObj::OPTION_ENABLE_CULLING, &culling);
         if (culling) {
             nw4r::math::AABB box;
-            AABB_ctor(&box);
             pObj->GetBoundingVolume(ScnObj::BOUNDINGVOLUME_AABB_WORLD, &box);
             int result = scnobj_culling_frustum->IntersectAABB_Ex(&box);
             if (result == 0) {

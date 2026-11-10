@@ -24,13 +24,12 @@
  *   which the link drops with the copies (`g3d/g3d_scninline.cpp` and the earlier units keep the first ones).
  * SHAPES. G3dObj::GetParent is defined `inline` here and its five callers compile under `#pragma dont_inline on`:
  *   the destructors' extab ranges then start after their asserts (retail's records).
- * SHAPES. MTX34_ctor, VEC3_ctor, AABB_ctor and ScnObj::SetScnObjFlag are defined `inline` ahead of the constructor
- *   and their callers compile under `dont_inline`: the visible bodies cannot throw, so the constructor's extab range
- *   starts after the first mtx34_identity (+0xA8), retail's record; the weak copies are dropped by the link.
+ * SHAPES. The constructor's extab range starts after the first mtx34_identity (+0xA8) and ends after the last
+ *   `VEC3::operator=` call: the member constructors and ScnObj::SetScnObjFlag are visible bodies that cannot
+ *   throw, while `vec3_assign` (the assignment's callee) is only declared here.
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
  *   `g3d/g3d_scninline.cpp`'s range.
- * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
- *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
+ * SHAPES. The ScnObj constructor's MTX34/AABB member arrays construct themselves (MWCC's loops).
  *   `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
  *   compares.  The unit compiles with `#pragma peephole off`: retail keeps the destructors' `extsh`, the `clrlwi` +
  *   `cmpwi` pairs, `addi r0` for a vtable store and `mr r3,rN` + `lwz r12,0(r3)` for a virtual call's table load
@@ -50,7 +49,7 @@
 #include "nw4r/db_assert.h"   /* nw4r::db::Panic (rule 2) */
 #include "MSL/algorithm.h"    /* std::find / std::distance */
 #include "g3d/g3d_scnmdlsmpl.h" /* AABB_ctor, owner g3d/g3d_scnmdlsmpl.cpp (rule 2) */
-#include "mh3_pad.h"            /* setVec3 / copyVec3 (rule 2) */
+#include "mh3_pad.h"            /* VEC3(x, y, z) / VEC3::operator= (rule 2) */
 
 #pragma pool_data off
 #pragma peephole off
@@ -105,17 +104,6 @@ void nw4r::g3d::ScnObj::CalcViewMtx(const math::MTX34* pCamera)
     mtx34_concat(&mMtxArray[MTX_VIEW], pCamera, &mMtxArray[MTX_WORLD]);
 }
 
-/* The math types' empty constructors and the box's element constructor, visible so the compiler knows they do not
- * throw (their kept copies are 0x8005050C, 0x80043EA8 and `g3d/g3d_scnmdlsmpl.cpp`'s 0x80080F44). */
-extern "C" inline void MTX34_ctor(nw4r::math::MTX34* out) {}
-extern "C" inline void VEC3_ctor(nw4r::math::VEC3* out) {}
-extern "C" inline nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
-{
-    VEC3_ctor(&pBox->min);
-    VEC3_ctor(&pBox->max);
-    return pBox;
-}
-
 /* Sets or clears a flag (the kept copy is `g3d/g3d_scninline.cpp`'s). */
 inline void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
 {
@@ -131,17 +119,6 @@ inline void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
  * callback. */
 nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
 {
-    math::MTX34* pMtx = mMtxArray;
-    do {
-        MTX34_ctor(pMtx);
-        pMtx++;
-    } while (pMtx < (math::MTX34*)mAABB);
-    math::AABB* pBox = mAABB;
-    do {
-        AABB_ctor(pBox);
-        pBox++;
-    } while (pBox < (math::AABB*)&mScnObjFlags);
-
     mScnObjFlags = 0;
     mPriorityDrawOpa = 128;
     mPriorityDrawXlu = 128;
@@ -156,14 +133,10 @@ nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
     mtx34_identity(&mMtxArray[MTX_WORLD]);
     mtx34_identity(&mMtxArray[MTX_VIEW]);
 
-    math::VEC3 zero0;
-    math::VEC3 zero1;
-    math::VEC3 zero2;
-    math::VEC3 zero3;
-    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_LOCAL].min, setVec3(&zero0, 0.0f, 0.0f, 0.0f));
-    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_LOCAL].max, setVec3(&zero1, 0.0f, 0.0f, 0.0f));
-    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].min, setVec3(&zero2, 0.0f, 0.0f, 0.0f));
-    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].max, setVec3(&zero3, 0.0f, 0.0f, 0.0f));
+    mAABB[BOUNDINGVOLUME_AABB_LOCAL].min = VEC3(0.0f, 0.0f, 0.0f);
+    mAABB[BOUNDINGVOLUME_AABB_LOCAL].max = VEC3(0.0f, 0.0f, 0.0f);
+    mAABB[BOUNDINGVOLUME_AABB_WORLD].min = VEC3(0.0f, 0.0f, 0.0f);
+    mAABB[BOUNDINGVOLUME_AABB_WORLD].max = VEC3(0.0f, 0.0f, 0.0f);
 }
 #pragma dont_inline reset
 
@@ -336,10 +309,16 @@ bool nw4r::g3d::ScnObj::SetBoundingVolume(ScnObjBoundingVolumeType type, const m
 
 #pragma dont_inline reset
 
+/* The two corners as plain records: the box copied as one aggregate, word by word (retail's copy).  size: 0x18 */
+struct AabbCorners {
+    /* +0x00 */ nw4r::math::_VEC3 min;
+    /* +0x0C */ nw4r::math::_VEC3 max;
+};
+
 /* 0x80081804 (0x34): copies a bounding box (the box type's assignment, called out of line). */
 extern "C" void aabb_copy(nw4r::math::AABB* pDst, const nw4r::math::AABB* pSrc)
 {
-    *pDst = *pSrc;
+    *(AabbCorners*)pDst = *(const AabbCorners*)pSrc;
 }
 
 /* 0x80081838 (0x58): copies a bounding box out. */

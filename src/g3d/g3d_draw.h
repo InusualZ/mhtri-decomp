@@ -41,7 +41,6 @@ namespace nw4r { namespace g3d { class LightObj; } }
 extern "C" s32 light_obj_is_specular_light(const nw4r::g3d::LightObj* pSelf);
 extern "C" s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pSelf);
 /* 0x80077DBC - writes the negation of `pIn` to `pOut`. */
-extern "C" void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 #endif
 
 #endif /* MHTRI_G3D_G3D_DRAW_H */

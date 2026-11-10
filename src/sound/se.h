@@ -22,7 +22,7 @@ struct SeSlot {
     /* +0x02 */ u8 kind;
     /* +0x03 */ u8 field_0x03;
     /* +0x04 */ nw4r::math::VEC3 pos;
-    /* +0x10 */ nw4r::math::VEC3 field_0x10;
+    /* +0x10 */ nw4r::math::_VEC3 field_0x10;
     /* +0x1C */ f32 field_0x1C;
     /* +0x20 */ f32 field_0x20;
     /* +0x24 */ u8 field_0x24;
@@ -129,8 +129,8 @@ s32 se_bank_req(s32 bank, s32 id);
 
 /* C-linkage helpers the model methods call (their owners are elsewhere in the game).
  * 0x80041E40 is owned by `src/mh3_pad.cpp`; this copy is normalised to that owner's body
- * (`returns dst`) - its header cannot be included from the `ef` band (VEC3_ctor/
- * setVec3 conflict, filed 2026-09-27). */
+ * (`returns dst`) - its header cannot be included from the `ef` band (VEC3::VEC3()/
+ * VEC3(x, y, z) conflict, filed 2026-09-27). */
 void frame_ctrl_set_play_policy(void* sub);
 void scn_mdl_clean_mat_buffer(void* obj);
 void res_file_release(void* sub);

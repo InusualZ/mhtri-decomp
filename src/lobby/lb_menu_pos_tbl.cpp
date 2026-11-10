@@ -32,7 +32,7 @@
 
 #include "lobby/fn_8021E1EC.h"
 #include "lobby/lb_menu_pos_tbl.h"
-#include "mh3_pad.h"                   /* VEC3_ctor / copyVec3 / setVec3, GameModeExec, setSoftresetFlag (rule 2) */
+#include "mh3_pad.h"                   /* GameModeExec, setSoftresetFlag (rule 2) */
 #include "mh3_pad/system_w.h"
 #include "mh3_pad/lb_param_w.h"
 #include "mh3_pad/Psw.h"
@@ -80,20 +80,10 @@
 /* Retail addresses each `.bss` object with its own `lis`/`addi` (playbook 43). */
 #pragma pool_data off
 
-/* One lobby exit position: a vector built through `setVec3`, so the file-scope ones are constructed by the unit's
- * `__sinit`.  size: 0xC */
-struct LbMenuPos : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    LbMenuPos(f32 x, f32 y, f32 z)
-    {
-        setVec3(this, x, y, z);
-    }
-};
-
 /* .bss 0x806AAB08 - the four lobby exits the player walks into (the fourth is never taken), and 0x806AAB38, a fifth
  * position built with them; defined at the foot of the file. */
-extern "C" LbMenuPos lb_menu_pos_tbl[4];
-extern "C" LbMenuPos lb_menu_pos_extra;
+extern "C" nw4r::math::VEC3 lb_menu_pos_tbl[4];
+extern "C" nw4r::math::VEC3 lb_menu_pos_extra;
 
 extern "C" {
 
@@ -558,7 +548,7 @@ void lobby_player_place(u8 mode, nw4r::math::VEC3* pos, u16 angle)
 void lobby_player_place_ex(u8 mode, nw4r::math::VEC3* pos, u16 angle, s32 kind)
 {
     lobby_wp->area_next_0x015 = mode;
-    copyVec3(&lobby_wp->spawn_pos_0x018, pos);
+    lobby_wp->spawn_pos_0x018 = *pos;
     lobby_wp->spawn_id_0x024 = angle;
     lobby_wp->area_change_0x026 = 1;
     lobby_wp->busy_0x172 = 10;
@@ -602,7 +592,7 @@ void lobby_local_area_change_step(TaskSlot* self)
         if (file_loading_ck(NULL, NULL) != 1) {
             stage_area_enter(lobby_wp->field_0x001, lobby_wp->field_0x002);
             demo_work_update();
-            lb_player_spawn_set(lobby_wp->spawn_0x018, lobby_wp->spawn_id_0x024, lobby_wp->field_0x001,
+            lb_player_spawn_set(&lobby_wp->spawn_pos_0x018, lobby_wp->spawn_id_0x024, lobby_wp->field_0x001,
                                 lobby_wp->field_0x002);
             lb_npc_model_release_all();
             lb_npc_map_setup();
@@ -657,13 +647,13 @@ LbPageState lb_page_state_0;         /* .bss 0x806AAAD8 */
 LbPageState lb_page_state_1;         /* .bss 0x806AAAF0 */
 
 /* The lobby exits, built by `__sinit`. */
-LbMenuPos lb_menu_pos_tbl[4] = {
-    LbMenuPos(2623.0f, 455.0f, -650.0f),
-    LbMenuPos(-2460.0f, 179.0f, -770.0f),
-    LbMenuPos(983.0f, 461.0f, 49.0f),
-    LbMenuPos(-210.0f, 0.0f, -127.0f),
+nw4r::math::VEC3 lb_menu_pos_tbl[4] = {
+    nw4r::math::VEC3(2623.0f, 455.0f, -650.0f),
+    nw4r::math::VEC3(-2460.0f, 179.0f, -770.0f),
+    nw4r::math::VEC3(983.0f, 461.0f, 49.0f),
+    nw4r::math::VEC3(-210.0f, 0.0f, -127.0f),
 };
-LbMenuPos lb_menu_pos_extra(-946.0f, 474.0f, -1848.0f);
+nw4r::math::VEC3 lb_menu_pos_extra(-946.0f, 474.0f, -1848.0f);
 
 LbLobbyWork lobby_w;
 
@@ -672,6 +662,4 @@ LbLobbyWork lobby_w;
 /* 0x8021FFFC (0x3C): constructs the work's two position vectors. */
 __declspec(noinline) inline LbLobbyWork::LbLobbyWork()
 {
-    VEC3_ctor(&spawn_pos_0x018);
-    VEC3_ctor(&npc_pos_0x058);
 }

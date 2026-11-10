@@ -9,7 +9,7 @@
 #include "ef.h"
 #include "pl.h"
 #include "g3d/g3d_anmscn.h" /* the g3d_anmscn.cpp declarations (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 /* The effect state `eft_water_state_ck`/`eft_state_flags_set` read and write. */

@@ -25,6 +25,9 @@ struct EffectManager;
 
 /* A pending effect-creation record (stride 0x30). */
 struct CreationQueueEntry {
+#ifdef __cplusplus
+    CreationQueueEntry(); /* 0x800A3008 (0x3C), ef/ef_animcurve.cpp: constructs the two vectors */
+#endif
     /* +0x00 */ u8 mType;
     /* +0x01 */ u8 mFlags;
     /* +0x02 */ u16 mLife;
@@ -38,6 +41,9 @@ struct CreationQueueEntry {
 
 /* The queue: a live-entry count and the 0x400-entry array right behind it. */
 struct CreationQueue {
+#ifdef __cplusplus
+    CreationQueue(); /* 0x800A2FA4 (0x64), ef/ef_animcurve.cpp: constructs the entries, then empties the queue */
+#endif
     /* +0x00 */ s32 mCount;
     /* +0x04 */ CreationQueueEntry mEntry[0x400];
 }; /* size: 0xC004 */

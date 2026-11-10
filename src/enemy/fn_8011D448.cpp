@@ -54,7 +54,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "unsplit/unknown.h"
 #include "unsplit/enemy.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/em_hook_get.h"
 #include "enemy/em_act_trap_ck.h"
 #include "enemy/em_hook9_call.h"
@@ -456,24 +456,21 @@ extern "C" void em_parts_refresh(_ENEMY_WORK* self, u8 part, s32 flag)
     EmPartBreakRec* list;
     EmPartBreakRec* rec;
     EmPartBreakRec* found;
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 tmp;
     u32 inverted;
     u8 group;
     u32 (*hook)(_ENEMY_WORK*, u8);
 
     list = get_enemy_data(self)->part_breaks_0x88;
     found = NULL;
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
     inverted = 0;
     rec = list;
     if (list != NULL) {
         for (; rec->part != 0xFF; rec++) {
             if (rec->part == part && rec->level == em_parts_damage_level_get(self, part)) {
                 if (em_area_ck(self) == 1 && rec->joint != (u32)-1) {
-                    copyVec3(&pos, setVec3(&tmp, rec->offset.x, rec->offset.y, rec->offset.z));
+                    pos = VEC3(rec->offset.x, rec->offset.y, rec->offset.z);
                     switch (rec->effect) {
                     case 0:
                         eft_em_spawn_tinted(self, 0, rec->joint, &pos, rec->scale, rec->color);
@@ -2814,8 +2811,8 @@ extern "C" void em_seq_move_setup(_ENEMY_WORK* self)
         move = motion->move;
         if (move != NULL) {
             em_move_vec2_clr(self);
-            copyVec3(&self->v_0x310, &move->velocity);
-            copyVec3(&self->v_0x31C, &move->accel);
+            self->v_0x310 = move->velocity;
+            self->v_0x31C = move->accel;
             if (self->seq_mot_0x8E0->move_kind == 3) {
                 vec3_scale_in_place(&self->v_0x310, get_em_chg_scale(self));
                 vec3_scale_in_place(&self->v_0x31C, get_em_chg_scale(self));
@@ -2835,8 +2832,8 @@ extern "C" void em_seq_move_setup(_ENEMY_WORK* self)
         move = motion->move;
         if (move != NULL) {
             em_move_vec2_clr(self);
-            copyVec3(&self->v_0x310, &move->velocity);
-            copyVec3(&self->v_0x31C, &move->accel);
+            self->v_0x310 = move->velocity;
+            self->v_0x31C = move->accel;
             self->seq_rot_0x8F8 = self->pos_0x1BC.y;
         }
         break;
@@ -3072,8 +3069,8 @@ extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
         case 31:
             move = cmd->move;
             em_move_vec2_clr(self);
-            copyVec3(&self->v_0x310, &move->velocity);
-            copyVec3(&self->v_0x31C, &move->accel);
+            self->v_0x310 = move->velocity;
+            self->v_0x31C = move->accel;
             mode = move->mode[0] & ~0xC0;
             if ((mode >= 0 && mode <= 2) || (mode >= 4 && mode <= 6) || mode == 3 || mode == 7) {
                 jitter_x = (f32)(s32)(self->bits_0x1EC & 0xF000) / 65536.0f;
@@ -3245,8 +3242,6 @@ extern "C" u8 em_seq_move_update(_ENEMY_WORK* self)
     _CP_VECTOR rot;
     EmSeqMove* move;
 
-    VEC3_ctor(&before);
-    VEC3_ctor(&unused);
     if (self->seq_stage_0x8D2 == 0 && self->seq_mot_0x8E0 != NULL) {
         if (self->seq_turn_0x8F0 > 0.0f) {
             em_turn_in_window(self, self->seq_turn_rate_0x8EC, self->seq_turn_0x8F0, self->seq_turn_angle_0x8F4);
@@ -3262,7 +3257,7 @@ extern "C" u8 em_seq_move_update(_ENEMY_WORK* self)
                 em_frame_check(self, 4, self->seq_move_frame_0x908, self->seq_move_gate_0x90C) == 0) {
                 break;
             }
-            copyVec3(&before, &self->v_0x310);
+            before = self->v_0x310;
             if (self->seq_mot_0x8E0->move_kind == 1) {
                 CancelFade(self);
             } else if ((u8)(self->seq_mot_0x8E0->move_kind + 249) <= 1) {
@@ -3543,7 +3538,6 @@ extern "C" void em_seq_run(_ENEMY_WORK* self, EmSeqCmd* seq, u8 drop)
     u32 breath;
     u32 joint;
 
-    VEC3_ctor(&pos);
     if (self->state_0x05 == 0) {
         self->state_0x05++;
         if (drop == 1) {

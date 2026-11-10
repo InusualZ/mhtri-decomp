@@ -40,7 +40,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "unsplit/unknown.h"
 #include "unsplit/enemy.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/em_hook_get.h"
 #include "enemy/em_act_trap_ck.h"
 #include "enemy/em_hook9_call.h"
@@ -166,7 +166,7 @@ extern "C" void em_eft_fx_spawn_at(_ENEMY_WORK* self, u32 type, u32 id, u32 time
 
     if (effect != NULL) {
         work = (EmEftFxGroupWork*)effect->work_0x38;
-        copyVec3(&work->offset, pos);
+        work->offset = *pos;
     }
 }
 
@@ -281,7 +281,7 @@ extern "C" void em_eft_fx_spawn_free(u32 type, const nw4r::math::VEC3* pos, cons
     effect->source_0x30 = NULL;
     effect->area_0x44 = area;
     effect->rot_0x24 = *rot;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->timer_0x0C = 0;
     eft_state_flags_set(effect, 0, 0);
     effect->demo_flag_0x08 = demo;
@@ -374,7 +374,6 @@ extern "C" void em_eft_fx_start_groups(_EFT* self)
     u16* ids;
     u16 group_id;
 
-    MTX34_ctor(&mtx);
     work = (EmEftFxGroupWork*)self->work_0x38;
     owner = (_ENEMY_WORK*)self->source_0x30;
     self->state_0x05++;
@@ -423,8 +422,6 @@ extern "C" void em_eft_fx_start_flat(_EFT* self)
     u16 group_id;
     s32 i;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     work = (EmEftFxFlatWork*)self->work_0x38;
     owner = (_ENEMY_WORK*)self->source_0x30;
     self->state_0x05++;
@@ -509,8 +506,8 @@ extern "C" void em_eft_fx_start_flat(_EFT* self)
             return;
         }
         get_joint_wpos_em(owner, work->joint, &self->pos_0x18);
-        addVec3To(&self->pos_0x18, &offset);
-        copyVec3(&work->pos, &self->pos_0x18);
+        self->pos_0x18 += offset;
+        work->pos = self->pos_0x18;
     }
     mtx34_set_trans(&mtx, &self->pos_0x18);
     for (i = 0; i < work->count; i++) {
@@ -739,18 +736,15 @@ extern "C" void em_eft_fx_place_at_joint(_EFT* self, nw4r::ef::Effect* effect, u
     _ENEMY_WORK* owner;
     EmEftFxGroupWork* work;
 
-    VEC3_ctor(&joint);
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
 
     owner = (_ENEMY_WORK*)self->source_0x30;
     work = (EmEftFxGroupWork*)self->work_0x38;
 
     cpSetRotMatrix(&self->rot_0x24, &mtx);
-    copyVec3(&offset, &work->offset);
+    offset = work->offset;
     mulVecMat(&offset, &mtx);
     get_joint_wpos_em(owner, work->joints[group], &joint);
-    addVec3To(&joint, &offset);
+    joint += offset;
     mtx34_set_trans(&mtx, &joint);
     effect->SetRootMtx(mtx);
 }

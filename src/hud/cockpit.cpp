@@ -97,14 +97,13 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/printf.h"
 #include "mh3_pad.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "mh3_pad/Psw.h"
 #include "mh3_pad/control.h"
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_camera.h"
 #include "g3d/scn_root_get_current_camera.h"
 #include "ef/pRoot.h"
-#include "ef/eft_capsule_ctor.h"
 #include "ef/effect.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/em_hit_parts_get.h"
@@ -112,6 +111,7 @@
 #include "stage/stg_w.h"
 #include "enemy/em_tall_ck.h"
 #include "Pl/pl_hit.h"   /* em_part_sphere_get (rule 2: the owner's header) */
+#include "Pl/pl_hit_sphere.h"   /* PlSphere */
 #include "lobby/lb_npc_callees.h"
 #include "place_rec_copy.h"
 #include "word_read.h"
@@ -262,16 +262,14 @@ typedef struct HudLobbyMarks {
     /* +0x39B2 */ u8 monster_marks[16];
 } HudLobbyMarks;
 
-/* A hit sphere: its centre and radius.  size: 0x10 */
-typedef struct HudSphere {
-    /* +0x00 */ VEC3 center;
-    /* +0x0C */ f32 radius;
-} HudSphere;
 
 /* A world ray: its origin and normalised direction.  size: 0x18 */
 typedef struct HudRay {
     /* +0x00 */ VEC3 origin;
     /* +0x0C */ VEC3 dir;
+
+    /* 0x802DC460 (0x38): constructs the origin and the direction (emitted after its first user). */
+    HudRay() __attribute__((never_inline)) {}
 } HudRay;
 
 /* The camera record the scene root's current camera handle reads as (the fields the pointer ray uses).
@@ -339,10 +337,9 @@ void ainpc_page_update(void);
 s32 ainpc_page_open_ck(void);
 u32 ainpc_page_dpd_ready_ck(void);
 u32 ainpc_page_target_pick(void);
-u32 hud_ray_sphere_hit_ck(HudSphere* sphere, HudRay* ray, f32* dist);
+u32 hud_ray_sphere_hit_ck(HitSphere* sphere, HudRay* ray, f32* dist);
 void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen);
 u32 ainpc_page_monster_pick(void);
-HudRay* hud_ray_init(HudRay* ray);
 u8 ainpc_page_monster_count(void);
 u8 ainpc_page_pick_kind_get(CockpitPointerPage* st);
 _mh_ivec2_ ainpc_page_label_pos_get(s8 kind, _mh_ivec2_ cursor);
@@ -1557,23 +1554,17 @@ u32 ainpc_page_target_pick(void)
 }
 
 /* 0x802DBFB0 (0xFC): whether `ray` passes within the sphere's radius; writes the distance along the ray. */
-u32 hud_ray_sphere_hit_ck(HudSphere* sphere, HudRay* ray, f32* dist)
+u32 hud_ray_sphere_hit_ck(HitSphere* sphere, HudRay* ray, f32* dist)
 {
     VEC3 rel;
     VEC3 along;
-    VEC3 tmp;
-    VEC3 tmp2;
     f32 dot;
 
-    VEC3_ctor(&rel);
-    VEC3_ctor(&along);
-    subVec3(&tmp, &sphere->center, &ray->origin);
-    copyVec3(&rel, &tmp);
+    rel = sphere->pos - ray->origin;
     dot = vec3_dot(&rel.x, &ray->dir.x);
     if (dot > 0.0f) {
         vec3_scale_by(&along.x, &ray->dir.x, dot);
-        subVec3(&tmp2, &rel, &along);
-        copyVec3(&rel, &tmp2);
+        rel = rel - along;
     }
     if (vec3_dot(&rel.x, &rel.x) <= sphere->radius * sphere->radius) {
         *dist = abs_f32(dot);
@@ -1591,22 +1582,16 @@ void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen)
     f32 cos;
     s32 handle;
     HudCamera* camera;
-    VEC3 right;
-    VEC3 up;
-    VEC3 fwd;
-    VEC3 step;
-    VEC3 tmp;
     _MH_VEC2 half;
     f32 scale;
 
     handle = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&handle_copy, &handle);
     camera = (HudCamera*)word_read(&handle_copy);
-    VEC3_ctor(&right);
-    VEC3_ctor(&up);
-    VEC3_ctor(&fwd);
-    subVec3(&tmp, &camera->target, &camera->pos);
-    copyVec3(&fwd, &tmp);
+    VEC3 right;
+    VEC3 up;
+    VEC3 fwd;
+    fwd = camera->target - camera->pos;
     vec3_cross(&right.x, &fwd.x, &camera->up.x);
     vec3_normalize_into(&right, &right);
     vec3_normalize_into(&fwd, &fwd);
@@ -1617,12 +1602,12 @@ void hud_pointer_ray_get(VEC3* origin, VEC3* dir, _mh_ivec2_* screen)
     sin_cos_deg(&sin, &cos, 0.5f * camera->fovy);
     scale = half.y * cos / sin;
     vec3_scale_by(&dir->x, &fwd.x, scale);
-    VEC3_ctor(&step);
+    VEC3 step;
     vec3_scale_by(&step.x, &right.x, (f32)screen->x - half.x);
-    addVec3To(dir, &step);
+    *dir += step;
     vec3_scale_by(&step.x, &up.x, (f32)screen->y - half.y);
-    addVec3To(dir, &step);
-    copyVec3(origin, &camera->pos);
+    *dir += step;
+    *origin = camera->pos;
     vec3_normalize_into(dir, dir);
 }
 
@@ -1635,16 +1620,13 @@ u32 ainpc_page_monster_pick(void)
     u16 max = get_move_work_max(3);
     u8 area = get_now_areano();
     nw4r::math::CAPSULE capsule;
-    HudSphere sphere;
+    PlSphere sphere;
     HudRay ray;
     s16* part;
     u32 i;
     f32 best;
     f32 dist;
 
-    eft_capsule_ctor(&capsule);
-    eft_vec_ctor(&sphere.center);
-    hud_ray_init(&ray);
     best = 3.4028235e38f;
     st->selecting = 0;
     hud_pointer_ray_get(&ray.origin, &ray.dir, &st->cursor);
@@ -1673,7 +1655,7 @@ u32 ainpc_page_monster_pick(void)
             continue;
         }
         for (; *part != -1; part += 22) {
-            if ((u8)em_part_sphere_get(em, (EmWeakPoint*)part, (PlCapsule*)&capsule, (HitSphere*)&sphere.center) == 0 &&
+            if ((u8)em_part_sphere_get(em, (EmWeakPoint*)part, (PlCapsule*)&capsule, &sphere) == 0 &&
                 hud_ray_sphere_hit_ck(&sphere, &ray, &dist) != 0 && dist < best) {
                 best = dist;
                 st->sel.valid = 1;
@@ -1686,14 +1668,6 @@ u32 ainpc_page_monster_pick(void)
         }
     }
     return st->selecting != 0;
-}
-
-/* 0x802DC460 (0x38): constructs a ray (its origin and direction). */
-HudRay* hud_ray_init(HudRay* ray)
-{
-    VEC3_ctor(&ray->origin);
-    VEC3_ctor(&ray->dir);
-    return ray;
 }
 
 /* 0x802DC498 (0xD0): counts the live monsters of this area the pointer page can pick. */
@@ -1819,8 +1793,8 @@ void ainpc_page_buttons_get(u16* trigger, u16* hold)
     if (lobby_net_busy_ck() != 1) {
         switch ((u8)get_ControlType(0)) {
         case 1:
-            *trigger = Psw[0].control_0x0FC;
-            *hold = Psw[0].field_0x100;
+            *trigger = Psw[0].fs_block.btn.hold;
+            *hold = Psw[0].fs_block.btn.trig;
             break;
         case 2:
             *trigger = Psw[0].field_0xca;
@@ -3587,8 +3561,6 @@ void cockpit_notice_quest_draw(s16 frame)
 s32 draw_lsp_element(_PLW* plw, u8 icon, u8 arrow, u16 rank)
 {
     s32 camera;
-    VEC3 screen;
-    VEC3 world;
     s32 x;
     s32 y;
     s8* name;
@@ -3602,8 +3574,8 @@ s32 draw_lsp_element(_PLW* plw, u8 icon, u8 arrow, u16 rank)
 
     handle = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &handle);
-    VEC3_ctor(&screen);
-    VEC3_ctor(&world);
+    VEC3 screen;
+    VEC3 world;
     if (game_ready_ck() == 0) {
         return 0;
     }
@@ -3670,12 +3642,10 @@ f32 chara_icon_height_tbl[3] = { 90.0f, 84.0f, 78.0f };
 /* 0x802E03D4 (0x94): the world point of `plw`'s name tag: its head joint, raised by height `kind`. */
 void chara_icon_pos_get(_PLW* plw, u8 kind, VEC3* out)
 {
+    *out = plw->vec_0x03C;
     VEC3 joint;
-
-    copyVec3(out, &plw->vec_0x03C);
-    VEC3_ctor(&joint);
     ((HudPlwJoints*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(14, &joint);
-    copyVec3(out, &joint);
+    *out = joint;
     out->y += chara_icon_height_tbl[kind];
 }
 

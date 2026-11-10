@@ -9,6 +9,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_random.h"
+#include "ef/ef_creationqueue.h"
 
 /* The library's list record: head, tail, live count and the link offset `fn_800A4030` sets. */
 typedef struct EfSysList {
@@ -77,11 +78,11 @@ public:
     /* +0x0004 */ void* mDrawOrder;     /* the draw-order list object */
     /* +0x0008 */ void* mStrategy;      /* the draw-strategy builder */
     /* +0x000C */ void* mLineStrategy;  /* the emitter-form builder */
-    /* +0x0010 */ u8 mCreationQueue[0xC004]; /* the queue the constructor builds (`ef_creation_queue_reset`) */
+    /* +0x0010 */ CreationQueue mCreationQueue;
     /* +0xC014 */ u32 mMaxGroupID;
     /* +0xC018 */ EfSysActivityList* mActivityList;
     /* +0xC01C */ nw4r::ef::Random mRandom;
-    /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* copyVec3 copies the caller's vector into it */
+    /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* VEC3::operator= copies the caller's vector into it */
     /* +0xC02C */ nw4r::math::MTX34 mRefMtx;
     /* +0xC05C */ f32 mRangeB;
     /* +0xC060 */ f32 mRangeA;

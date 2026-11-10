@@ -33,6 +33,10 @@ typedef struct CockpitItemTag {
     /* +0x18 */ u8 flag_0x18;         /* cleared with the icon state every frame (`cockpit_item_tag_update`) */
     /* +0x19 */ u8 count_0x19;       /* the count drawn on the tag (0 = none) */
     /* +0x1A */ u8 unused_0x1A[0x1C - 0x1A];
+#ifdef __cplusplus
+    /* 0x802F2208 (0x30): constructs the world position (emitted after `hud/cockpit_quest.cpp`'s `__sinit`). */
+    CockpitItemTag() __attribute__((never_inline)) {}
+#endif
 } CockpitItemTag;
 
 /* One entry of the mark table `CockpitWork::marks_0x0D4`: a texture coordinate pair plus the three
@@ -140,6 +144,10 @@ typedef struct CockpitWork {
     /* +0x18C */ u16 sparkle_a_frame_0x18C; /* the health bar's full-gauge sparkle frame (0..0x60) */
     /* +0x18E */ u16 sparkle_b_frame_0x18E; /* the stamina bar's full-gauge sparkle frame (0..0x60) */
     /* +0x190 */ u32 frame_0x190;        /* the frame counter the target colours blink on (mod 24) */
+#ifdef __cplusplus
+    /* 0x802F21A8 (0x60): constructs the item tag and the four name-tag positions (emitted after `hud/cockpit_quest.cpp`'s `__sinit`). */
+    CockpitWork() __attribute__((never_inline)) {}
+#endif
 } CockpitWork;
 
 
@@ -157,6 +165,10 @@ typedef struct PitTrap {
     /* +0x00 */ VEC3 pos;
     /* +0x0C */ u8 kind_0x0C;      /* 0 is drawn in the first colour, anything else in the second */
     /* +0x0D */ u8 unused_0x0D[0x10 - 0x0D];
+#ifdef __cplusplus
+    /* 0x802F2178 (0x30): constructs the position (emitted after `hud/cockpit_quest.cpp`'s `__sinit`). */
+    PitTrap() __attribute__((never_inline)) {}
+#endif
 } PitTrap;
 
 /* The one-player cockpit state at `cockpit_state` (the sub-screen selector).  Its owner is
@@ -183,6 +195,10 @@ typedef struct CockpitState {
     /* +0x078 */ u32 field_0x078;
     /* +0x07C */ s8 transfer_mode_0x07C[4]; /* each player slot's transfer-mode icon (`setCockpitTransferMode`) */
     /* +0x080 */ u8 unused_0x080[0x088 - 0x080];
+#ifdef __cplusplus
+    /* 0x802F2120 (0x58): constructs the four pit traps (emitted after `hud/cockpit_quest.cpp`'s `__sinit`). */
+    CockpitState() __attribute__((never_inline)) {}
+#endif
 } CockpitState;
 
 #endif /* MHTRI_HUD_COCKPIT_WORK_TYPES_H */

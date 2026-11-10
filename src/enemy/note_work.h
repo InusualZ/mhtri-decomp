@@ -11,19 +11,9 @@
 struct _QNPC_W;
 struct _g3d_work;
 
-/* The +0x110 pointer the pane's scene-model teardown reads: it lives over the `MHchar`'s padding
- * (`MHchar` is 0x140 bytes, `Pl/pl_se_rig.h`'s model record 0x164: this view spans the 0x164),
- * so it is the model view's own field.
- * size: 0x164 */
-struct NoteModelView {
-    /* +0x000 */ u8 pad_0x000[0x10C];
-    /* +0x10C */ _g3d_work* g3d_0x110;
-    /* +0x110 */ u8 pad_0x110[0x164 - 0x110];
-};
-
 /* The rest position and the two talk bytes after it, as `note_pane_init` resets them through one pointer. */
 struct NoteRestBlock {
-    /* +0x00 */ nw4r::math::VEC3 pos_0x00;
+    /* +0x00 */ nw4r::math::_VEC3 pos_0x00;
     /* +0x0C */ u8 talk_step_0x0C;
     /* +0x0D */ u8 field_0x0D;
     /* +0x0E */ u8 pad_0x0E[0x2];
@@ -38,10 +28,8 @@ struct NoteWork {
     /* +0x001 */ u8 field_0x001;
     /* +0x002 */ u8 field_0x002;     /* the slot index `note_work_alloc` marks on a free record */
     /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ union {
-        MHchar model;                   /* the actor model the note pane poses (0x140 of the 0x164) */
-        NoteModelView view;             /* the same bytes, read as the +0x110 scene-model pointer */
-    };
+    /* +0x004 */ MHchar model;          /* the actor model the note pane poses */
+    /* +0x144 */ u8 pad_0x144[0x168 - 0x144];
     /* +0x168 */ u8 field_0x168;
     /* +0x169 */ u8 field_0x169;
     /* +0x16A */ u8 field_0x16A;
@@ -71,7 +59,7 @@ struct NoteWork {
     /* +0x1B4 */ union {
         struct {
             /* +0x1B4 */ union {
-                nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
+                nw4r::math::_VEC3 vec_0x1B4;  /* the rest position `note_pane_init` copies from +0x170 */
                 struct {   /* the NPC talk program's view of the same 0x0C bytes */
                     /* +0x1B4 */ u8 pad_0x1B4;
                     /* +0x1B5 */ u8 talk_step_0x1B5;   /* 0 opens the talk, 1/2 wait for the window (`lobby/lb_quest_ui.cpp`) */

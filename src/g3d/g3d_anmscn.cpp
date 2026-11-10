@@ -63,7 +63,7 @@
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
 #include "fn_80047398.h" /* color_rgba_copy (rule 2) */
 #include "fn_8004CAD8.h" /* subVec3 / vec3_scale / vec3_normalize_into (rule 2) */
-#include "mh3_pad.h"        /* VEC3_ctor / copyVec3, owned by mh3_pad.cpp (rule 2) */
+#include "mh3_pad.h"        /* VEC3::VEC3() / VEC3::operator=, owned by mh3_pad.cpp (rule 2) */
 #include "MSL_C/alloc.h"    /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 
 #pragma peephole off
@@ -163,12 +163,10 @@ u32 fn_80067060(const ResHandle *p);
 s32 fn_80067084(const ResHandle *p);
 ResHandle *fn_80067098(ResHandle *dst, const u32 &src);
 void fn_800670C8(u32 *dst, const u32 *src);
-LightAnmResult *fn_800677D8(LightAnmResult *self);
 void fog_set_color(Fog *self, GXColor color);
 void fog_range_set(Fog *self, f32 startz, f32 endz);
 void fog_type_set(Fog *self, s32 type);
 FogAnmResult *fn_80067B5C(FogAnmResult *self);
-CameraAnmResult *fn_80067EB4(CameraAnmResult *self);
 u32 res_anm_light_get_id(const ResHandle *p);
 u32 res_anm_fog_get_id(const ResHandle *p);
 u32 res_anm_camera_get_id(const ResHandle *p);
@@ -223,11 +221,8 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
         fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
         break;
     case 1: {
-        math::VEC3 dir;
-        math::VEC3 pos;
-
-        subVec3(&dir, &pResult->aim, &pResult->pos);
-        vec3_scale(&pos, &dir, -1.0e10f);
+        math::VEC3 dir = pResult->aim - pResult->pos;
+        math::VEC3 pos = dir * -1.0e10f;
         pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
         light_obj_pos_vec_set(pObj, &pos.x);
         pObj->InitLightAttnA(1.0f, 0.0f, 0.0f);
@@ -236,9 +231,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
         break;
     }
     case 2: {
-        math::VEC3 dir;
-
-        subVec3(&dir, &pResult->aim, &pResult->pos);
+        math::VEC3 dir = pResult->aim - pResult->pos;
         vec3_normalize_into(&dir, &dir);
         pObj->InitLightColor(static_cast<const ut::Color&>(pResult->color));
         light_obj_pos_vec_set(pObj, &pResult->pos.x);
@@ -263,9 +256,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 /* 0x80064C24 (0xBC): builds the specular light object from a light animation result. */
 void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
 {
-    math::VEC3 dir;
-
-    subVec3(&dir, &pResult->aim, &pResult->pos);
+    math::VEC3 dir = pResult->aim - pResult->pos;
     vec3_normalize_into(&dir, &dir);
     pObj->Clear();
     pObj->InitLightColor(static_cast<const ut::Color&>(pResult->specColor));
@@ -1095,7 +1086,6 @@ void AnmScnRes::GetLight(LightObj *pDiff, LightObj *pSpec, u32 refNumber)
     G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1403, ANMSCN_THIS_ERROR);
 
     LightAnmResult result;
-    fn_800677D8(&result);
     const LightAnmResult *pResult = GetLightResult(&result, refNumber);
     if (pResult->flags & LightAnmResult::FLAG_LIGHT_ENABLE) {
         if (pDiff != NULL) {
@@ -1120,16 +1110,6 @@ void AnmScnRes::GetLight(LightObj *pDiff, LightObj *pSpec, u32 refNumber)
             light_obj_disable(pSpec);
         }
     }
-}
-
-/* The light result's constructor: default-constructs its two vectors and two colours. */
-extern "C" LightAnmResult *fn_800677D8(LightAnmResult *self)
-{
-    VEC3_ctor(&self->pos);
-    VEC3_ctor(&self->aim);
-    color_ctor_white((u32 *)&self->color);
-    color_ctor_white((u32 *)&self->specColor);
-    return self;
 }
 
 /* 0x80067824 (0x1B0): sets the fog's type, range and colour from the fog `refNumber` names. */
@@ -1205,7 +1185,6 @@ bool AnmScnRes::GetCamera(Camera camera, u32 refNumber)
     NW4R_ASSERT(fn_80067EE8(&camera), ANMSCN_FILE, 1474, "NW4R:Failed assertion camera.IsValid()");
 
     CameraAnmResult result;
-    fn_80067EB4(&result);
     const CameraAnmResult *pResult = GetCameraResult(&result, refNumber);
     if (!(pResult->flags & CameraAnmResult::FLAG_ANM_EXISTS)) {
         return false;
@@ -1227,18 +1206,15 @@ bool AnmScnRes::GetCamera(Camera camera, u32 refNumber)
     }
 
     Camera::PostureInfo posture;
-    camera_posture_info_ctor(&posture);
     switch (pResult->flags & CameraAnmResult::FLAG_CAMERA_TYPE_MASK) {
     case 0: {
-        math::VEC3 rotate;
         posture.mType = 1;
-        copyVec3((math::VEC3 *)&posture.mUpX, (math::VEC3 *)vec3_copy_construct(&rotate, (void *)&pResult->rotate));
+        posture.mUp = math::VEC3(pResult->rotate);
         break;
     }
     case 1: {
-        math::VEC3 aim;
         posture.mType = 2;
-        copyVec3((math::VEC3 *)&posture.mTargetX, (math::VEC3 *)vec3_copy_construct(&aim, (void *)&pResult->rotate));
+        posture.mTarget = math::VEC3(pResult->rotate);
         posture.mUnk28 = pResult->twist;
         break;
     }
@@ -1250,32 +1226,6 @@ bool AnmScnRes::GetCamera(Camera camera, u32 refNumber)
     camera.SetPosition(pResult->pos);
     camera.SetPosture(posture);
     return true;
-}
-
-/* 0x80067E54 (0x1C): copies three floats into `out` and returns it. */
-extern "C" void *vec3_copy_construct(void *out, void *in)
-{
-    math::VEC3 *dst = (math::VEC3 *)out;
-    const math::VEC3 *src = (const math::VEC3 *)in;
-    dst->x = src->x;
-    dst->y = src->y;
-    dst->z = src->z;
-    return out;
-}
-
-extern "C" nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self)
-{
-    VEC3_ctor((nw4r::math::VEC3 *)&self->mPosX);
-    VEC3_ctor((nw4r::math::VEC3 *)&self->mTargetX);
-    VEC3_ctor((nw4r::math::VEC3 *)&self->mUpX);
-    return self;
-}
-
-/* The camera result's constructor: default-constructs its position. */
-extern "C" CameraAnmResult *fn_80067EB4(CameraAnmResult *self)
-{
-    VEC3_ctor(&self->pos);
-    return self;
 }
 
 extern "C" s32 fn_80067EE8(const void *p)

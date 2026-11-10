@@ -327,10 +327,10 @@ extern "C" void split_camera_set(u8 bank, u8 view)
         data->mScissorY = split_camera_view_table[index].scissor_y;
         data->mScissorW = split_camera_view_table[index].scissor_w;
         data->mScissorH = split_camera_view_table[index].scissor_h;
-        data->mViewportX = split_camera_view_table[index].viewport_x;
-        data->mViewportY = split_camera_view_table[index].viewport_y;
-        data->mViewportW = split_camera_view_table[index].viewport_w;
-        data->mViewportH = split_camera_view_table[index].viewport_h;
+        data->mViewportPos.x = split_camera_view_table[index].viewport_x;
+        data->mViewportPos.y = split_camera_view_table[index].viewport_y;
+        data->mViewportSize.x = split_camera_view_table[index].viewport_w;
+        data->mViewportSize.y = split_camera_view_table[index].viewport_h;
         data->mUnkBC = split_camera_view_table[index].top;
         data->mUnkC0 = split_camera_view_table[index].bottom;
         data->mUnkC4 = split_camera_view_table[index].left;

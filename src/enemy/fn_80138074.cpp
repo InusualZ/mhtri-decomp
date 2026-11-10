@@ -4,7 +4,7 @@
  *   (0x801394B8-0x8013AC08).
  * RANGE. .text 0x80138074-0x8013ACC4 (73 functions); .data 0x805A1358-0x805A1530, .sdata 0x807919F0-0x80791A20,
  *   .sdata2 0x80796D40-0x80796D90, extab, extabindex.
- * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34_ctor scheme).  user_data_type_names is a GUESS
+ * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34::MTX34() scheme).  user_data_type_names is a GUESS
  *   (the TYPE strings ExecCallbackC compares).  Registry names (foreign rows): res_user_data_ctor (0x8008A220, the
  *   `g3d_resuser_ac.h` handle constructor) and res_node_user_data_get (0x80099378, `ResNode::GetResUserData`).
  *   The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
@@ -102,8 +102,9 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
+#include "stage/stg_w.h" /* get_worldworld_pos (rule 2) */
 #include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define calcMtxAngX_c1 ((u32 (*)(Mtx34*))calcMtxAngX)
@@ -223,13 +224,9 @@ u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2);
 extern s32 strcmp(const char* a, const char* b);
 
 extern void mtx34_identity(void* mtx);
-extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 vec3_distance(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
-extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
-extern void MTX33_ctor(nw4r::math::MTX33* mtx);
 extern void mtx34_blend(Mtx34* out, const Mtx34* a, const Mtx34* b, f32 wa, f32 wb, u8 keep_unit);
-extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 vec3_dot(const Vec3* a, const Vec3* b);
 extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void res_node_assign(void* out, const void* src);
@@ -244,7 +241,6 @@ extern void copyMat33__FPQ34nw4r4math5MTX34PQ34nw4r4math5MTX34(Mtx34* dst, const
 extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s32 calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(const Vec3* a, const Vec3* b);
 extern void rotVecY__FPQ34nw4r4math4VEC3Ul(Vec3* v, u32 angle);
-extern void get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(Vec3* out, const Vec3* v, u8 area);
 extern void* get_move_work_adrs__FUc(u8 area);
 extern u16 get_move_work_max__FUc(u8 area);
 extern u8 get_now_areano__Fv(void);
@@ -256,7 +252,7 @@ extern u32 em_damage_eval(EnemyWork* work);
 extern void em_coll_shape_set(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
-extern void get_worldlocal_pos(Vec3* out, const Vec3* v, u8 area);
+extern "C" Vec3 get_worldlocal_pos(Vec3* pos, u8 area);
 extern f32 stg_area_ceiling_get(u8 area);
 extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
@@ -533,19 +529,17 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
     Vec3 saved;
     Vec3 offset;
 
-    VEC3_ctor(&saved);
-    VEC3_ctor(&offset);
     if (self->field_0x30C == 1 || (self->flags_0x1C8 & 0x400) != 0) {
         return;
     }
     if (self->field_0x1E2 == 1 && self->field_0x1E3 == 1) {
-        copyVec3(&saved, &self->field_0x188);
+        saved = self->field_0x188;
         setVector3__FPQ34nw4r4math4VEC3fff(&offset, 0.0f, 0.0f, 50.0f);
         rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
-        addVec3To(&self->field_0x188, &offset);
+        self->field_0x188 += offset;
         em_coll_shape_set(self, arg1, em_hit_mask_get(self));
         if (self->field_0x218 == 0) {
-            copyVec3(&self->field_0x188, &saved);
+            self->field_0x188 = saved;
         }
     } else {
         em_coll_shape_set(self, arg1, em_hit_mask_get(self));
@@ -588,28 +582,10 @@ void fn_8013823C(EnemyWork* self) {
     Vec3 v8C;
     Vec3 v80;
     Vec3 v74;
-    Vec3 v68;
-    Vec3 v5C;
-    Vec3 v50;
-    Vec3 v44;
-    Vec3 v38;
-    Vec3 v2C;
-    Vec3 v20;
-    Vec3 v14;
-    Vec3 v8;
     u8 i;
     u32 flag;
     u8 was_special;
 
-    VEC3_ctor(&vD4);
-    VEC3_ctor(&vC8);
-    VEC3_ctor(&vBC);
-    VEC3_ctor(&vB0);
-    VEC3_ctor(&vA4);
-    VEC3_ctor(&v98);
-    VEC3_ctor(&v8C);
-    VEC3_ctor(&v80);
-    VEC3_ctor(&v74);
     flag = 0;
     for (i = 0; i < 3; i++) {
         if (event_demo_ck__Fv() == 0 && self->field_0x46A == 0) {
@@ -653,27 +629,19 @@ void fn_8013823C(EnemyWork* self) {
             } else {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 0.0f, 0.0f, 0.0f);
             }
-            get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v68, &v8C, self->field_0x1E1);
-            copyVec3(&vC8, &v68);
+            vC8 = get_worldworld_pos(&v8C, self->field_0x1E1);
             if (stage_map_kind_get(self->field_0x1E0) == 5 && self->field_0x9F7 == 3) {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 7000.0f, 0.0f, 5000.0f);
             } else {
                 setVector3__FPQ34nw4r4math4VEC3fff(&v8C, 0.0f, 0.0f, 0.0f);
             }
-            get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v5C, &v8C, self->field_0x9F7);
-            copyVec3(&vBC, &v5C);
-            get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v50, &self->field_0x188, self->field_0x1E1);
-            copyVec3(&vD4, &v50);
-            addVec3(&v38, &vC8, &vBC);
-            vec3_scale(&v44, &v38, 0.5f);
-            copyVec3(&vB0, &v44);
-            subVec3(&v2C, &vBC, &vB0);
-            copyVec3(&vA4, &v2C);
-            subVec3(&v20, &vD4, &vB0);
-            copyVec3(&v98, &v20);
+            vBC = get_worldworld_pos(&v8C, self->field_0x9F7);
+            vD4 = get_worldworld_pos(&self->field_0x188, self->field_0x1E1);
+            vB0 = (vC8 + vBC) * 0.5f;
+            vA4 = vBC - vB0;
+            v98 = vD4 - vB0;
             if (vec3_dot(&vA4, &v98) >= 0.0f) {
-                get_worldlocal_pos(&v14, &vD4, self->field_0x9F7);
-                copyVec3(&self->field_0x188, &v14);
+                self->field_0x188 = get_worldlocal_pos(&vD4, self->field_0x9F7);
                 self->field_0x188.y = stg_area_ceiling_get(self->field_0x9F7);
                 em_area_change(self, 0);
             }
@@ -701,11 +669,11 @@ void fn_8013823C(EnemyWork* self) {
     self->field_0x30D = 0;
     self->field_0x30E = 0;
     self->field_0x30F = 0;
-    copyVec3(&self->field_0x194, &self->field_0x188);
+    self->field_0x194 = self->field_0x188;
     was_special = self->field_0x1E2;
     em_approach_3d_clear(self);
     if (self->field_0x767 == 1) {
-        copyVec3(&self->field_0x778, &self->field_0x76C);
+        self->field_0x778 = self->field_0x76C;
     }
     self->field_0x767 = 1;
     self->field_0x740 = 0;
@@ -824,7 +792,7 @@ void fn_8013823C(EnemyWork* self) {
             }
             EM_CHAR(self)->move(move_arg);
         }
-        copyVec3(&self->field_0x188, &self->char_0x024.field_0x04);
+        self->field_0x188 = self->char_0x024.field_0x04;
         switch (self->field_0x1E2) {
         case 0:
             if (was_special != 1) {
@@ -839,8 +807,7 @@ void fn_8013823C(EnemyWork* self) {
             }
             break;
         }
-        subVec3(&v8, &self->field_0x188, &self->field_0x194);
-        copyVec3(&self->field_0x470, &v8);
+        self->field_0x470 = self->field_0x188 - self->field_0x194;
         fn_80138074(self, 0);
         em_ground_probe(self);
         em_height_limit_update(self);
@@ -862,7 +829,7 @@ void em_post_update(EnemyWork* self) {
 
     if (self->field_0x1DE != 0) {
         if (self->field_0x8C0 != 0) {
-            addVec3To(&self->field_0x188, &self->field_0x8B4);
+            self->field_0x188 += self->field_0x8B4;
             fn_80138074(self, 1);
             em_ground_probe(self);
             em_height_limit_update(self);
@@ -882,7 +849,7 @@ void em_post_update(EnemyWork* self) {
         if (self->field_0x766 == 0) {
             if (self->field_0x767 == 1) {
                 self->field_0x766++;
-                copyVec3(&self->field_0x778, &self->field_0x76C);
+                self->field_0x778 = self->field_0x76C;
             }
             if (self->field_0x768 > 0) {
                 self->field_0x768--;
@@ -963,7 +930,7 @@ void em_char_pose_sync(EnemyWork* self) {
     ch->field_0x28 = self->field_0x1BC;
     ch->field_0x2C = self->field_0x1C0;
     ch->field_0x30 = self->field_0x1C4;
-    copyVec3(&ch->field_0x04, &self->field_0x188);
+    ch->field_0x04 = self->field_0x188;
 }
 
 #pragma peephole off
@@ -1082,7 +1049,6 @@ void em_turn_joint_update(EnemyWork* self) {
     u32 total;
     UserDataItem* item;
 
-    VEC3_ctor(&pos);
     best = (u32)-1;
     if (self->field_0x740 == 0) {
         v = 0.0f;
@@ -1103,7 +1069,7 @@ void em_turn_joint_update(EnemyWork* self) {
         if (best != (u32)-1) {
             get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(self, best, &pos);
         } else {
-            copyVec3(&pos, &self->field_0x188);
+            pos = self->field_0x188;
         }
         v = (f32)(s16)(calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(&pos, &self->field_0x36C) -
                        (u16)self->field_0x1C0);
@@ -1175,7 +1141,6 @@ void ResUserDataAc::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
 
     if (index == work->field_0x110) {
         Vec3 pos;
-        VEC3_ctor(&pos);
         pos.x = 0.0f;
         pos.y = 0.0f;
         pos.z = 0.0f;
@@ -1212,9 +1177,6 @@ void ResUserDataAc::CalcAnmItem(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::Res
     nw4r::math::MTX33 dst;
     KeyFrameSet* frames;
 
-    VEC3_ctor(&angles);
-    MTX34_ctor(&mtx);
-    MTX33_ctor(&dst);
     switch (item->field_0x04) {
     case 0:
     case 3: {
@@ -1302,7 +1264,6 @@ void ResUserDataAc::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::R
 void ResUserDataAc::CalcMtxItem(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 node, UserDataItem* item) {
     Mtx34 mtx;
 
-    MTX34_ctor(&mtx);
     switch (item->field_0x04) {
     case 0:
     case 3: {
@@ -1362,15 +1323,12 @@ extern "C" {
 
 /* Writes the node's matrix relative to its parent's (the parent's inverse times the node's) into out. */
 void joint_local_mtx_get(Mtx34* out, void* arg1, Mtx34* arg2) {
-    Mtx34 m1;
-    Mtx34 m2;
-    Mtx34 m3;
     nw4r::g3d::ResNode key((void*)0);
     s32 idx;
 
-    MTX34_ctor(&m1);
-    MTX34_ctor(&m2);
-    MTX34_ctor(&m3);
+    Mtx34 m1;
+    Mtx34 m2;
+    Mtx34 m3;
     mtx34_copy(&m1, &arg2[res_node_mtx_id_get(arg1)]);
     idx = res_node_get_parent(arg1);
     res_node_assign(&key, &idx);
@@ -1396,13 +1354,6 @@ void ResUserDataAc::ExecCallbackC(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMd
     Mtx34 joint1Mtx;
     Mtx34 resultMtx;
 
-    MTX34_ctor(&parentMtx);
-    MTX34_ctor(&parentInv);
-    MTX34_ctor(&localMtx);
-    MTX34_ctor(&nodeMtx);
-    MTX34_ctor(&joint0Mtx);
-    MTX34_ctor(&joint1Mtx);
-    MTX34_ctor(&resultMtx);
     nw4r::g3d::ResNode node((void*)0);
     nw4r::g3d::ResNode link((void*)0);
     ResUserData userData;

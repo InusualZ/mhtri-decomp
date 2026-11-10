@@ -18,7 +18,7 @@ struct SeSlot {
     /* +0x02 */ u8 kind;
     /* +0x03 */ u8 field_0x03;
     /* +0x04 */ nw4r::math::VEC3 pos;
-    /* +0x10 */ nw4r::math::VEC3 field_0x10;
+    /* +0x10 */ nw4r::math::_VEC3 field_0x10;
     /* +0x1C */ f32 field_0x1C;
     /* +0x20 */ f32 field_0x20;
     /* +0x24 */ u8 field_0x24;

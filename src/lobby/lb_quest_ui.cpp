@@ -89,7 +89,7 @@
 #include "fn_80047398/lobby_world_block.h"
 #include "fn_80047398.h"
 #include "mh3_pad/lb_param_w.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "quest/quest_types.h"
 #include "hud/layout.h"
 #include "hud/cockpit.h"
@@ -2501,10 +2501,6 @@ void lb_scene_eft_move(_EFT* self) {
     s32 i;
     LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
     _CP_VECTOR rot;
-    VEC3 from;
-    VEC3 to;
-    VEC3 pos;
-    VEC3 step;
     LbQuestDetailModel* view;
     LbSceneEmitter* emitter;
     s32 j;
@@ -2513,9 +2509,9 @@ void lb_scene_eft_move(_EFT* self) {
     rot.x = 0;
     rot.y = 0;
     rot.z = 0;
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
-    VEC3_ctor(&pos);
+    VEC3 from;
+    VEC3 to;
+    VEC3 pos;
     for (i = 0; i < work->count; i++) {
         view = (LbQuestDetailModel*)work->models[i];
         emitter = lb_scene_emitter_tbls[i];
@@ -2558,10 +2554,9 @@ void lb_scene_eft_move(_EFT* self) {
             case 1:
                 vec_to_mh_vec3(&from, &lb_scene_model_pos[i]);
                 vec_to_mh_vec3(&to, &lb_scene_model_target[i]);
-                subVec3(&step, &to, &from);
-                copyVec3(&from, &step);
+                from = to - from;
                 vec3_scale_inv(&from, 1350.0f);
-                addVec3To(&view->pos, &from);
+                view->pos += from;
                 rot.y = calcVecAng2(&to, &from);
                 if (++work->frames[i] > 1350) {
                     view->step++;

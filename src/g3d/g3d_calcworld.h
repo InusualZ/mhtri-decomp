@@ -10,8 +10,6 @@
 extern "C" {
 #endif
 
-void addVec3To(void* dst, const void* src);
-void addVec3To(void* dst, const void* src);
 
 /* The world-matrix attribute helpers (0x800737AC..0x800737C4): clear the scale bits for a non-uniform or a
  * uniform-but-not-one scale, or set the uniform / one bits.  Consumers: `src/g3d/g3d_maya.cpp` (the per-node

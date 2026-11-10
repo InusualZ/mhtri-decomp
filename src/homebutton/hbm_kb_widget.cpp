@@ -735,7 +735,7 @@ static inline void hbmKbSetPaneSize(nw4r::lyt::Pane* pane, const nw4r::lyt::Size
 }
 
 /* A two-component vector built from its components.  size: 0x8 */
-struct HbmKbVec2 : public nw4r::math::VEC2 {
+struct HbmKbVec2 : public nw4r::math::_VEC2 {
     HbmKbVec2(f32 fx, f32 fy) {
         x = fx;
         y = fy;
@@ -743,8 +743,8 @@ struct HbmKbVec2 : public nw4r::math::VEC2 {
 }; /* size: 0x8 */
 
 /* Places a pane at `pos` in its parent's plane. */
-static inline void hbmKbSetPaneTranslate(nw4r::lyt::Pane* pane, const nw4r::math::VEC2& pos) {
-    nw4r::math::VEC3 translate;
+static inline void hbmKbSetPaneTranslate(nw4r::lyt::Pane* pane, const nw4r::math::_VEC2& pos) {
+    nw4r::math::_VEC3 translate;
     translate.x = pos.x;
     translate.y = pos.y;
     translate.z = 0.0f;
@@ -1949,8 +1949,8 @@ extern "C" void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInf
     u32 scissorHeight;
     f32 scale;
     f32 center;
-    nw4r::math::VEC2 pos;
-    nw4r::math::VEC2 size;
+    nw4r::math::_VEC2 pos;
+    nw4r::math::_VEC2 size;
 
     if (!self->scroller.isMoving()) {
         for (i = 0; i < 20; i++) {

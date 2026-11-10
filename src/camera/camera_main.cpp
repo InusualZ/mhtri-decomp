@@ -10,20 +10,26 @@
  *   the `clrlwi`-before-`add` index masks and the `li r0,N` + `psq_lx` epilogue pair) and `#pragma fp_contract off`
  *   (retail keeps `fmuls` + `fadds` in camera_blend_mix and camera_follow_update); four switch functions are
  *   bracketed by `#pragma optimization_level 4` (SHAPES).
- * NAMES.  The record layout is traced from the constructors (camera_work_ctor builds the six cameras in order:
- *   camera_follow_ctor the follow camera's fifteen vectors, camera_aim_ctor the aim camera, camera_shoulder_ctor the
- *   shoulder camera, camera_event_ctor the event camera, camera_area_ctor the area camera, camera_lobby_ctor the lobby
- *   camera and its goal, camera_quake_ctor the three quake slots) and from the camera index each camera hands
- *   camera_view_apply (0..5).  GUESS (from each body and its callers): every `camera_*` function and table name of the
+ * NAMES.  The record layout is traced from the constructors (CamWork() builds the six cameras in order: CamFollow()
+ *   the view's and the follow camera's fifteen vectors, CamAim(), CamShoulder(), CamEvent() (its two key pairs are
+ *   constructed in two loops, so they are arrays), CamArea(), CamLobby() with CamLobbyGoal(), then the three
+ *   CamQuake() slots; `__sinit` builds `camera_work` with `__construct_array`) and from the camera index each camera
+ *   hands camera_view_apply (0..5).  GUESS (from each body and its callers): every `camera_*` function and table name of the
  *   unit, the field names of `CamWork` and its members, and the foreign callee names proposed in
  *   config/RMHE08/name_registry.jsonl (lane camera-main) with their leaf headers.
  * RESIDUALS.
+ *   - camera_shoulder_update: the eye/hit and the late block's vectors sit one slot (0xC) above retail's; retail
+ *     keeps two more 12-byte objects between the rotation matrix and `eye` (the shape that puts them there was not
+ *     found: moving `angles`, `from`/`to` measured equal or worse).
  *   - `light/light.cpp` views the same 0x4F8 bytes as `LightWork` (light/light_work.h) and declares the accessor
- *     `camera_work_get` with that return type, so this unit casts its result to `CamWork*`; the constructors
- *     (camera_work_ctor..camera_follow_ctor) and camera_quake_update keep the `LightWork` member types.
- *   - The unit's `.data`, `.bss`, `.sdata` and `.ctors` are not emitted: the tables are declared `extern` under their
- *     map names (the camera ranges, shake, aim-eye, kill-cut key, area, lobby, script and demo-camera tables) and
- *     the two camera works are not a defined static object (camera_work_construct is the `.ctors` entry).
+ *     `camera_work_get` with that return type, so this unit returns `camera_work` through that view;
+ *     camera_quake_update keeps the `LightWork` member types.
+ *   - The unit's `.data` and `.sdata` are not emitted (the tables are declared `extern` under their map names: the
+ *     camera ranges, shake, aim-eye, kill-cut key, area, lobby, script and demo-camera tables); `.bss` emits only
+ *     `camera_work`.
+ *   - camera_shoulder_update: the plane intersection's `from`/`to` take the slots below `key` (0x50/0x44) where
+ *     retail gives them 0x98/0xA4 above `eye`; the mwcc-debugger dump renders stack operands as fixups, so the slot
+ *     assignment cannot be read from it (declaration order swapped: no change).
  *   - camera_follow_collide: retail jumps from the wall turn (and its step limit) straight into the ground clamp and
  *     from the swimming line check past it, which MWCC builds only from jumps (it neither threads a flag nor merges
  *     tails, playbook 213).  The goto-free shape (playbook 219) is two inline helpers: camera_follow_collide_move, a
@@ -36,10 +42,10 @@
  *     the row where retail keeps the row's byte offset (row types and an inline index tried);
  *     camera_shoulder_update's plane intersection colours `normal.z` f2 where retail uses f10;
  *     camera_event_script_step loads the latch mask into r0 before extending it into r4.
- * SHAPES.  The vector helpers that write through r3 (`subVec3`, `addVec3`, `vec3_scale`, `vec3_div`,
- *   `get_camera_target_pos`) are called through views returning the vector, which reproduces the original's
- *   temporaries and their stack slots; the C++ accessors return `CamVec3`/`CamMtx34`, whose copy constructor makes
- *   MWCC build the result in the caller's return slot (the manglings carry no return type).  A float parameter's
+ * SHAPES.  The vector accessors return by value (`get_camera_pos`, `get_camera_direction`, `get_camera_target_pos`,
+ *   `camera_view_pos_get`, `camera_proj_mtx_get`): VEC3's copy constructor makes MWCC build the result in the
+ *   caller's return slot; `get_current_view_mtx` returns `CamMtx34` for the same reason (MTX34's copy is implicit).
+ *   A local retail never constructs is not declared (camera_follow_collide).  A float parameter's
  *   position decides where its load is scheduled (coll_line_check takes the radius third).  Literals are written in
  *   the order the pool holds them (`0.7f + 0.3f * t`).  The switches whose two-value case groups retail tests first
  *   with `subi`/`cmplwi`/`ble` (camera_follow_yaw_input, camera_follow_kill_cut, camera_area_blend_update,
@@ -110,6 +116,9 @@ struct CamRange {
 
 /* The follow camera: the player-tracking view the game uses outside events (camera index 0). */
 struct CamFollow : CamView {
+    /* 0x802BF1D8 (0xA0): constructs the view's and the follow camera's fifteen vectors. */
+    CamFollow() __attribute__((never_inline)) {}
+
     /* +0x04C */ nw4r::math::VEC3 goal_pos;
     /* +0x058 */ nw4r::math::VEC3 goal_target;
     /* +0x064 */ u32 pitch_goal;
@@ -184,6 +193,9 @@ struct CamFollow : CamView {
 
 /* The aim camera: the first-person view of the scopes (camera index 1). */
 struct CamAim : CamView {
+    /* 0x802BF180 (0x58): constructs the view's vectors, the rotation and the origin. */
+    CamAim() __attribute__((never_inline)) {}
+
     /* +0x4C */ nw4r::math::MTX34 rot;
     /* +0x7C */ nw4r::math::VEC3 origin;
     /* +0x88 */ f32 fovy_min;
@@ -201,6 +213,9 @@ struct CamAim : CamView {
 
 /* The shoulder camera: the over-the-shoulder view of the lock-on (camera index 2). */
 struct CamShoulder : CamView {
+    /* 0x802BF138 (0x48): constructs the view's four vectors. */
+    CamShoulder() __attribute__((never_inline)) {}
+
     /* +0x4C */ s16 pitch;
     /* +0x4E */ s16 yaw_offset;
     /* +0x50 */ s16 yaw_dir;
@@ -209,10 +224,11 @@ struct CamShoulder : CamView {
 
 /* The event camera: the scripted view of demos and kill cuts (camera index 3). */
 struct CamEvent : CamView {
-    /* +0x04C */ nw4r::math::VEC3 pos_start;
-    /* +0x058 */ nw4r::math::VEC3 pos_end;
-    /* +0x064 */ nw4r::math::VEC3 target_start;
-    /* +0x070 */ nw4r::math::VEC3 target_end;
+    /* 0x802BF0AC (0x8C): constructs the view's vectors and the two key pairs. */
+    CamEvent() __attribute__((never_inline)) {}
+
+    /* +0x04C */ nw4r::math::VEC3 pos_keys[2];     /* the interpolation's start and end positions */
+    /* +0x064 */ nw4r::math::VEC3 target_keys[2];  /* the interpolation's start and end targets */
     /* +0x07C */ union {
         CamScriptOp* script;                /* the next script word */
         CamDcmKey* keys;                    /* the demo-camera key run (`stage_dcm_buffer_tbl`) */
@@ -266,6 +282,9 @@ struct CamEvent : CamView {
 
 /* The area camera: the fixed views a map's area records place (camera index 4). */
 struct CamArea : CamView {
+    /* 0x802BF044 (0x68): constructs the view's and the area camera's eight vectors. */
+    CamArea() __attribute__((never_inline)) {}
+
     /* +0x4C */ u32 field_0x4C;
     /* +0x50 */ u32 field_0x50;
     /* +0x54 */ s8 area_id;
@@ -332,6 +351,9 @@ struct CamAreaSet {
 
 /* The lobby camera's goal: where it heads, what it looks at, and how it gets there. */
 struct CamLobbyGoal {
+    /* 0x802BF004 (0x40): constructs the goal's three vectors. */
+    CamLobbyGoal() __attribute__((never_inline)) {}
+
     /* +0x00 */ nw4r::math::VEC3 pos;
     /* +0x0C */ nw4r::math::VEC3 target;
     /* +0x18 */ u8 step;                    /* returned by camera_mode_cur_get */
@@ -354,12 +376,18 @@ struct CamLobbyGoal {
 
 /* The lobby camera (camera index 5). */
 struct CamLobby : CamView {
+    /* 0x802BEFB4 (0x50): constructs the view's four vectors and the goal. */
+    CamLobby() __attribute__((never_inline)) {}
+
     /* +0x4C */ CamLobbyGoal goal;
     /* +0x94 */ u8 pad_0x94[0x4];
 }; /* size: 0x98 */
 
 /* One quake slot: CamWork carries three of them (`set_quake_sub`, `camera_pl_quake2_req`, `camera_shake_req`). */
 struct CamQuake {
+    /* 0x802BEF84 (0x30): constructs the quake slot's origin. */
+    CamQuake() __attribute__((never_inline)) {}
+
     /* +0x00 */ nw4r::math::VEC3 origin;
     /* +0x0C */ u8 active;
     /* +0x0D */ u8 kind;                    /* low five bits index the duration and amplitude tables */
@@ -371,6 +399,9 @@ struct CamQuake {
 /* The camera work: the six cameras, the player they follow and the quake slots (two of them at
  * `camera_work`, one per split-screen player; `camera_work_get` returns the current one). */
 struct CamWork {
+    /* 0x802BEF00 (0x84): constructs the six cameras in turn, then the three quake slots. */
+    CamWork() __attribute__((never_inline)) {}
+
     /* +0x000 */ CamFollow follow;
     /* +0x148 */ CamAim aim;
     /* +0x1F0 */ CamShoulder shoulder;
@@ -396,20 +427,9 @@ struct CamWork {
     /* +0x4F7 */ u8 slot_bits;              /* the camera-slot bit flags (camera_slot_bit_set/70/1CC) */
 }; /* size: 0x4F8 */
 
-/* The vector and matrix the C++ camera accessors return: the math types with the copy constructor the
- * original's vector and matrix classes carry, which makes the compiler build the returned local in the
- * caller's return slot (the accessors' manglings carry no return type, so the callers' declarations in
- * `camera/camera.h` name the plain math types). */
-struct CamVec3 : nw4r::math::VEC3 {
-    CamVec3() {}
-    CamVec3(const CamVec3& other)
-    {
-        x = other.x;
-        y = other.y;
-        z = other.z;
-    }
-}; /* size: 0xC */
-
+/* The matrix the C++ camera accessor returns: the math type with a copy constructor, which makes the compiler
+ * build the returned local in the caller's return slot (the accessor's mangling carries no return type, so the
+ * callers' declarations in `camera/camera.h` name the plain math type). */
 struct CamMtx34 : nw4r::math::MTX34 {
     CamMtx34() {}
     CamMtx34(const CamMtx34& other)
@@ -535,7 +555,8 @@ void camera_lobby_frame(CamWork* work);
 void camera_lobby_goal_set(_LB_NPC* npc, nw4r::math::VEC3* look, nw4r::math::VEC3* pos, u8 snap);
 void camera_event_reset(CamWork* work);
 void camera_event_update(CamWork* work);
-void camera_view_pos_get(nw4r::math::VEC3* out, u8 kind);
+/* free: C linkage evidenced - the map row is the unmangled `camera_view_pos_get` */
+nw4r::math::VEC3 camera_view_pos_get(u8 kind);
 f32 camera_fovy_get(void);
 f32 camera_roll_get(void);
 void camera_area_rec_take(CamArea* cam, CamAreaRec* rec);
@@ -571,8 +592,8 @@ void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index);
 }
 
 /* The camera's C++ entry points (`camera/camera.h` declares them for the other units). */
-CamVec3 get_camera_pos(void);
-CamVec3 get_camera_direction(void);
+nw4r::math::VEC3 get_camera_pos(void);
+nw4r::math::VEC3 get_camera_direction(void);
 CamMtx34 get_current_view_mtx(void);
 void set_quake_sub(u8 kind, nw4r::math::VEC3* origin);
 
@@ -652,7 +673,6 @@ void camera_quake_update(LightWork* self, u8 index);
 #include "lobby/lb_sub1a_send.h"
 #include "enemy/em024_action11_state5_ck.h"
 #include "quest/quest_move_sub_state_ck.h"
-#include "assignVec3.h"
 #include "enemy/em_area_ck.h"
 #include "hud/cockpit.h"
 
@@ -660,18 +680,10 @@ void camera_quake_update(LightWork* self, u8 index);
  * vector helpers that write their result through r3, called as functions returning the vector (the shape of
  * the original's by-value vector operators). */
 #define calcVecAngX_c1 ((u32 (*)(nw4r::math::VEC3*))calcVecAngX)
-#define camera_target_pos_get ((nw4r::math::VEC3 (*)(void))get_camera_target_pos)
-#define vec3_sub ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define vec3_add ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define cam_vec3_sub ((CamVec3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
 #define pl_id_bit_ck_c1 ((u32 (*)(_PLW*, s32))pl_id_bit_ck)
 #define pl_status_bit_ck_c1 ((s32 (*)(_PLW*, u32))pl_status_bit_ck)
-#define vec3_scale_v ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 #define pl_target_lock_ck_c1 ((u32 (*)(_PLW*))pl_target_lock_ck)
-#define em_vec3_from ((nw4r::math::VEC3* (*)(nw4r::math::VEC3*, const Vec*))em_vec3_copy)
-#define vec3_div_v ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_div)
 #define pl_act_true_ck_c1 ((u32 (*)(_PLW*))pl_act_true_ck)
-#define camera_view_pos ((nw4r::math::VEC3 (*)(u8))camera_view_pos_get)
 #define event_demo_running_ck_c1 ((u8 (*)(void))event_demo_running_ck)
 
 /* The unit's own tables (`.data`, `.sdata`, `.bss`): declared until the source emits them (RESIDUALS). */
@@ -719,18 +731,9 @@ extern "C" int sprintf(char* buffer, const char* format, ...);
 
 /* The rest of this unit's own functions, declared before their definitions. */
 extern "C" LightWork* camera_work_get(void);
-extern "C" LightWork* camera_work_ctor(LightWork* self);
-extern "C" LightTriple* camera_lobby_goal_ctor(LightTriple* self);
-extern "C" LightOctal* camera_area_ctor(LightOctal* self);
-extern "C" LightParams* camera_event_ctor(LightParams* self);
-extern "C" LightQuad* camera_shoulder_ctor(LightQuad* self);
-extern "C" LightQuadMid* camera_aim_ctor(LightQuadMid* self);
-extern "C" LightRoot* camera_follow_ctor(LightRoot* self);
-extern "C" LightChannel* camera_quake_ctor(LightChannel* self);
-extern "C" LightQuadTriple* camera_lobby_ctor(LightQuadTriple* self);
 
-/* The two camera works (`.bss` 0x806BB7E0, 0x9F0 B = 2 x 0x4F8). */
-extern LightWork camera_work[2];
+/* The two camera works (`.bss` 0x806BB7E0, 0x9F0 B = 2 x 0x4F8), defined at the foot of the file. */
+extern CamWork camera_work[2];
 
 #pragma peephole off
 #pragma fp_contract off
@@ -765,7 +768,7 @@ extern "C" void camera_work_init(void)
     u32 index;
 
     for (index = 0; index < 2; index++) {
-        camera_work_setup((CamWork*)&camera_work[(u8)index], index);
+        camera_work_setup(&camera_work[(u8)index], index);
     }
     camera_dcm_buffers_clear();
 }
@@ -777,7 +780,6 @@ extern "C" void camera_work_update(CamWork* work)
     u32 move;
     u32 kind;
 
-    VEC3_ctor(&light);
     move = (u32)get_move_work_adrs(2);
     work->player = (_PLW*)(move + (s8)my_player_no() * 0xB20);
     camera_pad_state_get(work);
@@ -805,7 +807,7 @@ extern "C" void camera_work_update(CamWork* work)
     stage_area_colour_update();
     camera_quake_update((LightWork*)work, kind);
     camera_view_angles_update(work);
-    copyVec3(&light, &vec3_sub(&get_camera_pos(), &camera_target_pos_get()));
+    light = *(&((get_camera_pos()) - (get_camera_target_pos())));
     if (screen_split_mode_ck() != 0) {
         setVector3(&light, 0.0f, 0.5f, -1.0f);
     }
@@ -816,10 +818,10 @@ extern "C" void camera_work_update(CamWork* work)
 /* Updates the first camera work and, in split screen, the second player's too. */
 extern "C" void camera_update(void)
 {
-    camera_work_update((CamWork*)&camera_work[0]);
+    camera_work_update(&camera_work[0]);
     if (screen_split_mode_ck() != 0) {
         my_player_no_set(1);
-        camera_work_update((CamWork*)&camera_work[1]);
+        camera_work_update(&camera_work[1]);
         my_player_no_set(0);
     }
 }
@@ -829,11 +831,10 @@ extern "C" void camera_scene_posture_init(u8 index, s32 camera)
 {
     nw4r::g3d::Camera cam;
     s32 handle;
-    nw4r::g3d::Camera::PostureInfo info;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(index);
     word_copy_return_dst(&cam, &handle);
-    camera_posture_info_ctor(&info);
+    nw4r::g3d::Camera::PostureInfo info;
     info.mType = camera;
 }
 
@@ -843,8 +844,7 @@ extern "C" void camera_water_cell_update(CamWork* work)
     nw4r::math::VEC3 poly;
     f32 height;
 
-    VEC3_ctor(&poly);
-    copyVec3(&poly, &::get_camera_pos());
+    poly = *(&::get_camera_pos());
     if (stage_water_surface_get(&poly, ::get_now_areano(), &work->area_handle, &height, 0xFFFF) == 0) {
         work->area_handle = 0;
     }
@@ -855,18 +855,15 @@ extern "C" void camera_follow_reset(CamWork* work)
 {
     CamFollow* cam = &work->follow;
     nw4r::math::VEC3 poly;
-    nw4r::math::VEC3 world;
     u8 mode;
 
-    VEC3_ctor(&poly);
     setVector3(&cam->pos, 0.0f, 0.0f, 100.0f);
     setVector3(&cam->target, 0.0f, 0.0f, 0.0f);
     cam->fovy = 55.0f;
     cam->roll = 0.0f;
     camera_scene_posture_init(0, 2);
     camera_view_apply(0, &cam->pos, &cam->target, cam->fovy, cam->roll);
-    subVec3(&world, &cam->pos, &cam->target);
-    copyVec3(&poly, &world);
+    poly = cam->pos - cam->target;
     calcVecAngXY(&poly, &cam->pitch_goal, &cam->yaw_goal);
     cam->pitch = cam->pitch_goal;
     cam->yaw = cam->yaw_goal;
@@ -941,25 +938,18 @@ extern "C" void camera_follow_reset(CamWork* work)
  * shake offsets, the collision pass and the blend from the previous view. */
 extern "C" void camera_follow_update(CamWork* work)
 {
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 player_pos;
-    nw4r::math::VEC3 unused;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 view_pos;
-    nw4r::math::VEC3 view_target;
-    nw4r::math::VEC3 diff;
     _PLW* player;
     f32 target_lag;
     f32 pos_lag;
     u8 shift;
 
     player = work->player;
-    VEC3_ctor(&offset);
-    VEC3_ctor(&player_pos);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&view_pos);
-    VEC3_ctor(&view_target);
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 player_pos;
+    nw4r::math::VEC3 unused;
+    nw4r::math::VEC3 dir;
+    nw4r::math::VEC3 view_pos;
+    nw4r::math::VEC3 view_target;
     if (player->slot_active != 0 && GameMode_ck() != 2) {
         camera_follow_lock_update(&work->follow, player);
         work->invert = 0;
@@ -978,15 +968,15 @@ extern "C" void camera_follow_update(CamWork* work)
         if (work->active_kind != 0xFF && work->active_kind != 2 && work->active_kind != 3) {
             u32 yaw;
 
-            copyVec3(&view_pos, &get_camera_pos());
-            copyVec3(&view_target, &camera_target_pos_get());
+            view_pos = *(&get_camera_pos());
+            view_target = *(&get_camera_target_pos());
             yaw = calcVecAng2(&view_target, &view_pos);
             work->follow.yaw = yaw;
             work->follow.yaw_goal = yaw;
         }
         if (work->follow.reset != 0)
             camera_follow_snap(&work->follow, player);
-        copyVec3(&player_pos, &player->vec_0x03C);
+        player_pos = player->vec_0x03C;
         if (camera_follow_dive_ck(&work->follow) == 1) {
             work->follow.range_rec = camera_range_dive;
         } else {
@@ -1014,8 +1004,8 @@ extern "C" void camera_follow_update(CamWork* work)
             work->follow.step = 1;
             work->follow.timer = frames - 1;
             work->follow.rate = 1.0f / (f32)frames;
-            VEC3_ctor(&diff);
-            copyVec3(&diff, &vec3_sub(&work->shoulder.pos, &player_pos));
+            nw4r::math::VEC3 diff;
+            diff = *(&(work->shoulder.pos - player_pos));
             table = camera_range_land;
             best = 100000000.0f;
             pick = 0;
@@ -1103,7 +1093,7 @@ extern "C" void camera_follow_update(CamWork* work)
             offset.z = work->follow.range_rec->offset.z;
             setVector3(&dir, 0.0f, 0.0f, 60.0f);
             rotVecY(&dir, player->field_0x058);
-            copyVec3(&dir, &vec3_sub(&player_pos, &dir));
+            dir = *(&(player_pos - dir));
             work->follow.goal_target.x = dir.x;
             work->follow.goal_target.y = 40.0f + player_pos.y;
             work->follow.goal_target.z = dir.z;
@@ -1134,7 +1124,7 @@ extern "C" void camera_follow_update(CamWork* work)
             pl_get_joint_wpos(player, 1, &player_pos);
             setVector3(&dir, 0.0f, 150.0f, 60.0f);
             rotVecY(&dir, player->field_0x058);
-            copyVec3(&work->follow.goal_target, &vec3_add(&player_pos, &dir));
+            work->follow.goal_target = *(&(player_pos + dir));
         }
         if (player->kind_0x09 == 3) {
             if (work->follow.swim_timer == 0) {
@@ -1168,7 +1158,7 @@ extern "C" void camera_follow_update(CamWork* work)
             target_lag = pos_lag;
         }
         rotVecY(&offset, work->follow.yaw);
-        copyVec3(&work->follow.goal_pos, &vec3_add(&offset, &player_pos));
+        work->follow.goal_pos = *(&(offset + player_pos));
         work->follow.push_mode = 0;
         camera_follow_shake_update(&work->follow, player);
         work->follow.target.x = work->follow.goal_target.x;
@@ -1185,18 +1175,18 @@ extern "C" void camera_follow_update(CamWork* work)
         work->follow.pos.z = work->follow.goal_pos.z;
         if (work->follow.push_mode != 0)
             camera_follow_push_apply(&work->follow);
-        addVec3To(&work->follow.pos, &work->follow.shake_pos);
-        addVec3To(&work->follow.target, &work->follow.shake_target);
+        work->follow.pos += work->follow.shake_pos;
+        work->follow.target += work->follow.shake_target;
         camera_follow_kill_cut(&work->follow, player);
         camera_follow_collide(work, &work->follow, player);
         if (camera_player_climb_ck(player, 3) == 1) {
-            copyVec3(&work->follow.pos, &work->follow.prev_pos);
-            copyVec3(&work->follow.target, &work->follow.prev_target);
+            work->follow.pos = work->follow.prev_pos;
+            work->follow.target = work->follow.prev_target;
         }
         switch (work->follow.step) {
         case 1:
-            copyVec3(&work->follow.prev_pos, &get_camera_pos());
-            copyVec3(&work->follow.prev_target, &camera_target_pos_get());
+            work->follow.prev_pos = *(&get_camera_pos());
+            work->follow.prev_target = *(&get_camera_target_pos());
             work->follow.step++;
         case 2: {
             f32 t;
@@ -1209,8 +1199,8 @@ extern "C" void camera_follow_update(CamWork* work)
             break;
         }
         }
-        copyVec3(&work->follow.prev_pos, &work->follow.pos);
-        copyVec3(&work->follow.prev_target, &work->follow.target);
+        work->follow.prev_pos = work->follow.pos;
+        work->follow.prev_target = work->follow.target;
         camera_view_apply(0, &work->follow.pos, &work->follow.target, work->follow.fovy, work->follow.roll);
     }
 }
@@ -1451,13 +1441,10 @@ extern "C" u32 camera_follow_wall_dist(CamFollow* cam, nw4r::math::VEC3* pos, u1
     nw4r::math::VEC3 hit;
     u8 area;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&probe);
-    VEC3_ctor(&hit);
     area = get_now_areano();
     vec_to_mh_vec3(&offset, &cam->range_rec->offset);
     rotVecY(&offset, yaw);
-    copyVec3(&probe, &vec3_add(pos, &offset));
+    probe = *(&(*pos + offset));
     if (coll_line_check(&probe, &cam->target, 28.0f, &hit, 1, 0xFFFF, area, 1) > 0) {
         *dist = vec3_distance(&probe, &hit);
         return 1;
@@ -1473,12 +1460,10 @@ extern "C" u8 camera_follow_wall_ck(CamFollow* cam, nw4r::math::VEC3* pos, u16 y
     nw4r::math::VEC3 probe;
     u8 area;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&probe);
     area = get_now_areano();
     vec_to_mh_vec3(&offset, &cam->range_rec->offset);
     rotVecY(&offset, yaw);
-    copyVec3(&probe, &vec3_add(pos, &offset));
+    probe = *(&(*pos + offset));
     return coll_line_check(&probe, &cam->target, 28.0f, NULL, 1, 0xFFFF, area, 1) > 0;
 }
 
@@ -1499,9 +1484,9 @@ static inline void camera_follow_wall_turn(CamFollow* cam, _PLW* player, u32 yaw
             turn = (u16)step;
         blocked = camera_follow_wall_ck(cam, &player->vec_0x03C, yaw + turn);
     }
-    copyVec3(rel, &vec3_sub(&cam->pos, &cam->target));
+    *rel = *(&(cam->pos - cam->target));
     rotVecY(rel, (u16)turn);
-    copyVec3(&cam->pos, &vec3_add(&cam->target, rel));
+    cam->pos = *(&(cam->target + *rel));
     cam->yaw_goal = (u16)(cam->yaw_goal + (u16)turn);
 }
 
@@ -1524,8 +1509,8 @@ static inline u8 camera_follow_collide_move(CamFollow* cam, _PLW* player, nw4r::
     step = 0;
     yaw = 0;
     clamped = 0;
-    copyVec3(old_pos, &cam->pos);
-    copyVec3(old_target, &cam->target);
+    *old_pos = cam->pos;
+    *old_target = cam->target;
     area = get_now_areano();
     do {
         if ((pl_status_bit_ck_c1(player, 0x1C0) != 0 || cam->wall_side != 0) && player->kind_0x09 != 3) {
@@ -1547,7 +1532,7 @@ static inline u8 camera_follow_collide_move(CamFollow* cam, _PLW* player, nw4r::
                 cam->wall_side = 0;
             }
         }
-        copyVec3(before, &cam->pos);
+        *before = cam->pos;
         coll_push_out(&cam->pos, 20.0f, 1, 1);
         pushed = 0;
         if (cam->yaw_snap == 1 || (s8)cam->yaw_hold > 0 || (s8)cam->pitch_hold > 0)
@@ -1557,7 +1542,7 @@ static inline u8 camera_follow_collide_move(CamFollow* cam, _PLW* player, nw4r::
         if (vec3_dist_sq(before, &cam->pos) > 0.0f) {
             cam->moved = 1;
             if (pushed == 0 && cam->push_hold == 0) {
-                copyVec3(rel, &vec3_sub(&cam->pos, &cam->target));
+                *rel = *(&(cam->pos - cam->target));
                 if (player->kind_0x09 == 3) {
                     u32 pitch;
 
@@ -1625,11 +1610,6 @@ extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* playe
     f32 new_dist;
     u8 kind;
 
-    VEC3_ctor(&old_pos);
-    VEC3_ctor(&old_target);
-    VEC3_ctor(&hit);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&before);
     kind = camera_follow_collide_move(cam, player, &old_pos, &old_target, &hit, &rel, &before);
     old_dist = vec3_distance(&old_pos, &old_target);
     new_dist = vec3_distance(&cam->pos, &old_target);
@@ -1640,14 +1620,12 @@ extern "C" void camera_follow_collide(CamWork* work, CamFollow* cam, _PLW* playe
         cam->target.x += 0.1f;
         cam->target.z += 0.1f;
     } else if (old_dist > new_dist) {
-        nw4r::math::VEC3 back;
-
         old_dist -= new_dist;
-        copyVec3(&rel, &vec3_sub(&old_pos, &cam->target));
+        rel = *(&(old_pos - cam->target));
         if (work->player->kind_0x09 != 3)
             rel.y = 0.0f;
         vec3_normalize_into(&rel, &rel);
-        copyVec3(&cam->target, &vec3_sub(&cam->target, &vec3_scale_v(&rel, old_dist)));
+        cam->target = *(&(cam->target - (rel * old_dist)));
     }
     cam->occluded = 0;
     if (camera_water_clamp(cam, &cam->target) != 0)
@@ -1933,12 +1911,10 @@ extern "C" void camera_follow_shake_update(CamFollow* cam, _PLW* player)
     u32 swing;
     u8 i;
 
-    VEC3_ctor(&pos_rel);
-    VEC3_ctor(&target_rel);
     swing = 0;
     turn = 0;
-    copyVec3(&pos_rel, &vec3_sub(&cam->pos, &cam->goal_pos));
-    copyVec3(&target_rel, &vec3_sub(&cam->target, &cam->goal_target));
+    pos_rel = *(&(cam->pos - cam->goal_pos));
+    target_rel = *(&(cam->target - cam->goal_target));
     if (camera_follow_shake_ck(cam, player, 0) == 1 || camera_follow_weapon_shake_ck(cam, player, 0) == 1) {
         f32 pos_scale = camera_shake_table[cam->shake_kind].pos_scale;
         f32 target_scale = camera_shake_table[cam->shake_kind].target_scale;
@@ -2030,11 +2006,11 @@ extern "C" void camera_follow_shake_update(CamFollow* cam, _PLW* player)
         cam->push_mode = 0;
     }
     if (camera_player_climb_ck(player, 2) == 1) {
-        copyVec3(&pos_rel, &vec3_sub(&cam->pos, &cam->goal_pos));
-        copyVec3(&target_rel, &vec3_sub(&cam->target, &cam->goal_target));
+        pos_rel = *(&(cam->pos - cam->goal_pos));
+        target_rel = *(&(cam->target - cam->goal_target));
         pos_rel.y = 0.0f;
-        copyVec3(&cam->shake_pos_peak, copyVec3(&cam->shake_pos, &pos_rel));
-        copyVec3(&cam->shake_target_peak, copyVec3(&cam->shake_target, &target_rel));
+        cam->shake_pos_peak = cam->shake_pos = pos_rel;
+        cam->shake_target_peak = cam->shake_target = target_rel;
         camera_shake_slot_arm(cam, 0, 100);
         camera_shake_slot_arm(cam, 1, 100);
     }
@@ -2076,14 +2052,11 @@ extern "C" void camera_follow_push_apply(CamFollow* cam)
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&target);
-    VEC3_ctor(&rel);
-    copyVec3(&pos, &vec3_add(&cam->pos, &cam->push_pos));
-    copyVec3(&target, &vec3_add(&cam->target, &cam->push_target));
+    pos = *(&(cam->pos + cam->push_pos));
+    target = *(&(cam->target + cam->push_target));
     if (cam->push_mode == 2) {
         if ((s8)cam->pitch_hold == 0 && (s8)cam->yaw_hold == 0) {
-            copyVec3(&rel, &vec3_sub(&pos, &target));
+            rel = *(&(pos - target));
             rel.y += cam->range_rec->target_offset.y;
             calcVecAngXY(&rel, &pitch, &yaw);
             if (cam->tilt != 0)
@@ -2156,21 +2129,12 @@ extern "C" void camera_area_reset(void)
     work->area.reload = 1;
 }
 
-/* Copies a range record's look-at offset into a vector. */
-inline nw4r::math::VEC3* camera_range_target(const CamRange* rec)
-{
-    nw4r::math::VEC3 look;
-
-    return em_vec3_from(&look, &rec->target_offset);
-}
-
 /* Snaps the follow camera behind the player at the distance record of its range. */
 extern "C" void camera_follow_snap(CamFollow* cam, _PLW* player)
 {
-    nw4r::math::VEC3 offset;
     u32 yaw;
 
-    setVec3(&offset, 0.0f, 0.0f, 0.0f);
+    nw4r::math::VEC3 offset(0.0f, 0.0f, 0.0f);
     yaw = (u16)(player->field_0x058 + 0x8000);
     cam->yaw = yaw;
     cam->yaw_goal = yaw;
@@ -2192,9 +2156,8 @@ extern "C" void camera_follow_snap(CamFollow* cam, _PLW* player)
     offset.y = cam->range_rec->offset.y;
     offset.z = cam->range_rec->offset.z;
     rotVecY(&offset, cam->yaw_goal);
-    copyVec3(&cam->pos, copyVec3(&cam->goal_pos, &vec3_add(&player->vec_0x03C, &offset)));
-    copyVec3(&cam->target,
-             copyVec3(&cam->goal_target, &vec3_add(&player->vec_0x03C, camera_range_target(cam->range_rec))));
+    cam->pos = cam->goal_pos = *(&(player->vec_0x03C + offset));
+    cam->target = cam->goal_target = player->vec_0x03C + nw4r::math::VEC3(cam->range_rec->target_offset);
     setVector3(&cam->shake_pos_peak, 0.0f, 0.0f, 0.0f);
     setVector3(&cam->shake_pos, 0.0f, 0.0f, 0.0f);
     setVector3(&cam->shake_target_peak, 0.0f, 0.0f, 0.0f);
@@ -2237,12 +2200,6 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
     struct _ENEMY_WORK* enemy;
     s32 query;
 
-    VEC3_ctor(&rel);
-    VEC3_ctor(&pos_key);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&target_key);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&center);
     enemy = em_kill_cut_target_get(1, player, &query);
     if (enemy == NULL) {
         if (cam->cut_frame > 0)
@@ -2328,8 +2285,8 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
             cam->cut_frame = shot->length + shot->start;
         }
         frames = (s32)(80.0f + -40.0f * cosf(90.0f * ((6.2831855f * (t / (f32)shot->length)) / 360.0f)));
-        addVec3To(&cam->cut_offset, &vec3_div_v(&vec3_sub(&pos_key, &cam->cut_offset), (f32)(u16)frames));
-        copyVec3(&pos_key, &cam->cut_offset);
+        cam->cut_offset += ((pos_key - cam->cut_offset) / ((f32)(u16)frames));
+        pos_key = cam->cut_offset;
         cam->range = 3;
         cam->cut_yaw += (s16)((s16)(0xE000 - cam->cut_yaw) / (u16)frames);
         if ((s16)cam->cut_yaw < -0x2000) {
@@ -2346,22 +2303,21 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
         rotVecY(&pos_key, enemy->field_0x1C0 + cam->cut_yaw);
         if (cam->cut_state == 0) {
             cam->cut_state++;
-            copyVec3(&cam->cut_center,
-                     &vec3_add(&player->vec_0x03C, &vec3_sub(&enemy->pos, &player->vec_0x03C)));
+            cam->cut_center = *(&(player->vec_0x03C + (enemy->pos - player->vec_0x03C)));
         } else if (cam->cut_state == 2) {
-            copyVec3(&rel, &vec3_add(&player->vec_0x03C, &vec3_sub(&enemy->pos, &player->vec_0x03C)));
+            rel = *(&(player->vec_0x03C + (enemy->pos - player->vec_0x03C)));
             cam->cut_center.x = rel.x;
             cam->cut_center.z = rel.z;
-            copyVec3(&cam->pos, &cam->cut_pos);
+            cam->pos = cam->cut_pos;
             rotVecY(&target_key, enemy->field_0x1C0);
-            copyVec3(&cam->target, &vec3_add(&cam->cut_center, &target_key));
+            cam->target = *(&(cam->cut_center + target_key));
             cam->yaw_goal = cam->yaw = calcVecAng2(&cam->target, &cam->pos);
             return;
         }
-        copyVec3(&center, &cam->cut_center);
-        copyVec3(&cam->pos, copyVec3(&cam->cut_pos, &vec3_add(&center, &pos_key)));
+        center = cam->cut_center;
+        cam->pos = cam->cut_pos = *(&(center + pos_key));
         rotVecY(&target_key, enemy->field_0x1C0);
-        copyVec3(&cam->target, &vec3_add(&center, &target_key));
+        cam->target = *(&(center + target_key));
         cam->yaw_goal = cam->yaw = calcVecAng2(&cam->target, &cam->pos);
         break;
     }
@@ -2408,8 +2364,8 @@ extern "C" void camera_follow_kill_cut(CamFollow* cam, _PLW* player)
         getKeyData3(target_keys, 2.0f * t, &target_key.x, &target_key.y, &target_key.z);
         rotVecY(&pos_key, enemy->field_0x1C0);
         rotVecY(&target_key, enemy->field_0x1C0);
-        copyVec3(&cam->target, &vec3_add(&enemy->pos, &target_key));
-        copyVec3(&cam->pos, &vec3_add(&enemy->pos, &pos_key));
+        cam->target = *(&(enemy->pos + target_key));
+        cam->pos = *(&(enemy->pos + pos_key));
         cam->yaw_goal = cam->yaw = calcVecAng2(&cam->target, &cam->pos);
         break;
     }
@@ -2444,11 +2400,9 @@ extern "C" bool camera_cut_active_ck(void)
 extern "C" void camera_aim_reset(CamWork* work)
 {
     CamAim* cam = &work->aim;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 target;
 
-    copyVec3(&cam->pos, setVec3(&pos, 0.0f, 0.0f, 10.0f));
-    copyVec3(&cam->target, setVec3(&target, 0.0f, 0.0f, 0.0f));
+    cam->pos = VEC3(0.0f, 0.0f, 10.0f);
+    cam->target = VEC3(0.0f, 0.0f, 0.0f);
     cam->roll = 0.0f;
     cam->fovy = 45.0f;
     camera_scene_posture_init(1, 2);
@@ -2520,11 +2474,10 @@ extern "C" void camera_aim_update(CamWork* work)
 {
     CamAim* cam = &work->aim;
     _PLW* player;
-    nw4r::math::VEC3 eye;
 
     player = (_PLW*)get_move_work_adrs(2);
     player = &player[(s8)my_player_no()];
-    VEC3_ctor(&eye);
+    nw4r::math::VEC3 eye;
     cam->active = 0;
     if (player->slot_active != 0 && GameMode_ck() != 2) {
         if (player->field_0x5E6 == 0) {
@@ -2580,7 +2533,7 @@ extern "C" void camera_aim_update(CamWork* work)
             }
             switch ((s8)cam->kind) {
             case 0:
-                copyVec3(&cam->origin, &player->vec_0x03C);
+                cam->origin = player->vec_0x03C;
                 pl_eye_mtx_get(player, &cam->rot);
                 cam->fovy = cam->fovy_near;
                 break;
@@ -2589,7 +2542,7 @@ extern "C" void camera_aim_update(CamWork* work)
                 cam->fovy = cam->fovy_far;
                 break;
             case 2:
-                copyVec3(&eye, &player->vec_0x03C);
+                eye = player->vec_0x03C;
                 if (player->kind_0x09 == 3)
                     eye.y += 50.0f;
                 else
@@ -2605,19 +2558,17 @@ extern "C" void camera_aim_update(CamWork* work)
             nw4r::math::VEC3 origin;
             CamAimEye* row;
 
-            VEC3_ctor(&offset);
-            VEC3_ctor(&origin);
             setVector3(&origin, cam->rot.m[0][3], cam->rot.m[1][3], cam->rot.m[2][3]);
             offset.x = camera_aim_eye_table[(s8)cam->kind].x;
             offset.y = 0.0f;
             offset.z = camera_aim_eye_table[(s8)cam->kind].z;
             mulVecMat(&offset, &cam->rot);
-            copyVec3(&cam->pos, &vec3_add(&origin, &offset));
+            cam->pos = *(&(origin + offset));
             row = &camera_aim_eye_table[(s8)cam->kind];
             cam->pos.y += row->height;
             vec_to_mh_vec3(&offset, &row->look);
             mulVecMat(&offset, &cam->rot);
-            copyVec3(&cam->target, &vec3_add(&origin, &offset));
+            cam->target = *(&(origin + offset));
             cam->active = 1;
             camera_water_clamp(cam, NULL);
             camera_view_apply(1, &cam->pos, &cam->target, cam->fovy, cam->roll);
@@ -2630,28 +2581,16 @@ extern "C" void camera_aim_update(CamWork* work)
  * line of sight. */
 extern "C" void camera_shoulder_update(CamWork* work)
 {
-    nw4r::math::MTX34 rot;
-    nw4r::math::VEC3 to;
-    nw4r::math::VEC3 from;
-    nw4r::math::VEC3 eye;
-    nw4r::math::VEC3 hit;
-    nw4r::math::VEC3 unused;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 look;
-    nw4r::math::VEC3 key;
     _CP_VECTOR angles;
-    nw4r::math::VEC3 plane;
-    nw4r::math::VEC3 normal;
-    nw4r::math::VEC3 dir;
     _PLW* player;
     CamShoulder* cam;
     u8 area;
 
     player = (_PLW*)get_move_work_adrs(2);
     player = &player[(s8)my_player_no()];
-    VEC3_ctor(&eye);
+    nw4r::math::VEC3 eye;
     area = get_now_areano();
-    VEC3_ctor(&hit);
+    nw4r::math::VEC3 hit;
     if (player->slot_active != 0 && GameMode_ck() != 2) {
         u16 diff;
         f32 lift;
@@ -2666,7 +2605,7 @@ extern "C" void camera_shoulder_update(CamWork* work)
                 cam->step = 0;
                 return;
             }
-            copyVec3(&cam->prev_pos, &work->follow.pos);
+            cam->prev_pos = work->follow.pos;
             cam->pitch = (s16)((player->gauge_0x64F + 100) * 34 - 0xB00);
             cam->yaw_dir = 0x800;
             cam->yaw_offset = 0;
@@ -2701,11 +2640,11 @@ extern "C" void camera_shoulder_update(CamWork* work)
         } else if (cam->yaw_offset < 0x800) {
             cam->yaw_offset += (s16)(((s16)(0x800 - cam->yaw_offset) * 6) >> 6);
         }
-        MTX34_ctor(&rot);
-        VEC3_ctor(&unused);
-        VEC3_ctor(&offset);
-        VEC3_ctor(&look);
-        VEC3_ctor(&key);
+        nw4r::math::MTX34 rot;
+        nw4r::math::VEC3 unused;
+        nw4r::math::VEC3 offset;
+        nw4r::math::VEC3 look;
+        nw4r::math::VEC3 key;
         done = 0;
         if (player->kind_0x09 == 3)
             lift = 70.0f;
@@ -2752,7 +2691,7 @@ extern "C" void camera_shoulder_update(CamWork* work)
         angles.z = 0;
         cpSetRotMatrix(&angles, &rot);
         mulVecMat(&offset, &rot);
-        copyVec3(&cam->pos, &vec3_add(&cam->target, &offset));
+        cam->pos = *(&(cam->target + offset));
         if (coll_line_check(&eye, &cam->pos, 25.0f, &hit, 1, 0xFFFF, area, 1) > 0) {
             cam->pos.x = hit.x;
             cam->pos.z = hit.z;
@@ -2774,19 +2713,19 @@ extern "C" void camera_shoulder_update(CamWork* work)
             f32 num;
             f32 t;
 
-            VEC3_ctor(&from);
-            VEC3_ctor(&to);
-            VEC3_ctor(&plane);
-            VEC3_ctor(&normal);
-            VEC3_ctor(&dir);
+            nw4r::math::VEC3 from;
+            nw4r::math::VEC3 to;
+            nw4r::math::VEC3 plane;
+            nw4r::math::VEC3 normal;
+            nw4r::math::VEC3 dir;
             plane.x = cam->target.x;
             plane.y = 0.0f;
             plane.z = cam->target.z;
             normal.x = look.x;
             normal.y = 0.0f;
             normal.z = look.z;
-            copyVec3(&from, &cam->pos);
-            copyVec3(&to, &vec3_add(&cam->target, &look));
+            from = cam->pos;
+            to = *(&(cam->target + look));
             num = normal.z * (plane.z - to.z);
             num += normal.x * (plane.x - to.x) + normal.y * (plane.y - to.y);
             dir.x = to.x - from.x;
@@ -2796,7 +2735,7 @@ extern "C" void camera_shoulder_update(CamWork* work)
             to.x = to.x + dir.x * t;
             to.y = to.y + dir.y * t;
             to.z = to.z + dir.z * t;
-            copyVec3(&cam->target, &to);
+            cam->target = to;
         }
         cam->roll = work->follow.roll;
         cam->fovy = work->follow.fovy;
@@ -2808,11 +2747,9 @@ extern "C" void camera_shoulder_update(CamWork* work)
 extern "C" void camera_area_cam_reset(CamWork* work)
 {
     CamArea* cam = &work->area;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 target;
 
-    copyVec3(&cam->pos, setVec3(&pos, 0.0f, 30.0f, 50.0f));
-    copyVec3(&cam->target, setVec3(&target, 0.0f, 0.0f, 0.0f));
+    cam->pos = VEC3(0.0f, 30.0f, 50.0f);
+    cam->target = VEC3(0.0f, 0.0f, 0.0f);
     cam->roll = 0.0f;
     cam->fovy = 50.0f;
     camera_scene_posture_init(4, 2);
@@ -2851,10 +2788,6 @@ extern "C" void camera_area_cam_update(CamWork* work)
     nw4r::math::VEC3 rec_pos;
     _PLW* player;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&player_pos);
-    VEC3_ctor(&base);
-    VEC3_ctor(&rec_pos);
     player = (_PLW*)get_move_work_adrs(2);
     player = &player[(s8)my_player_no()];
     cam->active = 0;
@@ -2884,41 +2817,41 @@ extern "C" void camera_area_cam_update(CamWork* work)
     if (cam->area_id != cam->prev_area_id && cam->area_id != -1)
         cam->changed = 1;
     camera_area_blend_update(work, cam);
-    copyVec3(&player_pos, &player->vec_0x03C);
+    player_pos = player->vec_0x03C;
     switch (cam->rec->kind) {
     case 0:
         setVector3(&offset, 0.0f, 0.0f, cam->distance);
         rotVecX(&offset, (u16)(s32)(0.5f + (65536.0f * cam->pitch) / 360.0f));
         rotVecY(&offset, (u16)(s32)(0.5f + (65536.0f * cam->yaw) / 360.0f));
-        copyVec3(&cam->target, &player_pos);
+        cam->target = player_pos;
         cam->target.y += cam->height;
-        copyVec3(&cam->pos, &vec3_add(&cam->target, &offset));
+        cam->pos = *(&(cam->target + offset));
         break;
     case 1:
-        copyVec3(&cam->target, &player_pos);
+        cam->target = player_pos;
         cam->target.y += 170.0f;
         break;
     case 2:
         vec_to_mh_vec3(&rec_pos, &cam->rec->pos);
-        copyVec3(&cam->pos, &rec_pos);
+        cam->pos = rec_pos;
         setVector3(&offset, 0.0f, 0.0f, 100.0f);
         rotVecX(&offset, (u16)(s32)(0.5f + (65536.0f * cam->pitch) / 360.0f));
         rotVecY(&offset, (u16)(s32)(0.5f + (65536.0f * cam->yaw) / 360.0f));
-        copyVec3(&cam->target, &vec3_sub(&cam->pos, &offset));
+        cam->target = *(&(cam->pos - offset));
         break;
     case 3:
         setVector3(&offset, 0.0f, 0.0f, cam->distance);
         rotVecX(&offset, (u16)(s32)(0.5f + (65536.0f * cam->pitch) / 360.0f));
         rotVecY(&offset, (u16)(s32)(0.5f + (65536.0f * cam->yaw) / 360.0f));
-        copyVec3(&base, &player_pos);
+        base = player_pos;
         base.y += cam->height;
         if (cam->sub_step == 0) {
-            copyVec3(&cam->target, &base);
+            cam->target = base;
             cam->sub_step++;
         } else {
-            copyVec3(&cam->target, &vec3_add(&cam->prev_target, &vec3_div_v(&vec3_sub(&base, &cam->prev_target), 3.0f)));
+            cam->target = *(&(cam->prev_target + ((base - cam->prev_target) / 3.0f)));
         }
-        copyVec3(&cam->pos, &vec3_add(&cam->target, &offset));
+        cam->pos = *(&(cam->target + offset));
         if (cam->pos.x < cam->rec->pos.x)
             cam->pos.x = cam->rec->pos.x;
         if (cam->pos.x > cam->rec->pos.x + cam->rec->box_x)
@@ -2931,8 +2864,8 @@ extern "C" void camera_area_cam_update(CamWork* work)
             cam->pos.z = cam->rec->pos.z + cam->rec->box_z;
         break;
     }
-    copyVec3(&cam->prev_pos, &cam->pos);
-    copyVec3(&cam->prev_target, &cam->target);
+    cam->prev_pos = cam->pos;
+    cam->prev_target = cam->target;
     camera_view_apply(4, &cam->pos, &cam->target, cam->fovy, cam->roll);
 }
 
@@ -2942,8 +2875,6 @@ extern "C" s32 camera_area_quad_ck(CamAreaQuad* quad, nw4r::math::VEC3* pos)
     nw4r::math::VEC3 d;
     nw4r::math::VEC3 e;
 
-    VEC3_ctor(&d);
-    VEC3_ctor(&e);
     setVector3(&d, 0.0f, 0.0f, 0.0f);
     setVector3(&e, 0.0f, 0.0f, 0.0f);
     if (pos->y < quad->corner[0].y || pos->y >= quad->corner[0].y + quad->height)
@@ -3089,13 +3020,12 @@ extern "C" void camera_area_fixed_blend(CamWork* work, CamArea* cam)
     nw4r::math::VEC3 rec_pos;
     f32 t;
 
-    VEC3_ctor(&rec_pos);
     switch (cam->step) {
     case 1:
-        copyVec3(&cam->start_pos, &camera_view_pos(work->kind));
-        copyVec3(&cam->start_pos, &get_camera_pos());
+        cam->start_pos = *(&camera_view_pos_get(work->kind));
+        cam->start_pos = *(&get_camera_pos());
         vec_to_mh_vec3(&rec_pos, &cam->rec->pos);
-        copyVec3(&cam->rec_pos, &rec_pos);
+        cam->rec_pos = rec_pos;
         cam->prev_rec = cam->rec;
         cam->fovy = camera_fovy_get();
         cam->step++;
@@ -3138,13 +3068,12 @@ extern "C" void camera_area_rec_take(CamArea* cam, CamAreaRec* rec)
 {
     nw4r::math::VEC3 rec_pos;
 
-    VEC3_ctor(&rec_pos);
     cam->distance = cam->distance_from = rec->param[0];
     cam->height = cam->height_from = rec->param[1];
     cam->pitch = cam->pitch_from = rec->param[2];
     cam->yaw = cam->yaw_from = rec->param[3];
     vec_to_mh_vec3(&rec_pos, &rec->pos);
-    copyVec3(&cam->rec_pos, copyVec3(&cam->start_pos, &rec_pos));
+    cam->rec_pos = cam->start_pos = rec_pos;
     cam->step = 0;
     cam->sub_step = 0;
     cam->reload = 0;
@@ -3184,12 +3113,9 @@ extern "C" void camera_area_default_set(void)
 extern "C" void camera_lobby_reset(CamWork* work)
 {
     CamLobby* cam = &work->lobby;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 target;
-    nw4r::math::VEC3 look;
 
-    copyVec3(&cam->pos, setVec3(&pos, 0.0f, 30.0f, 50.0f));
-    copyVec3(&cam->target, setVec3(&target, 0.0f, 0.0f, 0.0f));
+    cam->pos = VEC3(0.0f, 30.0f, 50.0f);
+    cam->target = VEC3(0.0f, 0.0f, 0.0f);
     cam->roll = 0.0f;
     cam->fovy = 50.0f;
     camera_scene_posture_init(5, 2);
@@ -3206,7 +3132,7 @@ extern "C" void camera_lobby_reset(CamWork* work)
     cam->goal.kind = 0;
     cam->goal.swing = 0;
     cam->goal.talk_lock = 0;
-    copyVec3(&cam->goal.look, setVec3(&look, 0.0f, 0.0f, 0.0f));
+    cam->goal.look = VEC3(0.0f, 0.0f, 0.0f);
     cam->goal.npc = NULL;
     cam->goal.tilt = 0.0f;
 }
@@ -3236,7 +3162,6 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
     CamArea* base;
     f32 t;
 
-    VEC3_ctor(&rel);
     player = work->player;
     base = &work->area;
     cam->active = 0;
@@ -3282,7 +3207,7 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
                 goal->swing--;
             }
             if (goal->swing > 0) {
-                copyVec3(&rel, &vec3_sub(&goal->pos, &base->pos));
+                rel = *(&(goal->pos - base->pos));
                 rotVecY(&rel, -(u16)(s32)(0.5f + (65536.0f * (0.13f * base->fovy)) / 360.0f));
                 rel.x = base->pos.x + rel.x;
                 rel.y = 100.0f + goal->pos.y;
@@ -3291,7 +3216,7 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
                             camera_lobby_blend_curve(goal, goal->swing, goal->talk_lock != 0 ? 1 : 2));
             }
         }
-        copyVec3(&cam->pos, &base->pos);
+        cam->pos = base->pos;
         break;
     case 1:
     case 2:
@@ -3324,23 +3249,23 @@ extern "C" void camera_lobby_update(CamWork* work, CamLobby* cam)
             }
         }
         if (goal->kind == 2)
-            copyVec3(&goal->target, &goal->look);
+            goal->target = goal->look;
         else
-            copyVec3(&goal->target, &player->vec_0x03C);
+            goal->target = player->vec_0x03C;
         goal->target.y += goal->height;
-        copyVec3(&rel, &vec3_sub(&base->pos, &goal->target));
+        rel = *(&(base->pos - goal->target));
         if (goal->kind == 4)
             rel.y = 0.0f;
         else
             rel.y += goal->tilt;
         vec3_normalize_into(&rel, &rel);
         vec3_scale_in_place(&rel, goal->distance);
-        addVec3To(&rel, &goal->target);
+        rel += goal->target;
         vec3_lerp(&cam->pos, &rel, &base->pos, t);
         break;
     }
     case 3:
-        copyVec3(&goal->target, &goal->look);
+        goal->target = goal->look;
         vec3_lerp(&cam->pos, &goal->pos, &base->pos, t);
         break;
     }
@@ -3389,7 +3314,7 @@ extern "C" void camera_lobby_goal_set(_LB_NPC* npc, nw4r::math::VEC3* look, nw4r
             goal->blend = 20;
         }
         goal->kind = 0;
-        copyVec3(&goal->pos, &npc->pos_0x10);
+        goal->pos = npc->pos_0x10;
         goal->fovy = 20.0f;
         goal->tilt = 0.0f;
     } else if (pos == NULL) {
@@ -3399,7 +3324,7 @@ extern "C" void camera_lobby_goal_set(_LB_NPC* npc, nw4r::math::VEC3* look, nw4r
         goal->tilt = -140.0f;
         if (look != NULL) {
             goal->kind = 2;
-            copyVec3(&goal->look, look);
+            goal->look = *look;
         } else if (snap == 1) {
             goal->kind = 4;
             npc = goal->npc;
@@ -3423,8 +3348,8 @@ extern "C" void camera_lobby_goal_set(_LB_NPC* npc, nw4r::math::VEC3* look, nw4r
             goal->blend = 20;
         }
         goal->kind = 3;
-        copyVec3(&goal->pos, pos);
-        copyVec3(&goal->look, look);
+        goal->pos = *pos;
+        goal->look = *look;
         goal->fovy = camera_fovy_get();
         goal->tilt = 0.0f;
     }
@@ -3482,8 +3407,6 @@ extern "C" void camera_lobby_view_set(u8 index, u8 snap)
     nw4r::math::VEC3 look;
     Vec* view;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&look);
     view = camera_lobby_views[index];
     vec_to_mh_vec3(&pos, &view[0]);
     vec_to_mh_vec3(&look, &view[1]);
@@ -3576,11 +3499,9 @@ extern "C" void camera_lobby_viewport_copy(void)
 extern "C" void camera_event_reset(CamWork* work)
 {
     CamEvent* cam = &work->event;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 target;
 
-    copyVec3(&cam->pos, setVec3(&pos, 0.0f, 30.0f, 50.0f));
-    copyVec3(&cam->target, setVec3(&target, 0.0f, 0.0f, 0.0f));
+    cam->pos = VEC3(0.0f, 30.0f, 50.0f);
+    cam->target = VEC3(0.0f, 0.0f, 0.0f);
     cam->roll = 0.0f;
     cam->fovy = 55.0f;
     camera_scene_posture_init(3, 2);
@@ -3594,10 +3515,10 @@ extern "C" void camera_event_reset(CamWork* work)
     cam->step = 0;
     cam->timer_max = 0;
     cam->timer = 0;
-    setVector3(&cam->pos_start, 0.0f, 0.0f, 0.0f);
-    setVector3(&cam->pos_end, 0.0f, 0.0f, 0.0f);
-    setVector3(&cam->target_start, 0.0f, 0.0f, 0.0f);
-    setVector3(&cam->target_end, 0.0f, 0.0f, 0.0f);
+    setVector3(&cam->pos_keys[0], 0.0f, 0.0f, 0.0f);
+    setVector3(&cam->pos_keys[1], 0.0f, 0.0f, 0.0f);
+    setVector3(&cam->target_keys[0], 0.0f, 0.0f, 0.0f);
+    setVector3(&cam->target_keys[1], 0.0f, 0.0f, 0.0f);
     cam->talk_step = 0;
 }
 
@@ -3925,12 +3846,12 @@ extern "C" s32 camera_event_script_run(CamWork* work, CamEvent* cam)
     case 0:
         cam->sub_step++;
         cam->mark = cam->script = camera_event_scripts[cam->mode];
-        copyVec3(&cam->pos, &get_camera_pos());
-        copyVec3(&cam->target, &camera_target_pos_get());
+        cam->pos = *(&get_camera_pos());
+        cam->target = *(&get_camera_target_pos());
         cam->roll = camera_roll_get();
         cam->fovy = camera_fovy_get();
-        copyVec3(&cam->pos_start, &cam->pos);
-        copyVec3(&cam->target_start, &cam->target);
+        cam->pos_keys[0] = cam->pos;
+        cam->target_keys[0] = cam->target;
         cam->roll_start = (s16)(10430.378f * cam->roll);
         cam->fovy_start = (s16)(10430.378f * cam->fovy);
         cam->field_0xFC = 0;
@@ -3974,14 +3895,14 @@ extern "C" s32 camera_event_script_step(CamWork* work, CamEvent* cam)
             cam->pos_arg = op->bytes.low;
             break;
         case 2:
-            camera_script_pos_read(&(&cam->pos_start)[(s8)op->bytes.arg], cam, word);
+            camera_script_pos_read(&cam->pos_keys[(s8)op->bytes.arg], cam, word);
             break;
         case 3:
             cam->target_space = op->bytes.arg;
             cam->target_arg = op->bytes.low;
             break;
         case 4:
-            camera_script_target_read(&(&cam->target_start)[(s8)op->bytes.arg], cam, word);
+            camera_script_target_read(&cam->target_keys[(s8)op->bytes.arg], cam, word);
             break;
         case 5:
             cam->field_0x89 = op->bytes.arg;
@@ -4090,8 +4011,8 @@ extern "C" s32 camera_event_script_step(CamWork* work, CamEvent* cam)
                 run = 0;
                 result = 0;
             } else {
-                copyVec3(&cam->pos_start, &cam->pos);
-                copyVec3(&cam->target_start, &cam->target);
+                cam->pos_keys[0] = cam->pos;
+                cam->target_keys[0] = cam->target;
                 cam->field_0x98 = cam->field_0xA0;
                 cam->field_0x9C = cam->field_0xA4;
                 cam->roll_start = cam->roll_end;
@@ -4157,20 +4078,19 @@ extern "C" void camera_script_pos_read(nw4r::math::VEC3* out, CamEvent* cam, Cam
     switch (cam->pos_space) {
     case 0:
         rotVecY(out, player->field_0x058);
-        copyVec3(out, &vec3_add(out, &player->vec_0x03C));
+        *out = *(&(*out + player->vec_0x03C));
         break;
     case 1:
-        copyVec3(out, &vec3_add(out, &player->vec_0x03C));
+        *out = *(&(*out + player->vec_0x03C));
         break;
     case 3: {
         u32 angle;
-        nw4r::math::VEC3 base;
 
         angle = 0;
-        setVec3(&base, 0.0f, 0.0f, 0.0f);
+        nw4r::math::VEC3 base(0.0f, 0.0f, 0.0f);
         camera_event_enemy_get(cam, &angle, &base);
         rotVecY(out, angle);
-        copyVec3(out, &vec3_add(out, &base));
+        *out = *(&(*out + base));
         break;
     }
     }
@@ -4189,17 +4109,16 @@ extern "C" void camera_script_target_read(nw4r::math::VEC3* out, CamEvent* cam, 
     switch (cam->target_space) {
     case 0:
         rotVecY(out, player->field_0x058);
-        copyVec3(out, &vec3_add(out, &player->vec_0x03C));
+        *out = *(&(*out + player->vec_0x03C));
         break;
     case 1:
-        copyVec3(out, &vec3_add(out, &player->vec_0x03C));
+        *out = *(&(*out + player->vec_0x03C));
         break;
     case 3: {
         u32 angle;
-        nw4r::math::VEC3 base;
 
         angle = 0;
-        setVec3(&base, 0.0f, 0.0f, 0.0f);
+        nw4r::math::VEC3 base(0.0f, 0.0f, 0.0f);
         camera_event_enemy_get(cam, &angle, &base);
         rotVecY(out, angle);
         if (camera_event_enemy_mode2_ck(cam) == 1) {
@@ -4207,9 +4126,9 @@ extern "C" void camera_script_target_read(nw4r::math::VEC3* out, CamEvent* cam, 
             out->y = base.y - out->y;
             out->z = base.z;
         } else if (camera_event_enemy_mode1_ck(cam) == 1) {
-            copyVec3(out, &base);
+            *out = base;
         } else {
-            copyVec3(out, &vec3_add(out, &base));
+            *out = *(&(*out + base));
         }
         break;
     }
@@ -4220,9 +4139,9 @@ extern "C" void camera_script_target_read(nw4r::math::VEC3* out, CamEvent* cam, 
 extern "C" void camera_event_channel_latch(CamEvent* cam, u32 mask)
 {
     if ((mask & 1) != 0)
-        copyVec3(&cam->pos_end, &cam->pos_start);
+        cam->pos_keys[1] = cam->pos_keys[0];
     if ((mask & 2) != 0)
-        copyVec3(&cam->target_end, &cam->target_start);
+        cam->target_keys[1] = cam->target_keys[0];
     if ((mask & 4) != 0)
         cam->roll_end = cam->roll_start;
     if ((mask & 8) != 0)
@@ -4242,17 +4161,13 @@ extern "C" void camera_event_channel_latch(CamEvent* cam, u32 mask)
 extern "C" void camera_event_path_step(CamWork* work, CamEvent* cam)
 {
     nw4r::math::MTX34 unused_mtx;
-    nw4r::math::VEC3 unused_a;
-    nw4r::math::VEC3 unused_b;
-    nw4r::math::VEC3 hit;
     u8 area;
     f32 t;
     f32 inv;
 
-    MTX34_ctor(&unused_mtx);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&hit);
+    nw4r::math::VEC3 unused_a;
+    nw4r::math::VEC3 unused_b;
+    nw4r::math::VEC3 hit;
     area = get_now_areano();
     if (cam->timer_max > 0)
         t = (f32)cam->timer / (f32)cam->timer_max;
@@ -4260,14 +4175,14 @@ extern "C" void camera_event_path_step(CamWork* work, CamEvent* cam)
         t = 1.0f;
     inv = 1.0f - t;
     if ((s32)cam->interp == 1) {
-        vec3_lerp(&cam->target, &cam->target_start, &cam->target_end, t);
-        vec3_lerp(&cam->pos, &cam->pos_start, &cam->pos_end, t);
+        vec3_lerp(&cam->target, &cam->target_keys[0], &cam->target_keys[1], t);
+        vec3_lerp(&cam->pos, &cam->pos_keys[0], &cam->pos_keys[1], t);
     }
     if ((cam->flags & 4) != 0) {
         f32 floor;
 
         if (coll_line_check(&cam->target, &cam->pos, 10.0f, &hit, 3, -5, area, 1) > 0)
-            copyVec3(&cam->pos, &hit);
+            cam->pos = hit;
         floor = 30.0f + GetGroundHit(&cam->pos, -5, area);
         if (floor > cam->pos.y)
             cam->pos.y = floor;
@@ -4286,7 +4201,7 @@ extern "C" void camera_event_enemy_get(CamEvent* cam, u32* angle, nw4r::math::VE
 
     if (enemy != NULL && enemy->active != 0) {
         *angle = enemy->field_0x1C0;
-        copyVec3(pos, &enemy->pos);
+        *pos = enemy->pos;
         return;
     }
     cam->flags |= 1;
@@ -4301,7 +4216,7 @@ extern "C" void camera_event_enemy_angles_get(CamEvent* cam, u32* angle_a, u32* 
     if (enemy != NULL && enemy->active != 0) {
         *angle_a = enemy->field_0x1BC;
         *angle_b = enemy->field_0x1C0;
-        copyVec3(pos, &enemy->pos);
+        *pos = enemy->pos;
         return;
     }
     cam->flags |= 1;
@@ -4411,8 +4326,6 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
     u32 pitch;
     u32 yaw;
     s32 loop;
-    nw4r::math::VEC3 base;
-    nw4r::math::VEC3 rel;
 
     frame = cam->timer << 1;
     key = cam->keys;
@@ -4420,14 +4333,14 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
     pitch = 0;
     yaw = 0;
     loop = 0;
-    setVec3(&base, 0.0f, 0.0f, 0.0f);
-    VEC3_ctor(&rel);
+    nw4r::math::VEC3 base(0.0f, 0.0f, 0.0f);
+    nw4r::math::VEC3 rel;
     if ((entry->flags & 8) != 0)
         loop = 1;
     while (key->frame >= 0) {
         if (frame == key->frame) {
-            copyVec3(&cam->pos, &key->pos);
-            copyVec3(&cam->target, &key->target);
+            cam->pos = key->pos;
+            cam->target = key->target;
             cam->roll = key->roll;
             cam->fovy = key->fovy;
             break;
@@ -4436,12 +4349,12 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
             f32 t = (f32)(frame - key[-1].frame) / (f32)(key->frame - key[-1].frame);
             f32 d;
 
-            copyVec3(&rel, &vec3_sub(&key->pos, &key[-1].pos));
+            rel = *(&(key->pos - key[-1].pos));
             vec3_scale_in_place(&rel, t);
-            copyVec3(&cam->pos, &vec3_add(&rel, &key[-1].pos));
-            copyVec3(&rel, &vec3_sub(&key->target, &key[-1].target));
+            cam->pos = *(&(rel + key[-1].pos));
+            rel = *(&(key->target - key[-1].target));
             vec3_scale_in_place(&rel, t);
-            copyVec3(&cam->target, &vec3_add(&rel, &key[-1].target));
+            cam->target = *(&(rel + key[-1].target));
             d = key->roll - key[-1].roll;
             d *= t;
             cam->roll = d + key[-1].roll;
@@ -4453,8 +4366,8 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
         key++;
     }
     if (loop != 0 && key->frame < 0) {
-        copyVec3(&cam->pos, &key[-1].pos);
-        copyVec3(&cam->target, &key[-1].target);
+        cam->pos = key[-1].pos;
+        cam->target = key[-1].target;
         cam->roll = key[-1].roll;
         cam->fovy = key[-1].fovy;
     }
@@ -4464,16 +4377,15 @@ extern "C" s32 camera_dcm_step(CamWork* work, CamEvent* cam)
         rotVecX(&cam->target, pitch);
         rotVecY(&cam->pos, yaw);
         rotVecY(&cam->target, yaw);
-        copyVec3(&cam->pos, &vec3_add(&cam->pos, &base));
-        copyVec3(&cam->target, &vec3_add(&cam->target, &base));
+        cam->pos = *(&(cam->pos + base));
+        cam->target = *(&(cam->target + base));
     }
     if ((entry->flags & 2) != 0) {
         nw4r::math::VEC3 hit;
         f32 floor;
 
-        VEC3_ctor(&hit);
         if (coll_line_check(&cam->target, &cam->pos, 10.0f, &hit, 3, -5, get_now_areano(), 1) != 0)
-            copyVec3(&cam->pos, &hit);
+            cam->pos = hit;
         floor = 10.0f + GetGroundHit(&cam->pos, -5, get_now_areano());
         if (floor > cam->pos.y)
             cam->pos.y = floor;
@@ -4492,94 +4404,86 @@ extern "C" s32 camera_angle_approach(u32 a, u32 b, u8 shift)
 /* The current camera's view matrix. */
 CamMtx34 get_current_view_mtx(void)
 {
-    CamMtx34 mtx;
     nw4r::g3d::Camera cam;
     void* handle;
 
     handle = scene_current_camera_get();
     word_copy_return_dst(&cam, &handle);
-    MTX34_ctor(&mtx);
+    CamMtx34 mtx;
     cam.GetCameraMtx(&mtx);
     return mtx;
 }
 
-/* Writes the current camera's projection matrix. */
-extern "C" void camera_proj_mtx_get(nw4r::math::MTX44* out)
+/* Returns the current camera's projection matrix. */
+extern "C" nw4r::math::MTX44 camera_proj_mtx_get(void)
 {
     nw4r::g3d::Camera cam;
     void* handle;
 
     handle = scene_current_camera_get();
     word_copy_return_dst(&cam, &handle);
-    MTX44_ctor(out);
-    camera_get_projection_mtx(&cam, out);
+    nw4r::math::MTX44 out;
+    camera_get_projection_mtx(&cam, &out);
+    return out;
 }
 
 /* The current camera's world position. */
-CamVec3 get_camera_pos(void)
+nw4r::math::VEC3 get_camera_pos(void)
 {
-    CamVec3 pos;
+    nw4r::math::VEC3 pos;
     nw4r::g3d::Camera cam;
     void* handle;
 
-    VEC3_ctor(&pos);
     handle = scene_current_camera_get();
     word_copy_return_dst(&cam, &handle);
     camera_get_position(&cam, &pos);
     return pos;
 }
 
-/* Writes the position of the camera `kind` names: the follow camera's, the area camera's, or zero. */
-extern "C" void camera_view_pos_get(nw4r::math::VEC3* out, u8 kind)
+/* Returns the position of the camera `kind` names: the follow camera's, the area camera's, or zero. */
+/* free: C linkage evidenced - the map row is the unmangled `camera_view_pos_get` */
+extern "C" nw4r::math::VEC3 camera_view_pos_get(u8 kind)
 {
     CamWork* work = (CamWork*)camera_work_get();
 
     switch (kind) {
     case 0:
-        assignVec3(out, &work->follow.pos);
-        break;
+        return work->follow.pos;
     case 4:
-        assignVec3(out, &work->area.pos);
-        break;
+        return work->area.pos;
     default:
-        setVec3(out, 0.0f, 0.0f, 0.0f);
-        break;
+        return nw4r::math::VEC3(0.0f, 0.0f, 0.0f);
     }
 }
 
-/* Writes the current camera's target. */
-extern "C" void get_camera_target_pos(nw4r::math::VEC3* out)
+/* Returns the current camera's target. */
+extern "C" nw4r::math::VEC3 get_camera_target_pos(void)
 {
     nw4r::math::VEC3 unused;
     nw4r::g3d::Camera cam;
     void* handle;
-    nw4r::g3d::Camera::PostureInfo info;
 
-    VEC3_ctor(&unused);
     handle = scene_current_camera_get();
     word_copy_return_dst(&cam, &handle);
-    camera_posture_info_ctor(&info);
+    nw4r::g3d::Camera::PostureInfo info;
     camera_posture_get(&cam, &info);
-    assignVec3(out, (nw4r::math::VEC3*)&info.mTargetX);
+    return info.mTarget;
 }
 
 /* The current camera's view direction: its target minus its position. */
-CamVec3 get_camera_direction(void)
+nw4r::math::VEC3 get_camera_direction(void)
 {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 unused;
     nw4r::g3d::Camera cam;
     void* handle;
-    nw4r::g3d::Camera::PostureInfo info;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused);
     handle = scene_current_camera_get();
     word_copy_return_dst(&cam, &handle);
-    camera_posture_info_ctor(&info);
+    nw4r::g3d::Camera::PostureInfo info;
     camera_posture_get(&cam, &info);
     camera_get_position(&cam, &pos);
-    return cam_vec3_sub((nw4r::math::VEC3*)&info.mTargetX, &pos);
+    return info.mTarget - pos;
 }
 
 /* Writes the current camera's two projection parameters at +0xB4 and +0xB8. */
@@ -4601,8 +4505,7 @@ extern "C" u32 camera_angle_x_get(void)
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&rel);
-    copyVec3(&rel, &vec3_sub(&get_camera_pos(), &camera_target_pos_get()));
+    rel = *(&((get_camera_pos()) - (get_camera_target_pos())));
     calcVecAngXY(&rel, &pitch, &yaw);
     return pitch;
 }
@@ -4614,8 +4517,7 @@ extern "C" s32 camera_angle_y_get(void)
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&rel);
-    copyVec3(&rel, &vec3_sub(&get_camera_pos(), &camera_target_pos_get()));
+    rel = *(&((get_camera_pos()) - (get_camera_target_pos())));
     calcVecAngXY(&rel, &pitch, &yaw);
     return yaw;
 }
@@ -4678,14 +4580,13 @@ extern "C" void camera_view_apply(u8 index, nw4r::math::VEC3* pos, nw4r::math::V
 {
     nw4r::g3d::Camera cam;
     s32 handle;
-    nw4r::g3d::Camera::PostureInfo info;
 
     handle = scene_camera_get(index);
     word_copy_return_dst(&cam, &handle);
-    camera_posture_info_ctor(&info);
+    nw4r::g3d::Camera::PostureInfo info;
     camera_posture_get(&cam, &info);
     info.mType = 2;
-    copyVec3((nw4r::math::VEC3*)&info.mTargetX, target);
+    info.mTarget = *target;
     info.mUnk28 = roll;
     camera_position_set(&cam, pos);
     cam.SetPosture(info);
@@ -4707,13 +4608,10 @@ extern "C" void camera_view_angles_update(CamWork* work)
     nw4r::math::VEC3 target;
     nw4r::math::VEC3 dir;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&target);
-    VEC3_ctor(&dir);
-    copyVec3(&pos, &get_camera_pos());
-    copyVec3(&target, &camera_target_pos_get());
+    pos = *(&get_camera_pos());
+    target = *(&get_camera_target_pos());
     work->view_yaw = calcVecAng2(&pos, &target);
-    copyVec3(&dir, &vec3_sub(&target, &pos));
+    dir = *(&(target - pos));
     work->view_pitch = calcVecAngX_c1(&dir);
 }
 
@@ -4774,7 +4672,7 @@ extern "C" void camera_quake_arm(CamQuake* slot, const nw4r::math::VEC3* origin,
     slot->active = 1;
     slot->kind = kind;
     slot->timer = camera_quake_frames[kind & 0x1F];
-    copyVec3(&slot->origin, origin);
+    slot->origin = *origin;
     slot->level = level;
 }
 
@@ -4790,7 +4688,6 @@ extern "C" void camera_quake_req(u8 kind)
     CamWork* work = (CamWork*)camera_work_get();
     nw4r::math::VEC3 origin;
 
-    VEC3_ctor(&origin);
     setVector3(&origin, 0.0f, 0.0f, 0.0f);
     camera_quake_arm(&work->quake[0], &origin, (u8)(kind | 0x80), 0);
 }
@@ -4846,7 +4743,6 @@ extern "C" void camera_shake_req(u8 kind)
     CamWork* work = (CamWork*)camera_work_get();
     nw4r::math::VEC3 origin;
 
-    VEC3_ctor(&origin);
     setVector3(&origin, 0.0f, 0.0f, 0.0f);
     camera_quake_arm(&work->quake[2], &origin, (u8)(kind | 0xA0), 0);
 }
@@ -4866,11 +4762,8 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
         f32 amp;
         f32 side;
 
-        VEC3_ctor(&pos);
-        VEC3_ctor(&target);
-        VEC3_ctor(&sway);
-        copyVec3(&pos, &get_camera_pos());
-        copyVec3(&target, &camera_target_pos_get());
+        pos = *(&get_camera_pos());
+        target = *(&get_camera_target_pos());
         if (index == 1 && stage_water_surface_get(&pos, get_now_areano(), &cell, &height, 4) != 0 &&
             pos.y < 15.0f + height && pos.y > height - 15.0f)
             return;
@@ -4906,8 +4799,8 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
         setVector3(&sway, side, 0.0f, 0.0f);
         rotVecY(&sway, camera_angle_y_get());
         sway.y = amp;
-        addVec3To(&pos, &sway);
-        addVec3To(&target, &sway);
+        pos += sway;
+        target += sway;
         camera_view_apply(index, &pos, &target, camera_fovy_get(), camera_roll_get());
     }
 }
@@ -4938,16 +4831,15 @@ extern "C" void camera_quake_update(LightWork* self, u8 index)
 extern "C" u8 camera_water_clamp(CamView* cam, nw4r::math::VEC3* target)
 {
     f32 lift;
-    nw4r::math::VEC3 dir;
     u16 cell;
     f32 height;
 
     lift = 0.0f;
-    VEC3_ctor(&dir);
+    nw4r::math::VEC3 dir;
     if (target != NULL) {
         u16 pitch;
 
-        copyVec3(&dir, &vec3_sub(target, &cam->pos));
+        dir = *(&(*target - cam->pos));
         pitch = calcVecAngX(&dir);
         if (pitch != 0 && pitch < 0x4000)
             lift = 6.0f * ((f32)pitch / 16384.0f);
@@ -4986,9 +4878,9 @@ extern "C" int stage_dcm_path_get(char* buffer, u8 mapno)
 extern "C" LightWork* camera_work_get(void)
 {
     if (screen_split_mode_ck() != 0 && (s8)my_player_no() != 0) {
-        return &camera_work[1];
+        return (LightWork*)&camera_work[1];
     }
-    return &camera_work[0];
+    return (LightWork*)&camera_work[0];
 }
 
 /* Runs camera_mode1_ck for the given player and puts the current player back afterwards. */
@@ -5050,141 +4942,6 @@ extern "C" void camera_kill_cut_start_split(u8 id, struct _ENEMY_WORK* arg)
     my_player_no_set(previous);
 }
 
-/* Constructs the two camera works. */
-extern "C" void camera_work_construct(void)
-{
-    __construct_array(&camera_work[0], (void*)camera_work_ctor, NULL, 0x4F8, 2);
-}
-
-/* Constructs a camera work: every camera in turn, then the three quake slots. */
-extern "C" LightWork* camera_work_ctor(LightWork* self)
-{
-    LightChannel* end;
-    LightChannel* channel;
-
-    camera_follow_ctor(&self->root);
-    camera_aim_ctor(&self->anim);
-    camera_shoulder_ctor(&self->lights);
-    camera_event_ctor(&self->params);
-    camera_area_ctor(&self->colors);
-    camera_lobby_ctor(&self->entry);
-
-    channel = &self->channel[0];
-    end = &self->channel[3];
-    do {
-        camera_quake_ctor(channel);
-        channel++;
-    } while (channel < end);
-    return self;
-}
-
-/* Constructs a quake slot's origin vector. */
-extern "C" LightChannel* camera_quake_ctor(LightChannel* self)
-{
-    VEC3_ctor(&self->pos);
-    return self;
-}
-
-/* Constructs the lobby camera's four vectors and its goal. */
-extern "C" LightQuadTriple* camera_lobby_ctor(LightQuadTriple* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    camera_lobby_goal_ctor(&self->inner);
-    return self;
-}
-
-/* Constructs the lobby goal's three vectors. */
-extern "C" LightTriple* camera_lobby_goal_ctor(LightTriple* self)
-{
-    VEC3_ctor(&self->a);
-    VEC3_ctor(&self->b);
-    VEC3_ctor(&self->c);
-    return self;
-}
-
-/* Constructs the area camera's eight vectors. */
-extern "C" LightOctal* camera_area_ctor(LightOctal* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    VEC3_ctor(&self->w[0]);
-    VEC3_ctor(&self->w[1]);
-    VEC3_ctor(&self->w[2]);
-    VEC3_ctor(&self->w[3]);
-    return self;
-}
-
-/* Constructs the event camera's four vectors and its two two-vector runs. */
-extern "C" LightParams* camera_event_ctor(LightParams* self)
-{
-    nw4r::math::VEC3* first;
-    nw4r::math::VEC3* second;
-
-    VEC3_ctor(&self->v0);
-    VEC3_ctor(&self->v1);
-    VEC3_ctor(&self->v2);
-    VEC3_ctor(&self->v3);
-
-    /* each run is walked from its start to the next run's start, which then starts the second walk */
-    first = &self->runs[0];
-    second = &self->runs[2];
-    do {
-        VEC3_ctor(first);
-        first++;
-    } while (first < second);
-
-    first = &self->runs[4];
-    do {
-        VEC3_ctor(second);
-        second++;
-    } while (second < first);
-    return self;
-}
-
-/* Constructs the shoulder camera's four vectors. */
-extern "C" LightQuad* camera_shoulder_ctor(LightQuad* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    return self;
-}
-
-/* Constructs the aim camera's four vectors, its rotation and its origin. */
-extern "C" LightQuadMid* camera_aim_ctor(LightQuadMid* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    MTX34_ctor(&self->mid);
-    VEC3_ctor(&self->tail);
-    return self;
-}
-
-/* Constructs the follow camera's fifteen vectors. */
-extern "C" LightRoot* camera_follow_ctor(LightRoot* self)
-{
-    VEC3_ctor(&self->v0);
-    VEC3_ctor(&self->v1);
-    VEC3_ctor(&self->v2);
-    VEC3_ctor(&self->v3);
-    VEC3_ctor(&self->v4);
-    VEC3_ctor(&self->v5);
-    VEC3_ctor(&self->v6);
-    VEC3_ctor(&self->v7);
-    VEC3_ctor(&self->v8);
-    VEC3_ctor(&self->v9);
-    VEC3_ctor(&self->v10);
-    VEC3_ctor(&self->v11);
-    VEC3_ctor(&self->v12);
-    VEC3_ctor(&self->v13);
-    VEC3_ctor(&self->v14);
-    return self;
-}
+/* The two camera works; the TU's `__sinit` (0x802BEEE0) constructs them with `__construct_array`, and the
+ * record constructors follow it (0x802BEF00..0x802BF278). */
+CamWork camera_work[2];

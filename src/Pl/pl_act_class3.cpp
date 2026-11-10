@@ -315,7 +315,6 @@ void pl_weapon3_impact_se_req(_PLW* self, u8 charged)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     pl_impact_pos_get(self, &pos);
     if (charged == 0) {
         shell_se_req(self->field_0xAFC, &pos, 21, self->chunk_ofs);

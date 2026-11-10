@@ -71,7 +71,7 @@
 #include "enemy/em_common.h"
 #include "enemy/fn_8012BDF4.h"
 #include "stage/get_now_mapno.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "nw4r/math.h"
 #include "ef/mtx34_trans_add.h"
 #include "ef/mtx34_trans_get.h"
@@ -244,7 +244,7 @@ _EFT* eft_em_tint_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math:
     rec->rot_0x24.y = 0;
     rec->area_0x44 = self->area_no;
     rec->field_0x10 = life;
-    copyVec3(&work->offset_0xD8, pos);
+    work->offset_0xD8 = *pos;
     work->joint_0xCC = joint;
     work->scale_0xD4 = scale * get_em_scale(self);
     work->color_0xE4.r = (color & 0xFF000000) >> 24;
@@ -288,9 +288,6 @@ void eft_em_tint_dispatch(_EFT* self) {
 /* 0x80305C08 (0x674): places the debris on its joint, creates its effect (the splash variant under water) and its
  * piece models, launches each piece in a random direction and picks the pieces' visible parts. */
 void eft_em_tint_model_create(_EFT* self) {
-    nw4r::math::VEC3 vel;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::MTX34 mtx;
     EftTintWork* work = (EftTintWork*)self->work_0x38;
     struct _ENEMY_WORK* enemy = (struct _ENEMY_WORK*)self->source_0x30;
     s32 i;
@@ -300,15 +297,15 @@ void eft_em_tint_model_create(_EFT* self) {
     u8 type;
     s32 part;
 
-    VEC3_ctor(&vel);
-    VEC3_ctor(&ofs);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 vel;
+    nw4r::math::VEC3 ofs;
+    nw4r::math::MTX34 mtx;
     self->state_0x05++;
-    copyVec3(&ofs, &work->offset_0xD8);
+    ofs = work->offset_0xD8;
     get_joint_wmat_em(enemy, work->joint_0xCC, &mtx);
     mtx34_trans_get(&mtx, &self->pos_0x18);
     mulVecMat(&ofs, &mtx);
-    addVec3To(&self->pos_0x18, &ofs);
+    self->pos_0x18 += ofs;
     type = self->type_0x02;
     if (type - 1U > 1) {
         if (type == 0) {
@@ -345,7 +342,7 @@ void eft_em_tint_model_create(_EFT* self) {
             return;
         }
         work->pieces_0x04[i].model_0x04->ready = 1;
-        copyVec3((nw4r::math::VEC3*)&work->pieces_0x04[i].model_0x04->pos_0x04, &self->pos_0x18);
+        *(nw4r::math::VEC3*)&work->pieces_0x04[i].model_0x04->pos_0x04 = self->pos_0x18;
         work->pieces_0x04[i].model_0x04->scale_0x1C.x = work->pieces_0x04[i].size_0x14;
         work->pieces_0x04[i].model_0x04->scale_0x1C.y = work->pieces_0x04[i].size_0x14;
         work->pieces_0x04[i].model_0x04->scale_0x1C.z = work->pieces_0x04[i].size_0x14;
@@ -361,7 +358,7 @@ void eft_em_tint_model_create(_EFT* self) {
         }
         rotVecX(&vel, 0xC000 - (u16)(0.5f + 65536.0f * (f32)(u32)(ran_suu(0) % 60) / 360.0f));
         rotVecY(&vel, ran_suu(0));
-        copyVec3((nw4r::math::VEC3*)&work->pieces_0x04[i].vel_0x08, &vel);
+        *(nw4r::math::VEC3*)&work->pieces_0x04[i].vel_0x08 = vel;
     }
     switch (self->type_0x02) {
     case 0:
@@ -441,7 +438,7 @@ void eft_em_tint_move(_EFT* self) {
                 vec3_scale_in_place((VEC3*)&work->pieces_0x04[i].vel_0x08, eft_tint_drag_b[self->demo_flag_0x08][self->type_0x02]);
             }
             work->pieces_0x04[i].vel_0x08.y -= work->fall_0xD0;
-            addVec3To(&work->pieces_0x04[i].model_0x04->pos_0x04, &work->pieces_0x04[i].vel_0x08);
+            work->pieces_0x04[i].model_0x04->pos_0x04 += work->pieces_0x04[i].vel_0x08;
             work->pieces_0x04[i].model_0x04->field_0x28 += mask[self->type_0x02] & ran_suu(0);
             work->pieces_0x04[i].model_0x04->field_0x2C += mask[self->type_0x02] & ran_suu(0);
             work->pieces_0x04[i].model_0x04->field_0x30 += mask[self->type_0x02] & ran_suu(0);

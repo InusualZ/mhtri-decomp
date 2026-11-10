@@ -29,7 +29,7 @@
 #include "types.h"
 #include "gx.h"
 #include "RVLGX/GXLight.h"         /* the GX light initialisers (rule 2) */
-#include "mh3_pad.h"               /* VEC3_ctor (rule 2) */
+#include "mh3_pad.h"               /* VEC3::VEC3() (rule 2) */
 #include "nw4r/math_types.h"       /* mtx34_rotate_vec3 (rule 2) */
 #include "nw4r/mtx34_mult_vec3.h"  /* mtx34_mult_vec3 (rule 2) */
 #include "nw4r/db_assert.h"        /* nw4r::db::Panic (rule 2) */
@@ -176,14 +176,12 @@ void LightObj::GetLightColor(GXColor* pColor) const {
  * direction. */
 void LightObj::ApplyViewMtx(const math::MTX34& camMtx) {
     math::VEC3 dir;
-    VEC3_ctor(&dir);
     light_obj_get_light_dir(this, &dir);
     mtx34_rotate_vec3(&dir, &camMtx, &dir);
     if (mFlag & 8) {
         GXInitSpecularDir(&mObj, dir.x, dir.y, dir.z);
     } else {
         math::VEC3 pos;
-        VEC3_ctor(&pos);
         light_obj_get_light_pos(this, &pos);
         mtx34_mult_vec3(&pos, &camMtx, &pos);
         GXInitLightPos(&mObj, pos.x, pos.y, pos.z);

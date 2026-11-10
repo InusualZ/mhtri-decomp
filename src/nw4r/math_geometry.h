@@ -14,10 +14,12 @@ namespace math {
 
 /* A plane n.p + d = 0. size: 0x10 */
 struct PLANE {
-    f32 Test(const VEC3& p) const;
+    f32 Test(const _VEC3& p) const;
 
     /* +0x0 */ VEC3 N;
     /* +0xC */ f32 d;
+
+    PLANE(); /* 0x800832F8 (0x30), g3d/g3d_scnroot.cpp: constructs `N` */
 };
 
 /* An axis-aligned box. size: 0x18 */
@@ -26,6 +28,9 @@ struct AABB {
 
     /* +0x00 */ VEC3 min;
     /* +0x0C */ VEC3 max;
+
+    /* 0x80080F44 (0x38): retail's out-of-line constructor (its two corners). */
+    AABB() __attribute__((never_inline)) {}
 };
 
 /* A view frustum: its camera matrix, side planes, depth range, bounding box and the six planes the box tests

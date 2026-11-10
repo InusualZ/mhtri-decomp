@@ -199,7 +199,6 @@ void em009_init(_ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 v;
     Em009UserData* helper;
 
-    VEC3_ctor(&v);
     switch (mode) {
     case 2:
         em_move_mode_set(self, 4);
@@ -364,7 +363,6 @@ void em009_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub) {
     nw4r::math::VEC3 pos;
     _CP_VECTOR rot;
 
-    VEC3_ctor(&pos);
     switch (kind) {
     case 1:
         switch (sub) {
@@ -609,7 +607,6 @@ void em009_act1_1(_ENEMY_WORK* self) {
 void em009_act1_2(_ENEMY_WORK* self) {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -701,7 +698,6 @@ void em009_act1_4(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1054,7 +1050,6 @@ void em009_act2_13(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1073,7 +1068,7 @@ void em009_act2_13(_ENEMY_WORK* self)
         if (em_frame_check(self, 1, 168.0f, 0.0f) == 1
             && (system_w.field_0x0c & 3) == 0) {
             if (em_magma_check(self) == 1) {
-                copyVec3(&v, &self->pos);
+                v = self->pos;
                 v.y = 5.0f + self->field_0x214;
                 eft009_set_pos(0x8B, &v, (struct _CP_VECTOR*)&self->field_0x1BC, 1.0f, self->area_no);
             } else {
@@ -1454,13 +1449,11 @@ void em009_act6_dispatch(_ENEMY_WORK* self)
 void em009_act7_0(_ENEMY_WORK* self)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 v;
     f32 f;
     f32 g;
     u32 ang;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&v);
+    nw4r::math::VEC3 v;
     switch (self->state) {
     case 0:
         self->state++;
@@ -1507,7 +1500,6 @@ void em009_act7_1(_ENEMY_WORK* self, u8 a)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1580,7 +1572,6 @@ void em009_act7_36(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1625,7 +1616,6 @@ void em009_act7_2(_ENEMY_WORK* self, u8 a)
     u32 kind;
     u32 id2;
 
-    VEC3_ctor(&v);
     switch (a) {
     default:
         id1 = 0x7F;
@@ -1709,13 +1699,11 @@ void em009_act7_2(_ENEMY_WORK* self, u8 a)
 void em009_act7_3(_ENEMY_WORK* self, u8 a)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 v;
     f32 f;
     f32 g;
     u32 ang;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&v);
+    nw4r::math::VEC3 v;
     switch (self->state) {
     case 0:
         self->state++;
@@ -1849,7 +1837,6 @@ void em009_act7_5(_ENEMY_WORK* self, u8 a, u8 b) {
     u32 done;
     f32 back;
 
-    VEC3_ctor(&v);
     done = 0;
     lim = 95.0f;
     em_busy_set(self);
@@ -2041,7 +2028,7 @@ void em009_act7_5(_ENEMY_WORK* self, u8 a, u8 b) {
         }
         if (em_frame_check(self, 1, 168.0f, 0.0f) == 1 && (system_w.field_0x0c & 3) == 0) {
             if (em_magma_check(self) == 1) {
-                copyVec3(&v, &self->pos);
+                v = self->pos;
                 v.y = self->field_0x214;
                 eft009_set_pos(0x8B, &v, (_CP_VECTOR*)&self->field_0x1BC, 1.0f, self->area_no);
             } else {
@@ -2755,7 +2742,6 @@ void em009_act13_0(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     self->timer_0x020++;
     em_frame_flag_set(self);
     switch (self->state) {
@@ -2798,7 +2784,7 @@ void em009_act13_0(_ENEMY_WORK* self)
             eft009_spawn_at_joint(self, 1, 6, 0, 1.0f);
         }
         if (em_demo_frame_get() == 0xC1 || em_demo_frame_get() == 0xE5) {
-            copyVec3(&v, &self->pos);
+            v = self->pos;
             v.y = 5.0f + self->field_0x20C;
             eft_spawn_pos_in_area(&v, self->area_no, 1, 0, 1.2f);
         }
@@ -2971,7 +2957,6 @@ void em009_alt_mode_effect(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     if (em_alt_mode_ck(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
         setVector3(&v, 0.0f, 0.0f, 80.0f);
         eft_spawn_type10(self, 0x18, 0x14, &v, 1.0f);
@@ -2983,11 +2968,10 @@ void em009_alt_mode_effect(_ENEMY_WORK* self)
  * position. */
 void em009_effect_spawn(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 scale)
 {
-    nw4r::math::VEC3 v;
     u8 kind;
 
     kind = b;
-    VEC3_ctor(&v);
+    nw4r::math::VEC3 v;
     switch (a) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -3096,7 +3080,7 @@ void em009_effect_spawn(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 scale)
             }
         }
         if (c == 0xFF) {
-            copyVec3(&v, &self->pos);
+            v = self->pos;
         } else {
             get_joint_wpos_em(self, c, &v);
         }
@@ -3106,7 +3090,7 @@ void em009_effect_spawn(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 scale)
         break;
     case 2:
         if (c == 0xFF) {
-            copyVec3(&v, &self->pos);
+            v = self->pos;
         } else {
             get_joint_wpos_em(self, c, &v);
         }
@@ -3122,7 +3106,6 @@ void em009_effect_spawn(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 scale)
 void em009_motion_events(_ENEMY_WORK* self) {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     em009_alt_mode_effect(self);
     switch (em_get_mot_no(self)) {
     case 0x2:
@@ -3264,7 +3247,7 @@ void em009_motion_events(_ENEMY_WORK* self) {
     case 0x19:
         if (em_after_frame_check(self, 3, 2.0f, 30.0f) == 1 && (system_w.field_0x0c & 1) == 0) {
             if (em_magma_check(self) == 1) {
-                copyVec3(&v, &self->pos);
+                v = self->pos;
                 v.y = 5.0f + self->field_0x214;
                 eft009_set_pos(0x8D, &v, (_CP_VECTOR*)&self->field_0x1BC, 1.0f, self->area_no);
             } else {

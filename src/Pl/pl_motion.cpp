@@ -35,7 +35,7 @@
  *    so `.data`/`.sdata` are not matched; `.sbss` lacks `quest_stage_release_none` (only the `.sdata` records use it).
  *    The two jump tables are compiler-local (`@NNNN`) against the map's `jumptable_805CBFC0`/`jumptable_805CC278`.
  * SHAPES. Callees whose owner header types a parameter or return differently from the retail call are called through a
- *   `_c1` cast view.  The exit points are a `setVec3`-constructed `SceneExitPoint`, so MWCC's `__sinit` builds them
+ *   `_c1` cast view.  The exit points are a `VEC3(x, y, z)`-constructed `nw4r::math::VEC3`, so MWCC's `__sinit` builds them
  *   (`.ctors`).  The scene inits clear the root counters with unrolled loops; the network slot loops count in an `int`.
  */
 
@@ -47,7 +47,7 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_motion.h"
 #include "fn_8004CAD8.h" /* rotVecY (rule 2) */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "ef/eft004.h" /* eft004_set_pl2 (rule 2) */
 #include "Pl/fn_80288CEC.h" /* `PlBox` and `_PL_ROOT`, shared with `Pl/pl_hit_sphere.cpp` and `Pl/pl_coll.cpp` (rule 1) */
 #include "Pl/fn_80262940.h" /* player_init_data_load (the owner's header, rule 2) */
@@ -57,7 +57,7 @@
 #include "enemy/em_pop.h" /* quest_flag_8_ck, quest_flag_80_ck (the owner's header, rule 2) */
 #include "fn_80047398.h" /* `arena_userdata_apply` (rule 2) */
 #include "quest/arenatask.h" /* `arena_user_data_buf` (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 #include "quest/quest_entry.h" /* quest_monsters_release (the owner's header, rule 2) */
 #include "mh3_pad/task.h" /* TaskSlot (rule 1) */
@@ -276,17 +276,8 @@ void em_pop_res_load(u8 idx);
 
 }
 
-/* A vector built through `setVec3` (0x80041E8C), so a file-scope one is constructed by the unit's `__sinit`.
- * size: 0xC */
-struct SceneExitPoint : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    SceneExitPoint(f32 x, f32 y, f32 z)
-    {
-        setVec3(this, x, y, z);
-    }
-};
-extern "C" SceneExitPoint scene_exit_point_a;
-extern "C" SceneExitPoint scene_exit_point_b;
+extern "C" nw4r::math::VEC3 scene_exit_point_a;
+extern "C" nw4r::math::VEC3 scene_exit_point_b;
 
 /* This unit's own `.data` step and row tables and `.sdata2` constants: the object does not emit them yet, so the
  * bodies load the map's symbols (see the unit header). */
@@ -411,7 +402,6 @@ void pl_act_class7_frame_update_1(_PLW* self, f32 dt) {
 void pl_act_class7_handler_00(_PLW* self, s32 kind, s32 variant) {
     nw4r::math::VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1121,7 +1111,6 @@ void pl_act_class7_handler_19(_PLW* self, s32 kind) {
 void pl_act_class7_handler_20(_PLW* self, s32 kind) {
     nw4r::math::VEC3 slide;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1155,7 +1144,7 @@ void pl_act_class7_handler_20(_PLW* self, s32 kind) {
                 slide.y = 0.0f;
                 slide.z = 0.0f;
                 rotVecXYZ(&slide, &self->rot_0x54);
-                addVec3To(&self->vec_0x03C, &slide);
+                self->vec_0x03C += slide;
             }
         }
         break;
@@ -1210,7 +1199,6 @@ void pl_act_class7_handler_22(_PLW* self) {
 void pl_act_class7_handler_23(_PLW* self, s32 kind) {
     nw4r::math::VEC3 slide;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1244,7 +1232,7 @@ void pl_act_class7_handler_23(_PLW* self, s32 kind) {
                 slide.y = 0.0f;
                 slide.z = 0.0f;
                 rotVecXYZ(&slide, &self->rot_0x54);
-                addVec3To(&self->vec_0x03C, &slide);
+                self->vec_0x03C += slide;
             }
         }
         break;
@@ -1900,7 +1888,7 @@ void quest_scene_boot(_PL_ROOT* root) {
         if (Check_movie_finish() == 1) {
             Movie_close();
         } else if ((Psw[0].mode == 2 && (Psw[0].field_0xda & 0x8000) != 0 && (u32)Movie_cut() == 1) ||
-                   (Psw[0].mode == 1 && (Psw[0].field_0x100 & 0x40) != 0 && (u32)Movie_cut() == 1)) {
+                   (Psw[0].mode == 1 && (Psw[0].fs_block.btn.trig & 0x40) != 0 && (u32)Movie_cut() == 1)) {
         } else {
             subTransSet((u32)Movie_draw_sub, 0, 0);
             return;
@@ -2068,7 +2056,7 @@ void quest_scene_load(_PL_ROOT* root) {
             root->timer_0x04 = 0;
             root->seq_0x01++;
             stage_area_enter(root->area_no_0xED, root->area_no_0xEA);
-            copyVec3(&root->pos_0x128, stage_entry_pos_get(root->area_no_0xED, root->area_no_0xEA));
+            root->pos_0x128 = *stage_entry_pos_get(root->area_no_0xED, root->area_no_0xEA);
             root->rot_y_0x134 = stage_entry_angle_get(root->area_no_0xED, root->area_no_0xEA);
             pl_area_entry_set(&root->pos_0x128, root->rot_y_0x134, root->area_no_0xED, root->area_no_0xEA);
             light_point_all_clear();
@@ -2359,7 +2347,6 @@ void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle) {
     nw4r::math::VEC3 point;
     u32 point_angle;
 
-    VEC3_ctor(&point);
     if (root->end_kind_0xFA == 2 || root->end_kind_0xFA == 3) {
         bgm_main_fade_out();
         if (isServerSelectState() == 1) {
@@ -2367,7 +2354,7 @@ void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle) {
         }
         if (PlayMode_ck() != 2) {
             root->area_no_0xEB = mode;
-            copyVec3(&root->pos_0x128, pos);
+            root->pos_0x128 = *pos;
             root->rot_y_0x134 = angle;
             root->seq_0x01 = 1;
             root->kind_0x02 = 0;
@@ -2382,11 +2369,11 @@ void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle) {
             if (root->bytes_0x136[(s8)my_player_no()] == 1) {
                 stage_area_point_get(mode, root->bytes_0x136[(s8)my_player_no()], &point, &point_angle);
                 root->area_no_0xEB = mode;
-                copyVec3(&root->pos_0x128, &point);
+                root->pos_0x128 = point;
                 root->rot_y_0x134 = point_angle;
             } else {
                 root->area_no_0xEB = mode;
-                copyVec3(&root->pos_0x128, pos);
+                root->pos_0x128 = *pos;
                 root->rot_y_0x134 = angle;
             }
             pl_area_entry_set(&root->pos_0x128, root->rot_y_0x134, root->area_no_0xED, root->area_no_0xEA);
@@ -3087,7 +3074,6 @@ void vs_scene_boot(_PL_ROOT* root) {
 /* 0x8028E718 (0x36C): the versus scene's load mode: the scene resources, the motion banks, the subsystem inits, the
  * arena stage, and every player placed at the area's entry point. */
 void vs_scene_load(_PL_ROOT* root) {
-    nw4r::math::VEC3 point;
     u32 point_angle;
     s32 count;
     s32 i;
@@ -3155,12 +3141,12 @@ void vs_scene_load(_PL_ROOT* root) {
             }
             root->kind_0x02++;
         case 1:
-            VEC3_ctor(&point);
+            nw4r::math::VEC3 point;
             stage_area_enter(root->area_no_0xED, root->area_no_0xEA);
             root->bytes_0x136[0] = 0;
             root->bytes_0x136[1] = 0;
             stage_area_point_get(root->area_no_0xEA, 0, &point, &point_angle);
-            copyVec3(&root->pos_0x128, &point);
+            root->pos_0x128 = point;
             root->rot_y_0x134 = point_angle;
             count = pl_player_count_get();
             for (i = 0; i < count; i++) {
@@ -3545,5 +3531,5 @@ u32 pl_net_move_handover(void) {
 } /* extern "C" */
 
 /* The two exit points of area 1 `scene_exit_point_ck` measures the player against; MWCC's `__sinit` builds them. */
-extern "C" SceneExitPoint scene_exit_point_a(573.0f, -1265.0f, 3392.0f);
-extern "C" SceneExitPoint scene_exit_point_b(1413.0f, -571.0f, 1740.0f);
+extern "C" nw4r::math::VEC3 scene_exit_point_a(573.0f, -1265.0f, 3392.0f);
+extern "C" nw4r::math::VEC3 scene_exit_point_b(1413.0f, -571.0f, 1740.0f);

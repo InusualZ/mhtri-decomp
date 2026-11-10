@@ -11,7 +11,7 @@
 
 #include "types.h"
 #include "pl.h"
-#include "lobby/lb_npc.h"                  /* mhchar_construct, the model record's constructor call (rule 2) */
+#include "lobby/lb_npc.h"
 #include "g3d/g3d_calcworld_callback.h"    /* nw4r::g3d::ICalcWorldCallback (rule 1) */
 
 namespace nw4r { namespace g3d { class ScnMdlSimple; } }
@@ -22,7 +22,7 @@ typedef struct PlSeModel {
     /* +0x000 */ MHchar model;
     /* +0x140 */ u8 field_0x140[0x24];
 
-    PlSeModel() { mhchar_construct(&model); }
+    PlSeModel() {}
 } PlSeModel; /* size: 0x164 */
 
 /* The world-matrix callback of a rig model (the rig's `slots_0xE40` records): it pins each node to the body joint of
@@ -58,9 +58,9 @@ typedef struct PlSeVecPair {
 
 /* One joint adjustment of an attachment: scale, translation and rotation (degrees).  size: 0x24 */
 typedef struct PlSeJointAdj {
-    /* +0x00 */ VEC3 scale_0x00;
-    /* +0x0C */ VEC3 trans_0x0C;
-    /* +0x18 */ VEC3 rot_0x18;
+    /* +0x00 */ nw4r::math::_VEC3 scale_0x00;
+    /* +0x0C */ nw4r::math::_VEC3 trans_0x0C;
+    /* +0x18 */ nw4r::math::_VEC3 rot_0x18;
 } PlSeJointAdj; /* size: 0x24 */
 
 /* The world-matrix callback of a rig attachment (the rig's `attachments_0x1230` records): it applies the attachment's

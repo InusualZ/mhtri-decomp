@@ -32,9 +32,8 @@
 #include "nw4r/math.h"
 #include "pl.h"
 #include "fn_8004CAD8.h"
-#include "ef/effect.h"            /* `eft_vec_ctor`, `eft_shape_init` (rule 2) */
-#include "ef/eft_capsule_ctor.h"
-#include "g3d/g3d_calcworld.h"    /* `addVec3To` (rule 2) */
+#include "ef/effect.h"            /* `CAPSULE::CAPSULE()` (rule 2) */
+#include "g3d/g3d_calcworld.h"    /* `VEC3::operator+=` (rule 2) */
 #include "Pl/fn_8025F088.h"       /* `get_move_work_adrs` / `get_move_work_max` (rule 2) */
 #include "Pl/pl_hit_sphere.h"     /* `PlCapsule`, `PlCapsuleBox`, `pl_capsule_box_set` (rule 2) */
 #include "Pl/pl_coll.h"           /* `HitSphere` and the push tests (rule 2) */
@@ -249,28 +248,19 @@ extern "C" void body_push_pl_em(_PLW* plw, _ENEMY_WORK* em)
 {
     PlCapsuleBox pl_box;
     PlCapsuleBox part_box;
-    PlCapsule pl_capsule;
-    PlCapsule part_capsule;
-    HitSphere sphere;
-    nw4r::math::VEC3 pl_sum;
-    nw4r::math::VEC3 em_sum;
-    nw4r::math::VEC3 pl_push;
-    nw4r::math::VEC3 em_push;
     f32 pl_max;
     f32 em_max;
     EmWeakPoint* part;
     u8 hits;
     f32 start_y;
 
-    eft_shape_init((struct EftShape*)&pl_box);
-    eft_shape_init((struct EftShape*)&part_box);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&pl_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&part_capsule);
-    eft_vec_ctor(&sphere.pos);
-    VEC3_ctor(&pl_sum);
-    VEC3_ctor(&em_sum);
-    VEC3_ctor(&pl_push);
-    VEC3_ctor(&em_push);
+    PlCapsule pl_capsule;
+    PlCapsule part_capsule;
+    PlSphere sphere;
+    nw4r::math::VEC3 pl_sum;
+    nw4r::math::VEC3 em_sum;
+    nw4r::math::VEC3 pl_push;
+    nw4r::math::VEC3 em_push;
     hits = 0;
     pl_max = 0.0f;
     em_max = 0.0f;
@@ -334,26 +324,17 @@ extern "C" void body_push_pl_body(_PLW* plw, _BODY_W* body)
 {
     PlCapsuleBox pl_box;
     PlCapsuleBox body_box;
-    PlCapsule pl_capsule;
-    PlCapsule body_capsule;
-    HitSphere sphere;
-    nw4r::math::VEC3 pl_sum;
-    nw4r::math::VEC3 body_sum;
-    nw4r::math::VEC3 pl_push;
-    nw4r::math::VEC3 body_push;
     f32 pl_max;
     f32 start_y;
     f32 floor_y;
 
-    eft_shape_init((struct EftShape*)&pl_box);
-    eft_shape_init((struct EftShape*)&body_box);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&pl_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&body_capsule);
-    eft_vec_ctor(&sphere.pos);
-    VEC3_ctor(&pl_sum);
-    VEC3_ctor(&body_sum);
-    VEC3_ctor(&pl_push);
-    VEC3_ctor(&body_push);
+    PlCapsule pl_capsule;
+    PlCapsule body_capsule;
+    PlSphere sphere;
+    nw4r::math::VEC3 pl_sum;
+    nw4r::math::VEC3 body_sum;
+    nw4r::math::VEC3 pl_push;
+    nw4r::math::VEC3 body_push;
     pl_max = 0.0f;
     setVector3(&pl_sum, 0.0f, 0.0f, 0.0f);
     setVector3(&body_sum, 0.0f, 0.0f, 0.0f);
@@ -393,22 +374,16 @@ extern "C" void body_push_pl_body(_PLW* plw, _BODY_W* body)
 /* 0x802987F0 (0x190): pushes two enemies' body spheres apart; a walker's push stays horizontal. */
 extern "C" void body_push_em_em(_ENEMY_WORK* a, _ENEMY_WORK* b)
 {
-    HitSphere a_sphere;
-    HitSphere b_sphere;
-    nw4r::math::VEC3 a_push;
-    nw4r::math::VEC3 b_push;
-    nw4r::math::VEC3 a_sum;
-    nw4r::math::VEC3 b_sum;
+    PlSphere a_sphere;
+    PlSphere b_sphere;
     f32 a_max;
     f32 b_max;
     s32 hit;
 
-    eft_vec_ctor(&a_sphere.pos);
-    eft_vec_ctor(&b_sphere.pos);
-    VEC3_ctor(&a_push);
-    VEC3_ctor(&b_push);
-    VEC3_ctor(&a_sum);
-    VEC3_ctor(&b_sum);
+    nw4r::math::VEC3 a_push;
+    nw4r::math::VEC3 b_push;
+    nw4r::math::VEC3 a_sum;
+    nw4r::math::VEC3 b_sum;
     hit = 0;
     a_max = 0.0f;
     b_max = 0.0f;
@@ -440,28 +415,19 @@ extern "C" void body_push_npc_em(_AINPC_W* npc, _ENEMY_WORK* em)
 {
     PlCapsuleBox npc_box;
     PlCapsuleBox part_box;
-    PlCapsule npc_capsule;
-    PlCapsule part_capsule;
-    HitSphere sphere;
-    nw4r::math::VEC3 npc_sum;
-    nw4r::math::VEC3 em_sum;
-    nw4r::math::VEC3 npc_push;
-    nw4r::math::VEC3 em_push;
     f32 npc_max;
     f32 em_max;
     EmWeakPoint* part;
     u8 hits;
     f32 start_y;
 
-    eft_shape_init((struct EftShape*)&npc_box);
-    eft_shape_init((struct EftShape*)&part_box);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&npc_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&part_capsule);
-    eft_vec_ctor(&sphere.pos);
-    VEC3_ctor(&npc_sum);
-    VEC3_ctor(&em_sum);
-    VEC3_ctor(&npc_push);
-    VEC3_ctor(&em_push);
+    PlCapsule npc_capsule;
+    PlCapsule part_capsule;
+    PlSphere sphere;
+    nw4r::math::VEC3 npc_sum;
+    nw4r::math::VEC3 em_sum;
+    nw4r::math::VEC3 npc_push;
+    nw4r::math::VEC3 em_push;
     hits = 0;
     npc_max = 0.0f;
     em_max = 0.0f;
@@ -530,40 +496,24 @@ extern "C" void pl_push_capsule_get(PlCapsule* out, _PLW* plw)
     nw4r::math::VEC3 mid;
     nw4r::math::VEC3 head;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 tmp0;
-    nw4r::math::VEC3 tmp1;
-    nw4r::math::VEC3 tmp2;
-    nw4r::math::VEC3 tmp3;
-    nw4r::math::VEC3 tmp4;
 
-    VEC3_ctor(&hip_a);
-    VEC3_ctor(&hip_b);
-    VEC3_ctor(&axis);
-    VEC3_ctor(&mid);
-    VEC3_ctor(&head);
-    VEC3_ctor(&dir);
     ((PlJointBody*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(0x14, &hip_b);
     ((PlJointBody*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(0x11, &hip_a);
-    addVec3To(&hip_a, pl_drift(plw));
-    addVec3To(&hip_b, pl_drift(plw));
-    addVec3(&tmp0, &hip_a, &hip_b);
-    copyVec3(&mid, &tmp0);
+    hip_a += *(pl_drift(plw));
+    hip_b += *(pl_drift(plw));
+    mid = hip_a + hip_b;
     vec3_scale_in_place(&mid, 0.5f);
     ((PlJointBody*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(0xD, &head);
-    addVec3(&tmp1, &head, pl_drift(plw));
-    copyVec3(&head, &tmp1);
-    subVec3(&tmp2, &head, &mid);
-    copyVec3(&axis, &tmp2);
+    head = head + *(pl_drift(plw));
+    axis = head - mid;
     if (vec3_length_sq(&axis.x) > 0.001f) {
         vec3_normalize_into(&dir, &axis);
     } else {
-        copyVec3(&dir, &axis);
+        dir = axis;
     }
     vec3_scale_in_place(&dir, 40.0f);
-    addVec3(&tmp3, &mid, &dir);
-    copyVec3(&out->start, &tmp3);
-    subVec3(&tmp4, &head, &dir);
-    copyVec3(&out->end, &tmp4);
+    out->start = mid + dir;
+    out->end = head - dir;
     out->radius = 40.0f;
 }
 
@@ -576,40 +526,24 @@ extern "C" void npc_push_capsule_get(PlCapsule* out, _AINPC_W* npc)
     nw4r::math::VEC3 mid;
     nw4r::math::VEC3 head;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 tmp0;
-    nw4r::math::VEC3 tmp1;
-    nw4r::math::VEC3 tmp2;
-    nw4r::math::VEC3 tmp3;
-    nw4r::math::VEC3 tmp4;
 
-    VEC3_ctor(&hip_a);
-    VEC3_ctor(&hip_b);
-    VEC3_ctor(&axis);
-    VEC3_ctor(&mid);
-    VEC3_ctor(&head);
-    VEC3_ctor(&dir);
     npc->model.get_joint_wpos(0x14, &hip_b);
     npc->model.get_joint_wpos(0x12, &hip_a);
-    addVec3To(&hip_a, &npc->drift_vel);
-    addVec3To(&hip_b, &npc->drift_vel);
-    addVec3(&tmp0, &hip_a, &hip_b);
-    copyVec3(&mid, &tmp0);
+    hip_a += npc->drift_vel;
+    hip_b += npc->drift_vel;
+    mid = hip_a + hip_b;
     vec3_scale_in_place(&mid, 0.5f);
     npc->model.get_joint_wpos(0xE, &head);
-    addVec3(&tmp1, &head, &npc->drift_vel);
-    copyVec3(&head, &tmp1);
-    subVec3(&tmp2, &head, &mid);
-    copyVec3(&axis, &tmp2);
+    head = head + npc->drift_vel;
+    axis = head - mid;
     if (vec3_length_sq(&axis.x) > 0.001f) {
         vec3_normalize_into(&dir, &axis);
     } else {
-        copyVec3(&dir, &axis);
+        dir = axis;
     }
     vec3_scale_in_place(&dir, 40.0f);
-    addVec3(&tmp3, &mid, &dir);
-    copyVec3(&out->start, &tmp3);
-    subVec3(&tmp4, &head, &dir);
-    copyVec3(&out->end, &tmp4);
+    out->start = mid + dir;
+    out->end = head - dir;
     out->radius = 30.0f;
 }
 
@@ -620,7 +554,6 @@ extern "C" void pl_push_accum(_PLW* plw, nw4r::math::VEC3* sum, f32* max_sq, nw4
     nw4r::math::VEC3 unused;
     f32 len_sq;
 
-    VEC3_ctor(&unused);
     len_sq = vec3_length_sq(&push->x);
     sum->x += push->x;
     if (pl_push_vertical_ck(plw) == 1) {
@@ -638,7 +571,6 @@ extern "C" void npc_push_accum(_AINPC_W* npc, nw4r::math::VEC3* sum, f32* max_sq
     nw4r::math::VEC3 unused;
     f32 len_sq;
 
-    VEC3_ctor(&unused);
     len_sq = vec3_length_sq(&push->x);
     sum->x += push->x;
     if (npc_push_vertical_ck(npc) == 1) {
@@ -656,7 +588,6 @@ extern "C" void em_push_accum(_ENEMY_WORK* em, nw4r::math::VEC3* sum, f32* max_s
     nw4r::math::VEC3 unused;
     f32 len_sq;
 
-    VEC3_ctor(&unused);
     len_sq = vec3_length_sq(&push->x);
     sum->x += push->x;
     if ((u8)(em->field_0x1E2 + 0xFF) <= 1) {
@@ -683,32 +614,28 @@ extern "C" void body_push_pl_em_apply(_PLW* plw, nw4r::math::VEC3* pl_push, _ENE
 {
     nw4r::math::VEC3 pl_vec;
     nw4r::math::VEC3 em_vec;
-    nw4r::math::VEC3 pl_half;
-    nw4r::math::VEC3 em_half;
     u8 kind;
 
-    VEC3_ctor(&pl_vec);
-    VEC3_ctor(&em_vec);
     kind = em_data_kind_get(em);
     if (kind < 4) {
-        copyVec3(&em_vec, &em->drift_vel_0x8B4);
-        addVec3To(&em_vec, em_push);
+        em_vec = em->drift_vel_0x8B4;
+        em_vec += *em_push;
         em->drift_on_0x8C0 = 1;
         em_push_drift_set(em, &em_vec);
     } else if (kind == 4) {
-        copyVec3(&pl_vec, pl_drift(plw));
-        vec3_scale(&pl_half, pl_push, 0.5f);
-        addVec3To(&pl_vec, &pl_half);
+        pl_vec = *pl_drift(plw);
+        nw4r::math::VEC3 pl_half = *pl_push * 0.5f;
+        pl_vec += pl_half;
         plw->drift_on_0x582 = 1;
         pl_push_drift_set(plw, &pl_vec);
-        copyVec3(&em_vec, &em->drift_vel_0x8B4);
-        vec3_scale(&em_half, em_push, 0.5f);
-        addVec3To(&em_vec, &em_half);
+        em_vec = em->drift_vel_0x8B4;
+        nw4r::math::VEC3 em_half = *em_push * 0.5f;
+        em_vec += em_half;
         em->drift_on_0x8C0 = 1;
         em_push_drift_set(em, &em_vec);
     } else {
-        copyVec3(&pl_vec, pl_drift(plw));
-        addVec3To(&pl_vec, pl_push);
+        pl_vec = *pl_drift(plw);
+        pl_vec += *pl_push;
         plw->drift_on_0x582 = 1;
         pl_push_drift_set(plw, &pl_vec);
     }
@@ -720,32 +647,28 @@ extern "C" void body_push_npc_em_apply(_AINPC_W* npc, nw4r::math::VEC3* npc_push
 {
     nw4r::math::VEC3 npc_vec;
     nw4r::math::VEC3 em_vec;
-    nw4r::math::VEC3 npc_half;
-    nw4r::math::VEC3 em_half;
     u8 kind;
 
-    VEC3_ctor(&npc_vec);
-    VEC3_ctor(&em_vec);
     kind = em_data_kind_get(em);
     if (kind < 3) {
-        copyVec3(&em_vec, &em->drift_vel_0x8B4);
-        addVec3To(&em_vec, em_push);
+        em_vec = em->drift_vel_0x8B4;
+        em_vec += *em_push;
         em->drift_on_0x8C0 = 1;
         em_push_drift_set(em, &em_vec);
     } else if (kind == 3) {
-        copyVec3(&npc_vec, &npc->drift_vel);
-        vec3_scale(&npc_half, npc_push, 0.5f);
-        addVec3To(&npc_vec, &npc_half);
+        npc_vec = npc->drift_vel;
+        nw4r::math::VEC3 npc_half = *npc_push * 0.5f;
+        npc_vec += npc_half;
         npc->drift_active = 1;
         npc_push_drift_set(npc, &npc_vec);
-        copyVec3(&em_vec, &em->drift_vel_0x8B4);
-        vec3_scale(&em_half, em_push, 0.5f);
-        addVec3To(&em_vec, &em_half);
+        em_vec = em->drift_vel_0x8B4;
+        nw4r::math::VEC3 em_half = *em_push * 0.5f;
+        em_vec += em_half;
         em->drift_on_0x8C0 = 1;
         em_push_drift_set(em, &em_vec);
     } else {
-        copyVec3(&npc_vec, &npc->drift_vel);
-        addVec3To(&npc_vec, npc_push);
+        npc_vec = npc->drift_vel;
+        npc_vec += *npc_push;
         npc->drift_active = 1;
         npc_push_drift_set(npc, &npc_vec);
     }
@@ -760,12 +683,10 @@ extern "C" void body_push_em_em_apply(_ENEMY_WORK* a, nw4r::math::VEC3* a_push, 
     u8 a_kind;
     u8 b_kind;
 
-    VEC3_ctor(&a_vec);
-    VEC3_ctor(&b_vec);
     a_kind = em_data_kind_get(a);
     b_kind = em_data_kind_get(b);
     if (a_kind > b_kind) {
-        copyVec3(&b_vec, &b->drift_vel_0x8B4);
+        b_vec = b->drift_vel_0x8B4;
         b_vec.x += b_push->x;
         if ((u8)(b->field_0x1E2 + 0xFF) <= 1) {
             b_vec.y += b_push->y;
@@ -774,7 +695,7 @@ extern "C" void body_push_em_em_apply(_ENEMY_WORK* a, nw4r::math::VEC3* a_push, 
         b->drift_on_0x8C0 = 1;
         em_push_drift_set(b, &b_vec);
     } else if (a_kind == b_kind) {
-        copyVec3(&a_vec, &a->drift_vel_0x8B4);
+        a_vec = a->drift_vel_0x8B4;
         a_vec.x += 0.5f * a_push->x;
         if ((u8)(a->field_0x1E2 + 0xFF) <= 1) {
             a_vec.y += 0.5f * a_push->y;
@@ -782,7 +703,7 @@ extern "C" void body_push_em_em_apply(_ENEMY_WORK* a, nw4r::math::VEC3* a_push, 
         a_vec.z += 0.5f * a_push->z;
         a->drift_on_0x8C0 = 1;
         em_push_drift_set(a, &a_vec);
-        copyVec3(&b_vec, &b->drift_vel_0x8B4);
+        b_vec = b->drift_vel_0x8B4;
         b_vec.x += 0.5f * b_push->x;
         if ((u8)(b->field_0x1E2 + 0xFF) <= 1) {
             b_vec.y += 0.5f * b_push->y;
@@ -791,7 +712,7 @@ extern "C" void body_push_em_em_apply(_ENEMY_WORK* a, nw4r::math::VEC3* a_push, 
         b->drift_on_0x8C0 = 1;
         em_push_drift_set(b, &b_vec);
     } else {
-        copyVec3(&a_vec, &a->drift_vel_0x8B4);
+        a_vec = a->drift_vel_0x8B4;
         a_vec.x += a_push->x;
         if ((u8)(a->field_0x1E2 + 0xFF) <= 1) {
             a_vec.y += a_push->y;
@@ -807,9 +728,8 @@ extern "C" void pl_push_drift_add(_PLW* plw, nw4r::math::VEC3* push)
 {
     nw4r::math::VEC3 drift;
 
-    VEC3_ctor(&drift);
-    copyVec3(&drift, pl_drift(plw));
-    addVec3To(&drift, push);
+    drift = *pl_drift(plw);
+    drift += *push;
     plw->drift_on_0x582 = 1;
     pl_push_drift_set(plw, &drift);
 }
@@ -857,18 +777,11 @@ extern "C" void em_push_sphere_get(HitSphere* out, _ENEMY_WORK* em)
     nw4r::math::VEC3 center;
     nw4r::math::VEC3 offset;
     EmSizeParams* size;
-    nw4r::math::VEC3 tmp0;
-    nw4r::math::VEC3 tmp1;
-    nw4r::math::VEC3 tmp3;
-    nw4r::math::VEC3 tmp2;
     f32 scale;
     nw4r::math::VEC3* src;
 
-    VEC3_ctor(&center);
-    VEC3_ctor(&offset);
     size = get_enemy_data(em)->size_0x54;
-    addVec3(&tmp0, &em->pos, &em->drift_vel_0x8B4);
-    copyVec3(&center, &tmp0);
+    center = em->pos + em->drift_vel_0x8B4;
     scale = get_em_chg_scale(em);
     if (em->field_0x1E2 == 1) {
         if (em->field_0x1E3 == 1) {
@@ -881,10 +794,8 @@ extern "C" void em_push_sphere_get(HitSphere* out, _ENEMY_WORK* em)
     } else {
         src = &size->center_0x00;
     }
-    copyVec3(&offset, setVec3(&tmp1, src->x, src->y, src->z));
-    vec3_scale(&tmp2, &offset, scale);
-    addVec3(&tmp3, &center, &tmp2);
-    copyVec3(&out->pos, &tmp3);
+    offset = VEC3(src->x, src->y, src->z);
+    out->pos = center + (offset * scale);
     out->radius = size->radius_0x24 * scale;
 }
 
@@ -894,7 +805,6 @@ extern "C" void push_accum(nw4r::math::VEC3* sum, f32* max_sq, nw4r::math::VEC3*
     nw4r::math::VEC3 unused;
     f32 len_sq;
 
-    VEC3_ctor(&unused);
     len_sq = vec3_length_sq(&push->x);
     sum->x += push->x;
     sum->y += push->y;
@@ -908,30 +818,22 @@ extern "C" void push_accum(nw4r::math::VEC3* sum, f32* max_sq, nw4r::math::VEC3*
 extern "C" void coll_push_out_em(nw4r::math::VEC3* pos, f32 radius, _ENEMY_WORK* em, u8 list)
 {
     PlCapsuleBox part_box;
-    HitSphere sphere;
-    HitSphere part_sphere;
+    PlSphere sphere;
+    PlSphere part_sphere;
+    f32 max_sq;
+    u8 hits;
+    EmWeakPoint* part;
+
     PlCapsule part_capsule;
     nw4r::math::VEC3 push;
     nw4r::math::VEC3 part_push;
     nw4r::math::VEC3 sum;
     nw4r::math::VEC3 unused;
-    f32 max_sq;
-    u8 hits;
-    EmWeakPoint* part;
-
-    eft_shape_init((struct EftShape*)&part_box);
-    eft_vec_ctor(&sphere.pos);
-    eft_vec_ctor(&part_sphere.pos);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&part_capsule);
-    VEC3_ctor(&push);
-    VEC3_ctor(&part_push);
-    VEC3_ctor(&sum);
-    VEC3_ctor(&unused);
     hits = 0;
     max_sq = 0.0f;
     setVector3(&sum, 0.0f, 0.0f, 0.0f);
     setVector3(&unused, 0.0f, 0.0f, 0.0f);
-    copyVec3(&sphere.pos, pos);
+    sphere.pos = *pos;
     sphere.radius = radius;
     switch (list) {
     case 0:
@@ -1004,9 +906,6 @@ extern "C" s32 body_shape_get(_BODY_W* body, EmWeakPoint* shape, PlCapsule* caps
     BodyOwnerObj* owner;
     s32 result;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&ofs_b);
-    MTX34_ctor(&mtx);
     result = 0;
     owner = body->owner_0x10;
     ofs.x = shape->offset.x;
@@ -1014,7 +913,7 @@ extern "C" s32 body_shape_get(_BODY_W* body, EmWeakPoint* shape, PlCapsule* caps
     ofs.z = shape->offset.z;
     if (shape->joint == 1000) {
         sphere->radius = shape->radius;
-        copyVec3(&sphere->pos, &owner->pos);
+        sphere->pos = owner->pos;
         cpSetRotMatrix(&owner->rot, &mtx);
         mulVecMat(&ofs, &mtx);
         sphere->pos.x += ofs.x;

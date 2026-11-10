@@ -51,8 +51,8 @@
 /* The retail functions address each table of this unit by its own symbol (no shared data base register). */
 #pragma pool_data off
 
-#include "nw4r/math.h"       /* nw4r::math::VEC3, the 3-float record VEC3_ctor takes */
-#include "mh3_pad/vec3.h"    /* VEC3_ctor (owner src/mh3_pad.cpp) */
+#include "nw4r/math.h"       /* nw4r::math::VEC3 */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "fn_8004CAD8.h"     /* userdata_progress_flag_ck/_set, unlock_bit_raise (owner src/fn_8004CAD8.cpp) */
 #include "hud/layout.h"     /* _mh_ivec2_, which the band header's prototypes name */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (owner: the Runtime.PPCEABI.H lib) */
@@ -961,7 +961,6 @@ void demo_effect_update(u8 demo)
     nw4r::math::VEC3* at;
     DemoFrameRange* range;
 
-    VEC3_ctor(&pos);
     frame = get_demo_data() * 2;
     switch (demo) {
     case 23:

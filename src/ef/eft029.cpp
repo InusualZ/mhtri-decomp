@@ -19,7 +19,7 @@
  *   `VEC3_SCALE`): retail builds every result in a compiler temporary in call order, which explicit out-locals do not
  *   reproduce.  The zone test is read as a `u8` return (raw `stb`); the colour bytes are `(c >> n) & 0xFF`; the type
  *   compares in `eft028_move_scaled` are `(s32)`; `eft028_move_view_fade` hoists its scale into a local and its player
- *   scan steps `n++, pl++` in that order.  `eft028_capsule_ends` is a global array of a `setVec3`-constructed vector.
+ *   scan steps `n++, pl++` in that order.  `eft028_capsule_ends` is a global array of a `VEC3(x, y, z)`-constructed vector.
  */
 
 #include "types.h"
@@ -29,7 +29,7 @@
 #include "unsplit/unknown.h"
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "fn_8004CAD8.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "gx.h"
 #include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "camera/camera_main.h" /* the camera target accessors (rule 2) */
@@ -86,9 +86,6 @@ struct _EFT029_PLAYER {
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
 #define EFT_FOCUS_POS ((nw4r::math::VEC3 (*)(void))get_camera_target_pos)
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 /* The zone test returns a byte (`stb r3` with no mask). */
 #define EFT_ZONE_TEST ((u8 (*)(nw4r::math::VEC3*, PlCapsuleBox*))pl_capsule_point_ck)
@@ -112,19 +109,10 @@ u8 eft028_alpha_by_id[16] = {
 u8 eft028_view_alpha_keys[8] = { 0x00, 0x50, 0x05, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
 }
 
-/* A vector built through `setVec3` (0x80041E8C), so a file-scope one is constructed by `__sinit`.  size: 0xC */
-struct EftCapsuleEnd : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    EftCapsuleEnd(f32 x, f32 y, f32 z)
-    {
-        setVec3(this, x, y, z);
-    }
-};
-
 /* The two ends of the eft028 zone capsule (`ef/eft026_fx.cpp`'s setter copies them); MWCC's `__sinit` builds them. */
-extern "C" EftCapsuleEnd eft028_capsule_ends[2] = {
-    EftCapsuleEnd(1440.0f, 360.0f, -3660.0f),
-    EftCapsuleEnd(1440.0f, 360.0f, -1440.0f),
+extern "C" nw4r::math::VEC3 eft028_capsule_ends[2] = {
+    nw4r::math::VEC3(1440.0f, 360.0f, -3660.0f),
+    nw4r::math::VEC3(1440.0f, 360.0f, -1440.0f),
 };
 
 #pragma peephole off
@@ -139,7 +127,6 @@ extern "C" void eft028_start_by_area(_EFT* self)
     u16 param;
     s32 i;
 
-    MTX34_ctor(&mtx);
     work = (_EFT029_WORK*)self->work_0x38;
     if (--self->timer_0x0C >= 0) {
         return;
@@ -439,19 +426,13 @@ extern "C" void eft028_move_view_fade(_EFT* self)
     u16 max;
     _GXColor col;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&spare_a);
-    VEC3_ctor(&cam);
-    VEC3_ctor(&focus);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&spare_b);
     work = (_EFT029_WORK*)self->work_0x38;
     if (self->area_0x44 != get_now_areano()) {
         self->state_0x05++;
         return;
     }
-    copyVec3(&focus, &EFT_FOCUS_POS());
-    copyVec3(&cam, &get_camera_pos());
+    focus = *(&EFT_FOCUS_POS());
+    cam = *(&get_camera_pos());
     if (cam.y > 0.0f || camera_mode1_ck() == 1) {
         keep = work->count;
     } else {
@@ -463,32 +444,32 @@ extern "C" void eft028_move_view_fade(_EFT* self)
                 break;
             }
         }
-        copyVec3(&dir, &VEC3_SUB(&focus, &cam));
+        dir = *(&(focus - cam));
         if (vec3_length_sq((f32*)&dir) > 0.0001f) {
             vec3_normalize_into(&dir, &dir);
         }
-        copyVec3(&pos, &VEC3_ADD(&cam, &VEC3_SCALE(&dir, 150.0f)));
+        pos = *(&(cam + (dir * 150.0f)));
         for (i = 0; i < work->count; i++) {
             if (work->effects[i] != NULL) {
                 SetRootMtxTrans(work->effects[i], &pos);
             }
         }
         focus.y = cam.y;
-        copyVec3(&dir, &VEC3_SUB(&focus, &cam));
+        dir = *(&(focus - cam));
         dist = vec3_len((f32*)&dir);
         pos.x = focus.x;
         pos.z = focus.z;
         pos.y = focus.y + dist;
         if (pos.y >= pl->ground_y) {
-            copyVec3(&dir, &VEC3_SUB(&pos, &cam));
+            dir = *(&(pos - cam));
             f32 s = (pl->ground_y - focus.y) / dist;
             vec3_scale_in_place(&dir, s);
-            copyVec3(&pos, &VEC3_ADD(&cam, &dir));
+            pos = *(&(cam + dir));
         } else {
-            copyVec3(&pos, &focus);
+            pos = focus;
         }
         pos.y = pl->ground_y - 3.0f;
-        copyVec3(&self->pos_0x18, &pos);
+        self->pos_0x18 = pos;
         SetRootMtxTrans(work->effects[0], &self->pos_0x18);
         col.r = 0xFF;
         col.g = 0xFF;
@@ -559,7 +540,6 @@ extern "C" void eft028_move_zone_pulse(_EFT* self)
     _EFT029_PLAYER* players;
     s32 i;
 
-    VEC3_ctor(&unused);
     players = (_EFT029_PLAYER*)get_move_work_adrs(2);
     if (self->area_0x44 != get_now_areano()) {
         self->state_0x05++;
@@ -630,17 +610,13 @@ extern "C" void eft028_move_view(_EFT* self)
     s32 i;
     _EFT029_WORK* work;
 
-    VEC3_ctor(&cam);
-    VEC3_ctor(&focus);
-    VEC3_ctor(&dir);
-    MTX34_ctor(&mtx);
     work = (_EFT029_WORK*)self->work_0x38;
     if (self->area_0x44 != get_now_areano()) {
         self->state_0x05++;
         return;
     }
-    copyVec3(&focus, &EFT_FOCUS_POS());
-    copyVec3(&cam, &get_camera_pos());
+    focus = *(&EFT_FOCUS_POS());
+    cam = *(&get_camera_pos());
     switch (self->type_0x02) {
     case 4:
         if (cam.y > 0.0f) {
@@ -653,11 +629,11 @@ extern "C" void eft028_move_view(_EFT* self)
         }
         break;
     }
-    copyVec3(&dir, &VEC3_SUB(&focus, &cam));
+    dir = *(&(focus - cam));
     if (vec3_length_sq((f32*)&dir) > 0.0001f) {
         vec3_normalize_into(&dir, &dir);
     }
-    copyVec3(&self->pos_0x18, &VEC3_ADD(&cam, &VEC3_SCALE(&dir, 150.0f)));
+    self->pos_0x18 = *(&(cam + (dir * 150.0f)));
     switch (self->type_0x02) {
     case 4:
         SetRootMtxTrans(work->effects[0], &self->pos_0x18);

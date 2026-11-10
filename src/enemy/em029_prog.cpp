@@ -58,7 +58,6 @@
 #include "enemy/em_hit_window_set_default.h"
 #include "enemy/fn_8012EC74.h"
 #include "enemy/em019_action13_active_ck.h"
-#include "enemy/em_ground_rec_clear.h"
 #include "enemy/enemy_control.h"
 #include "enemy/em_motion_param_set.h"
 #include "enemy/fn_80137604.h"
@@ -1032,7 +1031,6 @@ EmSeBranch em029_se_branch_act5_2_d = {0, 103, em029_se_tbl_act5_2_d};
 extern "C" void em_action6_sub0(struct _ENEMY_WORK* self) {
     EmGroundRec ground;
 
-    em_ground_rec_clear(&ground);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1040,7 +1038,7 @@ extern "C" void em_action6_sub0(struct _ENEMY_WORK* self) {
         em_mot_set(self, 3, 4, 0);
         em_approach_start(self, 0.0f, 0);
         if (em_ground_rec_find(self->field_0x01A, &ground) == 1) {
-            copyVec3(&self->aim, &ground.pos_0x08);
+            self->aim = ground.pos_0x08;
         }
         break;
     case 1:
@@ -1147,7 +1145,6 @@ void em_action_dispatch(struct _ENEMY_WORK* self) {
 extern "C" void em029_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, s32 joint, s32 delta, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         eft009_spawn_at_joint(self, joint, type, delta, scale);
@@ -1167,8 +1164,6 @@ extern "C" void em029_motion_events(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 shift;
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&shift);
-    VEC3_ctor(&pos);
     switch (em_get_mot_no(self)) {
     case 2:
         if (self->field_0x228 & 6) {

@@ -19,13 +19,13 @@
  * SHAPES. The data is the TU's own: fn_8005AA44 is an `inline` (`_ac.h`) function referenced by the
  *   dead-stripped res_mat_set_flag_0x100, so its two strings are weak `@STRING@` objects after the TU's own
  *   (the inline tail, playbook 80); "ResMat" (7 bytes) goes to `.sdata`; the two VEC3s are file-scope statics
- *   (`.bss`) whose constructors call `setVec3`, which makes MWCC emit `__sinit`, its `.ctors` word and the
+ *   (`.bss`) whose constructors call `VEC3(x, y, z)`, which makes MWCC emit `__sinit`, its `.ctors` word and the
  *   0.0f/100.0f `.sdata2` pool.  The (base, dx) constructor reproduces retail's argument order (`this`, then
  *   the x sum, then y/z through the base reference).
  */
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 2) */
 
@@ -140,21 +140,7 @@ Mtx34* mtx34_trans_apply(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
 
 }  // extern "C"
 
-/* A file-scope vector whose constructors build it through `setVec3`.  size: 0xC */
-struct StaticVec3 : public Vec3 {
-    /* Builds (x, y, z). */
-    StaticVec3(f32 x, f32 y, f32 z)
-    {
-        setVec3(this, x, y, z);
-    }
-    /* Builds `base` moved `dx` along x. */
-    StaticVec3(const Vec3& base, f32 dx)
-    {
-        setVec3(this, dx + base.x, base.y, base.z);
-    }
-};
-
 /* The two file-scope vectors the static initialiser (`.ctors` word 0x8056F2D0) builds: the origin, and the
  * origin moved 100 along x. */
-static StaticVec3 s_origin(0.0f, 0.0f, 0.0f);
-static StaticVec3 s_origin_x100(s_origin, 100.0f);
+static VEC3 s_origin(0.0f, 0.0f, 0.0f);
+static VEC3 s_origin_x100(100.0f + s_origin.x, s_origin.y, s_origin.z);

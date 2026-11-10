@@ -47,7 +47,7 @@
 #include "unsplit/enemy.h"
 #include "enemy/enemy_control.h" /* em_spawn_request (the owner's header, rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "ef.h"              /* VEC3_ctor */
+#include "ef.h"              /* VEC3::VEC3() */
 #include "ef/fn_80105314.h"  /* fn_801057A4 */
 #include "draw_shape.h"      /* draw_shape_arm */
 #include "enemy/fn_801251D0.h"
@@ -100,7 +100,6 @@
 #define em_mot_finished_ck_view1 ((u32 (*)(struct _ENEMY_WORK*))em_mot_finished_ck)
 #define em_parts_damage_level_get_view1 ((u8 (*)(_ENEMY_WORK*, u8))em_parts_damage_level_get)
 #define em_ground_ck_f ((u32 (*)(_ENEMY_WORK*, f32))em_ground_ck)
-#define assignVec3_view1 ((void (*)(nw4r::math::VEC3*, const nw4r::math::VEC3*))assignVec3)
 
 /* The user-data accessor `em008_init` installs: the base accessor with its own destructor, attach hook and
  * end-of-tree hook (its table is `.data` 0x805A6D28).  size: 0xC (`operator new(0xC)`) */
@@ -306,21 +305,14 @@ extern "C" const u32 em008_turn_seq_side[16] = {
     0x00050000, 0x0000000A, 0x00000000, 0x00000000,
 };
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x80166330): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`; the action-10 sound records point at the first vector.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x80166330): each vector is constructed into
+ * a temporary and copied (`EmSeShift`); the action-10 sound records point at the first vector.  size: 0x18 */
 struct Em008VecPair {
-    /* +0x00 */ nw4r::math::VEC3 pos;
-    /* +0x0C */ nw4r::math::VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, 0) and (0, dy, 0). */
-    Em008VecPair(f32 y, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_view1(&pos, (VEC3*)setVec3(&a, 0.0f, y, 0.0f));
-        assignVec3_view1(&step, (VEC3*)setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em008VecPair(f32 y, f32 dy) : pos(0.0f, y, 0.0f), step(0.0f, dy, 0.0f) {}
 };
 
 /* The two two-vector shift records `__sinit` seeds and the action-10 sound records point at (`.bss`, defined at
@@ -393,7 +385,6 @@ void em008_init(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
     Em008UserData* helper;
 
-    VEC3_ctor(&v);
     switch ((u8)arg) {
       case 2:
         em_move_mode_set(self, 4);
@@ -445,8 +436,6 @@ void em008_event_notify(_ENEMY_WORK* self, u8 arg, u8 sub) {
     VEC3 v1;
     VEC3 v2;
 
-    VEC3_ctor(&v1);
-    VEC3_ctor(&v2);
     switch (arg) {
       case 1:
         switch (sub) {
@@ -624,7 +613,6 @@ void em008_act0_dispatch(_ENEMY_WORK* self) {
 void em008_act1_0(_ENEMY_WORK* self) {
     VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;
@@ -660,7 +648,6 @@ void em008_act1_1(_ENEMY_WORK* self) {
 void em008_act1_2(_ENEMY_WORK* self) {
     VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
       case 0:
         self->state++;
@@ -1491,7 +1478,6 @@ void em008_act6_12(_ENEMY_WORK* self) {
 void em008_act6_13(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_timer_reset(self);
     em_shake_req_set(self);
     switch (self->state) {
@@ -1570,7 +1556,7 @@ void em008_act6_dispatch(_ENEMY_WORK* self) {
 /* 0x8015FD1C (0x68): fills an effect spawn record: the type, the position and the three id fields. */
 void em008_spawn_rec_set(EmSpawnRec* out, u8 a, u32 id, VEC3* pos, u16 b, u16 c) {
     out->id = id;
-    copyVec3(&out->pos, pos);
+    out->pos = *pos;
     out->field_0x10 = a;
     out->field_0x12 = b;
     out->field_0x14 = c;
@@ -1579,8 +1565,8 @@ void em008_spawn_rec_set(EmSpawnRec* out, u8 a, u32 id, VEC3* pos, u16 b, u16 c)
 /* 0x8015FD84 (0x18DC): the burrowing attack: motion (0x19, 4) repeated a `kind`-dependent number of times, the dust
  * every cycle and the per-cycle rock records for the burrowing pattern. */
 void em008_act7_0(_ENEMY_WORK* self, u8 arg1) {
-    EmSpawnRec rec;
     VEC3 vec;
+    EmSpawnRec rec;
     u8 temp_r0;
     u8 temp_r0_2;
     u8 temp_r0_3;
@@ -1588,8 +1574,6 @@ void em008_act7_0(_ENEMY_WORK* self, u8 arg1) {
     u8 temp_r0_5;
     u8 temp_r3_2;
 
-    VEC3_ctor(&vec);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2062,7 +2046,6 @@ void em008_act7_7(_ENEMY_WORK* self, u8 kind) {
     f32 speed;
     s32 step;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2185,11 +2168,9 @@ void em008_act7_9(_ENEMY_WORK* self, u8 arg1) {
 
 /* 0x80161E94 (0x194): motion (0x1B, 4) with hit window 0xD and, for `kind` 1, two rock records, then the finish. */
 void em008_act7_11(_ENEMY_WORK* self, u8 arg1) {
-    EmSpawnRec rec;
     VEC3 vec;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2756,11 +2737,9 @@ void em008_act12_dispatch(_ENEMY_WORK* self) {
 /* 0x80162500 (0xCC4): the arena demo: the timed motion and position keys of the entrance, the burrow cycle with its
  * rock records, the emerge and the roar. */
 void em008_act13_0(_ENEMY_WORK* self) {
-    EmSpawnRec rec;
     VEC3 vec;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3117,7 +3096,6 @@ void em008_part_rec_update(_ENEMY_WORK* self) {
 void em008_alt_mode_fx(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     if ((em_alt_mode_ck(self) == 1) && ((s32) em_get_mot_no(self) != 0x19) && ((s32) (system_w.field_0x0c % 30) == 0)) {
         setVector3(&vec, 0.0f, 150.0f, 170.0f);
         eft_spawn_type10(self, 8, 0x13, &vec, 1.0f);
@@ -3129,7 +3107,6 @@ void em008_alt_mode_fx(_ENEMY_WORK* self) {
 void em008_effect_spawn(_ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s32 delta, f32 scale) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (kind) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -3263,7 +3240,7 @@ void em008_effect_spawn(_ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s32 delt
     case 1:
         if ((self->field_0x228 & 6) == 0) {
             if (joint == 0xFF) {
-                copyVec3(&vec, &self->pos);
+                vec = self->pos;
             } else {
                 get_joint_wpos_em(self, joint, &vec);
             }
@@ -3294,7 +3271,6 @@ void em008_flag491_update(_ENEMY_WORK* self) {
 void em008_motion_events(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em008_part_rec_update(self);
     em008_flag491_update(self);
     em008_alt_mode_fx(self);
@@ -3802,7 +3778,6 @@ void em008_tev_color_update(_ENEMY_WORK* self) {
 /* 0x80165964 (0x25C): the program's state query: `kind` 0 the alt-mode stage, 1 the part pair, 2 the nearest of
  * three area points when it is far enough, 3 the area-4/6 event stage, 4 the +0x32A countdown run out. */
 u32 em008_state_query(_ENEMY_WORK* self, u8 kind) {
-    VEC3 vec;
     f32 best;
     u8 near;
     s32 i;
@@ -3820,7 +3795,7 @@ u32 em008_state_query(_ENEMY_WORK* self, u8 kind) {
         }
     case 2:
         if (stage_map_kind_get(self->field_0x1E0) == 2 && self->area_no == 3) {
-            VEC3_ctor(&vec);
+            VEC3 vec;
             for (i = 0; i < 3; i++) {
                 em_data_point_get(self, ((self->area_no & 0xF) << 8) | (u8)(i + 7), &vec);
                 if (i == 0) {
@@ -3928,7 +3903,6 @@ s32 em008_part_break_ck(_ENEMY_WORK* self, u8 part) {
 void em008_part_break_set(_ENEMY_WORK* self, u8 part) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (part) {
     case 0:
         if (em008_part_flag_clear_ck(self, 1) == 1) {
@@ -4045,12 +4019,10 @@ void Em008UserData::Attach() {
 void Em008UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, nw4r::g3d::FuncObjCalcWorld* pFuncObj) {
     nw4r::g3d::ResNode head((void*)0);
     s32 idx;
-    MTX34 out;
-    MTX34 local;
 
     (void)pFuncObj;
-    MTX34_ctor(&out);
-    MTX34_ctor(&local);
+    MTX34 out;
+    MTX34 local;
     idx = (s32)(u32)mdl.GetResNode(0x18).mpData;
     res_node_assign(&head, &idx);
     {

@@ -26,11 +26,11 @@
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
 #include "gx.h"
-#include "ef/fn_80104BD0.h"
+#include "ef/em_hit_eft.h"
 #include "sound/fn_800D7F54.h"   /* se_req_pos_ps - owner sound/fn_800D7F54.cpp */
 #include "ef/fn_80105314.h"
 #include "unsplit/ef.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(_EFT*, u8, u8))eft_state_flags_set)
@@ -136,7 +136,6 @@ struct _EFT {
  * externs
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 extern "C" void eft_res_slot_release(void* self);
 extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count, u32 arg);
 extern "C" _EFT* eft_res_slot_get(u32 pool_id);
@@ -297,12 +296,11 @@ Vec eft009_part_joint_offsets[66] = {
  * the enemy joint every frame and recolours them by type. */
 extern "C" void fn_80103D28(_EFT* self)
 {
-    nw4r::math::VEC3 vec;
     _EFT_GROUP_WORK* work = self->work_0x38.group;
     _ENEMY_WORK* enemy = self->source_0x30;
     s32 i;
 
-    VEC3_ctor(&vec);
+    nw4r::math::VEC3 vec;
     self->state_0x05++;
     if ((s32)self->type_0x02 == 0x23) {
         for (i = 0; i < work->count; i++) {
@@ -366,9 +364,9 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x3F:
     case 0x40:
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         work->items_0x04[0]->SetRootMtx(work->mtx_0x0C);
         change_paramscale_eff(work->items_0x04[0], get_em_scale(enemy));
@@ -393,9 +391,9 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x3D:
     case 0x3E:
     case 0x41:
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
@@ -407,12 +405,12 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x21:
     case 0x23: {
         for (i = 0; i < work->count; i++) {
-            copyVec3(&vec, &work->offset_0x3C);
+            vec = work->offset_0x3C;
             if (i == 1) {
                 vec.x *= -1.0f;
             }
             mulVecMat(&vec, &work->mtx_0x0C);
-            addVec3To(&self->pos_0x18, &vec);
+            self->pos_0x18 += vec;
             mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -421,9 +419,9 @@ extern "C" void fn_80103D28(_EFT* self)
     }
     case 0x1B:
     case 0x1C:
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         rotLocalMatX(self->rot_0x24.x, &work->mtx_0x0C);
         for (i = 0; i < work->count; i++) {
@@ -436,10 +434,10 @@ extern "C" void fn_80103D28(_EFT* self)
     case 0x38:
     case 0x39:
         get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
@@ -471,16 +469,14 @@ extern "C" void fn_80103D28(_EFT* self)
  * recolours the group by type, and retires the effect once every pooled effect has finished. */
 extern "C" void fn_801041BC(_EFT* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 vec;
     _GXColor color;
     s32 moved = 0;
     s32 i;
 
-    MTX34_ctor(&mtx);
+    nw4r::math::MTX34 mtx;
     _EFT_GROUP_WORK* work = self->work_0x38.group;
     _ENEMY_WORK* enemy = self->source_0x30;
-    VEC3_ctor(&vec);
+    nw4r::math::VEC3 vec;
     self->timer_0x0C--;
     if (self->timer_0x0C >= 0) {
         return;
@@ -511,9 +507,9 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x41:
         get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
@@ -526,12 +522,12 @@ extern "C" void fn_801041BC(_EFT* self)
         get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
-            copyVec3(&vec, &work->offset_0x3C);
+            vec = work->offset_0x3C;
             if (i == 1) {
                 vec.x *= -1.0f;
             }
             mulVecMat(&vec, &work->mtx_0x0C);
-            addVec3To(&self->pos_0x18, &vec);
+            self->pos_0x18 += vec;
             mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -544,9 +540,9 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x2D:
         get_joint_wpos_em(enemy, eft009_joint_ids[self->type_0x02], &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
@@ -566,9 +562,9 @@ extern "C" void fn_801041BC(_EFT* self)
     case 0x1C:
         get_joint_wmat_em(enemy, eft009_joint_ids[self->type_0x02], &work->mtx_0x0C);
         mtx34_trans_get(&work->mtx_0x0C, &self->pos_0x18);
-        copyVec3(&vec, &work->offset_0x3C);
+        vec = work->offset_0x3C;
         mulVecMat(&vec, &work->mtx_0x0C);
-        addVec3To(&self->pos_0x18, &vec);
+        self->pos_0x18 += vec;
         mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         rotLocalMatX(self->rot_0x24.x, &work->mtx_0x0C);
         for (i = 0; i < work->count; i++) {
@@ -727,7 +723,7 @@ void eft009_set_pos(u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, 
         effect->rot_0x24.y = rot->y;
         effect->rot_0x24.z = 0;
         effect->source_0x30 = NULL;
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
     }
 }
 
@@ -743,7 +739,7 @@ extern "C" void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 id, u32 type, s32 joi
         effect->rot_0x24.y = self->rot_y_0x1C0 + joint_delta;
         effect->rot_0x24.z = 0;
         effect->source_0x30 = self;
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
     }
 }
 
@@ -790,7 +786,7 @@ extern "C" void fn_80104B94(_EFT* self)
 {
     switch (self->state_0x05) {
     case 0:
-        fn_80104BD0(self);
+        em_hit_eft_step(self);
         break;
     case 1:
         eft_em_effects_move(self);

@@ -376,8 +376,6 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
 void ef_anim_copy_u8_channels(const u8* mCmdList, u8* target, u32 step, u32 mode);
 void ef_anim_key_tick(const EfAnimHeader* header, u32 step, u16* tick, u32 mode);
 void ef_anim_copy_f32_channels(const u8* mCmdList, f32* target, u32 step, u32 mode);
-CreationQueue* ef_creation_queue_reset(CreationQueue* queue);
-CreationQueueEntry* ef_creation_queue_entry_ctor(CreationQueueEntry* slot);
 
 /* 0x8009CDBC - resolves the key tick, fractional tick and divisor of position `step` in a curve `mode`
  * steps long (`header` holds the tick count, flags and divisor count); a tick count <= 1 gives tick 0. */
@@ -1990,22 +1988,13 @@ void ef_anim_copy_f32_channels(const u8* mCmdList, f32* target, u32 step, u32 mo
     }
 }
 
-/* 0x800A2FA4 - resets the whole creation queue: clear every slot's VEC3 tails and the count. */
-CreationQueue* ef_creation_queue_reset(CreationQueue* queue) {
-    CreationQueueEntry* slot = &queue->mEntry[0];
-    do {
-        ef_creation_queue_entry_ctor(slot);
-        slot++;
-    } while (slot < &queue->mEntry[0x400]);
-    queue->mCount = 0;
-    return queue;
-}
-
-/* 0x800A3008 - initialises a queue slot's two VEC3 tails. */
-CreationQueueEntry* ef_creation_queue_entry_ctor(CreationQueueEntry* slot) {
-    VEC3_ctor(&slot->mPos);
-    VEC3_ctor(&slot->mVel);
-    return slot;
-}
-
 } /* extern "C" */
+
+/* 0x800A2FA4 (0x64): constructs every queue entry, then empties the queue. */
+CreationQueue::CreationQueue() {
+    mCount = 0;
+}
+
+/* 0x800A3008 (0x3C): constructs the entry's two vectors. */
+CreationQueueEntry::CreationQueueEntry() {
+}

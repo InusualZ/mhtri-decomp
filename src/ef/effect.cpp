@@ -30,10 +30,8 @@
  *    bound to the copy constructors' reference parameters), ours names them, so 0x10/0xC.
  *   `fn_800FA208`: the frontend turns `if (hit == 1) return 1; return 0;` into `cntlzw` (the first backend dump
  *   already has it), so each case assigns `result` instead.
- *   flipcheck: `.bss` (the two static name arrays) and `.ctors` (`fn_800FAC1C`, the arrays' static initialiser)
- *   are claimed, not emitted: they are MWCC's `__sinit` for `static` arrays of a class whose constructors are
- *   `fn_800FAC78` and `eft_capsule_ctor`, and `eft_capsule_ctor` is called by its C name from eight other units,
- *   so emitting it as a constructor is a cross-unit rename (request ef-effect-2#2).
+ *   The two static name arrays at the foot of the file are emitted with their `__sinit` and the element
+ *   constructor (`EftNameArrayElem`, whose capsule is `nw4r::math::CAPSULE`).
  */
 
 #include "ef/eft_name_tbl_ptr.h" /* eft_name_tbl_ptr (rule 2: the owner's header) */
@@ -47,13 +45,14 @@
 #include "pl.h"
 #include "g3d/g3d_anmscn.h" /* the g3d_anmscn.cpp declarations (rule 2) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/effect_types.h"
 #include "ef/eft_res.h" /* eft_pro_slot_assign (rule 2) */
 #include "ef/ef_effect.h" /* ef_system_memory_manager (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* res_mat_tev_color_copy_ctor (rule 2) */
 #include "g3d/res_mat_chan_copy_ctor.h" /* res_mat_chan_copy_ctor (rule 2) */
+#include "Pl/pl_hit_sphere.h" /* PlSphere, PlCapsule, PlCapsuleBox, pl_capsule_box_set (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the range's records
@@ -101,7 +100,7 @@ typedef struct EftEmitterRecord {
 
 /* The 0x10-byte sphere record `fn_800FA354` copies and `hit_point_sphr` tests. */
 typedef struct EftSphere {
-    /* +0x00 */ nw4r::math::VEC3 center_0x00;
+    /* +0x00 */ nw4r::math::_VEC3 center_0x00;
     /* +0x0C */ f32 radius_0x0C;
 } EftSphere; /* size: 0x10 */
 
@@ -111,26 +110,13 @@ typedef struct EftBox {
     /* +0x18 */ f32 radius_0x18;
 } EftBox; /* size: 0x1C */
 
-/* The capsule box `eft_shape_init` constructs and `pl_capsule_box_set` fills (the layout of `PlCapsuleBox`):
- * the capsule, its direction, its midpoint and the bounding reach. */
-typedef struct EftShape {
-    /* +0x00 */ EftBox box_0x00;
-    /* +0x1C */ nw4r::math::VEC3 a_0x1C;
-    /* +0x28 */ nw4r::math::VEC3 b_0x28;
-    /* +0x34 */ f32 reach_0x34;
-} EftShape; /* size: 0x38 */
-
-/* The two-vector head `pl_segment_init` zeroes (the first 0x18 bytes of a box/shape record). */
-typedef struct EftVectors {
-    /* +0x00 */ nw4r::math::VEC3 a_0x00;
-    /* +0x0C */ nw4r::math::VEC3 b_0x0C;
-} EftVectors; /* size: 0x18 */
-
-/* One 0x20-byte element of the static name array `fn_800FAC1C` constructs. */
+/* One 0x20-byte element of the static name arrays the unit's `__sinit` constructs. */
 typedef struct EftNameArrayElem {
     /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ EftVectors vectors_0x04;
-    /* +0x1C */ u8 pad_0x1C[0x04];
+    /* +0x04 */ nw4r::math::CAPSULE capsule_0x04;
+
+    /* 0x800FAC78 (0x34): retail's out-of-line constructor (the capsule). */
+    EftNameArrayElem() __attribute__((never_inline)) {}
 } EftNameArrayElem; /* size: 0x20 */
 
 /* The name-table node `fn_800F97F0` reads its resource word from. */
@@ -141,6 +127,8 @@ typedef struct EftNameEntry {
 
 /* The per-manager payload `change_color_scale_eff` builds and `fn_800F9A70` reads back. */
 typedef struct EftParticleArgs {
+    /* 0x800F9A8C (0x34): constructs the position vector. */
+    EftParticleArgs() __attribute__((never_inline)) {}
     /* +0x00 */ u8 mode_0x00;
     /* +0x01 */ u8 color_0x01[4];
     /* +0x05 */ u8 color2_0x05[4];
@@ -201,15 +189,11 @@ u32 hit_point_sphr(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 r);
 
 /* The unit's own symbols other units call. */
 extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b);
-extern "C" EftVectors* pl_segment_init(EftVectors* self);
-extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 
 /* the unit's own helpers, used before their definitions below */
 extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec);
 extern "C" void fn_800FA318(EftBox* dst, const EftBox* src);
 extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src);
-extern "C" EftShape* eft_shape_init(EftShape* self);
-extern "C" EftVectors* eft_capsule_ctor(EftVectors* self);
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag);
 
 extern "C" {
@@ -217,7 +201,6 @@ extern "C" {
 void color_rgba_copy(void* dst, void* src);
 void mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void camera_proj_params_get(f32* out_a, f32* out_b);
-void VEC2_ctor(void* out);
 void* ef_emitter_tex_flags(void* self);
 void ef_word_copy(void* dst, const void* src);
 void ef_pm_handle(void* dst, void* src);
@@ -252,7 +235,6 @@ s32 eft_pro_slot_list_set_area(u32 a, u32 b, void* table, void* names);
 void* stage_effect_block_get(void);
 u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
-void pl_capsule_box_set(void* a, void* b);
 u32 pl_capsule_point_ck(void* a, void* b);
 f32 vec3_length_sq(void* v);
 
@@ -260,7 +242,6 @@ f32 vec3_length_sq(void* v);
 void __construct_array(void* base, void* ctor, u32 a, u32 elemsize, u32 count);
 
 /* the compiler-generated array constructors the unit hands to `__construct_array` */
-EftNameArrayElem* fn_800FAC78(EftNameArrayElem* self);
 
 /* the shared SDK entry points */
 void* memset(void* dst, int v, u32 n);
@@ -268,7 +249,6 @@ void* memcpy(void* dst, const void* src, u32 n);
 
 /* the unit's own symbols */
 void fn_800F9A70(void* mgr, EftParticleArgs* data);
-EftParticleArgs* fn_800F9A8C(EftParticleArgs* self);
 void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v);
 void effect_retire(EftHandle* handle, u32 flag);
 void change_color_scale_eff(void* effect, u8 mode, _GXColor* color, _GXColor* color2, f32 scale, nw4r::math::VEC3* pos, bool flag);
@@ -294,8 +274,6 @@ void Panic(const char* file, int line, const char* msg, ...);
 #include "unsplit/ef_control.h" /* eft_control (rule 2: the band) */
 extern "C" void* lbl_8058A880[];
 extern "C" void* lbl_8058A924[];
-extern "C" u8 lbl_806A1400[];
-extern "C" u8 lbl_806A2080[];
 
 #pragma fp_contract off
 #pragma peephole off
@@ -307,13 +285,11 @@ extern "C" u8 lbl_806A2080[];
 /* 0x800F95A4 - build the camera-space root transform for one effect and hand it to the draw path. */
 extern "C" void fn_800F95A4(void* self) {
     nw4r::math::MTX34 world;
-    nw4r::math::VEC3 pos;
     f32 fov;
     f32 aspect;
 
-    MTX34_ctor(&world);
-    VEC3_ctor(&pos);
-    copyVec3(&pos, &get_camera_pos());
+    nw4r::math::VEC3 pos;
+    pos = *(&get_camera_pos());
     mtx34_copy(&world, &get_current_view_mtx());
     camera_proj_params_get(&fov, &aspect);
     fn_800A602C(self, &pos, &world, fov, aspect);
@@ -349,7 +325,6 @@ extern "C" void eft_word_copy(u32* dst, const u32* src) {
 /* 0x800F96E0 - set the effect's root matrix translation from a world position. */
 void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
         mtx34_copy(&mtx, src);
@@ -363,7 +338,6 @@ void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
 /* 0x800F975C - add a world position to the effect's root matrix translation. */
 extern "C" void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)ef_effect_root_mtx(effect);
         mtx34_copy(&mtx, src);
@@ -435,12 +409,11 @@ void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor 
 /* 0x800F99D4 - hand a colour/scale request to every particle manager of the effect. */
 extern "C" void change_color_scale_eff(void* effect, u8 mode, _GXColor* color, _GXColor* color2, f32 scale, nw4r::math::VEC3* pos, bool flag) {
     EftParticleArgs args;
-    fn_800F9A8C(&args);
     args.mode_0x00 = mode;
     color_rgba_copy(args.color_0x01, color);
     color_rgba_copy(args.color2_0x05, color2);
     args.scale_0x0C = scale;
-    copyVec3(&args.pos_0x10, pos);
+    args.pos_0x10 = *pos;
     ((nw4r::ef::Effect*)effect)->ForeachParticleManager((void (*)(void*, u32))fn_800F9A70, (u32)&args, flag);
 }
 
@@ -449,18 +422,10 @@ extern "C" void fn_800F9A70(void* mgr, EftParticleArgs* data) {
     fn_800AC100(mgr, data->mode_0x00, data->color_0x01, data->color2_0x05, data->scale_0x0C, &data->pos_0x10);
 }
 
-/* 0x800F9A8C - zero a vector at +0x10 and return the record. */
-extern "C" EftParticleArgs* fn_800F9A8C(EftParticleArgs* self) {
-    VEC3_ctor(&self->pos_0x10);
-    return self;
-}
-
 /* 0x800F9AC0 - scale the effect's first emitter uniformly. */
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
     nw4r::math::VEC3 v;
     nw4r::math::VEC2 v2;
-    VEC3_ctor(&v);
-    VEC2_ctor(&v2);
     if (scale < 0.00001f) {
         return;
     }
@@ -475,14 +440,13 @@ void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
 
 /* 0x800F9B68 - install a scale vector on one handle. */
 extern "C" void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v) {
-    copyVec3(&handle->pos_0x9C, v);
+    handle->pos_0x9C = *v;
     fn_800A95D8(handle);
 }
 
 /* 0x800F9BA0 - scale the effect's first emitter by a vector. */
 void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* v) {
     nw4r::math::VEC3 tmp;
-    VEC3_ctor(&tmp);
     if (vec3_length_sq(v) < 0.00001f) {
         return;
     }
@@ -565,7 +529,6 @@ static inline void eft_color_from_u32(_GXColor* dst, u32 color) {
 #pragma opt_optimizecontrolflow off
 /* 0x800F9E04 - colour/parameter update for one spawned effect. */
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag) {
-    nw4r::math::VEC3 pos;
     _GXColor out;
     union {
         u32 word;
@@ -573,7 +536,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
     } stage;
     _GXColor cur;
     u32 v;
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     u32 color = get_stg_eft_col(get_now_areano(), flag);
     eft_color_from_u32(&stage.color, color);
 
@@ -634,27 +597,24 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
 
 /* 0x800FA208 - test one effect emitter record against a world position. */
 extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {
-    EftSphere sphere;
-    EftBox box;
-    EftShape box2;
+    PlSphere sphere;
+    PlCapsule box;
+    PlCapsuleBox box2;
     u32 result;
-    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
-    eft_capsule_ctor((EftVectors*)&box);
-    eft_shape_init(&box2);
     switch (rec->mode_0x00) {
     case 0:
         result = 0;
         break;
     case 1:
-        fn_800FA354(&sphere, (const EftSphere*)rec->sphere_0x04);
-        if (hit_point_sphr(pos, &sphere.center_0x00, sphere.radius_0x0C) == 1) {
+        fn_800FA354((EftSphere*)&sphere, (const EftSphere*)rec->sphere_0x04);
+        if (hit_point_sphr(pos, &sphere.pos, sphere.radius) == 1) {
             result = 1;
         } else {
             result = 0;
         }
         break;
     case 2:
-        fn_800FA318(&box, (const EftBox*)rec->box_0x14);
+        fn_800FA318((EftBox*)&box, (const EftBox*)rec->box_0x14);
         pl_capsule_box_set(&box, &box2);
         if (pl_capsule_point_ck(pos, &box2) == 1) {
             result = 1;
@@ -686,39 +646,10 @@ extern "C" void fn_800FA354(EftSphere* dst, const EftSphere* src) {
     *dst = *src;
 }
 
-/* 0x800FA378 - construct the box record and its two vectors. */
-extern "C" EftShape* eft_shape_init(EftShape* self) {
-    eft_capsule_ctor((EftVectors*)&self->box_0x00);
-    VEC3_ctor(&self->a_0x1C);
-    VEC3_ctor(&self->b_0x28);
-    return self;
-}
-
-/* 0x800FA3B8 - construct the sphere record. */
-extern "C" EftVectors* eft_capsule_ctor(EftVectors* self) {
-    pl_segment_init(self);
-    return self;
-}
-
-/* 0x800FA3E8 - zero the two vectors of a record. */
-extern "C" EftVectors* pl_segment_init(EftVectors* self) {
-    VEC3_ctor(&self->a_0x00);
-    VEC3_ctor(&self->b_0x0C);
-    return self;
-}
-
-/* 0x800FA420 - zero one vector. */
-extern "C" nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self) {
-    VEC3_ctor(self);
-    return self;
-}
-
 /* 0x800FA450 - run the area effect set against the world. */
 extern "C" void fn_800FA450(void* effect) {
-    EftSphere sphere;
-    nw4r::math::VEC3 pos;
-    EftBox box;
-    EftShape box2;
+    PlSphere sphere;
+    PlCapsule box;
     u32 res;
     void* handle;
     u32 i;
@@ -727,10 +658,8 @@ extern "C" void fn_800FA450(void* effect) {
     s32 alive;
     EftEmitterRecord* rec;
     s32 j;
-    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
-    eft_capsule_ctor((EftVectors*)&box);
-    VEC3_ctor(&pos);
-    eft_shape_init(&box2);
+    nw4r::math::VEC3 pos;
+    PlCapsuleBox box2;
     ef_store_word(&res, 0);
     count = ef_effect_emitter_count(effect);
     if (count == 0) {
@@ -776,16 +705,11 @@ extern "C" void fn_800FA450(void* effect) {
 
 /* 0x800FA5D4 - run the weapon effect set against a character's model. */
 extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
-    EftSphere sphere;
-    EftSphere sphere2;
+    PlSphere sphere;
+    PlSphere sphere2;
+    PlCapsule box;
     nw4r::math::VEC3 pos;
-    EftBox box;
-    EftShape shape;
-    eft_vec_ctor((nw4r::math::VEC3*)&sphere);
-    eft_vec_ctor((nw4r::math::VEC3*)&sphere2);
-    eft_capsule_ctor((EftVectors*)&box);
-    VEC3_ctor(&pos);
-    eft_shape_init(&shape);
+    PlCapsuleBox shape;
     s32 count = mhchar_mat_num_get(chr);
     u8 flags = owner->flags_0x14;
     if ((flags & 1) != 0) {
@@ -938,14 +862,8 @@ extern "C" void fn_800FA9B8(EftNameSet* out, u8 area) {
     }
 }
 
-/* 0x800FAC1C - construct the two static effect-name arrays. */
-extern "C" void fn_800FAC1C(void) {
-    __construct_array(lbl_806A1400, (void*)fn_800FAC78, 0, 0x20, 0x64);
-    __construct_array(lbl_806A2080, (void*)eft_capsule_ctor, 0, 0x1C, 4);
-}
-
-/* 0x800FAC78 - construct one 0x20-byte name-array element. */
-extern "C" EftNameArrayElem* fn_800FAC78(EftNameArrayElem* self) {
-    eft_capsule_ctor(&self->vectors_0x04);
-    return self;
+/* The two static arrays the compiler's static initialiser constructs (`.bss` 0x806A1400 / 0x806A2080). */
+extern "C" {
+EftNameArrayElem lbl_806A1400[0x64];
+nw4r::math::CAPSULE lbl_806A2080[4];
 }

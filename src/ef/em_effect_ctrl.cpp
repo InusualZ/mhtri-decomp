@@ -39,6 +39,7 @@
 #include "ef/eft_res_slot_release.h" /* eft_res_slot_release (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
+#include "stage/stg_w.h" /* get_now_area_pos (rule 2) */
 #include "Pl/plw.h"
 #include "Pl/pl_hit_sphere.h"
 #include "gx.h"
@@ -48,12 +49,13 @@
 #include "g3d/g3d_scnroot.h" /* fn_80082BCC (rule 2) */
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 
 #include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "pl.h"
+#include "stage/stg_w.h" /* get_now_area_pos (rule 2) */
 
 
 #pragma peephole off
@@ -137,12 +139,10 @@ struct EftState {
 extern "C" void* ef_resource_instance(void);
 /* Bounds-checks `index` against `obj`'s +0x08 count, then forwards to `fn_80501C9C`. */
 extern "C" void ef_resource_effect_project_at(void* obj, u16 index);
-/* The `nw4r::math::VEC3` copy the map still spells `copyVec3`. */
+/* The `nw4r::math::VEC3` copy the map still spells `VEC3::operator=`. */
 /* The library's error path (`eft_res_slot_release`). */
 /* The state-3 handler, defined below. */
 extern "C" void fn_801025F8(void* self);
-/* Builds the current area's effect vector from the per-map table at 0x806C87C0. */
-extern "C" void get_now_area_pos(nw4r::math::VEC3* out, u8 area);
 
 /* Creates the `id` effect model on `chr`; NULL on failure. */
 void* res_eft_model_create(MHchar* chr, u16 id, u32 arg);
@@ -611,7 +611,6 @@ EftAreaSphere** eft_map_area_table[22] = {
 extern "C" void eft004_model_set_start(EftState* self) {
     s32 i;
     EftModelSet* set;
-    nw4r::math::VEC3 vec;
     void* unused_0x08;
     EftAreaSphere** area_table;
 
@@ -657,8 +656,8 @@ extern "C" void eft004_model_set_start(EftState* self) {
     }
 
     self->field_01 = 1;
-    get_now_area_pos(&vec, self->area);
-    copyVec3(&set->vec, &vec);
+    nw4r::math::VEC3 vec = get_now_area_pos(self->area);
+    set->vec = vec;
 }
 
 
@@ -771,36 +770,24 @@ struct EmEffectWork {
 
 /* --- callees ------------------------------------------------------------------------------------ */
 extern "C" f32 vec3_length_sq(const nw4r::math::VEC3* work);
-extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" f32 vec3_len(const nw4r::math::VEC3* in);
 extern "C" f32 vec3_dot(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
-extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
-extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
-extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void camera_world_to_screen(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
-extern "C" void pl_segment_init(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
-extern "C" void eft_vec_ctor(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 pl_segment_sphere_hit(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 stage_oneshot_clear_ck(void);
 extern "C" u32 camera_mode1_ck(void);
 extern "C" u8 get_option_21(void);
 /* get_now_areano / get_now_mapno / eftGetKeyAlpha / vec_to_mh_vec3 come from `unsplit/unknown.h` as
- * their real declarations (rule 9).  get_camera_pos / get_camera_direction are NOT converted: their map
- * names are no-argument manglings (`__Fv`) but every call site passes an out pointer, so the only
- * declaration that reproduces the target's codegen is the `extern "C"` map spelling - the real
- * `nw4r::math::VEC3 get_camera_pos()` (struct return, sret) grows the frame 0x1C0 -> 0x1F0 and drops the
- * unit's score, so it is left and reported (rule 9, no real name expressible without a score change).
+ * their real declarations (rule 9).  get_camera_pos / get_camera_direction return by value (the owner's
+ * header), and each result is a temporary the caller assigns from.
  * move/setTevKColor are `MHchar` members whose owner (the canonical `pl.h` struct) does not carry them
  * yet - left as the map spelling and reported. */
-#include "camera/camera.h" /* get_camera_pos (rule 2: the owner's header) */
+#include "camera/camera.h" /* get_camera_pos, get_camera_direction (rule 2: the owner's header) */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_res_models_spawn_c1 ((void (*)(void*, void*, u32, s32, u32))eft_res_models_spawn)
-/* The call keeps the out-pointer view (`void (VEC3*)`) the target's frame needs: a cast call to the owner's by-value `get_camera_pos` is the same direct call to the map symbol. */
-#define get_camera_pos_c1 ((void (*)(nw4r::math::VEC3*))get_camera_pos)
-extern "C" void get_camera_direction__Fv(nw4r::math::VEC3* out);
 extern "C" void move__6MHcharFUs(_EmHandle* self, u32 motion);
 extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* self, u32 index, u32 id,
                                                                   _GXColor* color);
@@ -809,7 +796,6 @@ extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* se
 /* --- the functions, in address order ------------------------------------------------------------ */
 extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos);
 extern "C" void fn_801027D0(EmEffectWork* work);
-extern "C" EmEffectQuad* pl_segment_box_init(EmEffectQuad* quad);
 
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 
@@ -817,31 +803,6 @@ void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 #pragma peephole off
 
 extern "C" void fn_80101FA4(EmEffectWork* work) {
-    nw4r::math::VEC3 v130; /* +0x130, the model's screen position */
-    nw4r::math::VEC3 v124; /* +0x124, the camera-relative emitter position */
-    nw4r::math::VEC3 v118; /* +0x118 */
-    nw4r::math::VEC3 v10C; /* +0x10C */
-    nw4r::math::VEC3 v100; /* +0x100 */
-    nw4r::math::VEC3 vF4;  /* +0x0F4 */
-    nw4r::math::VEC3 vE8;  /* +0x0E8 */
-    nw4r::math::VEC3 vDC;  /* +0x0DC */
-    nw4r::math::VEC3 vD0;  /* +0x0D0 */
-    nw4r::math::VEC3 cam;  /* +0x0C4 */
-    nw4r::math::VEC3 vB8;  /* +0x0B8 */
-    nw4r::math::VEC3 vAC;  /* +0x0AC */
-    nw4r::math::VEC3 vA0;  /* +0x0A0 */
-    nw4r::math::VEC3 v94;  /* +0x094 */
-    nw4r::math::VEC3 v88;  /* +0x088 */
-    nw4r::math::VEC3 v7C;  /* +0x07C */
-    nw4r::math::VEC3 v70;  /* +0x070 */
-    nw4r::math::VEC3 v64;  /* +0x064 */
-    nw4r::math::VEC3 v58;  /* +0x058 */
-    nw4r::math::VEC3 v4C;  /* +0x04C */
-    nw4r::math::VEC3 v40;  /* +0x040 */
-    nw4r::math::VEC3 v34;  /* +0x034 */
-    nw4r::math::VEC3 v28;  /* +0x028 */
-    nw4r::math::VEC3 v1C;  /* +0x01C */
-    nw4r::math::VEC3 v10;  /* +0x010 */
     _GXColor color;        /* +0x00C */
     s32 model;             /* +0x008 */
     f32 f31;
@@ -856,15 +817,15 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     f32 ease;
     f32 scale;
 
-    VEC3_ctor(&v130);
-    VEC3_ctor(&v124);
-    VEC3_ctor(&v118);
-    VEC3_ctor(&v10C);
-    VEC3_ctor(&v100);
-    VEC3_ctor(&vF4);
-    VEC3_ctor(&vE8);
-    VEC3_ctor(&vDC);
-    VEC3_ctor(&vD0);
+    nw4r::math::VEC3 v130;
+    nw4r::math::VEC3 v124;
+    nw4r::math::VEC3 v118;
+    nw4r::math::VEC3 v10C;
+    nw4r::math::VEC3 v100;
+    nw4r::math::VEC3 vF4;
+    nw4r::math::VEC3 vE8;
+    nw4r::math::VEC3 vDC;
+    nw4r::math::VEC3 vD0;
     unit = work->unit;
     if (work->area != get_now_areano()) {
         work->active = 0;
@@ -878,38 +839,27 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         return;
     }
     if (stage_water_enabled_ck() != 0) {
-        get_camera_pos_c1(&cam);
-        copyVec3(&vD0, &cam);
+        vD0 = get_camera_pos();
         if (vD0.y < 0.0f) {
             return;
         }
     }
-    get_camera_direction__Fv(&vB8);
-    copyVec3(&v100, &vB8);
-    get_camera_pos_c1(&vA0);
-    subVec3(&vAC, &unit->world_pos, &vA0);
-    copyVec3(&vF4, &vAC);
+    v100 = get_camera_direction();
+    vF4 = unit->world_pos - get_camera_pos();
     model = scn_root_get_current_camera(pRoot);
     camera_world_to_screen(&model, &v130, &unit->world_pos);
     f29 = vec3_dot(&v100, &vF4);
     vec3_normalize_into(&v100, &v100);
     vec3_normalize_into(&vF4, &vF4);
-    get_camera_pos_c1(&v94);
-    copyVec3(&v124, &v94);
-    vec3_scale(&v88, &vF4, 50.0f);
-    copyVec3(&vE8, &v88);
-    addVec3To(&v124, &vE8);
+    v124 = get_camera_pos();
+    vE8 = vF4 * 50.0f;
+    v124 += vE8;
     if (!(v130.x <= -100.0f) && !(v130.x >= 740.0f) && !(v130.y <= -100.0f)
         && !(v130.y >= 580.0f) && !(f29 < 0.0f)) {
-        vec3_scale(&v64, &v100, vec3_dot(&vE8, &v100));
-        get_camera_pos_c1(&v70);
-        addVec3(&v7C, &v70, &v64);
-        copyVec3(&v10C, &v7C);
-        subVec3(&v58, &v10C, &v124);
-        copyVec3(&vE8, &v58);
+        v10C = get_camera_pos() + v100 * (vec3_dot(&vE8, &v100));
+        vE8 = v10C - v124;
         vec3_scale_in_place(&vE8, 2.0f);
-        addVec3(&v4C, &v124, &vE8);
-        copyVec3(&v118, &v4C);
+        v118 = v124 + vE8;
         f31 = (f32)(s32)vec3_len(&vE8);
         off_screen = 0.0f;
         if (v130.x >= 640.0f) {
@@ -934,16 +884,11 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
             for (i = 0; i < unit->emitter_count; i++) {
                 unit->handles[i]->offset_x = unit->entries[i].offset_x;
                 unit->handles[i]->offset_y = unit->entries[i].offset_y;
-                vec3_scale(&v28, &vE8, (f32)unit->entries[i].intensity);
-                vec3_scale(&v34, &v28, spread);
-                addVec3(&v40, &v124, &v34);
-                copyVec3(&unit->handles[i]->pos, &v40);
+                unit->handles[i]->pos = v124 + ((vE8 * ((f32)unit->entries[i].intensity)) * spread);
                 if (unit->entries[i].follow != 0) {
-                    copyVec3(&unit->handles[i]->pos, &unit->handles[0]->pos);
+                    unit->handles[i]->pos = unit->handles[0]->pos;
                 }
-                vec3_scale(&v10, &vDC, unit->entries[i].scale);
-                vec3_scale(&v1C, &v10, f31 / unit->scale);
-                addVec3To(&unit->handles[i]->pos, &v1C);
+                unit->handles[i]->pos += (vDC * unit->entries[i].scale) * (f31 / unit->scale);
                 color.r = 0xFF - unit->entries[i].color_r;
                 color.g = 0xFF - unit->entries[i].color_g;
                 color.b = 0xFF - unit->entries[i].color_b;
@@ -999,7 +944,6 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
     nw4r::math::VEC3 local;
     EmEffectUnit* unit;
 
-    VEC3_ctor(&local);
     unit = work->unit;
     unit->part_flag = part;
     if (work->emitting != work->last_emitting) {
@@ -1041,37 +985,32 @@ extern "C" void fn_801025FC(EmEffectWork* work, u8 part, nw4r::math::VEC3* pos) 
     if (get_option_21() != 0) {
         unit->color.a = (u8)((u32)unit->color.a >> 1);
     }
-    copyVec3(&unit->self->pos, pos);
+    unit->self->pos = *pos;
     setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(unit->self, 0, 3, &unit->color);
     move__6MHcharFUs(unit->self, 0);
     eft_res_models_spawn_c1(work, &unit->self, 2, 1, 0);
 }
 
 extern "C" void fn_801027D0(EmEffectWork* work) {
-    EmEffectSegment seg;   /* +0x028, from the effect to the camera */
-    EmEffectProbe point;   /* +0x018, the probe entry copied locally before it is tested */
-    nw4r::math::VEC3 eye;  /* +0x008 */
-    EmEffectQuad quad;     /* +0x040 */
     EmEffectUnit* unit;
     u8 hit;
     u32 i;
 
     unit = work->unit;
-    pl_segment_init(&seg);
-    pl_segment_box_init(&quad);
-    eft_vec_ctor(&point.pos);
+    PlSegment seg;         /* +0x028, from the effect to the camera */
+    PlSegmentBox quad;     /* +0x040 */
+    PlSphere point;        /* +0x018, the probe entry copied locally before it is tested */
     if (unit->probes == 0) {
         unit->scale_rate = 1.0f;
         return;
     }
-    copyVec3(&seg.from, &unit->world_pos);
-    get_camera_pos_c1(&eye);
-    copyVec3(&seg.to, &eye);
-    pl_segment_box_set((const PlSegment*)&seg, (PlSegmentBox*)&quad);
+    seg.start = unit->world_pos;
+    seg.end = get_camera_pos();
+    pl_segment_box_set(&seg, &quad);
     for (i = 0; unit->probes[i].scale > 0.0f; i++) {
         vec_to_mh_vec3(&point.pos, (Vec*)&unit->probes[i].pos);
-        point.scale = unit->probes[i].scale;
-        hit = pl_segment_sphere_hit(&quad, &point.pos, 0, 0);
+        point.radius = unit->probes[i].scale;
+        hit = pl_segment_sphere_hit((const EmEffectQuad*)&quad, &point.pos, 0, 0);
         if (hit != 0) {
             break;
         }
@@ -1097,11 +1036,3 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
 
 #pragma peephole on
 
-/* Zeroes the four positions of a caller's frame; the effect's own vector initialiser. */
-extern "C" EmEffectQuad* pl_segment_box_init(EmEffectQuad* quad) {
-    VEC3_ctor(&quad->v[0]);
-    VEC3_ctor(&quad->v[1]);
-    VEC3_ctor(&quad->v[2]);
-    VEC3_ctor(&quad->v[3]);
-    return quad;
-}

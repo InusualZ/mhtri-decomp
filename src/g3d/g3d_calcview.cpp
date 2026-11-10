@@ -60,7 +60,7 @@
 #include "g3d/g3d_anmchr.h" /* res_node_ref, res_node_ref_nonconst, res_node_ofs_to_node (rule 2) */
 #include "hud/mtx34_inverse_affine.h" /* mtx34_inverse_affine, mtx34_inverse_transpose, mtx34_to_mtx33, owner hud/pl_frame_sync.cpp (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
-#include "mh3_pad.h"          /* setVec3 (rule 2) */
+#include "mh3_pad.h"          /* VEC3(x, y, z) (rule 2) */
 #include "nw4r/fn_805012C4.h"  /* nw4r::math::MTX34Zero (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_get_ptr, mtx34_const_ptr (rule 2) */
 #include "MTX/PSMTXCopy.h"      /* PSMTXCopy, PSMTXConcat, PSMTXConcatArray, owner MTX/mtx.c (rule 2) */
@@ -491,8 +491,7 @@ asm void mtx34_up_axis_in_parent(register f32* pDst, register const f32* pMtx, r
 void mtx34_calc_billboard_std(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, const Mtx34* pCamera, const nw4r::g3d::ResMdl* pMdl,
                               u32 mtxId)
 {
-    nw4r::math::VEC3 axis;
-    setVec3(&axis, pOut->m[0][1], pOut->m[1][1], calcview_zero_f32);
+    nw4r::math::VEC3 axis(pOut->m[0][1], pOut->m[1][1], calcview_zero_f32);
     if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
         vec3_normalize_into(&axis, &axis);
         if (bUniformScale) {
@@ -566,11 +565,8 @@ void mtx34_calc_billboard_std_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 b
                                     u32 mtxId)
 {
     nw4r::math::VEC3 right;
-    VEC3_ctor(&right);
-    nw4r::math::VEC3 up;
-    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
-    nw4r::math::VEC3 eye;
-    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    nw4r::math::VEC3 up(pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 eye(-pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
     if (abs_f32(eye.x) >= calcview_epsilon_f32 || abs_f32(eye.y) >= calcview_epsilon_f32 ||
         abs_f32(eye.z) >= calcview_epsilon_f32) {
         vec3_normalize_into(&eye, &eye);
@@ -631,7 +627,6 @@ void mtx34_calc_billboard_y(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformS
                             const nw4r::g3d::ResMdl* pMdl, u32 mtxId)
 {
     nw4r::math::VEC3 axis;
-    VEC3_ctor(&axis);
     u32 node;
     u32 parent;
     u32 info = res_mdl_info_handle((void*)pMdl);
@@ -679,11 +674,8 @@ void mtx34_calc_billboard_y_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUn
                                   const nw4r::g3d::ResMdl* pMdl, u32 mtxId)
 {
     nw4r::math::VEC3 right;
-    VEC3_ctor(&right);
     nw4r::math::VEC3 up;
-    VEC3_ctor(&up);
-    nw4r::math::VEC3 eye;
-    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    nw4r::math::VEC3 eye(-pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
     u32 node;
     u32 parent;
     u32 info = res_mdl_info_handle((void*)pMdl);
@@ -739,11 +731,8 @@ void mtx34_calc_billboard_y_rot(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUnif
                                 u32 mtxId)
 {
     nw4r::math::VEC3 right;
-    VEC3_ctor(&right);
-    nw4r::math::VEC3 up;
-    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
-    nw4r::math::VEC3 axis;
-    setVec3(&axis, up.y, -up.x, calcview_zero_f32);
+    nw4r::math::VEC3 up(pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 axis(up.y, -up.x, calcview_zero_f32);
     if (abs_f32(up.x) >= calcview_epsilon_f32 || abs_f32(up.y) >= calcview_epsilon_f32 ||
         abs_f32(up.z) >= calcview_epsilon_f32) {
         const Mtx34* pWorld = &pWorldArray[mtxId];
@@ -771,11 +760,8 @@ void mtx34_calc_billboard_y_rot_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32
                                       const nw4r::g3d::ResMdl* pMdl, u32 mtxId)
 {
     nw4r::math::VEC3 right;
-    VEC3_ctor(&right);
-    nw4r::math::VEC3 up;
-    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
-    nw4r::math::VEC3 eye;
-    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    nw4r::math::VEC3 up(pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 eye(-pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
     if (abs_f32(up.x) >= calcview_epsilon_f32 || abs_f32(up.y) >= calcview_epsilon_f32 ||
         abs_f32(up.z) >= calcview_epsilon_f32) {
         const Mtx34* pWorld = &pWorldArray[mtxId];
@@ -825,7 +811,6 @@ void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pView
         }
         Mtx34* pWork = (Mtx34*)g3d_billboard_work_mtx();
         for (u32 i = 0; i < numMtx; i++) {
-            Mtx34 inverse;
             u32 node;
             u32 parentNode;
             ResHandle mdl;
@@ -862,7 +847,7 @@ void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pView
                     }
                 }
                 if (bHasChild) {
-                    MTX34_ctor(&inverse);
+                    Mtx34 inverse;
                     if (mtx34_inverse_affine(&inverse, &pWorldMtxArray[i]) == 1) {
                         mtx34_concat(&pWork[i], &pViewPosMtxArray[i], &inverse);
                     } else {
@@ -980,7 +965,6 @@ void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pV
                 mtx34_concat(pPosBuf, pCamera, pWorld);
             }
             for (u32 i = 0; i < num; i++) {
-                Mtx34 inverse;
                 u32 node;
                 u32 parentNode;
                 ResHandle mdl;
@@ -1019,7 +1003,7 @@ void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pV
                         }
                     }
                     if (bHasChild) {
-                        MTX34_ctor(&inverse);
+                        Mtx34 inverse;
                         if (mtx34_inverse_affine(&inverse, &pWorldMtxArray[base + i]) == 1) {
                             mtx34_concat(&pWork[base + i], &pPosBuf[i], &inverse);
                         } else {
@@ -1161,7 +1145,6 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
                 mtx34_concat(pPosBuf, pCamera, pWorldBuf);
             }
             for (u32 i = 0; i < num; i++) {
-                Mtx34 inverse;
                 u32 node;
                 u32 parentNode;
                 ResHandle mdl;
@@ -1200,7 +1183,7 @@ void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33
                         }
                     }
                     if (bHasChild) {
-                        MTX34_ctor(&inverse);
+                        Mtx34 inverse;
                         if (mtx34_inverse_affine(&inverse, &pWorldMtxArray[base + i]) == 1) {
                             mtx34_concat(&pWork[base + i], &pPosBuf[i], &inverse);
                         } else {

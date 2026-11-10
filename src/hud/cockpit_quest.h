@@ -164,8 +164,8 @@ void cockpit_item_tag_draw_at(_PLW* plw, const CockpitItemTag* tag, const _mh_iv
 s32 cockpit_item_slot_live_ck(_PLW* plw, u16 idx);                                        /* 0x802EEC24 */
 s16 cockpit_item_slot_live_count(_PLW* plw);                                                 /* 0x802EECA0 */
 u8 cockpit_lockon_level_get(_PLW* plw);                                                  /* 0x802EED0C */
-void cockpit_aim_marker_draw(VEC3 pos);                                                 /* 0x802EEDE4 */
-void cockpit_aim_marker_draw_split(VEC3 pos, u8 player);                                      /* 0x802EEEA0 */
+void cockpit_aim_marker_draw(_VEC3 pos);                                                 /* 0x802EEDE4 */
+void cockpit_aim_marker_draw_split(_VEC3 pos, u8 player);                                      /* 0x802EEEA0 */
 void cockpit_eye_marker_draw(_PLW* plw);                                                /* 0x802EEF7C */
 void cockpit_eye_marker_draw_split(_PLW* plw);                                                /* 0x802EF00C */
 void cockpit_shell_marker_draw(_PLW* plw);                                                                                     /* 0x802EF0A0 */
@@ -192,11 +192,6 @@ void cockpit_split_weapon_hud_draw(CockpitWork* work, u8 player);               
 void cockpit_split_aim_view_draw(CockpitWork* work, u8 player);                             /* 0x802F1B1C */
 void cockpit_split_ammo_gauge_draw(_PLW* plw, s16 x, s16 y, u8 aim);                          /* 0x802F1CF8 */
 void cockpit_split_flash_gauge_draw(CockpitWork* work, u8 player);                             /* 0x802F1F34 */
-void cockpit_static_init(void);                                                     /* 0x802F20D8 */
-CockpitState* cockpit_state_construct(CockpitState* state);                             /* 0x802F2120 */
-PitTrap* pit_trap_construct(PitTrap* trap);                                        /* 0x802F2178 */
-CockpitWork* cockpit_work_construct(CockpitWork* work);                                /* 0x802F21A8 */
-CockpitItemTag* cockpit_item_tag_construct(CockpitItemTag* tag);                           /* 0x802F2208 */
 
 /* One player's weapon-frame sprite ids (`cockpit_weapon_frame_draw`): the glow and the condition marker.  size: 0x8 */
 typedef struct CockpitWeaponIds {

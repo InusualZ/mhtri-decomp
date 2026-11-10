@@ -98,7 +98,7 @@ inline void GXTexCoord2f32(f32 s, f32 t) {
 inline void GXEnd() {}
 
 /* A texture coordinate built by a constructor, as the layout library's VEC2(x, y) builds one. size: 0x8 */
-struct CornerVEC2 : public nw4r::math::VEC2 {
+struct CornerVEC2 : public nw4r::math::_VEC2 {
     CornerVEC2(f32 fx, f32 fy) {
         x = fx;
         y = fy;

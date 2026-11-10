@@ -48,7 +48,7 @@
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80114E34_types.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -280,8 +280,6 @@ extern "C" void fn_801156A0(_EFT* self)
     s32 j;
     f32 z;
 
-    VEC3_ctor(&v);
-    MTX34_ctor(&mtx);
     work = (_EFT_WORK_B*)self->work_0x38;
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
@@ -340,7 +338,7 @@ extern "C" void fn_801156A0(_EFT* self)
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = z + v.z;
         mtx34_trans_get_c1(&work->mtx[i][0], &self->pos_0x18, z);
-        copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
+        work->models[i]->pos_0x04 = self->pos_0x18;
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
         work->models[i]->field_0x30 = self->field_0x2C;
@@ -369,8 +367,6 @@ EftModelCallback::EftModelCallback()
 /* Moves the eft021 record's models through their pose animation. */
 extern "C" void fn_80115A80(_EFT* self)
 {
-    nw4r::math::VEC3 v;
-    nw4r::math::MTX34 mtx;
     _EFT_WORK_B* work;
     _PLW* plw;
     _GXColor color;
@@ -389,8 +385,8 @@ extern "C" void fn_80115A80(_EFT* self)
     f32 f30 = 20.0f;
     f32 f31 = 255.0f;
 
-    VEC3_ctor(&v);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 v;
+    nw4r::math::MTX34 mtx;
     work = (_EFT_WORK_B*)self->work_0x38;
     if (self->type_0x02 != 2) {
         plw = (_PLW*)self->source_0x30;
@@ -484,7 +480,7 @@ extern "C" void fn_80115A80(_EFT* self)
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = f1 + v.z;
         mtx34_trans_get_c1(&work->mtx[i][0], &self->pos_0x18, f1);
-        copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
+        work->models[i]->pos_0x04 = self->pos_0x18;
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
         work->models[i]->field_0x30 = self->field_0x2C;
@@ -533,10 +529,6 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
                                      nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
     EftModelCallback* obj = this;
-    nw4r::math::MTX34 out;
-    nw4r::math::MTX34 ma;
-    nw4r::math::MTX34 mb;
-    nw4r::math::MTX34 mc;
     nw4r::math::MTX34* dst;
     nw4r::math::VEC3* a;
     nw4r::math::VEC3* b;
@@ -553,13 +545,13 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
 
     effect = obj->owner_0x04;
     work = (_EFT_WORK_B*)effect->work_0x38;
-    VEC3_ctor((nw4r::math::VEC3*)&out);
-    VEC3_ctor((nw4r::math::VEC3*)&ma);
-    VEC3_ctor((nw4r::math::VEC3*)&mb);
-    MTX34_ctor(&mc);
-    MTX34_ctor(&out);
-    MTX34_ctor(&ma);
-    MTX34_ctor(&mb);
+    nw4r::math::VEC3 scratch0;
+    nw4r::math::VEC3 scratch1;
+    nw4r::math::VEC3 scratch2;
+    nw4r::math::MTX34 mc;
+    nw4r::math::MTX34 out;
+    nw4r::math::MTX34 ma;
+    nw4r::math::MTX34 mb;
     nw4r::g3d::ResNode h0((void*)0);
     nw4r::g3d::ResNode h1((void*)0);
     s32 id0;
@@ -619,7 +611,7 @@ void eft022_set(nw4r::math::VEC3* pos, u8 area)
     effect->release_0x40 = fn_801164F0;
     effect->field_0x03 = 22;
     effect->area_0x44 = area;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->type_0x02 = 0;
     effect->timer_0x0C = 0;
     effect->flag_0x01 = 1;
@@ -645,7 +637,7 @@ extern "C" void eft022_spawn(void* source, nw4r::math::VEC3* pos, u8 area)
     effect->release_0x40 = fn_801164F0;
     effect->field_0x03 = 22;
     effect->area_0x44 = area;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->type_0x02 = 1;
     effect->timer_0x0C = 0;
     effect->flag_0x01 = 1;

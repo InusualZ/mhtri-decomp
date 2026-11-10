@@ -13,7 +13,7 @@
  * SEAM - registered edges 0x804459E4 / 0x80448404; the internal extent is NOT proven:
  *   - left: 0x804459E4 starts the band's own `.data` (0x80607210) and `.sdata` (0x80793B28) runs; the
  *     accessor `fn_804459DC` before it reads `arena_lsp_data_adrs`, so it is a candidate first function.
- *   - right: 0x80448404 begins the save-file module; `arena_camera_light_vec_init` (0x80448358) writes
+ *   - right: 0x80448404 begins the save-file module; the unit's `__sinit` (0x80448358) builds
  *     this band's two `.bss` vector arrays, so the cut is exactly there.
  *   - unproven internal cut 0x80446990: the band's `.data` (0x806073B8, 0x806073E0) and `.bss` (0x806E4078,
  *     0x806E4090) tail runs tile a second object under that cut; `tudiscover.py` has no strong cut there.
@@ -30,12 +30,12 @@
  *     (`arena_task` 83.50 -> 80.73 %), which the target does not do.
  *   - `.sbss` 8 of 20 B (`que_info` and `arena_lsp_data_adrs`, defined at the foot; the other 12 claimed bytes
  *     have no reference in the DOL), `.sdata2` 0 of 56 B (naming the pool needs float literals, which makes
- *     the 100 % camera/vec functions' relocations anonymous) and `.ctors` 0 of 4 B (`arena_camera_light_vec_init`
- *     is a static initialiser; the flip needs its file-scope object) are not emitted.
+ *     the 100 % camera/vec functions' relocations anonymous) are not emitted; `.ctors` is the
+ *     compiler's `__sinit` word (the two vector arrays are defined with `VEC3(x, y, z)` initialisers).
  *   - the orphan census lists `stage_w` (0x806B87C0, shared by four units, so not claimable here) and
  *     `multi_arena_clr_time` (shared with `quest/quest_entry`); `dataclaim.py --fixpoint` has nothing to claim.
- *   `flipcheck.py` answers NOT READY: `.text` bytes, `.sbss`, `.sdata` (one pad byte), `.sdata2`,
- *     `.ctors` and one extabindex byte (`arena_task`'s size, 4 B over); extab is byte-identical.
+ *   `flipcheck.py` answers NOT READY: `.text` bytes, `.sbss`, `.sdata` (one pad byte), `.sdata2`
+ *     and one extabindex byte (`arena_task`'s size, 4 B over); extab is byte-identical.
  *
  * NAMES: real names from the map/dump where they exist; the rest are GUESSES from the bodies -
  *   `arena_camera_vec`, `arena_light_vec`, `arena_user_data_buf` (0x100-byte records selected by
@@ -121,7 +121,7 @@
 #include "fn_80047398.h"        /* `arena_userdata_apply`, `subTransSetPrio` (the owner's header, rule 2) */
 #include "fn_8004CAD8.h"        /* `get_vsUser_work` and the `ResTex`/`ResPltt` handle helpers (the owner's header, rule 2) */
 #include "Pl/fn_802693C4.h"     /* `Get_motion_no` / `Pl_chr_setX` (the owner's header, rule 2) */
-#include "mh3_pad/vec3.h"       /* `setVec3` (the owner header, rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "Runtime.PPCEABI.H/memcpy.h" /* `memcpy` (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h" /* `memset` (the owner's header, rule 2) */
 #include "menu/get_pop_dat_ptr.h"  /* `get_arena_cfg` (the owner header, rule 2) */
@@ -129,7 +129,7 @@
 #include "Pl/fn_8027D684.h"     /* the equip colour accessors (the owner's header, rule 2) */
 #include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera` (the owner's header, rule 2) */
 #include "g3d/g3d_scnroot.h"    /* `nw4r::g3d::ScnRoot` (the owner's header, rule 2) */
-#include "g3d/g3d_anmscn.h"    /* `camera_posture_info_ctor` (the owner's header, rule 2) */
+#include "g3d/g3d_anmscn.h"    /* `nw4r::g3d::Camera::PostureInfo` (the owner's header, rule 2) */
 #include "camera/fn_802B5C58.h" /* `camera_position_set` (the owner's header, rule 2) */
 #include "mh3_pad.h"            /* `word_copy_return_dst`, `TaskSlot` (the owner's header, rule 2) */
 #include "unsplit/g3d.h"        /* `pRoot`, the g3d scene root (unowned: band header) */
@@ -984,15 +984,14 @@ extern "C" void arena_player_init(ArenaWork* params) {
 /* Points the scene's first camera at the arena: position from `arena_camera_vec[0]`, target from
  * `[1]`, a perspective of the arena's own fov and clip range. */
 extern "C" void arena_camera_init(ArenaWork* work) {
-    nw4r::g3d::Camera::PostureInfo posture;
     nw4r::g3d::Camera camera;
     s32 handle;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(0);
     word_copy_return_dst(&camera, &handle);
-    camera_posture_info_ctor(&posture);
+    nw4r::g3d::Camera::PostureInfo posture;
     posture.mType = 2;
-    copyVec3((nw4r::math::VEC3*)&posture.mTargetX, &arena_camera_vec[1]);
+    posture.mTarget = arena_camera_vec[1];
     posture.mUnk28 = arena_zero_f;
     camera_position_set(&camera, &arena_camera_vec[0]);
     camera.SetPosture(posture);
@@ -1657,16 +1656,6 @@ extern "C" s32 arena_game_task(ArenaWork* work) {
     return 0;
 }
 
-/* Writes the six default vectors the arena camera and the four arena lights start from. */
-extern "C" void arena_camera_light_vec_init(void) {
-    setVec3(&arena_camera_vec[0], arena_zero_f, arena_85f, arena_440f);
-    setVec3(&arena_camera_vec[1], arena_zero_f, arena_75f, arena_zero_f);
-    setVec3(&arena_light_vec[0], arena_zero_f, arena_zero_f, arena_50f);
-    setVec3(&arena_light_vec[1], arena_n50f, arena_70f, arena_20f);
-    setVec3(&arena_light_vec[2], arena_70f, arena_n30f, arena_n20f);
-    setVec3(&arena_light_vec[3], arena_zero_f, arena_100f, arena_zero_f);
-}
-
 /* The spawn offsets `arena_player_init` indexes by slot kind: three (x, y, z) rows - kind 0 at the
  * origin, kind 1 to the left and kind 2 to the right - and a zero pad word.  `.data` 0x80607.. (0x28 B). */
 f32 arena_player_offset_table[10] = {0.0f, 0.0f, 0.0f, -140.0f, -40.0f, 0.0f, 140.0f, -40.0f, 0.0f, 0.0f};
@@ -1679,7 +1668,16 @@ u32 arena_light_colors[4] = {0x5A5A5AFF, 0xFFFFFFFF, 0x405050FF, 0x808080FF};
 u8 arena_user_data_buf[0x200];
 ArenaWork arena_work;
 u32 arena_draw_func[4];
-nw4r::math::VEC3 arena_camera_vec[2];
-nw4r::math::VEC3 arena_light_vec[4];
+/* The arena camera's eye and look-at and the four arena light positions, built by the unit's `__sinit`. */
+nw4r::math::VEC3 arena_camera_vec[2] = {
+    nw4r::math::VEC3(arena_zero_f, arena_85f, arena_440f),
+    nw4r::math::VEC3(arena_zero_f, arena_75f, arena_zero_f),
+};
+nw4r::math::VEC3 arena_light_vec[4] = {
+    nw4r::math::VEC3(arena_zero_f, arena_zero_f, arena_50f),
+    nw4r::math::VEC3(arena_n50f, arena_70f, arena_20f),
+    nw4r::math::VEC3(arena_70f, arena_n30f, arena_n20f),
+    nw4r::math::VEC3(arena_zero_f, arena_100f, arena_zero_f),
+};
 ArenaQuestInfoList* que_info;
 u8* arena_lsp_data_adrs;

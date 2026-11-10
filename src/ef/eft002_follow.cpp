@@ -17,7 +17,11 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "ef/effect.h"   /* SetRootMtxTrans, effect_move (rule 2) */
+#include "stage/stg_w.h" /* get_now_areano (rule 2) */
+
+/* The unit was written in C: its own symbols and the plain-named callees keep C linkage. */
+extern "C" {
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math type the mangled callees take
@@ -76,23 +80,16 @@ struct _EFT_S8 {
  * ------------------------------------------------------------------------------------------------- */
 
       /* a `blr` stub in the DOL: the VEC3 ctor */
-extern void* addVec3To(VEC3* dst, const VEC3* src);
 extern void eft_res_models_spawn(void* self, void* effects, u32 mode, s32 count, u32 arg);
 extern void eft_res_slot_release(void* self);
-extern void fn_800FD718(struct _EFT_S8* self);
-extern void fn_800FD850(struct _EFT_S8* self);
-extern void fn_800FD860(struct _EFT_S8* self);
+extern void eft002_follow(struct _EFT_S8* self);
+extern void eft002_state_next(struct _EFT_S8* self);
+extern void eft002_release(struct _EFT_S8* self);
 
 /* The mangled callees, declared with the map's spelling (docs/plan.md, "The language comes from the
  * symbol"): `setVector3(nw4r::math::VEC3*, f32, f32, f32)`, `rotVecX/rotVecZ(..., u32)`,
  * `SetRootMtxTrans(nw4r::ef::Effect*, nw4r::math::VEC3*)`, `effect_move(nw4r::ef::Effect*)`,
  * `get_now_areano()`. */
-extern u32 get_now_areano__Fv(void);
-extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3* v, f32 x, f32 y, f32 z);
-extern void rotVecX__FPQ34nw4r4math4VEC3Ul(VEC3* v, u32 angle);
-extern void rotVecZ__FPQ34nw4r4math4VEC3Ul(VEC3* v, u32 angle);
-extern void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect, VEC3* pos);
-extern u32 effect_move__FPQ34nw4r2ef6Effect(void* effect);
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
@@ -100,14 +97,13 @@ extern u32 effect_move__FPQ34nw4r2ef6Effect(void* effect);
 
 /* Per-frame body of the shell family's effect: counts the frame budget down, drops the effect once the
  * shell is gone, and re-seats it on the shell's position while the shell is in the effect's area. */
-void fn_800FD718(struct _EFT_S8* self)
+void eft002_follow(struct _EFT_S8* self)
 {
     struct _EFT_WORK* work;
     struct _SHELL_W* source;
-    VEC3 v;
 
     work = self->work_0x38;
-    VEC3_ctor(&v);
+    VEC3 v;
 
     if (self->type_0x02 == 1) {
         source = (struct _SHELL_W*)self->source_0x30;
@@ -118,18 +114,18 @@ void fn_800FD718(struct _EFT_S8* self)
             return;
         }
         self->area_0x44 = source->area_0x08;
-        if (self->area_0x44 != (u8)get_now_areano__Fv()) {
+        if (self->area_0x44 != (u8)get_now_areano()) {
             return;
         }
-        copyVec3(&self->pos_0x18, &source->pos_0x18);
-        setVector3__FPQ34nw4r4math4VEC3fff(&v, 0.0f, 20.0f, 0.0f);
-        rotVecX__FPQ34nw4r4math4VEC3Ul(&v, source->rot_x_0x24);
-        rotVecZ__FPQ34nw4r4math4VEC3Ul(&v, source->rot_z_0x2C);
-        addVec3To(&self->pos_0x18, &v);
-        SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effect, &self->pos_0x18);
+        self->pos_0x18 = source->pos_0x18;
+        setVector3(&v, 0.0f, 20.0f, 0.0f);
+        rotVecX(&v, source->rot_x_0x24);
+        rotVecZ(&v, source->rot_z_0x2C);
+        self->pos_0x18 += v;
+        SetRootMtxTrans((nw4r::ef::Effect*)work->effect, &self->pos_0x18);
     }
 
-    if (effect_move__FPQ34nw4r2ef6Effect(work->effect) == 0) {
+    if (effect_move((nw4r::ef::Effect*)work->effect) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
         return;
@@ -138,13 +134,15 @@ void fn_800FD718(struct _EFT_S8* self)
 }
 
 /* Advances the effect one state: the state-2 "nothing left to do" step. */
-void fn_800FD850(struct _EFT_S8* self)
+void eft002_state_next(struct _EFT_S8* self)
 {
     self->state_0x05++;
 }
 
 /* Releases the effect: the state-3 step, the release `eft_res_slot_release` performs. */
-void fn_800FD860(struct _EFT_S8* self)
+void eft002_release(struct _EFT_S8* self)
 {
     eft_res_slot_release(self);
 }
+
+} /* extern "C" */

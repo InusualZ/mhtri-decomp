@@ -1235,12 +1235,11 @@ extern "C" s32 fn_80245E20(_PLW* self) {
 
 /* Drops the actor onto the ground of its area's zone; a dead master rides down, any other actor turns visible. */
 extern "C" u32 pl_zone_ground_drop(_PLW* self) {
-    VEC3 ground;
+    LandData ground;
     u32 zone;
     f32 height;
     u8 area;
 
-    em_land_data_init(&ground);
     area = self->area_0x16;
     if (area == 0xFF) {
         return 0;
@@ -1346,8 +1345,6 @@ extern "C" void pl_act_state_reset(_PLW* self) {
 extern "C" void fn_80246158(_PLW* self) {
     VEC3 vec;
     VEC3 scratch;
-    VEC3_ctor(&vec);
-    VEC3_ctor(&scratch);
     vec.x = lbl_805C4898[self->chunk_ofs * 2];
     vec.y = pl_float_zero;
     vec.z = lbl_805C4898[self->chunk_ofs * 2 + 1];
@@ -1379,7 +1376,7 @@ extern "C" void pl_pos_place(_PLW* self, VEC3* pos, u16 angle, u8 kind, u8 area,
     if (keepChase == 0) {
         fn_80246158(self);
     }
-    copyVec3(&self->vec_0x048, &self->vec_0x03C);
+    self->vec_0x048 = self->vec_0x03C;
     ground = GetGroundHit(&self->vec_0x03C, -5, self->area_0x16);
     if (self->vec_0x03C.y < ground) {
         self->vec_0x03C.y = ground;
@@ -1629,7 +1626,6 @@ extern "C" s32 pl_ground_height_probe(_PLW* self, f32* height) {
     f32 below;
     s32 hit;
 
-    em_land_data_init(&land);
     if (pl_ground_check(self, &self->vec_0x03C, &land, &below, 4) != 0) {
         if (pl_ground_check(self, &self->vec_0x03C, &land, height, -6) == 0) {
             *height = below;
@@ -1880,10 +1876,7 @@ extern "C" void pl_act_draw(_PLW* self, s32 variant) {
 extern "C" void pl_act_step_down(_PLW* self, s32 variant) {
     VEC3 step;
     VEC3 probe;
-    VEC3 ahead;
 
-    VEC3_ctor(&step);
-    VEC3_ctor(&probe);
     pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
     case 0:
@@ -1900,8 +1893,7 @@ extern "C" void pl_act_step_down(_PLW* self, s32 variant) {
         step.y = pl_frame_window_180;
         step.z = pl_frame_window_55;
         rotVecY(&step, self->rot_0x54.y);
-        addVec3(&ahead, &self->vec_0x03C, &step);
-        copyVec3(&probe, &ahead);
+        probe = self->vec_0x03C + step;
         self->vec_0x03C.y = GetGroundHit(&probe, -6, self->area_0x16);
         self->vec_0x03C.x += step.x;
         self->vec_0x03C.z += step.z;
@@ -1920,10 +1912,7 @@ extern "C" void pl_act_step_down(_PLW* self, s32 variant) {
 extern "C" void pl_act_step_up(_PLW* self) {
     VEC3 step;
     VEC3 probe;
-    VEC3 ahead;
 
-    VEC3_ctor(&step);
-    VEC3_ctor(&probe);
     pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
     case 0:
@@ -1937,8 +1926,7 @@ extern "C" void pl_act_step_up(_PLW* self) {
         step.y = pl_frame_window_210;
         step.z = pl_frame_window_55;
         rotVecY(&step, self->rot_0x54.y);
-        addVec3(&ahead, &self->vec_0x03C, &step);
-        copyVec3(&probe, &ahead);
+        probe = self->vec_0x03C + step;
         self->vec_0x03C.y = GetGroundHit(&probe, -6, self->area_0x16);
         self->vec_0x03C.x += step.x;
         self->vec_0x03C.z += step.z;
@@ -1990,7 +1978,6 @@ extern "C" void fn_802478A4(_PLW* self) {
 extern "C" void pl_act_flinch(_PLW* self, s32 variant) {
     VEC3 slide;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->field_0x28 = 0;
@@ -2077,10 +2064,8 @@ extern "C" void fn_80247C2C(_PLW* self) {
 
 /* 0x80247CC4 (0xB0): Steps the actor forward along its facing and picks the ground/air kind from the height. */
 extern "C" void fn_80247CC4(_PLW* self) {
-    VEC3 work;
     VEC3 vec;
-    VEC3_ctor(&vec);
-    em_land_data_init(&work);
+    LandData work;
     vec.x = pl_float_zero;
     vec.y = pl_float_zero;
     vec.z = pl_frame_window_3;
@@ -2407,7 +2392,6 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
     s32 part;
     s32 frame;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -2494,7 +2478,7 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
             slide.y = pl_float_zero;
             slide.z = pl_float_neg8;
             rotVecXYZ(&slide, &self->rot_0x54);
-            addVec3To(&self->vec_0x03C, &slide);
+            self->vec_0x03C += slide;
         }
         if ((u32)variant <= 1 && self->field_0x002 == (s8)8 &&
             Pl_frame_check(self, 2, pl_frame_window_20, pl_float_zero) == 1) {
@@ -2578,11 +2562,10 @@ extern "C" void pl_act_knockback(_PLW* self, s32 variant, s32 level, u8 alt) {
  * master to the camp entry when the motion ends. */
 #pragma opt_common_subs off
 extern "C" void pl_act_item_throw(_PLW* self, s32 kind) {
-    VEC3 camp;
     s16* act;
     f32 useFrame;
 
-    setVec3(&camp, pl_float_zero, pl_float_zero, pl_float_zero);
+    VEC3 camp(pl_float_zero, pl_float_zero, pl_float_zero);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -2652,7 +2635,7 @@ extern "C" void pl_act_item_throw(_PLW* self, s32 kind) {
             if (kind != 2 && kind != 5) {
                 Pl_act_set_motion_slot(self, self->kind_0x09, pl_item_throw_tbl[(u32)(kind * 4 + 3)], 0);
             } else if (Pl_master_ck(self) == 1) {
-                copyVec3(&camp, stage_entry_pos_get(self->kind_0x015, 0));
+                camp = *stage_entry_pos_get(self->kind_0x015, 0);
                 pl_act_stage_latch_set(self, 1);
                 pl_warp_start(0, &camp, 0);
                 pl_act_set_gauge_arm(self, 2);
@@ -2854,7 +2837,6 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
     f32 swing;
     u8 dir;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -2997,7 +2979,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
             slide.y = pl_float_zero;
             slide.z = pl_float_neg8;
             rotVecXYZ(&slide, &self->rot_0x54);
-            addVec3To(&self->vec_0x03C, &slide);
+            self->vec_0x03C += slide;
         }
         if (Pl_frame_check(self, 1, pl_frame_window_18, pl_float_zero) == 1) {
             slide.x = pl_float_zero;
@@ -3039,7 +3021,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
             }
             if (self->field_0x006 == 0) {
                 rotVecXYZ(&slide, &self->rot_0x54);
-                addVec3To(&self->vec_0x03C, &slide);
+                self->vec_0x03C += slide;
             }
         }
         if (Pl_Skill_ck(self, 0xB6) == 1 && Pl_frame_check(self, 2, pl_frame_window_20, pl_float_zero) == 1) {
@@ -3064,7 +3046,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
                 break;
             }
             rotVecXYZ(&slide, &self->rot_0x54);
-            addVec3To(&self->vec_0x03C, &slide);
+            self->vec_0x03C += slide;
         }
         break;
     case 2:
@@ -3080,7 +3062,6 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
 extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -3147,7 +3128,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
             /* +0x054 is the actor's rotation; other units read its first word as a scalar, so the
              * `_CP_VECTOR` view is taken through the named field rather than a byte offset. */
             rotVecXYZ(&vec, (_CP_VECTOR*)&self->param_0x54);
-            addVec3To(&self->field_0x03C, &vec);
+            *(VEC3*)&self->field_0x03C += vec;
         }
         break;
     }
@@ -5406,7 +5387,6 @@ extern "C" void pl_act_step_offhand_gesture(_PLW* self, s32 part)
 extern "C" void pl_act_launched(_PLW* self) {
     VEC3 launch;
 
-    VEC3_ctor(&launch);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -5716,8 +5696,6 @@ extern "C" void pl_act_rest_spot(_PLW* self) {
     s32 index;
     s16 kind;
 
-    VEC3_ctor(&spot);
-    VEC3_ctor(&ahead);
     if (--self->field_0x28 <= 0) {
         self->field_0x28 = 0;
     }
@@ -5850,7 +5828,6 @@ extern "C" void pl_act_step_84(_PLW* self)
 extern "C" void pl_act_resting(_PLW* self) {
     VEC3 rise;
 
-    VEC3_ctor(&rise);
     pl_act_set_step_time(self, 2);
     pl_act_set_gauge_arm(self, 2);
     switch (self->act_step_0x05) {
@@ -6992,7 +6969,6 @@ extern "C" void pl_act_group0_dispatch(_PLW* self) {
 extern "C" void pl_act_guard(_PLW* self) {
     VEC3 push;
 
-    VEC3_ctor(&push);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7062,7 +7038,6 @@ extern "C" void pl_act_crouch(_PLW* self, s32 variant) {
     VEC3 push;
     u8 limit;
 
-    VEC3_ctor(&push);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7109,7 +7084,6 @@ extern "C" void pl_act_crouch(_PLW* self, s32 variant) {
 extern "C" void pl_act_sneak(_PLW* self, s32 variant) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7210,7 +7184,6 @@ extern "C" void pl_act_quick_turn(_PLW* self) {
 extern "C" void pl_act_dash(_PLW* self, s32 variant) {
     VEC3 run;
 
-    VEC3_ctor(&run);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7284,7 +7257,7 @@ extern "C" void pl_act_dash(_PLW* self, s32 variant) {
             }
         }
         rotVecXYZ(&run, &self->rot_0x54);
-        addVec3To(&self->vec_0x03C, &run);
+        self->vec_0x03C += run;
         break;
     }
 }
@@ -7313,7 +7286,6 @@ extern "C" void pl_act_step_arm_table(_PLW* self) {
 extern "C" void pl_act_walk(_PLW* self, s32 unused) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7503,7 +7475,6 @@ extern "C" void pl_act_look_around(_PLW* self) {
 extern "C" void pl_act_tired_walk(_PLW* self, s32 variant) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7576,7 +7547,6 @@ extern "C" void pl_act_gauge_gate_by_skill(_PLW* self)
 extern "C" void pl_act_tiptoe(_PLW* self, s32 variant) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7709,7 +7679,6 @@ extern "C" void pl_act_dash_turn(_PLW* self) {
 extern "C" void pl_act_dash_stop(_PLW* self) {
     VEC3 slide;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7771,7 +7740,6 @@ extern "C" void pl_act_step_attr_112(_PLW* self)
 extern "C" void pl_act_run(_PLW* self) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7823,7 +7791,6 @@ extern "C" void pl_act_run(_PLW* self) {
 extern "C" void pl_act_run_turn(_PLW* self) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -7873,7 +7840,6 @@ extern "C" void pl_act_run_turn(_PLW* self) {
 extern "C" void pl_act_hidden_walk(_PLW* self) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -8055,7 +8021,6 @@ extern "C" void pl_act_jump(_PLW* self, s32 variant) {
     f32 ledge;
     u8 hit;
 
-    VEC3_ctor(&move);
     self->field_0x28++;
     switch (self->act_step_0x05) {
     case 0:
@@ -8182,7 +8147,6 @@ extern "C" void pl_act_climb_down(_PLW* self, s32 variant) {
     f32 scale;
     f32 speed;
 
-    VEC3_ctor(&back);
     self->field_0x28++;
     switch (self->act_step_0x05) {
     case 0:
@@ -8409,7 +8373,6 @@ extern "C" void pl_act_weapon_sheathe_attack(_PLW* self) {
 extern "C" void pl_act_weapon_thrust(_PLW* self) {
     VEC3 lunge;
 
-    VEC3_ctor(&lunge);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -8488,7 +8451,6 @@ extern "C" void pl_act_weapon_thrust(_PLW* self) {
 extern "C" void pl_act_weapon_swing(_PLW* self, s32 variant) {
     VEC3 lunge;
 
-    VEC3_ctor(&lunge);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -8624,7 +8586,6 @@ extern "C" void pl_act_weapon_follow_up(_PLW* self, s32 variant) {
     VEC3 lunge;
     s16 slot;
 
-    VEC3_ctor(&lunge);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -8963,7 +8924,6 @@ extern "C" void pl_act_knockback_flight(_PLW* self, s32 variant) {
     s32 hit;
     u32 done;
 
-    VEC3_ctor(&fly);
     pl_act_set_gauge_arm(self, 2);
     switch (self->act_step_0x05) {
     case 0:
@@ -9092,7 +9052,6 @@ extern "C" void pl_act_blown_away(_PLW* self, s32 variant) {
     f32 back;
     u16 motion;
 
-    VEC3_ctor(&fly);
     pl_act_set_gauge_arm(self, 2);
     switch (self->act_step_0x05) {
     case 0:
@@ -9331,8 +9290,6 @@ extern "C" void pl_act_mud_stuck(_PLW* self, s32 variant) {
     VEC3 unused;
     u8 count;
 
-    VEC3_ctor(&wade);
-    VEC3_ctor(&unused);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9389,7 +9346,6 @@ extern "C" void pl_act_mud_stuck(_PLW* self, s32 variant) {
 extern "C" void pl_act_mud_stand(_PLW* self) {
     VEC3 unused;
 
-    VEC3_ctor(&unused);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9425,7 +9381,6 @@ extern "C" void pl_act_mud_walk(_PLW* self, s32 variant) {
     VEC3 wade;
     u8 count;
 
-    VEC3_ctor(&wade);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9603,7 +9558,6 @@ extern "C" void pl_act_sleep(_PLW* self) {
 extern "C" void pl_act_drowsy_walk(_PLW* self) {
     VEC3 unused;
 
-    VEC3_ctor(&unused);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9640,7 +9594,6 @@ extern "C" void pl_act_drowsy_walk(_PLW* self) {
 extern "C" void pl_act_sleep_fall(_PLW* self) {
     VEC3 unused;
 
-    VEC3_ctor(&unused);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9842,15 +9795,12 @@ extern "C" void pl_act_flinch_drawn(_PLW* self, s32 variant) {
 extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
     VEC3 target;
     VEC3 dir;
-    VEC3 diff;
     PlMoveWork* work;
     s32 i;
     u16 count;
     s32 found;
     u16 angle;
 
-    VEC3_ctor(&target);
-    VEC3_ctor(&dir);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9880,8 +9830,7 @@ extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
                 if (variant == 0 && work->kind_0x003 == 0x12 && (u8)work->sub_area_0x01A == self->sub_area_0x3B6) {
                     found = 1;
                     get_joint_wpos_em((struct _ENEMY_WORK*)work, 0xF, &target);
-                    subVec3(&diff, &target, &self->vec_0x03C);
-                    copyVec3(&dir, &diff);
+                    dir = target - self->vec_0x03C;
                     calcVecAngXY(&dir, (u32*)&self->rot_0x54.x, (u32*)&self->rot_0x54.y);
                     self->field_0x0AC = self->rot_0x54.x;
                     self->field_0x0A8 = self->rot_0x54.y;
@@ -9889,7 +9838,7 @@ extern "C" void pl_act_grabbed(_PLW* self, s32 variant) {
                 }
                 if (variant == 1 && work->kind_0x003 == 4 && (u8)work->sub_area_0x01A == self->sub_area_0x3B6) {
                     found = 1;
-                    copyVec3(&target, &work->pos_0x188);
+                    target = work->pos_0x188;
                     self->rot_0x54.y = calcVecAng2(&self->vec_0x03C, &target);
                     self->field_0x0A8 = self->rot_0x54.y;
                     break;
@@ -10156,7 +10105,6 @@ extern "C" void fn_8025953C(_PLW* self, s32 a2)
 {
     VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -10192,7 +10140,6 @@ extern "C" void fn_80259684(_PLW* self, s32 a2)
 {
     VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -10245,7 +10192,6 @@ extern "C" void pl_act_wind_launched(_PLW* self, s32 variant, s32 drawn) {
     VEC3 move;
     s32 frames;
 
-    VEC3_ctor(&move);
     self->field_0x28++;
     switch (self->act_step_0x05) {
     case 0:
@@ -10354,7 +10300,6 @@ extern "C" void pl_act_swept_away(_PLW* self) {
     VEC3 unused;
     s32 frames;
 
-    VEC3_ctor(&unused);
     frames = ++self->field_0x28;
     switch (self->act_step_0x05) {
     case 0:
@@ -10382,7 +10327,7 @@ extern "C" void pl_act_swept_away(_PLW* self) {
         } else {
             self->vec_0x03C.z += pl_frame_window_10;
         }
-        copyVec3(&self->vec_0x048, &self->vec_0x03C);
+        self->vec_0x048 = self->vec_0x03C;
         break;
     }
 }
@@ -10391,11 +10336,10 @@ extern "C" void pl_act_swept_away(_PLW* self) {
 extern "C" void pl_chunk_anchor_place(_PLW* self) {
     VEC3 offset;
 
-    VEC3_ctor(&offset);
-    copyVec3(&offset, (VEC3*)&self->motion_vel_0x78);
+    offset = *(VEC3*)&self->motion_vel_0x78;
     rotVecY(&offset, self->field_0x058);
-    copyVec3(&self->vec_0x03C, &pl_chunk_anchors[self->chunk_ofs]);
-    addVec3To(&self->vec_0x03C, &offset);
+    self->vec_0x03C = pl_chunk_anchors[self->chunk_ofs];
+    self->vec_0x03C += offset;
 }
 
 /* The drop-in act: falls from the chunk's anchor with a growing drop speed, landing pose at 30, keeping the actor
@@ -10447,7 +10391,7 @@ extern "C" void pl_act_drop_out(_PLW* self) {
         self->motion_vel_0x80 = pl_float_neg2000;
         self->field_0x06C = pl_float_zero;
         pl_chunk_anchor_place(self);
-        copyVec3(&self->vec_0x048, &self->vec_0x03C);
+        self->vec_0x048 = self->vec_0x03C;
         break;
     case 1:
         if (Pl_motion_end_ck(self) == 1) {
@@ -10494,7 +10438,6 @@ extern "C" void pl_act_knockdown_drawn(_PLW* self, s32 variant, s32 heavy) {
 extern "C" void pl_act_roar_flinch(_PLW* self, s32 drawn) {
     VEC3 slide;
 
-    VEC3_ctor(&slide);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -11788,7 +11731,6 @@ extern "C" void pl_act_carry_idle(_PLW* self, s32 variant) {
 extern "C" void pl_act_carry_walk(_PLW* self) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     pl_carry_latch_refresh(self);
     switch (self->act_step_0x05) {
     case 0:
@@ -11826,7 +11768,6 @@ extern "C" void pl_act_carry_walk(_PLW* self) {
 extern "C" void pl_act_carry_run(_PLW* self) {
     VEC3 step;
 
-    VEC3_ctor(&step);
     pl_carry_latch_refresh(self);
     switch (self->act_step_0x05) {
     case 0:
@@ -11935,7 +11876,6 @@ extern "C" void pl_act_carry_jump(_PLW* self, s32 variant) {
     s32 breakAt;
     s32 rollAt;
 
-    VEC3_ctor(&move);
     pl_carry_latch_refresh(self);
     self->field_0x28++;
     switch (self->act_step_0x05) {
@@ -12173,7 +12113,6 @@ extern "C" void pl_act_group12_dispatch(_PLW* self) {
 extern "C" void pl_act_cart_away(_PLW* self) {
     VEC3 drag;
 
-    VEC3_ctor(&drag);
     pl_act_set_step_time(self, 10);
     pl_act_set_gauge_arm(self, 10);
     self->field_0x001 = 1;
@@ -12199,7 +12138,7 @@ extern "C" void pl_act_cart_away(_PLW* self) {
         drag.y = pl_float_zero;
         drag.z = pl_frame_window_10;
         rotVecY(&drag, self->rot_0x54.y);
-        addVec3To(&self->vec_0x03C, &drag);
+        self->vec_0x03C += drag;
         break;
     }
 }
@@ -12694,7 +12633,6 @@ extern "C" void fn_8025E448(_PLW* self) {
     u8 icon;
     u32 prompt;
 
-    VEC3_ctor(&spot);
     if (Pl_master_ck(self) == 0) {
         self->field_0x3E4 = 0;
         self->field_0x3E7 = 0;
@@ -12944,7 +12882,6 @@ extern "C" void fn_8025EC58(_PLW* self) {
     s32 word;
     VEC3 pos;
     struct _CP_VECTOR rot;
-    VEC3_ctor(&pos);
     if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, &self->vec_0x03C, &kind, &pos, &rot, &word) != 0xFFFF &&
         kind == 1) {
         pl_act_stagger_fill(self);
@@ -13062,11 +12999,9 @@ extern "C" u32 pl_camera_near_head_ck(_PLW* self) {
     VEC3 camera;
     VEC3 head;
 
-    VEC3_ctor(&camera);
-    VEC3_ctor(&head);
     if ((u32)pl_act_no_eft_ck(self, 0) == 1) {
         const VEC3& pos = get_camera_pos();
-        copyVec3(&camera, &pos);
+        camera = pos;
         pl_get_joint_wpos(self, 3, &head);
         if (vec3_dist_sq(&camera, &head) < pl_float_10000) {
             return 1;
@@ -13081,7 +13016,7 @@ void fn_8025F088(_PLW* self) {
     MHchar* chr = &((PlBodyWork*)self->physics_0x13C)->chr_0x04;
 
     get_move_work_adrs(0);
-    copyVec3(&self->vec_0x048, &self->vec_0x03C);
+    self->vec_0x048 = self->vec_0x03C;
 
     self->field_0x65C = self->field_0x65D;
     if (self->field_0x017 != self->area_0x16) {
@@ -13161,7 +13096,7 @@ void fn_8025F088(_PLW* self) {
     pl_model_pos_sync(self);
     fn_8025ED00(self);
     pl_rig_model_move(self->physics_0x13C);
-    copyVec3(&self->vec_0x03C, &chr->pos_0x04);
+    self->vec_0x03C = chr->pos_0x04;
     switch (self->kind_0x09) {
     default:
         if (self->field_0x01B == 0) {
@@ -13198,7 +13133,6 @@ void fn_8025F478(_PLW* self) {
     LandData work;
     f32 value;
 
-    em_land_data_init(&work);
     if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         self->ground_y_0x060 = value;
         self->kind_0x09 = 0;
@@ -13233,7 +13167,6 @@ s32 fn_8025F588(_PLW* self) {
     f32 value;
     f32 height;
 
-    em_land_data_init(&work);
     if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         height = value;
         self->ground_y_0x060 = height;
@@ -13356,7 +13289,6 @@ void fn_8025FA00(_PLW* self) {
     f32 value;
     f32 height;
 
-    em_land_data_init(&work);
     if (pl_ground_check(self, &self->vec_0x03C, &self->field_0x5A4, &value, -6) == 1) {
         height = value;
         self->ground_y_0x060 = height;
@@ -13610,7 +13542,7 @@ s32 fn_80260198(_PLW* self) {
             if (kind == 0) {
                 break;
             }
-            value = calc_xz_angle(entry->x_0x08, entry->z_0x10, pl_float_zero, pl_float_zero);
+            value = calc_xz_angle(entry->pos.x, entry->pos.z, pl_float_zero, pl_float_zero);
             if ((kind & 2) != 0) {
                 self->field_0x058 = value;
                 self->field_0x0A8 = value;
@@ -14270,7 +14202,6 @@ s32 pl_item_use_act_pick(_PLW* self, u8* kind, u16* act, u16* arg, s32* word, u1
     s16 hit_kind;
     s32 want;
 
-    VEC3_ctor(&pos);
     *kind = 0xFF;
     *act = 0xFF;
     self->field_0x309 |= 1;
@@ -14599,7 +14530,7 @@ s32 pl_item_use_act_pick(_PLW* self, u8* kind, u16* act, u16* arg, s32* word, u1
         }
         if (want == pl_stg_weapon_near_find(self, &pos, &near_id, &near_word)) {
             *word = near_id;
-            self->target_pos_0x090 = pos;
+            static_cast<_VEC3&>(self->target_pos_0x090) = pos;
             pl_pos_blend_start(self, 20);
             if (self->kind_0x09 == 3) {
                 *kind = 0;
@@ -14888,7 +14819,6 @@ s32 pl_scan_act_select(_PLW* self) {
     f32 stop;
     f32 lead;
 
-    VEC3_ctor(&pos);
     quest = (SysQuestMove*)get_move_work_adrs(0);
     if (self->field_0x318 == 0) {
         return 0;
@@ -16537,7 +16467,6 @@ u32 fn_802657AC(_PLW* self) {
  * skills and the red health, the status the hit carries, and the knockback act its kind selects. */
 #pragma optimization_level 4
 s32 pl_hit_react(_PLW* self) {
-    VEC3 pos;
     u8 guts;
     s16 dmg;
     s16 hp;
@@ -16552,7 +16481,7 @@ s32 pl_hit_react(_PLW* self) {
     s16 now;
 
     no_se = 0;
-    VEC3_ctor(&pos);
+    VEC3 pos;
     if (self->hit_pending_0x39E == 0) {
         return 0;
     }
@@ -17276,11 +17205,10 @@ void pl_frame_post_step(_PLW* self) {
     s16 kind;
     u8 act_kind;
 
-    VEC3_ctor(&pos);
     self->field_0x268 = 0;
     if (event_demo_ck() != 1) {
         if (self->drift_on_0x582 != 0) {
-            addVec3To(&self->vec_0x03C, (VEC3*)self->drift_vel_0x574);
+            self->vec_0x03C += *(VEC3*)self->drift_vel_0x574;
             fn_8025FF0C(self, 1);
             fn_8025FA00(self);
             pl_model_pos_sync(self);
@@ -17369,10 +17297,10 @@ void pl_model_state_set(_PLW* self, u32 action, s32 a, u16 b) {
     }
 }
 
-/* Seeds the four chunk anchors the drop-in acts start from. */
-extern "C" void pl_chunk_anchors_init(void) {
-    setVec3(&pl_chunk_anchors[0], pl_float_neg152, pl_float_zero, pl_frame_window_2048);
-    setVec3(&pl_chunk_anchors[1], pl_frame_window_181, pl_float_zero, pl_frame_window_2051);
-    setVec3(&pl_chunk_anchors[2], pl_float_neg152, pl_float_zero, pl_frame_window_2048);
-    setVec3(&pl_chunk_anchors[3], pl_frame_window_181, pl_float_zero, pl_frame_window_2051);
-}
+/* The four chunk anchors the drop-in acts start from (`.bss` 0x806AB3E0), built by the unit's `__sinit`. */
+VEC3 pl_chunk_anchors[4] = {
+    VEC3(pl_float_neg152, pl_float_zero, pl_frame_window_2048),
+    VEC3(pl_frame_window_181, pl_float_zero, pl_frame_window_2051),
+    VEC3(pl_float_neg152, pl_float_zero, pl_frame_window_2048),
+    VEC3(pl_frame_window_181, pl_float_zero, pl_frame_window_2051),
+};

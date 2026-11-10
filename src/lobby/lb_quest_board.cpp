@@ -79,7 +79,7 @@
 #include "sound/fn_800DD1F0.h"
 #include "fn_80040598.h"
 #include "stage/stg_w.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "MSL_C/alloc.h"
 
 
@@ -1040,7 +1040,7 @@ extern "C" void lb_quest_board_effect_spawn(_LB_NPC* npc, u8 kind, u32 joint, VE
             work->count = 1;
             work->scale = scale;
             work->joint = joint;
-            copyVec3(&work->offset, offset);
+            work->offset = *offset;
             self->field_0x03 = 0x37;
             self->type_0x02 = kind;
             self->source_0x30 = npc;
@@ -1183,8 +1183,6 @@ extern "C" void lb_quest_board_effect_init(_EFT* self) {
     _LB_NPC* npc;
     s32 i;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     work = (LbQuestBoardEft*)self->work_0x38;
     npc = (_LB_NPC*)self->source_0x30;
     self->state_0x05++;
@@ -1214,9 +1212,9 @@ extern "C" void lb_quest_board_effect_init(_EFT* self) {
         }
         ((MHchar*)npc->body_0x058)->get_joint_wpos(work->joint, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&offset, &work->offset);
+        offset = work->offset;
         mulVecMat(&offset, &mtx);
-        addVec3To(&self->pos_0x18, &offset);
+        self->pos_0x18 += offset;
         SetRootMtxTrans(work->effect, &self->pos_0x18);
         break;
     case 6:
@@ -1249,7 +1247,6 @@ extern "C" void lb_quest_board_flash_init(_EFT* self) {
     VEC3 pos;
     LbQuestBoardEft* work;
 
-    VEC3_ctor(&pos);
     work = (LbQuestBoardEft*)self->work_0x38;
     self->state_0x05++;
     if (eft_res_spawn_gate_ck(self, 3) == 0) {
@@ -1272,7 +1269,6 @@ extern "C" void lb_quest_board_follow_init(_EFT* self) {
     VEC3 pos;
     LbQuestBoardEft* work;
 
-    VEC3_ctor(&pos);
     work = (LbQuestBoardEft*)self->work_0x38;
     self->state_0x05++;
     if (eft_res_spawn_gate_ck(self, 3) == 0) {
@@ -1315,8 +1311,6 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
     u32 apply;
     s32 motion;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     work = (LbQuestBoardEft*)self->work_0x38;
     npc = (_LB_NPC*)self->source_0x30;
     if (eft_res_spawn_gate_ck(self, 3) == 0) {
@@ -1368,7 +1362,7 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
         break;
     }
     if (apply == 1) {
-        copyVec3(&offset, &work->offset);
+        offset = work->offset;
         mulVecMat(&offset, &mtx);
         mtx34_trans_add(&mtx, &offset);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -1430,7 +1424,7 @@ extern "C" void lb_quest_board_flash_move(_EFT* self) {
     }
     ((MHchar*)npc->body_0x058)->get_joint_wpos(10, &self->pos_0x18);
     self->pos_0x18.y += 30.0f;
-    copyVec3(&work->model->pos_0x04, &self->pos_0x18);
+    work->model->pos_0x04 = self->pos_0x18;
     eft_rot_vec_copy(&work->model->rot_0x28, &self->rot_0x24);
     work->model->move(0);
     eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
@@ -1445,8 +1439,6 @@ extern "C" void q_result_effect_follow_npc(_EFT* self) {
     nw4r::math::MTX34 mtx;
     s32 motion;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     if (eft_res_spawn_gate_ck(self, 3) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -1470,7 +1462,7 @@ extern "C" void q_result_effect_follow_npc(_EFT* self) {
     ((MHchar*)npc->body_0x058)->get_joint_wpos(11, &self->pos_0x18);
     setVector3(&offset, 25.0f, 16.0f, 3.0f);
     mulVecMat(&offset, &mtx);
-    addVec3To(&self->pos_0x18, &offset);
+    self->pos_0x18 += offset;
     mtx34_set_trans(&mtx, &self->pos_0x18);
     work->model->move2(&mtx, 0);
     eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);

@@ -63,7 +63,7 @@
 #include "enemy/em007_act.h"
 #include "Pl/pl_hit_sphere.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 #include "ef/eft009.h" /* eft009_set_pos, eft009_spawn_at_joint (rule 2: the owner's header) */
@@ -315,7 +315,6 @@ u32 em007_ally_wait_near_ck(struct _ENEMY_WORK* self, u8 a);
  * `enemy/em001_prog.cpp`, `stage/stg_w.cpp`, `camera/camera_main.cpp`, `lobby/fn_8030121C.cpp` and
  * `enemy/em_model.cpp`. */
 f32 vec3_distance(void* a, void* b);
-void addVec3To(void* a, void* b);
 void eft007_part_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void stg_ground_impact_set(void* pos, u8 a, u16 b);
 void camera_flag_0x145_set(void);
@@ -434,7 +433,6 @@ void em007_init(struct _ENEMY_WORK* self, u8 arg1) {
     EmActionBlock* blk;
     Em007UserData* helper;
 
-    VEC3_ctor(&pos);
     blk = &self->action_0x328;
     setVector3(&blk->vec_0x328, 1.0f, 1.0f, 1.0f);
     setVector3(&blk->vec_0x334, 1.0f, 1.0f, 1.0f);
@@ -572,7 +570,7 @@ void em007_frame_update(struct _ENEMY_WORK* self) {
             if (other->active != 0 && (other->field_0x1C8 & 1) != 0 && self != other &&
                 self->area_no == other->area_no &&
                 em_phase_get(self) == em_phase_get(other) && other->action == 0xB) {
-                copyVec3(&self->aim, &other->pos);
+                self->aim = other->pos;
                 self->action_0x328.field_0x345 = 1;
                 found = 1;
                 break;
@@ -713,7 +711,6 @@ void em007_act1_1(struct _ENEMY_WORK* self) {
 void em007_act1_2(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1421,12 +1418,10 @@ extern "C" void em007_act7_3(struct _ENEMY_WORK* self, u8 arg1) {
 
 extern "C" void em007_act7_4(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp1C;
-    nw4r::math::VEC3 sp10;
     u32 spC;
     u32 sp8;
     u16 var_r3;
 
-    VEC3_ctor(&sp1C);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1434,8 +1429,7 @@ extern "C" void em007_act7_4(struct _ENEMY_WORK* self) {
         em_mot_set(self, 0x17, 6, 0);
         em_hit_window_set(self, 0, 7, 0x80);
         em_stamina_add(self, (u32)-0x14);
-        subVec3(&sp10, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp1C, &sp10);
+        sp1C = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp1C, &spC, &sp8);
         var_r3 = sp8 - (u16)(self->field_0x1C0 + 0xD334);
         if ((u32)(var_r3 - 1) <= 0x7FFE) {
@@ -1458,13 +1452,11 @@ extern "C" void em007_act7_4(struct _ENEMY_WORK* self) {
 
 extern "C" void em007_act7_5(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 sp1C;
-    nw4r::math::VEC3 sp10;
     u32 spC;
     u32 sp8;
     u16 temp_r0;
     u32 var_r0;
 
-    VEC3_ctor(&sp1C);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1472,8 +1464,7 @@ extern "C" void em007_act7_5(struct _ENEMY_WORK* self, u8 arg1) {
         em_mot_set(self, 0x18, 6, 0);
         em_hit_window_set(self, 0, 8, 0x80);
         em_stamina_add(self, (u32)-0x14);
-        subVec3(&sp10, &self->vec_0x36C, &self->pos);
-        copyVec3(&sp1C, &sp10);
+        sp1C = self->vec_0x36C - self->pos;
         calcVecAngXY(&sp1C, &spC, &sp8);
         temp_r0 = sp8 - (u16)(self->field_0x1C0 + 0x2CCD);
         if ((s32)temp_r0 > 0x8000) {
@@ -1501,7 +1492,6 @@ extern "C" void em007_act7_5(struct _ENEMY_WORK* self, u8 arg1) {
 extern "C" void em007_act7_6(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1534,13 +1524,6 @@ extern "C" void em007_act7_6(struct _ENEMY_WORK* self, u8 arg1) {
 }
 
 extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
-    nw4r::math::MTX34 sp60;
-    EmSpawnRec rec;
-    nw4r::math::VEC3 sp38;
-    nw4r::math::VEC3 sp2C;
-    nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     u32 var_r4;
     u32 var_r28;
     u32 var_r29;
@@ -1552,12 +1535,12 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
     u16 mask;
 
     var_r31 = arg2;
-    VEC3_ctor(&sp38);
-    VEC3_ctor(&sp2C);
-    VEC3_ctor(&sp20);
-    VEC3_ctor(&sp14);
-    MTX34_ctor(&sp60);
-    em_spawn_rec_init(&rec);
+    nw4r::math::VEC3 sp38;
+    nw4r::math::VEC3 sp2C;
+    nw4r::math::VEC3 sp20;
+    nw4r::math::VEC3 sp14;
+    nw4r::math::MTX34 sp60;
+    EmSpawnRec rec;
     switch (self->state) {
     case 0:
         self->state++;
@@ -1599,13 +1582,13 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
         }
         if (em_frame_check(self, 0, 114.0f, 0.0f) == 1) {
             rec.id = 0x17;
-            copyVec3(&rec.pos, setVec3(&sp8, 0.0f, 200.0f, 60.0f));
-            copyVec3(&sp38, &rec.pos);
+            rec.pos = VEC3(0.0f, 200.0f, 60.0f);
+            sp38 = rec.pos;
             get_joint_wmat_em(self, rec.id, &sp60);
             setVector3(&sp2C, sp60.m[0][3], sp60.m[1][3], sp60.m[2][3]);
             mulVecMat(&sp38, &sp60);
-            addVec3To(&sp2C, &sp38);
-            copyVec3(&sp14, &self->pos);
+            sp2C += sp38;
+            sp14 = self->pos;
             sp14.y += 50.0f;
             mask = em_hit_mask_get(self);
             temp_r29 = findInterSection(&sp14, &sp2C, &sp20, 1, 0xFFFF, self->area_no, mask | 0xC0, 0);
@@ -1647,10 +1630,8 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
 
 extern "C" void em007_act7_10(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     f32 var_f31;
 
-    VEC3_ctor(&sp14);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1678,7 +1659,7 @@ extern "C" void em007_act7_10(struct _ENEMY_WORK* self) {
         }
         if (em_frame_check(self, 0, 104.0f, 0.0f) == 1) {
             em_camera_req(self, (u32)-1, 1);
-            copyVec3(&sp14, setVec3(&sp8, 0.0f, 0.0f, 0.0f));
+            sp14 = VEC3(0.0f, 0.0f, 0.0f);
             ((Em007ShellSpawnFn)shell_set_func_ptr->method_0x2C)(self, 5, 0x21, &sp14, 1.0f, self->field_0xAEA);
         }
         if ((em_frame_check(self, 1, 138.0f, 0.0f) == 1) && (em_busy_ck(self) == 1)) {
@@ -1741,8 +1722,6 @@ extern "C" void em007_act7_13(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp14;
     nw4r::math::VEC3 sp8;
 
-    VEC3_ctor(&sp14);
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1824,22 +1803,16 @@ extern "C" void em007_act7_dispatch(struct _ENEMY_WORK* self) {
 extern "C" u32 em007_partner_front_ck(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 sp2C;
     nw4r::math::VEC3 sp20;
-    nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     s32 temp_r31;
     u8* temp_r31_2;
 
-    VEC3_ctor(&sp2C);
-    VEC3_ctor(&sp20);
     temp_r31 = (s32)get_move_work_adrs(2);
     if ((s32)arg1 < (s32)get_move_work_max(2)) {
         temp_r31_2 = (u8*)(temp_r31 + (arg1 * 0xB20));
         if (*temp_r31_2 != 0) {
             setVector3(&sp2C, 0.0f, 0.0f, 1.0f);
             rotVecY(&sp2C, self->field_0x1C0);
-            vec3_scale(&sp8, &sp2C, 300.0f * get_em_chg_scale(self));
-            addVec3(&sp14, &self->pos, &sp8);
-            copyVec3(&sp20, &sp14);
+            sp20 = self->pos + (sp2C * (300.0f * get_em_chg_scale(self)));
             if (vec3_dist_sq(temp_r31_2 + 0x3C, &sp20) <= 40000.0f) {
                 return 1;
             }
@@ -1851,30 +1824,22 @@ extern "C" u32 em007_partner_front_ck(struct _ENEMY_WORK* self, u8 arg1) {
 extern "C" void em007_act8_0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp3C;
     nw4r::math::VEC3 sp30;
-    nw4r::math::VEC3 sp24;
-    nw4r::math::VEC3 sp18;
-    nw4r::math::VEC3 spC;
     u16 sp8;
     f32 temp_f31;
     s32 temp_r0;
 
-    VEC3_ctor(&sp3C);
-    VEC3_ctor(&sp30);
     switch (self->state) {
     case 0:
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 0);
         em007_aim_point_get(self, &sp3C, &sp8, 250.0f);
-        subVec3(&sp24, &sp3C, &self->pos);
-        copyVec3(&sp30, &sp24);
+        sp30 = sp3C - self->pos;
         em_target_pos_set(self, &sp3C);
         em_turn_seq_start(self, (void*)em007_turn_seq_6, 2, 1, sp8);
         em_move_vec_clr(self);
         temp_f31 = get_em_base_scale(self);
-        vec3_scale(&spC, &sp30, 0.02f);
-        vec3_scale(&sp18, &spC, temp_f31);
-        copyVec3(&self->offset_0x30C.vec_0x310, &sp18);
+        self->offset_0x30C.vec_0x310 = (sp30 * 0.02f) * temp_f31;
         self->field_0x314 = 0.0f;
         break;
     case 1:
@@ -2385,10 +2350,8 @@ extern "C" void em007_act13_1(struct _ENEMY_WORK* self) {
 
 extern "C" void em007_act13_2(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp14;
-    nw4r::math::VEC3 sp8;
     f32 var_f31;
 
-    VEC3_ctor(&sp14);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2415,7 +2378,7 @@ extern "C" void em007_act13_2(struct _ENEMY_WORK* self) {
         }
         if (em_frame_check(self, 0, 104.0f, 0.0f) == 1) {
             em_camera_req(self, (u32)-1, 1);
-            copyVec3(&sp14, setVec3(&sp8, 0.0f, 0.0f, 0.0f));
+            sp14 = VEC3(0.0f, 0.0f, 0.0f);
             ((Em007ShellSpawnFn)shell_set_func_ptr->method_0x2C)(self, 5, 0x21, &sp14, 1.0f, self->field_0xAEA);
         }
         if ((em_frame_check(self, 1, 138.0f, 0.0f) == 1) && (em_busy_ck(self) == 1)) {
@@ -2433,25 +2396,19 @@ extern "C" void em007_act13_2(struct _ENEMY_WORK* self) {
 extern "C" void em007_act13_3(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp30;
     nw4r::math::VEC3 sp24;
-    nw4r::math::VEC3 sp18;
-    nw4r::math::VEC3 spC;
     u16 sp8;
 
-    VEC3_ctor(&sp30);
-    VEC3_ctor(&sp24);
     switch (self->state) {
     case 0:
         self->state++;
         self->state_0x006 = 0;
         em_move_mode_set(self, 0);
         em007_aim_point_get(self, &sp30, &sp8, 300.0f);
-        subVec3(&sp18, &sp30, &self->pos);
-        copyVec3(&sp24, &sp18);
+        sp24 = sp30 - self->pos;
         em_target_pos_set(self, &sp30);
         em_turn_seq_start(self, (void*)em007_turn_seq_6, 2, 1, sp8);
         em_move_vec_clr(self);
-        vec3_scale(&spC, &sp24, 1.0f / em_mot_frame_end_get(self));
-        copyVec3(&self->offset_0x30C.vec_0x310, &spC);
+        self->offset_0x30C.vec_0x310 = sp24 * (1.0f / em_mot_frame_end_get(self));
         self->field_0x314 = 0.0f;
         break;
     case 1:
@@ -2670,7 +2627,6 @@ void em007_model_copy_bind_nodes(struct Em007EftWork* work, u8 index);
  * and `system_w`'s counter has run a multiple of 24 frames. */
 void em007_alt_mode_effect(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     if (em_alt_mode_ck(self) == 1) {
         if (system_w.field_0x0c % 0x18 == 0) {
             setVector3(&pos, 0.0f, -30.0f, 120.0f);
@@ -2683,7 +2639,6 @@ void em007_alt_mode_effect(struct _ENEMY_WORK* self) {
  * else the joint goes to `eft009_spawn_at_joint`/`eft_spawn_pos_in_area`/`eft_spawn_type11`. */
 void em007_effect_spawn(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, f32 scale) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (mode) {
     case 0:
         if ((self->field_0x228 & 0x6) != 0) {
@@ -2811,7 +2766,7 @@ void em007_effect_spawn(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u
             }
         }
         if (joint == 0xff) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -2821,7 +2776,7 @@ void em007_effect_spawn(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u
         break;
     case 2:
         if (joint == 0xff) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -2841,12 +2796,10 @@ void em007_alt_scale_step(struct _ENEMY_WORK* self);
  * and its frame. */
 void em007_motion_events(struct _ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    _CP_VECTOR rot;
     f32 scale;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
+    _CP_VECTOR rot;
     em007_alt_parts_update(self);
     em007_alt_mode_effect(self);
     switch (em_get_mot_no(self)) {
@@ -3968,13 +3921,9 @@ void em007_alt_scale_step(struct _ENEMY_WORK* self) {
 void em007_aim_point_get(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut, f32 scale) {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 rot;
-    nw4r::math::VEC3 tmp;
-    nw4r::math::VEC3 res;
     u16 ang;
     u16 delta;
-    VEC3_ctor(&dir);
-    VEC3_ctor(&rot);
-    copyVec3(&dir, &self->vec_0x36C);
+    dir = self->vec_0x36C;
     ang = calcVecAng2(&self->pos, &dir);
     *angleOut = ang;
     delta = (u16)(ang - self->field_0x1C0);
@@ -3983,15 +3932,13 @@ void em007_aim_point_get(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* a
         f32 base = vec3_distance(&dir, &self->pos);
         setVector3(&rot, 0.0f, 0.0f, base - scale);
         rotVecY(&rot, *angleOut);
-        addVec3(&tmp, &self->pos, &rot);
-        copyVec3(out, &tmp);
+        *out = self->pos + rot;
     } else {
         u16 a2 = (delta < 0x8000) ? 0x4000 : 0xc000;
         *angleOut = (u16)(a2 + self->field_0x1C0);
         setVector3(&rot, 0.0f, 0.0f, -scale);
         rotVecY(&rot, *angleOut);
-        addVec3(&res, &dir, &rot);
-        copyVec3(out, &res);
+        *out = dir + rot;
     }
 }
 
@@ -4008,7 +3955,6 @@ void Em007UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* pResult, nw4r::g3d::R
     nw4r::math::VEC3 unused;
     nw4r::math::VEC3* scale;
 
-    VEC3_ctor(&unused);
     scale = &this->work->action_0x328.vec_0x328;
     switch (item->field_0x04) {
     default:
@@ -4034,8 +3980,6 @@ void Em007UserData::CalcWorldEnd(nw4r::math::MTX34* mtx, nw4r::g3d::ResMdl mdl, 
     s32 data;
     struct _ENEMY_WORK* work;
 
-    MTX34_ctor(&rot);
-    MTX34_ctor(&world);
     data = (s32)mdl.GetResNode(0x11).mpData;
     res_node_assign(&node, &data);
     work = this->work;
@@ -4208,8 +4152,6 @@ void em007_model_eft_step(_EFT* self) {
 #pragma push
 #pragma optimization_level 0
 void em007_model_eft_create(_EFT* self) {
-    nw4r::math::VEC3 scratch_a;
-    nw4r::math::VEC3 scratch_b;
     u32 light;
     _AINPC_W* npc;
     struct _LB_NPC* lb_npc;
@@ -4218,8 +4160,8 @@ void em007_model_eft_create(_EFT* self) {
     u32 i;
 
     work = (struct Em007EftWork*)self->work_0x38;
-    VEC3_ctor(&scratch_a);
-    VEC3_ctor(&scratch_b);
+    nw4r::math::VEC3 scratch_a;
+    nw4r::math::VEC3 scratch_b;
     for (i = 0; i < work->model_count_0x00; i++) {
         if (work->mode_0x28 == 0) {
             light = 6;

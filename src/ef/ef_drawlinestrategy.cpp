@@ -128,13 +128,11 @@ void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
     EfEmitterDrawSetting* ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     NW4R_POINTER_ASSERT(ed, 106, ef_line_ed_assert_str);
 
-    MTX34 mtxPm;
-    MTX34 mtxEm;
     u32 screenSpace = (mNumTexmap != 0);
 
-    MTX34_ctor(&mtxPm);
+    MTX34 mtxPm;
     ef_pm_get_mtx(pm, &mtxPm);
-    MTX34_ctor(&mtxEm);
+    MTX34 mtxEm;
     ef_draw_info_view_mtx(&info, &mtxEm);
     mtx34_concat(&mtxEm, &mtxEm, &mtxPm);
     GXLoadPosMtxImm(mtx34_get_ptr(&mtxEm), 0);
@@ -150,8 +148,6 @@ void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
     for (; particle != NULL; particle = getNext(pm, particle)) {
         f32 t;
         f32 g;
-        VEC3 pos;
-        VEC3 dir;
 
         t = ef_particle_get_scale((struct EfParticle*)particle);
         if (t < ef_float_epsilon()) {
@@ -161,8 +157,8 @@ void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         if (g < ef_float_epsilon()) {
             continue;
         }
-        assignVec3((Vec*)&pos, (Vec*)&particle->world_pos);
-        VEC3_ctor(&dir);
+        VEC3 pos = (const VEC3&)particle->world_pos;
+        VEC3 dir;
         ef_particle_get_move_dir(particle, &dir);
         if (ef_vec3_normalize(&dir) == 0) {
             continue;

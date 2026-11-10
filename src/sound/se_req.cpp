@@ -30,7 +30,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h"
 #include "pl.h"
 #include "sound/se.h"
 #include "sound/se_req.h"
@@ -139,7 +139,7 @@ inline void se_slot_start(SeSlot* slot, _se_w* work, s32 id, nw4r::math::VEC3* p
     slot->field_0x30 = -1;
     slot->field_0x34 = -1;
     slot->param = 0;
-    copyVec3(&slot->pos, pos);
+    slot->pos = *pos;
     slot->field_0x10 = slot->pos;
 }
 
@@ -161,7 +161,7 @@ inline void se_slot_hold_req(_se_w* work, nw4r::math::VEC3* pos, u32 key, s32 id
         if (slot->field_0x48 == 0) {
             slot->in_use = 0;
         } else {
-            copyVec3(&slot->pos, pos);
+            slot->pos = *pos;
             slot->field_0x10 = slot->pos;
             return;
         }
@@ -524,7 +524,7 @@ extern "C" void se_slot_hold_start(_se_w* work, nw4r::math::VEC3* pos, u32 key, 
     slot->field_0x03 = 1;
     slot->field_0x44 = key;
     slot->field_0x48 = (s16)hold;
-    copyVec3(&slot->pos, pos);
+    slot->pos = *pos;
     slot->field_0x10 = slot->pos;
 }
 
@@ -544,7 +544,7 @@ extern "C" void se_slot_hold_start_owner(_se_w* work, nw4r::math::VEC3* pos, u32
     slot->field_0x03 = 1;
     slot->field_0x44 = key;
     slot->field_0x48 = (s16)hold;
-    copyVec3(&slot->pos, pos);
+    slot->pos = *pos;
     slot->field_0x10 = slot->pos;
 }
 
@@ -581,11 +581,9 @@ extern "C" SeSlot* se_slot_hold_find(_se_w* work, u32 key, s32 id)
 void shell_se_req2(_se_w* work, nw4r::math::CAPSULE* capsule, u8 kind, u32 key)
 {
     nw4r::math::VEC3 listener;
-    VEC3_ctor(&listener);
     nw4r::math::VEC3 near;
-    VEC3_ctor(&near);
     if (se_pool != 0 && work != 0 && se_disabled_ck() != 1) {
-        copyVec3(&listener, &se_pool->cam_pos);
+        listener = se_pool->cam_pos;
         switch (kind) {
         case 7:
             key += kind;
@@ -608,7 +606,7 @@ void shell_se_req2(_se_w* work, nw4r::math::CAPSULE* capsule, u8 kind, u32 key)
 
 /* The held-slot refresh `shell_se_req` expands per case: refreshes the live slot `k`/`i` of `w` at `pos` and leaves
  * the case, or frees a slot whose hold ran out so that the case starts a new one. */
-#define SE_SLOT_HOLD_FIND(w, k, i)                                                                                          slot = se_slot_hold_find(w, k, i);                                                                                     if (slot) {                                                                                                                if (slot->field_0x48 <= -1) {                                                                                              break;                                                                                                             }                                                                                                                      slot->field_0x48--;                                                                                                    if (slot->field_0x48 == 0) {                                                                                               slot->in_use = 0;                                                                                                  } else {                                                                                                                   copyVec3(&slot->pos, pos);                                                                                             slot->field_0x10 = slot->pos;                                                                                          break;                                                                                                             }                                                                                                                  }
+#define SE_SLOT_HOLD_FIND(w, k, i)                                                                                          slot = se_slot_hold_find(w, k, i);                                                                                     if (slot) {                                                                                                                if (slot->field_0x48 <= -1) {                                                                                              break;                                                                                                             }                                                                                                                      slot->field_0x48--;                                                                                                    if (slot->field_0x48 == 0) {                                                                                               slot->in_use = 0;                                                                                                  } else {                                                                                                                   slot->pos = *pos;                                                                                             slot->field_0x10 = slot->pos;                                                                                          break;                                                                                                             }                                                                                                                  }
 
 /* `SE_SLOT_HOLD_FIND`, then a new slot for SE `i` held `h` frames (owner `o` past the work) when none is live. */
 #define SE_SLOT_HOLD_REQ(w, i, h, o)                                                                                        SE_SLOT_HOLD_FIND(w, key, i)                                                                                           slot = fn_800D8E58(w, i);                                                                                              if (slot) {                                                                                                                se_slot_hold_start(w, pos, key, slot, i, h, o);                                                                    }
@@ -699,7 +697,7 @@ void shell_se_req(_se_w* work, nw4r::math::VEC3* pos, u8 kind, u32 key)
                 if (slot->field_0x48 == 0) {
                     slot->in_use = 0;
                 } else {
-                    copyVec3(&slot->pos, pos);
+                    slot->pos = *pos;
                     slot->field_0x10 = slot->pos;
                 }
                 break;
@@ -985,7 +983,6 @@ extern "C" void se_point_frame(SePool* self, s32 arg)
     SePointTable* table;
     nw4r::math::VEC3 pos;
     _PLW* player;
-    VEC3_ctor(&pos);
     if (se_disabled_ck() == 1) {
         pool->prev_area = pool->area;
         pool->area = get_now_areano();
@@ -1007,8 +1004,8 @@ extern "C" void se_point_frame(SePool* self, s32 arg)
         if (work == 0) {
             return;
         }
-        copyVec3(&work->listener_pos, &pool->cam_pos);
-        copyVec3(&work->listener_target, &pool->cam_target);
+        work->listener_pos = pool->cam_pos;
+        work->listener_target = pool->cam_target;
     } else {
         rec = table->recs;
         if (table->loaded == 0 || table->count == 0) {
@@ -1021,15 +1018,13 @@ extern "C" void se_point_frame(SePool* self, s32 arg)
         if (snd_chunk_handle_get(work->field_0x0C) == -1) {
             return;
         }
-        copyVec3(&work->listener_pos, &pool->cam_pos);
-        copyVec3(&work->listener_target, &pool->cam_target);
+        work->listener_pos = pool->cam_pos;
+        work->listener_target = pool->cam_target;
         area = pool->area;
         if (area == 0 && stage_map_kind_get(get_now_mapno()) == 1 && quest_id_head_ck() == 0) {
-            nw4r::math::VEC3 left;
-            copyVec3(&pos, setVec3(&left, -389.0f, 420.0f, 485.0f));
+            pos = VEC3(-389.0f, 420.0f, 485.0f);
             shell_se_req(work, &pos, 6, 0);
-            nw4r::math::VEC3 right;
-            copyVec3(&pos, setVec3(&right, -353.0f, 420.0f, -474.0f));
+            pos = VEC3(-353.0f, 420.0f, -474.0f);
             shell_se_req(work, &pos, 6, 1);
         }
         for (i = 0; i < table->count; i++, rec++) {
@@ -1064,7 +1059,7 @@ extern "C" void se_point_frame(SePool* self, s32 arg)
                         } else {
                             pl_segment_closest_point(&rec->seg_start, &rec->seg_end, &work->listener_pos, &pos);
                         }
-                        copyVec3(&live->pos, &pos);
+                        live->pos = pos;
                         live->field_0x10 = live->pos;
                         continue;
                     }
@@ -1099,11 +1094,11 @@ extern "C" void se_point_frame(SePool* self, s32 arg)
                 slot->field_0x34 = -1;
                 slot->param = 0;
                 if (rec->shape == 0) {
-                    copyVec3(&slot->pos, &rec->pos);
+                    slot->pos = rec->pos;
                     slot->field_0x10 = slot->pos;
                 } else {
                     pl_segment_closest_point(&rec->seg_start, &rec->seg_end, &work->listener_pos, &pos);
-                    copyVec3(&slot->pos, &pos);
+                    slot->pos = pos;
                     slot->field_0x10 = slot->pos;
                     rec->handle = 255;
                     u8 handle = se_point_handle_free_get();
@@ -1167,7 +1162,7 @@ extern "C" void se_point_area_scan(SePoolView* pool)
         }
         pool->zones[n].active = 1;
         pool->zones[n].area = rec->area;
-        copyVec3(&pool->zones[n].pos, &rec->pos);
+        pool->zones[n].pos = rec->pos;
         pool->zones[n].radius = rec->radius;
         pool->zones[n].level_tbl = rec->se_id;
         n++;

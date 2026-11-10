@@ -44,9 +44,8 @@
  *   return (a `u16 id` parameter costs more).
  *   Data: `.data`/`.sdata` objects are defined where their first user is, not yet in the target's order; the
  *   `.sdata2` pool is compiler-made; `.sdata` is 8 bytes longer than the target's.
- *   `cockpit_static_init`..`cockpit_item_tag_construct` are plain functions: the target's are MWCC's `__sinit` and
- *   the record constructors (its `.ctors` word 0x8056F38C), which need `CockpitWork`/`CockpitState`/`PitTrap`/
- *   `CockpitItemTag` constructors.
+ *   `cockpit_shell_marker_draw`/`cockpit_eye_marker_draw(_split)`: the by-value `_VEC3` argument's copy address is
+ *   computed before the three word copies where retail computes it after.
  * SHAPES. Locals are declared in the reverse of their target stack offsets; a value passed by value to a callee
  *   (`quest_marker_draw(_faded)`'s window spot, `cockpit_aim_marker_draw`'s `VEC3`) is a by-value parameter, not a
  *   pointer to a copy; `bool` locals for `GetMenuFontColor` arguments; `switch` where retail compares a byte with
@@ -953,7 +952,6 @@ void cockpit_draw(void) {
  * player `player`'s camera and clamped to that player's half of the screen: a black shadow, then the name in the
  * player's colour. */
 void cockpit_name_tags_draw(CockpitWork* work, u8 player) {
-    VEC3 screen;
     u32 camera;
     s32 handle;
     _PLW* plw;
@@ -968,7 +966,7 @@ void cockpit_name_tags_draw(CockpitWork* work, u8 player) {
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[player]);
     word_copy_return_dst(&camera, &handle);
-    VEC3_ctor(&screen);
+    VEC3 screen;
     top = 18.0f;
     bottom = 480.0f;
     plw = (_PLW*)get_move_work_adrs(2);
@@ -2546,15 +2544,13 @@ f32 quest_pit_area_offsets[2][3] = {
 /* 0x802E97A8.  The player's marker position: the actor position, moved by the pit area's entry offset when the
  * current map is the pit map and the player is not flagged. */
 void quest_player_marker_pos(_PLW* plw, VEC3* out) {
-    VEC3 to;
-    VEC3 from;
     u32 extra_to;
     u32 extra_from;
 
-    copyVec3(out, &plw->vec_0x03C);
+    *out = plw->vec_0x03C;
     if (stage_map_kind_get(get_now_mapno()) == 9 && Pl_area_flag_get(plw->chunk_ofs) == 0) {
-        VEC3_ctor(&to);
-        VEC3_ctor(&from);
+        VEC3 to;
+        VEC3 from;
         stage_area_point_get(plw->area_0x16, 0, &from, &extra_from);
         stage_area_point_get(plw->area_0x16, 1, &to, &extra_to);
         out->x = out->x + (quest_pit_area_offsets[plw->area_0x16][0] + (to.x - from.x));
@@ -2578,11 +2574,9 @@ void quest_player_marker_draw(CockpitWork* work, _PLW* plw, s32 clip) {
     u32 slot_color;
     u16 slot_val;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&local);
     quest_player_marker_pos(plw, &local);
     const VEC3& world = get_worldworld_pos(&local, plw->area_0x16);
-    copyVec3(&pos, &world);
+    pos = world;
     icon = Pl_master_ck(plw) == 1 ? 0 : 10;
     if (clip != 0) {
         scale = 25.0f;
@@ -2656,7 +2650,6 @@ void quest_marker_draw_with_master(CockpitWork* work, _PLW* plw) {
     f32 scale;
     _PL_ROOT* root;
 
-    VEC3_ctor(&pos);
     other = (_PLW*)get_move_work_adrs(2);
     count = get_move_work_max(2);
     while (count > 0) {
@@ -2668,7 +2661,7 @@ void quest_marker_draw_with_master(CockpitWork* work, _PLW* plw) {
     }
     if ((u8)stage_map_kind_get(get_now_mapno()) != 6) {
         const VEC3& world = get_worldworld_pos(&plw->vec_0x03C, plw->area_0x16);
-        copyVec3(&pos, &world);
+        pos = world;
         scale = 25.0769234f;
         quest_marker_draw_at(work, &pos.x, 0, scale, (u16)(f32)(u16)(0x18000 - plw->field_0x058),
                              color_mult(player_color_get(plw->chunk_ofs), 0x999999FF), 0);
@@ -2676,7 +2669,7 @@ void quest_marker_draw_with_master(CockpitWork* work, _PLW* plw) {
     root = (_PL_ROOT*)get_move_work_adrs(0);
     {
         const VEC3& world = get_worldworld_pos(&root->pos_0x128, root->area_no_0xEB);
-        copyVec3(&pos, &world);
+        pos = world;
         scale = 31.3461533f;
         quest_marker_draw_at(work, &pos.x, 0, scale, (u16)(f32)(u16)(0x18000 - root->rot_y_0x134),
                              player_color_get(plw->chunk_ofs), 0);
@@ -3107,9 +3100,8 @@ void quest_target_marker_draw(CockpitWork* work, _ENEMY_WORK* target, s32 clip) 
     f32 scale;
     u32 color;
 
-    VEC3_ctor(&pos);
     const VEC3& world = get_worldworld_pos(&target->pos, target->area_no);
-    copyVec3(&pos, &world);
+    pos = world;
     if ((clip == 0 || quest_mark_on_screen_ck(work, &pos.x) != 0) &&
         quest_target_icon_get(work, target, &icon, &scale, &color) != 0) {
         if (clip == 0) {
@@ -3517,7 +3509,7 @@ void PitTrapSet(const VEC3* pos, u8 kind) {
 
     if (state->pit_trap_count_0x058 < 4) {
         trap = &state->pit_traps_0x018[state->pit_trap_count_0x058];
-        copyVec3(&trap->pos, pos);
+        trap->pos = *pos;
         trap->kind_0x0C = kind;
         state->pit_trap_count_0x058++;
     }
@@ -3529,7 +3521,6 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos
     _PLW* plw;
     u16 angle;
     _SPR_DATA_* rec;
-    VEC3 local;
     u32 angle_on;
     f32 proj[2];
     f32 scale;
@@ -3555,7 +3546,7 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos
         angle = 0;
     }
     rec = get_lsp_data(id, NULL);
-    VEC3_ctor(&local);
+    VEC3 local;
     quest_player_marker_pos(plw, &local);
     const VEC3& world = get_worldworld_pos(&local, plw->area_0x16);
     quest_screen_project(proj, &world.x);
@@ -3623,7 +3614,6 @@ void quest_marker_draw(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
         SprRecordWords words;
         _SPR_DATA_ spr;
     } rec;
-    VEC3 local;
     f32 spot[2];
     f32 proj[2];
     _PLW* plw = work->plw;
@@ -3649,7 +3639,7 @@ void quest_marker_draw(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos) {
             quest_pit_area_icon_marks_draw(work, 0x12, 0);
         }
     } else {
-        VEC3_ctor(&local);
+        VEC3 local;
         quest_player_marker_pos(plw, &local);
         const VEC3& world = get_worldworld_pos(&local, plw->area_0x16);
         quest_screen_project(proj, &world.x);
@@ -4566,7 +4556,6 @@ void cockpit_item_list_draw(_PLW* plw, u8* anim) {
 /* 0x802EE82C (0x150): Draws the cockpit's floating item tag over the player: projected through the current camera,
  * kept below the screen top, offset by the tag's own y. */
 void cockpit_item_tag_draw(CockpitWork* work) {
-    VEC3 screen;
     u32 camera;
     _mh_ivec2_ pos;
     s32 handle;
@@ -4577,7 +4566,7 @@ void cockpit_item_tag_draw(CockpitWork* work) {
         tag = &work->item_tag_0x02C;
         if (tag->tex_idx_0x15 != 0) {
             set_blendmode(4, 5, 1);
-            VEC3_ctor(&screen);
+            VEC3 screen;
             chara_icon_pos_get(plw, 1, &tag->pos);
             handle = scn_root_get_current_camera(pRoot);
             word_copy_return_dst(&camera, &handle);
@@ -4682,16 +4671,15 @@ u8 cockpit_lockon_level_get(_PLW* plw) {
 }
 
 /* 0x802EEDE4 (0xBC): Draws the aim marker at the world position `pos`, projected through the current camera. */
-void cockpit_aim_marker_draw(VEC3 pos) {
+void cockpit_aim_marker_draw(_VEC3 pos) {
     VEC3 screen;
     u32 camera;
     _mh_ivec2_ spot;
     s32 handle;
 
-    VEC3_ctor(&screen);
     handle = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &handle);
-    camera_world_to_screen(&camera, &screen, &pos);
+    camera_world_to_screen(&camera, &screen, static_cast<VEC3*>(&pos));
     if (screen.z < 0.0f || screen.z > 1.0f) {
         return;
     }
@@ -4701,16 +4689,15 @@ void cockpit_aim_marker_draw(VEC3 pos) {
 }
 
 /* 0x802EEEA0 (0xDC): `cockpit_aim_marker_draw` through player `player`'s own scene camera. */
-void cockpit_aim_marker_draw_split(VEC3 pos, u8 player) {
+void cockpit_aim_marker_draw_split(_VEC3 pos, u8 player) {
     VEC3 screen;
     u32 camera;
     _mh_ivec2_ spot;
     s32 handle;
 
-    VEC3_ctor(&screen);
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[player]);
     word_copy_return_dst(&camera, &handle);
-    camera_world_to_screen(&camera, &screen, &pos);
+    camera_world_to_screen(&camera, &screen, static_cast<VEC3*>(&pos));
     if (screen.z < 0.0f || screen.z > 1.0f) {
         return;
     }
@@ -4721,44 +4708,36 @@ void cockpit_aim_marker_draw_split(VEC3 pos, u8 player) {
 
 /* 0x802EEF7C (0x90): Draws the aim marker 1000 units ahead of the player's eye. */
 void cockpit_eye_marker_draw(_PLW* plw) {
-    MTX34 eye;
     VEC3 pos;
-    VEC3 ofs;
+    MTX34 eye;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&eye);
     pl_eye_mtx_get(plw, &eye);
-    copyVec3(&pos, setVec3(&ofs, 0.0f, 0.0f, 1000.0f));
+    pos = VEC3(0.0f, 0.0f, 1000.0f);
     mulVecMatAddTrans(&pos, &eye);
-    cockpit_aim_marker_draw(pos);
+    cockpit_aim_marker_draw(static_cast<_VEC3&>(pos));
 }
 
 /* 0x802EF00C (0x94): `cockpit_eye_marker_draw` through the player's own scene camera. */
 void cockpit_eye_marker_draw_split(_PLW* plw) {
-    MTX34 eye;
     VEC3 pos;
-    VEC3 ofs;
+    MTX34 eye;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&eye);
     pl_eye_mtx_get(plw, &eye);
-    copyVec3(&pos, setVec3(&ofs, 0.0f, 0.0f, 1000.0f));
+    pos = VEC3(0.0f, 0.0f, 1000.0f);
     mulVecMatAddTrans(&pos, &eye);
-    cockpit_aim_marker_draw_split(pos, plw->chunk_ofs);
+    cockpit_aim_marker_draw_split(static_cast<_VEC3&>(pos), plw->chunk_ofs);
 }
 
 /* 0x802EF0FC (0x134): Draws the digit over the AI NPC's head (when it carries one), projected through the current
  * camera. */
 #pragma fp_contract off
 void cockpit_npc_digit_draw(CockpitWork* work) {
-    VEC3 screen;
-    VEC3 world;
     u32 camera;
     s32 handle;
     _AINPC_W* npc = work->ai_npc_0x048;
 
-    VEC3_ctor(&screen);
-    assignVec3((Vec*)&world, (Vec*)&npc->vec_0x178);
+    VEC3 screen;
+    VEC3 world = npc->vec_0x178;
     handle = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &handle);
     if (work->npc_digit_0x04C != 0) {
@@ -5175,7 +5154,6 @@ void cockpit_split_timer_draw(u8 kind) {
 /* 0x802F0124 (0x1C8): Draws the work record's item tag over its player in the split view, through that player's own
  * camera and clamped to the player's half of the screen. */
 void cockpit_split_item_tag_draw(CockpitWork* work) {
-    VEC3 screen;
     u32 camera;
     _mh_ivec2_ pos;
     s32 handle;
@@ -5187,7 +5165,7 @@ void cockpit_split_item_tag_draw(CockpitWork* work) {
     if (plw->field_0x3E4 != 0) {
         tag = &work->item_tag_0x02C;
         if (tag->tex_idx_0x15 != 0) {
-            VEC3_ctor(&screen);
+            VEC3 screen;
             top = 64.0f;
             bottom = 480.0f;
             handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(Screen_w.camera_view.player_camera_0x50[plw->chunk_ofs]);
@@ -5947,47 +5925,6 @@ void cockpit_split_flash_gauge_draw(CockpitWork* work, u8 player) {
     }
 }
 
-/* 0x802F20D8 (0x48): The unit's static initialiser: constructs both cockpit work records and the cockpit state. */
-void cockpit_static_init(void) {
-    __construct_array(cockpit_work, (void*)cockpit_work_construct, NULL, sizeof(CockpitWork), 2);
-    cockpit_state_construct(&cockpit_state);
-}
-
-/* 0x802F2120 (0x58): Constructs the cockpit state: the positions of its four pit traps. */
-CockpitState* cockpit_state_construct(CockpitState* state) {
-    PitTrap* trap = state->pit_traps_0x018;
-
-    do {
-        pit_trap_construct(trap);
-        trap++;
-    } while (trap < &state->pit_traps_0x018[4]);
-    return state;
-}
-
-/* 0x802F2178 (0x30): Constructs one pit trap record (its position). */
-PitTrap* pit_trap_construct(PitTrap* trap) {
-    VEC3_ctor(&trap->pos);
-    return trap;
-}
-
-/* 0x802F21A8 (0x60): Constructs one cockpit work record: its item tag and its four marker positions. */
-CockpitWork* cockpit_work_construct(CockpitWork* work) {
-    VEC3* pos;
-
-    cockpit_item_tag_construct(&work->item_tag_0x02C);
-    pos = work->name_pos_0x054;
-    do {
-        VEC3_ctor(pos);
-        pos++;
-    } while (pos < &work->name_pos_0x054[4]);
-    return work;
-}
-
-/* 0x802F2208 (0x30): Constructs one item tag (its world position). */
-CockpitItemTag* cockpit_item_tag_construct(CockpitItemTag* tag) {
-    VEC3_ctor(&tag->pos);
-    return tag;
-}
 
 /* 0x802EE288 (0xA8): Draws the item icon of slot `slot` (none for 0xFF, an empty or a 0xDF slot), crossed out in red
  * when `pl_item_now_usable_ck` says the item cannot be used. */
@@ -6176,9 +6113,8 @@ void cockpit_shell_marker_draw(_PLW* plw)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     eft053_shell_pos_project(plw, &pos);
-    cockpit_aim_marker_draw(pos);
+    cockpit_aim_marker_draw(static_cast<_VEC3&>(pos));
 }
 
 /* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `camera_mode1_ck()` hold,

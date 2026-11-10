@@ -34,7 +34,7 @@
 #include "OS/PPCArch.h"            /* PPCSync (rule 2) */
 #include "RVLGX/GXTev.h"           /* GXSetTevKColor (rule 2) */
 #include "RVLGX/GXBump.h"          /* GXSetIndTexMtx (rule 2) */
-#include "fn_8004CAD8/mtx.h"       /* MTX34_ctor (rule 2) */
+#include "fn_8004CAD8/mtx.h"       /* MTX34::MTX34() (rule 2) */
 #include "nw4r/db_assert.h"        /* nw4r::db::Panic (rule 2) */
 #include "g3d/g3d_calcview.h"      /* g3d_lc_queue_wait (rule 2) */
 #include "g3d/g3d_resvtx.h"
@@ -56,7 +56,6 @@ f32 powf(f32 x, f32 y);
 
 
 extern "C" {
-G3dIndMtxOp* g3d_ind_mtx_op_ctor(G3dIndMtxOp* pOp);
 const nw4r::g3d::ResMatFurData* res_mat_fur_ref(const nw4r::g3d::ResMatFur* pFur);
 const nw4r::g3d::ResMatFurData* res_mat_fur_ptr(const nw4r::g3d::ResMatFur* pFur);
 void GDWrite_u32(u32 value);
@@ -155,7 +154,6 @@ static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndM
     } else if (pIndMtxOp != NULL) {
         if (pSwap == NULL || !pSwap->indMtxAndScale.IsValid()) {
             G3dIndMtxOp op;
-            g3d_ind_mtx_op_ctor(&op);
             pIndMtxOp->Exec(&op);
             g3d_ind_mtx_op_load(&op);
         } else {
@@ -166,17 +164,6 @@ static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndM
 
 }  // namespace g3d
 }  // namespace nw4r
-
-/* 0x8007663C (0x60): clears the operation's flags and constructs its three matrices. */
-G3dIndMtxOp* g3d_ind_mtx_op_ctor(G3dIndMtxOp* pOp) {
-    pOp->flags = 0;
-    nw4r::math::MTX34* pMtx = pOp->mtx;
-    do {
-        MTX34_ctor(pMtx);
-        pMtx++;
-    } while (pMtx < pOp->mtx + 3);
-    return pOp;
-}
 
 /* 0x8007669C (0x34): returns the material's MatTexCoordGen block. */
 nw4r::g3d::ResMatTexCoordGen nw4r::g3d::ResMat::GetResMatTexCoordGen() {
@@ -320,9 +307,6 @@ void nw4r::g3d::Draw1Mat1ShpDirectly(ResMat mat, ResShp shp, const math::MTX34* 
             f32 alphaPowExp = res_mat_fur_ref(&fur)->alphaPowExp;
             f32 colorPowExp = res_mat_fur_ref(&fur)->colorPowExp;
             math::MTX34 indMtx[3];
-            MTX34_ctor(&indMtx[0]);
-            MTX34_ctor(&indMtx[1]);
-            MTX34_ctor(&indMtx[2]);
             u32 matSrc[4];
             u32 attnFn[4];
             /* The channel order the colour controls are read in: colour 0, alpha 0, colour 1, alpha 1. */

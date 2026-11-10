@@ -84,14 +84,13 @@
 #include "g3d/g3d_calcview.h"            /* fn_800710BC (rule 2) */
 #include "g3d/g3d_state.h"               /* mtx34_inverse (rule 2) */
 #include "nw4r/fn_805012C4.h"            /* mtx34_rotate_vec3 (rule 2) */
-#include "fn_8004CAD8.h"                 /* MTX34_ctor, mtx34_identity, fn_80050508 (rule 2) */
+#include "fn_8004CAD8.h"                 /* MTX34::MTX34(), mtx34_identity, fn_80050508 (rule 2) */
 #include "fn_80047398.h"                 /* color_rgba_copy (rule 2) */
-#include "mh3_pad/vec3.h"                /* copyVec3 (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "ef/ef_particle_get_color.h"   /* the particle colour getters (rule 2) */
 #include "ef/ef_pm_modulate_color.h"    /* the manager colour helpers (rule 2) */
 #include "ef/ef_emitter_tex_flags.h"    /* the emitter accessors (rule 2) */
 #include "ef/ef_draw_info_projection.h" /* ef_draw_info_projection (rule 2) */
-#include "mh3_pad/vec3_assign.h"        /* vec3_assign (rule 2) */
 
 
 
@@ -123,7 +122,6 @@ extern char ef_strategy_impl_particle_h_str4[]; /* "particle.h"                 
 extern char ef_strategy_impl_layer_assert_str5[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B6C */
 extern char ef_strategy_impl_particle_h_str5[]; /* "particle.h"                                               .data 0x80594B9C */
 
-EfAheadContext* ef_ahead_context_members_ctor(EfAheadContext* self);
 
 }  // extern "C"
 
@@ -163,11 +161,11 @@ DrawStrategy* DrawStrategyBuilder::Create(u32 type) {
 }  // namespace nw4r
 
 /* The unit vectors, the zero vector and the identity matrix the static initializer builds. */
-VEC3 ef_unit_x_vec;
-VEC3 ef_unit_y_vec;
-VEC3 ef_unit_z_vec;
-VEC3 ef_zero_vec;
-MTX34 ef_identity_mtx;
+VEC3 ef_unit_x_vec(1.0f, 0.0f, 0.0f);
+VEC3 ef_unit_y_vec(0.0f, 1.0f, 0.0f);
+VEC3 ef_unit_z_vec(0.0f, 0.0f, 1.0f);
+VEC3 ef_zero_vec(0.0f, 0.0f, 0.0f);
+EfIdentityMtx ef_identity_mtx;
 
 namespace nw4r {
 namespace ef {
@@ -180,8 +178,6 @@ DrawStrategyImpl::PrevTexture::PrevTexture() {
     f32 one;
     f32 zero;
 
-    VEC2_ctor(&scale);
-    VEC2_ctor(&translate);
     texture = NULL;
     one = 1.0f;
     scale_s = one;
@@ -1205,7 +1201,6 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
                     pp->tex_scale[layer].y != mPrevTexture[layer].scale.y || pp->tex_rotate[layer] != mPrevTexture[layer].rotate ||
                     pp->tex_translate[layer].x != mPrevTexture[layer].translate.x ||
                     pp->tex_translate[layer].y != mPrevTexture[layer].translate.y) {
-                    MTX34 mtx;
                     u8* flags;
 
                     loaded = true;
@@ -1219,7 +1214,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
                     mPrevTexture[layer].translate.x = pp->tex_translate[layer].x;
                     mPrevTexture[layer].translate.y = pp->tex_translate[layer].y;
 
-                    MTX34_ctor(&mtx);
+                    MTX34 mtx;
                     mtx34_identity(&mtx);
                     mtx.m[0][3] = pp->tex_translate[layer].x;
                     mtx.m[1][3] = pp->tex_translate[layer].y;
@@ -1500,11 +1495,7 @@ namespace ef {
  * manager space (and, for draw types 5 and 7, the manager's own Y axis). */
 DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleManager* pm) {
     EfEmitterDrawSetting* ed;
-    VEC3 axis_y;
-    VEC3 center;
-    VEC3 manager_y;
 
-    ef_ahead_context_members_ctor(this);
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_strategy_impl_file_str, 1219, ef_strategy_impl_pm_assert_str, pm);
     }
@@ -1515,17 +1506,16 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     ef_pm_get_mtx(pm, &manager_mtx);
     mtx34_inverse(&manager_mtx_inv, &manager_mtx);
 
-    setVec3(&axis_y, emitter_mtx.m[0][1], emitter_mtx.m[1][1], emitter_mtx.m[2][1]);
+    VEC3 axis_y(emitter_mtx.m[0][1], emitter_mtx.m[1][1], emitter_mtx.m[2][1]);
     mtx34_rotate_vec3(&axis_y, &manager_mtx_inv, &axis_y);
     if (ef_vec3_normalize(&axis_y) == 0) {
-        VEC3 up;
-        copyVec3(&axis_y, setVec3(&up, 0.0f, 1.0f, 0.0f));
+        axis_y = VEC3(0.0f, 1.0f, 0.0f);
     }
-    copyVec3(&emitter_axis_y, &axis_y);
+    emitter_axis_y = axis_y;
 
-    setVec3(&center, emitter_mtx.m[0][3], emitter_mtx.m[1][3], emitter_mtx.m[2][3]);
+    VEC3 center(emitter_mtx.m[0][3], emitter_mtx.m[1][3], emitter_mtx.m[2][3]);
     ef_vec3_transform(&center, &manager_mtx_inv, &center);
-    copyVec3(&emitter_center, &center);
+    emitter_center = center;
 
     EF_VALID_PTR_ASSERT(ef_strategy_impl_file_str, 1250, ef_strategy_impl_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
@@ -1533,10 +1523,9 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
         nw4r::db::Panic(ef_strategy_impl_file_str, 1253, ef_strategy_impl_ed_assert_str, ed);
     }
     if ((s32)ed->type_direction == 5 || (s32)ed->type_direction == 7) {
-        setVec3(&manager_y, manager_mtx_inv.m[0][1], manager_mtx_inv.m[1][1], manager_mtx_inv.m[2][1]);
+        VEC3 manager_y(manager_mtx_inv.m[0][1], manager_mtx_inv.m[1][1], manager_mtx_inv.m[2][1]);
         if (ef_vec3_normalize(&manager_y) == 0) {
-            VEC3 up;
-            copyVec3(&manager_y, setVec3(&up, 0.0f, 1.0f, 0.0f));
+            manager_y = VEC3(0.0f, 1.0f, 0.0f);
         }
         vec3_assign(&manager_axis_y, &manager_y);
     }
@@ -1547,23 +1536,8 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
 
 extern "C" {
 
-/* 0x800C9434 (0x54): the ahead context's member constructors (three matrices, two vectors). */
-EfAheadContext* ef_ahead_context_members_ctor(EfAheadContext* self) {
-    MTX34_ctor(&self->emitter_mtx);
-    MTX34_ctor(&self->manager_mtx);
-    MTX34_ctor(&self->manager_mtx_inv);
-    VEC3_ctor(&self->emitter_axis_y);
-    VEC3_ctor(&self->emitter_center);
-    return self;
-}
-
-/* 0x800C9488 (0xB8): builds the four basis vectors and the identity matrix the strategies start from. */
-void ef_strategy_init_basis(void) {
-    setVec3(&ef_unit_x_vec, 1.0f, 0.0f, 0.0f);
-    setVec3(&ef_unit_y_vec, 0.0f, 1.0f, 0.0f);
-    setVec3(&ef_unit_z_vec, 0.0f, 0.0f, 1.0f);
-    setVec3(&ef_zero_vec, 0.0f, 0.0f, 0.0f);
-    mtx34_set(&ef_identity_mtx, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-}
-
 }  // extern "C"
+
+/* 0x800C9434 (0x54): constructs the ahead context's three matrices and two vectors. */
+nw4r::ef::DrawStrategyImpl::AheadContextBase::AheadContextBase() {
+}

@@ -41,7 +41,7 @@
 #include "unsplit/unknown.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "main.h"    /* _MH_VEC2 / get_ScreenSize / fn_8004030C (rule 2) */
 #include "copyVec2.h"
 #include "MTX/mtx.h"
@@ -164,7 +164,12 @@ typedef struct FilterPanel {
 typedef struct DrawSpriteSlot {
     /* +0x00 */ u8 pad_0x00[0x18];
     /* +0x18 */ s32 count;
-    /* +0x1C */ u8 pad_0x1C[0x1C];
+    /* +0x1C */ u8 pad_0x1C[0xC];
+    /* +0x28 */ nw4r::math::VEC3 node_0x28;
+    /* +0x34 */ u8 pad_0x34[0x4];
+
+    /* 0x8005951C (0x34): retail's out-of-line constructor; builds `node_0x28`. */
+    DrawSpriteSlot() __attribute__((never_inline)) {}
 } DrawSpriteSlot; /* size: 0x38 */
 
 /* A draw layer's callback: it takes the layer's own block. */
@@ -198,6 +203,9 @@ typedef struct GameDrawState {
     /* +0x141 */ u8 pad_0x141[0x03];
     /* +0x144 */ f32 fade_value;         /* the angle `screen_fade_ease` eases toward zero */
     /* +0x148 */ f32 field_0x148;
+
+    /* 0x800594E8 (0x34): retail's out-of-line constructor; builds `sprite_0x3C`. */
+    GameDrawState() __attribute__((never_inline)) {}
 } GameDrawState; /* size: 0x14C */
 
 extern "C" GameDrawState lbl_8066ACF8;
@@ -1360,29 +1368,5 @@ extern "C" void filter_flag_clear(void) {
     lbl_8066ACF8.fade_phase = 0;
 }
 
-/* The sub-object chain `game_draw_sinit` walks: the global state's +0x3C block, whose +0x28 node is the
- * `VEC3_ctor` target.  Only the node's base is used. size: 0x3C */
-typedef struct CtorBlock {
-    /* +0x00 */ u8 pad_0x00[0x28];
-    /* +0x28 */ nw4r::math::VEC3 node_0x28;
-    /* +0x34 */ u8 pad_0x34[0x08];
-} CtorBlock; /* size: 0x3C */
-
-extern "C" void* game_draw_state_ctor(GameDrawState* s);
-extern "C" void* draw_sprite_slot_ctor(CtorBlock* self);
-
-/* The constructor chain `game_draw_sinit` runs over the global state (retail emits the sinit first, then
- * the two constructors): the +0x3C sub-object's own +0x28 node is handed to `VEC3_ctor`. */
-extern "C" void game_draw_sinit(void) {
-    game_draw_state_ctor(&lbl_8066ACF8);
-}
-
-extern "C" void* game_draw_state_ctor(GameDrawState* s) {
-    draw_sprite_slot_ctor((CtorBlock*)&s->sprite_0x3C);
-    return s;
-}
-
-extern "C" void* draw_sprite_slot_ctor(CtorBlock* self) {
-    VEC3_ctor(&self->node_0x28);
-    return self;
-}
+/* The global state; the compiler's static initialiser constructs it. */
+GameDrawState lbl_8066ACF8;

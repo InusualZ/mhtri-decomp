@@ -13,7 +13,10 @@
 
 /* The draw-time view state `nw4r::ef::DrawInfo`: the view matrix first, the light state, the fog record and the
  * material and ambient colours. */
-typedef struct EfDrawInfo {
+namespace nw4r {
+namespace ef {
+struct DrawInfo {
+    DrawInfo(); /* 0x800A6134 (0xB8), ef/ef_effectsystem.cpp: identity matrices, lighting and fog off, white material */
     /* +0x00 */ MTX34 view_mtx;      /* the camera's view matrix */
     /* +0x30 */ MTX34 mtx_0x30;      /* a second matrix the draw info carries (copied with the view matrix) */
     /* +0x60 */ bool light_enable;   /* lighting on for the draw */
@@ -32,7 +35,17 @@ typedef struct EfDrawInfo {
     /* +0x8C */ VEC3 depth_origin;    /* the world point whose view direction the offset follows */
     /* +0x98 */ GXColor mat_color;   /* the material colour handed to GXSetChanMatColor */
     /* +0x9C */ GXColor amb_color;   /* the ambient colour handed to GXSetChanAmbColor */
-} EfDrawInfo; /* size: 0xA0 (lower bound) */
+}; /* size: 0xA0 (lower bound) */
+} // namespace ef
+} // namespace nw4r
+typedef nw4r::ef::DrawInfo EfDrawInfo;
+
+/* A draw info's byte image: the storage `ParticleManager::Draw` builds its copy in, which runs no constructor (the
+ * two matrices, then the light, fog, depth and colour words). size: 0xA0 */
+typedef struct EfDrawInfoImage {
+    /* +0x00 */ nw4r::math::_MTX34 mtx[2];
+    /* +0x60 */ u32 words[0x10];
+} EfDrawInfoImage; /* size: 0xA0 */
 
 /* The emitter draw setting `nw4r::ef::EmitterDrawSetting`: the GX state of one emitter's particles. */
 typedef struct EfEmitterDrawSetting {

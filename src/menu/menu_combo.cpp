@@ -45,10 +45,10 @@
 #include "ef/effect.h"
 #include "pl.h" /* _PLW */
 #include "gx.h" /* _GXColor */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 */
-#include "fn_8004CAD8.h" /* calcVecAngXY / rotVecX / rotVecY / cpSetRotMatrix / getKeyData3 / MTX34_ctor */
+#include "mh3_pad.h" /* the owner header */
+#include "fn_8004CAD8.h" /* calcVecAngXY / rotVecX / rotVecY / cpSetRotMatrix / getKeyData3 / MTX34::MTX34() */
 #include "sound/fn_800DD1F0.h" /* mhchar_joint_mtx_get */
-#include "g3d/g3d_calcworld.h" /* addVec3To */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= */
 #include "ef/eft001.h" /* mtx34_set_trans */
 #include "ef/mtx34_trans_get.h"
 #include "ef/eft_stage_spawn_flag.h"

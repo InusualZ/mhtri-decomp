@@ -24,7 +24,6 @@ void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
 
 /* 0x80075390..0x80075620 - the matrix helpers (0x80075394 is the member `Camera::GetCameraMtx`) `g3d/g3d_state.cpp` calls (rule 2, moved out of that
  * unit's local extern block on landing). */
-void MTX44_ctor(nw4r::math::MTX44* pMtx);
 /* 0x800746DC (0x7C): resets the camera record the handle names to its defaults. */
 void camera_init(nw4r::g3d::Camera* pSelf);
 /* 0x80075440 (0xAC): copies the camera's projection matrix (rebuilt first when stale) into `pOut`. */

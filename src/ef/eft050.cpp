@@ -44,7 +44,7 @@
 #include "stage/stg_w.h"     /* get_now_areano (the owner header, rule 2) */
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "nw4r/math_types.h" /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h" /* the vector helpers (rule 2) */
@@ -230,7 +230,6 @@ extern "C" {
 #endif
 
 void draw_font_idx_num(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
-void addVec3To(VEC3* dst, const VEC3* src);
 u32 calc_xz_angle(f32 a, f32 b, f32 c, f32 d);
 const u8* ai_npc_behaviour_get(u8 index);
 void ai_npc_pair_values_get(u8 a, u8 b, u16* out);
@@ -337,11 +336,6 @@ void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag);
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
-/* `em_vec3_copy` returns its argument's copy by value. */
-#define EFT_VEC3_COPY ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*))em_vec3_copy)
 /* The bite body reads `eft050_catch_limit_get`'s result as the byte it is (the caller narrows it, not the callee). */
 #define EFT050_CATCH_LIMIT ((u8 (*)(HoldOwner*, HoldOwner*))eft050_catch_limit_get)
 
@@ -661,7 +655,7 @@ extern "C" void eft050_fish_spawn(u8 type, VEC3* pos, f32 scale, f32 scale2, u32
     work->param_0x3C = param;
     work->flag_0x60 = 0;
     work->scale_0x30 = scale2;
-    copyVec3(&eft->pos_0x18, copyVec3(&work->pos_0x08, pos));
+    eft->pos_0x18 = work->pos_0x08 = *pos;
     eft->rot_0x24.x = 0;
     eft->rot_0x24.y = 0;
     eft->rot_0x24.z = 0;
@@ -717,7 +711,6 @@ extern "C" void eft050_fish_alive(_EFT* self)
     Eft050Work* work;
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     work = (Eft050Work*)self->work_0x38;
     switch (self->field_0x06) {
     case 0:
@@ -740,19 +733,19 @@ extern "C" void eft050_fish_alive(_EFT* self)
         break;
     }
     if (self->field_0x06 < 3) {
-        copyVec3(&ofs, &VEC3_SUB(&self->pos_0x18, &work->pos_0x08));
+        ofs = *(&(self->pos_0x18 - work->pos_0x08));
         ofs.y = 0.0f;
         if (vec3_len((f32*)&ofs) > work->scale_0x24) {
             vec3_normalize_into(&ofs, &ofs);
-            copyVec3(&self->pos_0x18, &VEC3_ADD(&work->pos_0x08, &VEC3_SCALE(&ofs, work->scale_0x24)));
+            self->pos_0x18 = *(&(work->pos_0x08 + (ofs * work->scale_0x24)));
         }
     }
     self->rot_0x24.x = work->rot_x_0x4C;
     self->rot_0x24.y = work->rot_y_0x50 + work->wiggle_0x48;
     self->rot_0x24.z = work->rot_z_0x54;
-    copyVec3(&work->models_0x00[0]->pos_0x04, &self->pos_0x18);
+    work->models_0x00[0]->pos_0x04 = self->pos_0x18;
     eft_rot_vec_copy(&work->models_0x00[0]->rot_0x28, &self->rot_0x24);
-    copyVec3(&work->models_0x00[0]->scale_0x1C, &work->scale_0x14);
+    work->models_0x00[0]->scale_0x1C = work->scale_0x14;
     work->models_0x00[0]->move(0);
     eft_res_models_spawn(self, (void**)work->models_0x00, 2, work->count_0x04, 0);
 }
@@ -901,8 +894,6 @@ extern "C" void eft050_fish_appear(_EFT* self)
     f32 dist;
     u32 yaw;
 
-    VEC3_ctor(&ofs);
-    MTX34_ctor(&mtx);
     switch (self->field_0x07) {
     case 0:
         self->field_0x07++;
@@ -920,8 +911,8 @@ extern "C" void eft050_fish_appear(_EFT* self)
         ofs.z = dist;
         yaw = ran_suu(1);
         rotVecY(&ofs, yaw);
-        copyVec3(&self->pos_0x18, &work->pos_0x08);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 = work->pos_0x08;
+        self->pos_0x18 += ofs;
         self->timer_0x0C = 10;
         work->rot_x_0x4C = 0;
         work->rot_z_0x54 = 0;
@@ -943,7 +934,7 @@ extern "C" void eft050_fish_appear(_EFT* self)
             self->field_0x06 = 1;
             self->field_0x07 = 0;
             self->timer_0x0C = (ran_suu(0) & 0x1F) + 10;
-            copyVec3(&work->scale_0x14, &EFT_VEC3_COPY(&slot->scale_0x08));
+            work->scale_0x14 = VEC3(*(const Vec*)&slot->scale_0x08);
         }
         break;
     }
@@ -967,10 +958,6 @@ extern "C" void eft050_fish_swim(_EFT* self)
     s32 frames;
     u32 yaw;
 
-    VEC3_ctor(&step);
-    VEC3_ctor(&move);
-    VEC3_ctor(&unused);
-    MTX34_ctor(&mtx);
     bite = 0;
     flt = eft050_float_find(self, 0);
     switch (self->field_0x07) {
@@ -998,7 +985,7 @@ extern "C" void eft050_fish_swim(_EFT* self)
         rot.z = work->rot_z_0x54;
         cpSetRotMatrix(&rot, &mtx);
         mtx34_rotate_vec3(&move, &mtx, &step);
-        addVec3To(&self->pos_0x18, &move);
+        self->pos_0x18 += move;
         work->wiggle_0x48 -= work->wiggle_0x48 * 2;
         work->wiggle_0x48 -= work->wiggle_0x48 / 2;
         if (flt != NULL) {
@@ -1090,9 +1077,6 @@ extern "C" void eft050_fish_bite(_EFT* self)
     s32 div;
     u32 yaw;
 
-    VEC3_ctor(&step);
-    VEC3_ctor(&move);
-    MTX34_ctor(&mtx);
     flt = eft050_float_find(self, 1);
     if (flt != NULL) {
         if (Pl_act_ck((_PLW*)flt->source_0x30, 0, 0x42) != 0 || Pl_act_ck((_PLW*)flt->source_0x30, 0, 0x43) != 0) {
@@ -1164,7 +1148,7 @@ extern "C" void eft050_fish_bite(_EFT* self)
         rot.z = work->rot_z_0x54;
         cpSetRotMatrixYXZ(&rot, &mtx);
         mtx34_rotate_vec3(&move, &mtx, &step);
-        addVec3To(&self->pos_0x18, &move);
+        self->pos_0x18 += move;
         if (--self->timer_0x0C <= 0) {
             if (fish->catches_0x59C[0] != 0 && fish->catches_0x59C[0] != slot->id_0x00) {
                 eft050_fish_swim_again(self);
@@ -1276,7 +1260,7 @@ extern "C" void eft050_fish_bite(_EFT* self)
         rot.y = work->rot_y_0x50;
         rot.z = work->rot_z_0x54;
         rotVecY(&move, rot.y);
-        addVec3To(&self->pos_0x18, &move);
+        self->pos_0x18 += move;
         if ((work->speed_0x20 += work->accel_0x2C) >= 0.0f) {
             self->field_0x07++;
             level = EFT050_CATCH_LIMIT((HoldOwner*)self, (HoldOwner*)flt);
@@ -1344,7 +1328,7 @@ extern "C" void eft050_fish_bite(_EFT* self)
         rot.y = work->rot_y_0x50;
         rot.z = work->rot_z_0x54;
         rotVecY(&move, rot.y);
-        addVec3To(&self->pos_0x18, &move);
+        self->pos_0x18 += move;
         if ((work->speed_0x20 += work->accel_0x2C) <= 0.0f) {
             eft050_fish_swim_again(self);
         }
@@ -1362,7 +1346,6 @@ extern "C" void eft050_fish_hooked(_EFT* self)
     nw4r::math::VEC3 pos;
     _PLW* plw;
 
-    VEC3_ctor(&pos);
     plw = (_PLW*)flt->source_0x30;
     if (flt->field_0x03 != 34 || flt->used_0x00 == 0 || flt->state_0x05 >= 2) {
         self->field_0x06 = 4;
@@ -1399,9 +1382,9 @@ extern "C" void eft050_fish_hooked(_EFT* self)
             work->rot_x_0x4C -= 0x1000;
             break;
         }
-        copyVec3(&pos, &flt->pos_0x18);
+        pos = flt->pos_0x18;
         pos.y -= 10.0f * work->slot_0x5A;
-        copyVec3(&self->pos_0x18, &pos);
+        self->pos_0x18 = pos;
         break;
     }
 }
@@ -1429,7 +1412,7 @@ extern "C" void eft050_fish_respawn(_EFT* self)
         } else {
             self->field_0x07++;
         }
-        copyVec3(&self->pos_0x18, &work->pos_0x08);
+        self->pos_0x18 = work->pos_0x08;
         if (work->respawn_0x5B == 1) {
             self->timer_0x0C = 10;
         } else {
@@ -1469,9 +1452,6 @@ extern "C" void eft050_fish_flee(_EFT* self)
     _PLW* players;
     f32 shrink;
 
-    VEC3_ctor(&step);
-    VEC3_ctor(&away);
-    MTX34_ctor(&mtx);
     work = (Eft050Work*)self->work_0x38;
     slot = eft050_fish_kind_get(work->kind_0x58);
     switch (self->field_0x07) {
@@ -1481,8 +1461,8 @@ extern "C" void eft050_fish_flee(_EFT* self)
         work->speed_0x20 = 24.0f;
         work->hooked_0x59 = 0;
         players = (_PLW*)get_move_work_adrs(2);
-        copyVec3(&away, &VEC3_SUB(&self->pos_0x18, &players[(s8)my_player_no()].vec_0x03C));
-        copyVec3(&step, &VEC3_SCALE(&away, work->scale_0x24));
+        away = *(&(self->pos_0x18 - players[(s8)my_player_no()].vec_0x03C));
+        step = *(&(away * work->scale_0x24));
         work->rot_y_0x50 = eft050_xz_angle_get(&self->pos_0x18, &step);
         work->rot_y_0x50 -= 0x4000;
         work->rot_y_0x50 += ran_suu(0) & 0x7FFF;
@@ -1505,7 +1485,7 @@ extern "C" void eft050_fish_flee(_EFT* self)
         rot.z = work->rot_z_0x54;
         cpSetRotMatrix(&rot, &mtx);
         mulVecMat(&step, &mtx);
-        addVec3To(&self->pos_0x18, &step);
+        self->pos_0x18 += step;
         if (self->timer_0x0C < 10) {
             shrink = 0.1f * (slot->scale_0x08.x / 10.0f);
             work->scale_0x14.x -= shrink;
@@ -1910,7 +1890,6 @@ extern "C" void eft050_interior_fx_spawn(u32 id, nw4r::math::VEC3* pos, f32 scal
     s32 i;
     EftFishRoll* tbl;
 
-    VEC3_ctor(&unused);
     map = get_now_mapno();
     if (move_work_state_ck() == 1) {
         eft050_fish_school_spawn((u8)id, pos, scale, 0);

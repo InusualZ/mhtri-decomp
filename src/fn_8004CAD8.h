@@ -8,7 +8,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor / set_slot_none - the two this unit's consumers share */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() / set_slot_none - the two this unit's consumers share */
 #include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (leaf header) */
 #include "vec3_scale.h" /* vec3_scale (leaf header) */
 #include "draw_rect.h" /* _DRAW_RECT_2D_TEX, DrawRect */
@@ -151,7 +151,7 @@ void mtx34_identity(void* pOut);
  * direction vector. */
 void mtx34_concat_assign(MTX34* dst, const MTX34* src);
 s32 vec3_angle_xy(const f32* v);
-/* `MTX34_ctor` (0x8005050C) and `set_slot_none` (0x8004CAD8) live in `fn_8004CAD8/mtx.h`, included
+/* `MTX34::MTX34()` (0x8005050C) and `set_slot_none` (0x8004CAD8) live in `fn_8004CAD8/mtx.h`, included
  * below - this header's other declarations still disagree with several consumers, so a band that
  * only needs those two takes the light one. */
 /* 0x80052BC0/0x800534B0 - the `ResTex`/`ResPltt` value-type constructors the
@@ -181,22 +181,19 @@ void* mtx34_get_ptr(void* pOut);
 f32 vec3_distance(void* a, void* b);
 /* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
  * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `subVec3(out, a, b)` is
- * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `calcVecDistXZ(a, b)` calls `subVec3(&local, b, a)`
+ * `VEC3::VEC3()(out); PSVECSubtract(out, a, b)`, and `calcVecDistXZ(a, b)` calls `subVec3(&local, b, a)`
  * then the length helper `vec3_len(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
  * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
-void subVec3(void* out, const void* a, const void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
-void subVec3(void* out, const void* a, const void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
 /* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
  * radius constant, e.g. `enemy/fn_801B0010.cpp` against `lbl_80798B3C` = 2250000.0f = 1500^2). */
 f32 vec3_dist_sq(const void* a, const void* b);
 /* 0x80051378 - the three-pointer vector helper this range owns (unmangled `addVec3`, so C
- * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
+ * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3::VEC3()`, then tail-forwards all
  * three to `vec3_add_ps`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added with its first consumer
  * (rule 2) - the owner header did not declare it yet. */
-void addVec3(VEC3* out, VEC3* a, VEC3* b);
 /* 0x80050850 - the in-place normaliser this range owns (unmangled `vec3_normalize_into`, so C
  * linkage).  Its body saves r3/r4 in r29/r30, hands r3 to `PSVECNormalize`'s `src` (r3) and
  * r4 to its `dst` (the target body reads 0(r3)/8(r3) and stores 0(r4)/8(r4)), then restores
@@ -212,7 +209,7 @@ void anim_key_curve_eval(f32* keys, f32 frame, f32* out0, f32* out1);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `vec3_add_ps(out, a, b)`
  * is the paired-single add `out = a + b`, `vec3_copy(out, src)` the field-by-field three-float copy,
- * `vec3_scale(out, in, s)` the scale (`VEC3_ctor` then `vec3_scale_by`; in its leaf header), and `vec3_scale_in_place` the
+ * `vec3_scale(out, in, s)` the scale (`VEC3::VEC3()` then `vec3_scale_by`; in its leaf header), and `vec3_scale_in_place` the
  * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
  * parameter spellings are the ones the consumers that already include this header declare
  * (`ef/fn_801173AC.cpp`, `enemy/fn_801B7020.cpp`, `enemy/fn_8035E034.cpp`): `vec3_scale_in_place`'s return
@@ -254,7 +251,6 @@ s32 calcVecAngX2(void* a, void* b);
 #ifdef __cplusplus
 void capsule_box_from_points(VEC3* start, VEC3* end, f32 radius, nw4r::math::CAPSULE* out);
 #endif
-void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
  * as four separate word moves.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
 void place_rec_copy(void* dst, const void* src);

@@ -404,12 +404,12 @@ const ut::Font* TextBox::GetFont() const {
 
 /* 0x8052DADC (0x84): Loads the pane matrix with its y axis flipped, since text is laid out downwards. */
 void TextBox::LoadMtx(const DrawInfo& drawInfo) {
-    math::MTX34 mtx;
+    math::_MTX34 mtx;
 
     if (drawInfo.mFlag.mulViewDraw) {
-        PSMTXConcat(&drawInfo.mViewMtx, &mGlbMtx, &mtx);
+        PSMTXConcat((const math::MTX34*)&drawInfo.mViewMtx, (const math::MTX34*)&mGlbMtx, (math::MTX34*)&mtx);
     } else {
-        PSMTXCopy(&mGlbMtx, &mtx);
+        PSMTXCopy((const math::MTX34*)&mGlbMtx, (math::MTX34*)&mtx);
     }
 
     mtx.m[0][1] = -mtx.m[0][1];
@@ -439,7 +439,7 @@ const ut::Rect TextBox::GetTextDrawRect(ut::TextWriterBase<wchar_t>* pWriter) co
     CalcStringRect(&textRect, *pWriter, mTextBuf, mTextLen, mSize.width);
 
     const Size textSize(textRect.right - textRect.left, textRect.bottom - textRect.top);
-    math::VEC2 ltPos = static_cast<const math::VEC2&>(GetVtxPos());
+    math::_VEC2 ltPos = static_cast<const math::VEC2&>(GetVtxPos());
 
     ltPos.x += (mSize.width - textSize.width) * GetTextMagH();
     ltPos.y -= (mSize.height - textSize.height) * GetTextMagV();

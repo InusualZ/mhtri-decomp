@@ -90,7 +90,7 @@
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
 #include "g3d/g3d_resmat.h" /* ResTexSrt */
-#include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
+#include "fn_8004CAD8.h"         /* MTX34::MTX34(), fn_8005024C (their owner's header) */
 #include "g3d/g3d_calcmaterial.h" /* res_tex_srt_copy_ctor (rule 2) */
 #include "unsplit/sound.h"       /* fn_800E2994 */
 #include "unsplit/unknown.h"     /* SystemWork / system_w */
@@ -788,7 +788,6 @@ void em020_event_notify(_ENEMY_WORK* self, u8 kind, u8 sub)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (self->area_no == 0)
         self->field_0x38C = 0;
     switch (kind) {
@@ -1023,7 +1022,7 @@ void em020_circle_charge(_ENEMY_WORK* self, u8 dir, u8 mode)
             em_approach_start(self, 0.0f, 0x1A);
         } else {
             step = 0x3000;
-            copyVec3(home, &self->vec_0x36C);
+            *home = self->vec_0x36C;
             self->vec_0x36C.y += 2000.0f;
             if (self->vec_0x36C.y > self->field_0x210)
                 self->vec_0x36C.y = self->field_0x210;
@@ -1102,7 +1101,7 @@ void em020_circle_charge(_ENEMY_WORK* self, u8 dir, u8 mode)
                     self->state += 1;
                     self->state_0x006 = 0;
                     em_mot_set_blend(self, 0x13, 0x28, 0, 1);
-                    copyVec3(&self->vec_0x36C, home);
+                    self->vec_0x36C = *home;
                     break;
                 }
             }
@@ -1141,7 +1140,6 @@ void em020_blast(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1477,7 +1475,7 @@ void em020_leap(_ENEMY_WORK* self, u8 kind)
             break;
         case 1:
             em_approach_start(self, 0.0f, 0x12);
-            copyVec3(home, &self->pos);
+            *home = self->pos;
             break;
         }
         em_mot_set_blend(self, 0x46, 0xA, 0, 1);
@@ -1692,8 +1690,6 @@ void em020_tail_sweep(_ENEMY_WORK* self)
     nw4r::math::VEC3 from;
     nw4r::math::VEC3 to;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1721,7 +1717,6 @@ void em020_spin(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1749,7 +1744,6 @@ void em020_burrow_attack_a(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -1802,7 +1796,6 @@ void em020_burrow_attack_b(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_hit_arm_set(self);
     switch (self->state) {
     case 0:
@@ -1857,7 +1850,6 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
 {
     Vec3 keys;
 
-    VEC3_ctor(&keys);
 
     switch (self->state) {
     case 0:
@@ -2143,7 +2135,6 @@ void em020_demo_intro(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_water_surface_latch(self);
     switch (self->state) {
     case 0:
@@ -2314,7 +2305,6 @@ void em020_demo_burrow(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -2395,7 +2385,6 @@ void em020_demo_emerge(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_hit_arm_set(self);
     switch (self->state) {
     case 0:
@@ -2677,8 +2666,6 @@ void em020_drool_spawn(_ENEMY_WORK* self)
     nw4r::math::MTX34 mtx;
     u16 pitch;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     if (em_alt_mode_ck(self) == 1 && (u32)(em_get_mot_no(self) - 0xC8) > 1) {
         pitch = ((u32 (*)(nw4r::math::VEC3*))calcVecAngX)(&self->vec_0x76C);
         if ((system_w.field_0x0c & 0x1F) == 0) {
@@ -2704,11 +2691,7 @@ void em020_motion_events(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 from;
     nw4r::math::VEC3 to;
-    nw4r::math::VEC3 sum;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     em020_drool_spawn(self);
     switch (em_get_mot_no(self)) {
     case 0x02:
@@ -2811,8 +2794,7 @@ void em020_motion_events(_ENEMY_WORK* self)
             eft026_pl_spawn_c1((struct _EFT26_EM*)self, 8, &pos, 3, get_em_scale(self));
             setVector3(&pos, 0.0f, 0.0f, 1800.0f * get_em_chg_scale(self));
             rotVecY(&pos, self->field_0x1C0);
-            addVec3(&sum, &self->pos, &pos);
-            copyVec3(&from, copyVec3(&to, &sum));
+            from = to = self->pos + pos;
             from.y -= 1000.0f * get_em_chg_scale(self);
             to.y += 700.0f * get_em_chg_scale(self);
             shell_set_func_ptr->method_0x30(self, 0xA, &from, &to, 1.8f, 0xFFFF, shell_set_func_ptr);
@@ -3022,7 +3004,6 @@ extern "C" void em020_model_refresh(_ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
     _GXColor color;
 
-    MTX34_ctor(&mtx);
     {
         nw4r::g3d::ScnMdl::CopiedMatAccess access_a((nw4r::g3d::ScnMdl*) self->field_0x13C, 8);
         nw4r::g3d::ScnMdl::CopiedMatAccess access_b((nw4r::g3d::ScnMdl*) self->field_0x13C, 9);
@@ -3276,7 +3257,7 @@ struct LbNetPositionPacket {
     /* +0x35 */ u8 meal_0x35;
     /* +0x36 */ u8 pad_0x36[0xA];
 
-    LbNetPositionPacket() { VEC3_ctor(&pos_0x24); }
+    LbNetPositionPacket() {}
 }; /* size: 0x40 */
 
 /* The action packet (kind 1): the facing, the position as whole units, the action and its flags.  size: 0x38 */
@@ -3324,7 +3305,7 @@ struct LbNetPlacePacket {
     /* +0x34 */ char name_0x34[0xA];
     /* +0x3E */ u8 pad_0x3E[0x2];
 
-    LbNetPlacePacket() { VEC3_ctor(&pos_0x24); }
+    LbNetPlacePacket() {}
 }; /* size: 0x40 */
 
 /* The full-state packet (kinds 13 and 22): the facing and position, the action, the held item, the two names and
@@ -3349,7 +3330,7 @@ struct LbNetStatePacket {
     /* +0x58 */ u8 area_0x58;
     /* +0x59 */ u8 pad_0x59[0x3];
 
-    LbNetStatePacket() { VEC3_ctor(&unused_0x24); }
+    LbNetStatePacket() {}
 }; /* size: 0x5C */
 
 /* The trade-offer packet (kind 14): the facing and position, the action, the area, the item and the two names.
@@ -4222,13 +4203,13 @@ void lobby_net_position_recv(_PLW* plw, const LbNetPositionPacket* packet, u8 ki
     plw->area_0x16 = area;
     if (kind == 0 && area == packet->area_0x32) {
         if (lb_npc_act_busy_ck(plw->field_0x00A, plw->act_no) == 0) {
-            copyVec3((nw4r::math::VEC3*)&plw->target_pos_0x090, (const nw4r::math::VEC3*)&packet->pos_0x24);
+            *(nw4r::math::VEC3*)&plw->target_pos_0x090 = *((const nw4r::math::VEC3*)&packet->pos_0x24);
             lb_npc_walk_blend_set(plw, lobby_state_block.move_frames_0x168C);
         }
     } else {
-        copyVec3((nw4r::math::VEC3*)&plw->vec_0x03C, (const nw4r::math::VEC3*)&packet->pos_0x24);
-        copyVec3((nw4r::math::VEC3*)&plw->vec_0x048, (const nw4r::math::VEC3*)&plw->vec_0x03C);
-        copyVec3((nw4r::math::VEC3*)&plw->target_pos_0x090, (const nw4r::math::VEC3*)&plw->vec_0x03C);
+        *(nw4r::math::VEC3*)&plw->vec_0x03C = *((const nw4r::math::VEC3*)&packet->pos_0x24);
+        *(nw4r::math::VEC3*)&plw->vec_0x048 = *((const nw4r::math::VEC3*)&plw->vec_0x03C);
+        *(nw4r::math::VEC3*)&plw->target_pos_0x090 = *((const nw4r::math::VEC3*)&plw->vec_0x03C);
         plw->field_0x0A8 = plw->field_0x058 = packet->angle_0x30;
         lb_npc_walk_blend_set(plw, 0);
     }
@@ -4312,7 +4293,7 @@ void lobby_net_place_send(_PLW* plw, s8 area, nw4r::math::VEC3* pos, s16 angle)
         packet.head.kind_0x00 = 9;
         packet.head.valid_0x01 = 1;
         memcpy(packet.head.from_0x04, em020_quest_page_ptr(), 0xA);
-        copyVec3(&packet.pos_0x24, pos);
+        packet.pos_0x24 = *pos;
         packet.angle_0x30 = angle;
         packet.area_0x32 = area;
         packet.latch_0x33 = plw->field_0xB00;
@@ -4327,9 +4308,9 @@ void lobby_net_place_recv(_PLW* plw, const LbNetPlacePacket* packet)
 {
     plw->field_0xB00 = packet->latch_0x33;
     plw->area_0x16 = packet->area_0x32;
-    copyVec3(&plw->vec_0x03C, &packet->pos_0x24);
-    copyVec3(&plw->vec_0x048, &plw->vec_0x03C);
-    copyVec3(&plw->target_pos_0x090, &plw->vec_0x03C);
+    plw->vec_0x03C = packet->pos_0x24;
+    plw->vec_0x048 = plw->vec_0x03C;
+    plw->target_pos_0x090 = plw->vec_0x03C;
     plw->field_0x0A8 = plw->field_0x058 = (u16)packet->angle_0x30;
     strcpy((char*)plw->name_0xB05, packet->name_0x34);
     lb_npc_walk_blend_set(plw, 0);

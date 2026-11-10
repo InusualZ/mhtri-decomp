@@ -34,7 +34,7 @@
 #include "fn_80047398/lobby_world_block.h"
 #include "lobby/lb_npc.h" /* lb_party_state_reset (rule 2: its owner) */
 #include "enemy/em_pop.h" /* quest_flag_2000000_ck (rule 2: its owner) */
-#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34_ctor / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
+#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34::MTX34() / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
 #include "ef/system_core.h" /* rand_lcg_step / work_mem_alloc */
 #include "ef/work_mem_free.h"
 #include "quest/quest_slot_count_get.h"

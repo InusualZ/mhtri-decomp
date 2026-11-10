@@ -14,7 +14,7 @@
  *   The colour bytes are extracted masked (`(color & 0xFF000000) >> 24`): `(u8)(color >> 24)` is three instructions
  *   short.
  *   `s32 i;` is declared before `u32 color;` (the order decides which reuses the dead `enemy` register).
- *   `s32 mapno = get_now_mapno__Fv();` (not `u8`) narrows with `clrlwi` and compares `cmpwi`, as
+ *   `s32 mapno = get_now_mapno();` (not `u8`) narrows with `clrlwi` and compares `cmpwi`, as
  *   `(s32)self->type_0x02 == 0x2E` does.
  *   The effect object keeps its `+0x34` slot (`dispatch_0x34`) so the work pointer stays at +0x38.
  *   The secondary switch reads the type into a local used as the table index (MWCC then emits retail's
@@ -24,8 +24,19 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
+#include "fn_8004CAD8.h"          /* cpSetRotMatrix (rule 2) */
+#include "ef/eft_res.h"           /* res_eft_create (rule 2) */
+#include "ef/effect.h"            /* change_paramscale_eff(_vec3) (rule 2) */
+#include "ef/ef_effect.h"         /* nw4r::ef::Effect::SetRootMtx (rule 2) */
+#include "stage/get_now_mapno.h"  /* get_now_mapno (rule 2) */
+#include "stage/get_stg_eft_col.h" /* get_stg_eft_col (rule 2) */
+#include "enemy/fn_8012BDF4.h"    /* em_work_die_ck (rule 2) */
+#include "enemy/em_common.h"      /* get_joint_wpos_em (rule 2) */
+
+/* The unit was written in C: its own symbols and the plain-named callees keep C linkage. */
+extern "C" {
 
 /* ---------------------------------------------------------------------------------------------------
  * types
@@ -96,19 +107,6 @@ void fn_80105560(_EM_EFT* self);               /* effect creation failed */
 void fn_80105564(_EM_EFT* self);
 
 /* C++-mangled callees, declared with the map's spelling. */
-extern u8 get_now_mapno__Fv(void);
-extern s32 em_work_die_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy);
-extern void get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(_ENEMY_WORK* enemy, u32 joint,
-                                                                  VEC3* pos);
-extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 arg);
-extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(_CP_VECTOR* rot, MTX34* mtx);
-extern void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(VEC3* vec, MTX34* mtx);
-extern u32 get_stg_eft_col__FUcUc(u8 area, u8 which);
-extern void SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(void* effect, const MTX34* mtx);
-extern void change_paramscale_eff__FPQ34nw4r2ef6Effectf(void* effect, f32 scale);
-extern void change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect,
-                                                                               VEC3* scale);
-extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3* vec, f32 x, f32 y, f32 z);
 
 /* The unit's `.data`: the `res_eft_create` effect id and parameter id per hit-effect type (`self->type_0x02`,
  * 150 types). */
@@ -144,10 +142,8 @@ u16 em_hit_eft_param_ids[150] = {
 
 /* Drives one enemy hit-effect object for a frame: spawns the type's effects on the first call, then
  * re-places, re-colours and re-scales them. */
-void fn_80104BD0(_EM_EFT* self)
+void em_hit_eft_step(_EM_EFT* self)
 {
-    MTX34 mtx;
-    VEC3 vec;
     _EM_EFT_WORK* work;
     _ENEMY_WORK* enemy;
     s32 i;
@@ -155,13 +151,13 @@ void fn_80104BD0(_EM_EFT* self)
 
 #pragma peephole off
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&vec);
+    MTX34 mtx;
+    VEC3 vec;
 
     work = self->work_0x38;
     enemy = self->enemy_0x30;
 
-    if (enemy != NULL && em_work_die_ck__FP11_ENEMY_WORK(enemy) != 0) {
+    if (enemy != NULL && em_work_die_ck(enemy) != 0) {
         self->flag_0x01 = 0;
         self->state_0x05 = 3;
         return;
@@ -190,7 +186,7 @@ void fn_80104BD0(_EM_EFT* self)
             if ((enemy->field_0x228 & 6) != 0) {
                 self->type_0x02 += 0xC;
             } else {
-                s32 mapno = get_now_mapno__Fv();
+                s32 mapno = get_now_mapno();
                 if (mapno == 4 || mapno == 0xF) {
                     self->type_0x02 += 8;
                 }
@@ -214,7 +210,7 @@ void fn_80104BD0(_EM_EFT* self)
         break;
     }
 
-    work->effects[0] = res_eft_create__FUsUsUl(em_hit_eft_effect_ids[self->type_0x02],
+    work->effects[0] = res_eft_create(em_hit_eft_effect_ids[self->type_0x02],
                                                em_hit_eft_param_ids[self->type_0x02], 0);
     if (work->effects[0] == NULL) {
         fn_80105560(self);
@@ -226,7 +222,7 @@ void fn_80104BD0(_EM_EFT* self)
 
         switch (type) {
         case 0x33:
-            work->effects[1] = res_eft_create__FUsUsUl(0xE2, em_hit_eft_param_ids[type], 0);
+            work->effects[1] = res_eft_create(0xE2, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -234,7 +230,7 @@ void fn_80104BD0(_EM_EFT* self)
             work->count++;
             break;
         case 0x34:
-            work->effects[1] = res_eft_create__FUsUsUl(0x14A, em_hit_eft_param_ids[type], 0);
+            work->effects[1] = res_eft_create(0x14A, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -243,7 +239,7 @@ void fn_80104BD0(_EM_EFT* self)
             break;
         case 0x35:
         case 0x36:
-            work->effects[1] = res_eft_create__FUsUsUl(0xE3, em_hit_eft_param_ids[type], 0);
+            work->effects[1] = res_eft_create(0xE3, em_hit_eft_param_ids[type], 0);
             if (work->effects[1] == NULL) {
                 fn_80105560(self);
                 return;
@@ -253,12 +249,12 @@ void fn_80104BD0(_EM_EFT* self)
         }
     }
 
-    cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(&self->rot_0x24, &mtx);
+    cpSetRotMatrix(&self->rot_0x24, &mtx);
 
     if (work->joint_0x04 != 0xFF) {
-        mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&self->pos_0x18, &mtx);
+        mulVecMat(&self->pos_0x18, &mtx);
         mtx34_set_trans(&mtx, &self->pos_0x18);
-        get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(enemy, work->joint_0x04, &self->pos_0x18);
+        get_joint_wpos_em(enemy, work->joint_0x04, &self->pos_0x18);
 
         switch (self->type_0x02) {
         case 0x00:
@@ -343,11 +339,11 @@ void fn_80104BD0(_EM_EFT* self)
         case 0x91:
         case 0x94:
             self->pos_0x18.y = 5.0f + enemy->field_0x20C;
-            color = get_stg_eft_col__FUcUc(self->area_0x44, 0);
+            color = get_stg_eft_col(self->area_0x44, 0);
             break;
         case 0x78:
             self->pos_0x18.y = enemy->field_0x210 - 5.0f;
-            color = get_stg_eft_col__FUcUc(self->area_0x44, 1);
+            color = get_stg_eft_col(self->area_0x44, 1);
             break;
         case 0x03:
         case 0x26:
@@ -355,14 +351,14 @@ void fn_80104BD0(_EM_EFT* self)
         case 0x7C:
         default:
             self->pos_0x18.y = 5.0f + enemy->field_0x210;
-            color = get_stg_eft_col__FUcUc(self->area_0x44, 1);
+            color = get_stg_eft_col(self->area_0x44, 1);
             break;
         }
     } else {
         if (enemy != NULL) {
-            mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&self->pos_0x18, &mtx);
+            mulVecMat(&self->pos_0x18, &mtx);
             mtx34_set_trans(&mtx, &self->pos_0x18);
-            copyVec3(&self->pos_0x18, &enemy->field_0x188);
+            self->pos_0x18 = enemy->field_0x188;
         }
 
         switch (self->type_0x02) {
@@ -448,12 +444,12 @@ void fn_80104BD0(_EM_EFT* self)
         case 0x81:
         case 0x91:
         case 0x94:
-            color = get_stg_eft_col__FUcUc(self->area_0x44, 0);
+            color = get_stg_eft_col(self->area_0x44, 0);
             break;
         case 0x26:
         case 0x38:
         default:
-            color = get_stg_eft_col__FUcUc(self->area_0x44, 1);
+            color = get_stg_eft_col(self->area_0x44, 1);
             break;
         }
     }
@@ -465,7 +461,7 @@ void fn_80104BD0(_EM_EFT* self)
     mtx.m[2][3] += self->pos_0x18.z;
 
     for (i = 0; i < work->count; i++) {
-        SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(work->effects[i], &mtx);
+        ((nw4r::ef::Effect*)work->effects[i])->SetRootMtx(mtx);
     }
 
     self->flag_0x01 = 1;
@@ -475,15 +471,17 @@ void fn_80104BD0(_EM_EFT* self)
     work->color_a_0x13 = 0xFF;
 
     if ((s32)self->type_0x02 == 0x2E) {
-        setVector3__FPQ34nw4r4math4VEC3fff(&vec, 0.7f, 0.5f, 0.7f);
+        setVector3(&vec, 0.7f, 0.5f, 0.7f);
         for (i = 0; i < work->count; i++) {
-            change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effects[i], &vec);
+            change_paramscale_eff_vec3((nw4r::ef::Effect*)work->effects[i], &vec);
         }
     } else {
         for (i = 0; i < work->count; i++) {
-            change_paramscale_eff__FPQ34nw4r2ef6Effectf(work->effects[i], work->paramscale_0x14);
+            change_paramscale_eff((nw4r::ef::Effect*)work->effects[i], work->paramscale_0x14);
         }
     }
 
     eft_em_effects_move(self);
 }
+
+} /* extern "C" */

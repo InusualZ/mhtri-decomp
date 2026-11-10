@@ -55,17 +55,12 @@ void hit_flags_clear(struct _HIT_W* hit);
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void eft004_key_spawn(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void eft013_npc_place(struct _AINPC_W* self, nw4r::math::VEC3* pos, u32 a, f32 scale, u32 b);
-void em_land_data_init(::LandData* land);
 void vec3_move_damp(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* dir, f32 k,
                   nw4r::math::VEC3* out);
-void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void g3d_root_model_bind(s32 a, u32 b);
-void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void g3d_root_model_bind(s32 a, u32 b);
-void vec3_scale(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
-void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
  /* owner `src/mh3_pad.cpp`; its body returns `dst` */

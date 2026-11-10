@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 /* 0x803A4E58 - reads the note NPC record's motion number (the +0x54 halfword `qn_get_motion_no`
- * returns) with the retail `VEC3 v; VEC3_ctor(&v);` call-site idiom in front of it. */
+ * returns) with the retail `VEC3 v; VEC3::VEC3()(&v);` call-site idiom in front of it. */
 void note_pane_get_motion(struct NoteWork* self);
 
 /* 0x803A9B7C - applies a kill another player reported (area list, spawn order, count, kill or capture, quest

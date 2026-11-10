@@ -24,10 +24,10 @@
 
 #include "types.h"
 #include "lobby/lobby_w.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "ai/fn_802D44F4.h" /* ai_slots_clear (rule 2: its owner) */
 #include "lobby/lb_npc.h" /* lb_party_state_reset (rule 2: its owner) */
-#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34_ctor / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
+#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34::MTX34() / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
 #include "Network/network_pat_control.h" /* net_ctrl_wk */
 #include "Network/net_session_close.h" /* requestSessionJoin / getSessionJoinResult / the profile checks */
 #include "camera/camera.h" /* camera_talk_lock_set */
@@ -89,17 +89,15 @@ extern "C" void lobby_hud_frame_update(void) {
 extern "C" void move_work_draw(_PLW* mw, _mh_ivec2_* pos, u32 mode) {
     u32 camera;
     s32 camera_id;
-    nw4r::math::VEC3 scr;
-    nw4r::math::VEC3 wpos;
-    nw4r::math::VEC3 icon;
     s16 size;
     u32 color;
     s32 tex;
 
     camera_id = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &camera_id);
-    VEC3_ctor(&scr);
-    assignVec3((Vec*)&wpos, (Vec*)&mw->field_0x03C);
+    nw4r::math::VEC3 scr;
+    nw4r::math::VEC3 wpos = mw->vec_0x03C;
+    nw4r::math::_VEC3 icon;
     if ((mw->field_0xB01 & 4) && (lobby_w.counter_0x030 & 0x10)) {
         return;
     }
@@ -148,12 +146,6 @@ extern "C" void move_work_draw(_PLW* mw, _mh_ivec2_* pos, u32 mode) {
 extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
     u32 camera;
     s32 camera_id;
-    nw4r::math::VEC3 scr;
-    nw4r::math::VEC3 eye;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 joint;
-    nw4r::math::VEC3 wpos;
-    nw4r::math::VEC3 icon;
     s16 mark;
     s32 size;
     u32 node;
@@ -162,11 +154,12 @@ extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
 
     camera_id = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &camera_id);
-    VEC3_ctor(&scr);
-    VEC3_ctor(&eye);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&joint);
-    assignVec3((Vec*)&wpos, (Vec*)&npc->pos_0x10);
+    nw4r::math::VEC3 scr;
+    nw4r::math::VEC3 eye;
+    nw4r::math::VEC3 dir;
+    nw4r::math::VEC3 joint;
+    nw4r::math::VEC3 wpos = npc->pos_0x10;
+    nw4r::math::_VEC3 icon;
     mark = -1;
     if (lb_npc_id_ck(npc, 0) == 1) {
         if (lb_npc_talk_mark_ck(npc) == 0) {
@@ -196,11 +189,9 @@ extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
     }
     {
         const nw4r::math::VEC3& eye_now = get_camera_pos();
-        nw4r::math::VEC3 delta;
 
-        copyVec3(&eye, &eye_now);
-        subVec3(&delta, &eye, &wpos);
-        copyVec3(&dir, &delta);
+        eye = eye_now;
+        dir = eye - wpos;
     }
     scale = 1600.0f / vec3_len((f32*)&dir);
     raw = scale;
@@ -211,7 +202,7 @@ extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
         scale = 2.1f;
     }
     size = 24.0f * scale;
-    copyVec3(&wpos, &npc->pos_0x10);
+    wpos = npc->pos_0x10;
     wpos.x += 6.0f;
     node = mhchar_node_id_get((MHchar*)npc->body_0x058, "HD-00");
     if (node != 0) {

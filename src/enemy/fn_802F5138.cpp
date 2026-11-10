@@ -58,7 +58,7 @@
 #include "ef/eft_slot.h"
 #include "ef/get_move_work_adrs.h"
 #include "fn_8004CAD8.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= */
 #include "enemy/em_motion_param_set.h"
 #include "ef/eft013_spark_set_em.h"
 #include "lobby/lb_quest_screen.h" /* quest_time_limit_get / quest_time_elapsed_get */
@@ -188,7 +188,6 @@ extern "C" s32 em032_retire_ck(_ENEMY_WORK* work);
 extern "C" s32 em032_rest_mode_ck(_ENEMY_WORK* work);
 extern "C" s32 em032_action_select(_ENEMY_WORK* work);
 extern "C" void em032_vacant_attack_clear(_ENEMY_WORK* work);
-extern "C" void em032_vec_pairs_init(void);
 
 /* The em032 program table (`em032_prog_tbl`): the entry points the shared enemy program driver calls (the slot
  * names follow `Em006ProgTbl`; the empty slots are zero).
@@ -1024,7 +1023,6 @@ extern "C" void em032_route_index_nearest(_ENEMY_WORK* work) {
     u8 kind;
     f32 dist;
 
-    VEC3_ctor(&pos);
     nearest = 0;
     kind = stage_map_kind_get(work->field_0x1E0);
     if ((s32)work->field_0x00A == 0 || (s32)work->field_0x00A == 5) {
@@ -1200,13 +1198,8 @@ extern "C" void em032_act5_hover(_ENEMY_WORK* work, u8 kind) {
 /* 0x802F6E1C (0x1E4): the retreat step: sets the target 1000 units back along the line from the target to the
  * record and swims there for at most 300 frames. */
 extern "C" void em032_act5_retreat(_ENEMY_WORK* work, u8 kind) {
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 target;
-    nw4r::math::VEC3 back;
-
     em_hit_arm_set(work);
-    VEC3_ctor(&dir);
+    nw4r::math::VEC3 dir;
     switch (work->state) {
     case 0:
         work->state++;
@@ -1216,17 +1209,14 @@ extern "C" void em032_act5_retreat(_ENEMY_WORK* work, u8 kind) {
         } else {
             em_mot_set_ck(work, 5, 20, 0);
         }
-        subVec3(&diff, &work->vec_0x36C, &work->pos);
-        copyVec3(&dir, &diff);
+        dir = work->vec_0x36C - work->pos;
         dir.y = 0.0f;
         if (vec3_length_sq(&dir.x) > 0.001f) {
             vec3_normalize_into(&dir, &dir);
         } else {
             setVector3(&dir, 0.0f, 0.0f, 1.0f);
         }
-        vec3_scale(&back, &dir, 1000.0f);
-        subVec3(&target, &work->pos, &back);
-        copyVec3(&work->vec_0x36C, &target);
+        work->vec_0x36C = work->pos - (dir * 1000.0f);
         work->field_0x380 = 6;
         em_approach_start(work, 0.0f, 2);
         em_move_vec2_clr(work);
@@ -1331,14 +1321,10 @@ extern "C" void em032_act5_rise_sink(_ENEMY_WORK* work, u8 mode) {
  * degrees; otherwise it climbs or sinks at a fixed rate until the motion frame or the climb runs out. */
 extern "C" void em032_act5_leap(_ENEMY_WORK* work, u8 mode) {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 sum;
-    nw4r::math::VEC3 scaled;
     f32 dist;
     f32 frames;
     f32 tilt;
 
-    VEC3_ctor(&dir);
     frames = 57.5f;
     tilt = -22.5f;
     switch (work->state) {
@@ -1350,8 +1336,7 @@ extern "C" void em032_act5_leap(_ENEMY_WORK* work, u8 mode) {
         em_approach_start(work, 0.0f, 0);
         if ((s32)mode == 1) {
             dist = calcVecDistXZ(&work->pos, &work->vec_0x36C);
-            subVec3(&diff, &work->pos, &work->vec_0x36C);
-            copyVec3(&dir, &diff);
+            dir = work->pos - work->vec_0x36C;
             dir.y = 0.0f;
             if (vec3_length_sq(&dir.x) > 0.001f) {
                 vec3_normalize_into(&dir, &dir);
@@ -1362,9 +1347,7 @@ extern "C" void em032_act5_leap(_ENEMY_WORK* work, u8 mode) {
             if (dir.y > 0.0f) {
                 dir.y = -dir.y;
             }
-            vec3_scale(&scaled, &dir, dist);
-            addVec3(&sum, &work->vec_0x36C, &scaled);
-            copyVec3(&dir, &sum);
+            dir = work->vec_0x36C + (dir * dist);
             work->action_0x328.vec_0x328.y = (dir.y - work->pos.y) / frames;
         } else if (work->pos.y <= work->vec_0x36C.y) {
             work->action_0x328.vec_0x328.y = -3.0f;
@@ -1874,14 +1857,11 @@ extern "C" void em032_act7_ram(_ENEMY_WORK* work) {
 /* 0x802F8290 (0x4D8): the charge attack: turns to the target while the motion winds up, then charges on the
  * second motion until the measured distance is used up; mode 0 spawns the wake effects, mode 1 the sparks. */
 extern "C" void em032_act7_charge(_ENEMY_WORK* work, u8 mode) {
+    f32 turn = 3.0f;
+
     nw4r::math::VEC3 unused_a;
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 unused_b;
-    f32 turn = 3.0f;
-
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused_b);
     em_hit_arm_set(work);
     switch (work->state) {
     case 0:
@@ -1889,7 +1869,7 @@ extern "C" void em032_act7_charge(_ENEMY_WORK* work, u8 mode) {
         em_move_mode_set(work, 2);
         em_mot_set(work, 12, 20, 0);
         work->value_0x378 = vec3_distance(&work->pos, &work->vec_0x36C);
-        copyVec3(&work->uv_model_0x328.pos_0x330, &work->pos);
+        work->uv_model_0x328.pos_0x330 = work->pos;
         em_move_vec2_clr(work);
         if (work->field_0x00A == 4) {
             work->offset_0x30C.vec_0x310.z = 15.0f;
@@ -1959,7 +1939,7 @@ extern "C" void em032_act7_charge(_ENEMY_WORK* work, u8 mode) {
             }
             break;
         }
-        copyVec3(&work->uv_model_0x328.pos_0x330, &work->pos);
+        work->uv_model_0x328.pos_0x330 = work->pos;
         break;
     }
 }
@@ -2605,26 +2585,9 @@ extern "C" void em032_vacant_attack_clear(_ENEMY_WORK* work) {
 }
 
 /* The three point/step vector pairs the static initializer seeds (`.bss`, defined after it). */
-extern nw4r::math::VEC3 em032_vec_pair_0[2];
-extern nw4r::math::VEC3 em032_vec_pair_1[2];
-extern nw4r::math::VEC3 em032_vec_pair_2[2];
-
-/* 0x802F9898 (0xFC): the static initializer: seeds the three point/step vector pairs. */
-extern "C" void em032_vec_pairs_init(void) {
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
-    nw4r::math::VEC3 c;
-    nw4r::math::VEC3 d;
-    nw4r::math::VEC3 e;
-    nw4r::math::VEC3 f;
-
-    assignVec3((Vec*)em032_vec_pair_0, (Vec*)setVec3(&a, 0.0f, 0.0f, 40.0f));
-    assignVec3((Vec*)&em032_vec_pair_0[1], (Vec*)setVec3(&b, 0.0f, 0.0f, 0.0f));
-    assignVec3((Vec*)em032_vec_pair_1, (Vec*)setVec3(&c, 0.0f, 2.0f, 0.0f));
-    assignVec3((Vec*)&em032_vec_pair_1[1], (Vec*)setVec3(&d, 0.0f, -0.02f, 0.0f));
-    assignVec3((Vec*)em032_vec_pair_2, (Vec*)setVec3(&e, 0.0f, 0.0f, 20.0f));
-    assignVec3((Vec*)&em032_vec_pair_2[1], (Vec*)setVec3(&f, 0.0f, 0.0f, 0.0f));
-}
+extern EmSeShiftPair em032_vec_pair_0;
+extern EmSeShiftPair em032_vec_pair_1;
+extern EmSeShiftPair em032_vec_pair_2;
 
 EmSeRecord em032_se_rec_10_0A_a = {100, 0, 2, 0, 0, {0, 1, 0, 0}, 0};
 
@@ -2720,7 +2683,7 @@ EmSeEntry em032_se_seq_10_8C[2] = {
 
 EmSeRecord em032_se_rec_11_00_a = {100, 0, 2, 0, 0, {0, 1, 0, 0}, 0};
 
-EmSeRecord em032_se_rec_11_00_b = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)em032_vec_pair_0};
+EmSeRecord em032_se_rec_11_00_b = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)&em032_vec_pair_0};
 
 EmSeEntry em032_se_seq_11_00[5] = {
     {0x00, {0, 0, 0}, &em032_se_rec_11_00_a},
@@ -2732,7 +2695,7 @@ EmSeEntry em032_se_seq_11_00[5] = {
 
 EmSeRecord em032_se_rec_11_00_2_a = {101, 0, 2, 0, 0, {0, 1, 0, 0}, 0};
 
-EmSeRecord em032_se_rec_11_00_2_b = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)em032_vec_pair_0};
+EmSeRecord em032_se_rec_11_00_2_b = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)&em032_vec_pair_0};
 
 EmSeEntry em032_se_seq_11_00_2[5] = {
     {0x00, {0, 0, 0}, &em032_se_rec_11_00_2_a},
@@ -2744,7 +2707,7 @@ EmSeEntry em032_se_seq_11_00_2[5] = {
 
 EmSeRecord em032_se_rec_11_33_a = {105, 0, 2, 0, 0, {0, 1, 0, 0}, 0};
 
-EmSeRecord em032_se_rec_11_33_b = {106, 0, 2, 0, 0, {0, 129, 3, 0}, (const EmSeOffset*)em032_vec_pair_1};
+EmSeRecord em032_se_rec_11_33_b = {106, 0, 2, 0, 0, {0, 129, 3, 0}, (const EmSeOffset*)&em032_vec_pair_1};
 
 EmSeEntry em032_se_seq_11_33[3] = {
     {0x00, {0, 0, 0}, &em032_se_rec_11_33_a},
@@ -2754,7 +2717,7 @@ EmSeEntry em032_se_seq_11_33[3] = {
 
 EmSeRecord em032_se_rec_11_33_2_a = {108, 0, 2, 0, 0, {0, 1, 0, 0}, 0};
 
-EmSeRecord em032_se_rec_11_33_2_b = {107, 0, 2, 0, 0, {0, 129, 3, 0}, (const EmSeOffset*)em032_vec_pair_1};
+EmSeRecord em032_se_rec_11_33_2_b = {107, 0, 2, 0, 0, {0, 129, 3, 0}, (const EmSeOffset*)&em032_vec_pair_1};
 
 EmSeEntry em032_se_seq_11_33_2[3] = {
     {0x00, {0, 0, 0}, &em032_se_rec_11_33_2_a},
@@ -2772,7 +2735,7 @@ EmSeEntry em032_se_seq_11_33_3[3] = {
     {0xFF, {0, 0, 0}, 0},
 };
 
-EmSeRecord em032_se_rec_11_38_a = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)em032_vec_pair_0};
+EmSeRecord em032_se_rec_11_38_a = {3, 0, 6, 0, 0, {0, 4, 3, 0}, (const EmSeOffset*)&em032_vec_pair_0};
 
 EmSeEntry em032_se_seq_11_38[5] = {
     {0x0C, {0, 0, 0}, 0},
@@ -3066,7 +3029,8 @@ f32 em032_demo2_rot_keys[284] = {
     -1.0f, 0.0f, 65.87f, 0.0f,
 };
 
-/* The unit's `.bss`: three point/step vector pairs the static initializer seeds.  Names are GUESSes. */
-nw4r::math::VEC3 em032_vec_pair_0[2];
-nw4r::math::VEC3 em032_vec_pair_1[2];
-nw4r::math::VEC3 em032_vec_pair_2[2];
+/* The unit's `.bss`: three point/step vector pairs MWCC's `__sinit` (0x802F9898) builds.  Names are GUESSes. */
+#pragma pool_data off
+EmSeShiftPair em032_vec_pair_0 = {nw4r::math::VEC3(0.0f, 0.0f, 40.0f), nw4r::math::VEC3(0.0f, 0.0f, 0.0f)};
+EmSeShiftPair em032_vec_pair_1 = {nw4r::math::VEC3(0.0f, 2.0f, 0.0f), nw4r::math::VEC3(0.0f, -0.02f, 0.0f)};
+EmSeShiftPair em032_vec_pair_2 = {nw4r::math::VEC3(0.0f, 0.0f, 20.0f), nw4r::math::VEC3(0.0f, 0.0f, 0.0f)};

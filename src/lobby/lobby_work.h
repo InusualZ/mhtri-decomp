@@ -7,7 +7,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
-#include "mh3_pad/vec3.h"   /* VEC3_ctor, the constructor below (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 
 struct LbMenuWork;
 struct LbMenuPanel;
@@ -58,10 +58,7 @@ typedef struct LbLobbyWork {
     /* +0x015 */ u8 area_next_0x015;   /* the area the area change loads next (`lobby_area_change_step`) */
     /* +0x016 */ u8 area_prev_0x016;   /* the area it leaves */
     /* +0x017 */ u8 unused_0x017;
-    /* +0x018 */ union {   /* the player spawn record `lb_player_spawn_set` reads: the position the placement copies in */
-        /* +0x018 */ u8 spawn_0x018[0xC];
-        /* +0x018 */ nw4r::math::VEC3 spawn_pos_0x018;
-    };
+    /* +0x018 */ nw4r::math::VEC3 spawn_pos_0x018;   /* the spawn position `lb_player_spawn_set` reads */
     /* +0x024 */ u16 spawn_id_0x024;   /* its entry id */
     /* +0x026 */ u8 area_change_0x026; /* 1 asks the game-mode flow for an area change */
     /* +0x027 */ union {

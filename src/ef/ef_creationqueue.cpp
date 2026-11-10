@@ -108,11 +108,11 @@ extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* 
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;
-        copyVec3(&self->mEntry[self->mCount].mPos, pos);
+        self->mEntry[self->mCount].mPos = *pos;
     }
     if (vel != 0) {
         self->mEntry[self->mCount].mFlags |= 2;
-        copyVec3(&self->mEntry[self->mCount].mVel, vel);
+        self->mEntry[self->mCount].mVel = *vel;
     }
     self->mCount++;
 }
@@ -155,11 +155,11 @@ extern "C" void ef_creation_queue_add_type1(CreationQueue* self, const Setting* 
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;
-        copyVec3(&self->mEntry[self->mCount].mPos, pos);
+        self->mEntry[self->mCount].mPos = *pos;
     }
     if (vel != 0) {
         self->mEntry[self->mCount].mFlags |= 2;
-        copyVec3(&self->mEntry[self->mCount].mVel, vel);
+        self->mEntry[self->mCount].mVel = *vel;
     }
     self->mCount++;
 }

@@ -18,7 +18,7 @@
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
 #include "types.h"
-#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34_ctor / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
+#include "fn_8004CAD8.h" /* calcVecAngXY / MTX34::MTX34() / vec3_scale_in_place / userdata_flag_ck (rule 2: its owner) */
 #include "ef/eft_res.h" /* eft_res_slot_get / eft_res_models_spawn / res_eft_model_create */
 #include "sound/mhchar_draw_mode_set.h"
 #include "sound/pl_se_pos_req.h"
@@ -77,7 +77,7 @@ void eft045_set(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, _PLW* plw) {
             return;
         }
     }
-    copyVec3(&self->pos_0x18, pos);
+    self->pos_0x18 = *pos;
     eft_rot_vec_copy(&self->rot_0x24, rot);
     eft_state_flags_set_c1(self, 1, 0);
     self->field_0x03 = 0x2D;
@@ -124,7 +124,6 @@ extern "C" void eft045_start(_EFT* self) {
     s16 i;
     MHchar* model;
 
-    VEC3_ctor(&dir);
     self->state_0x05++;
     work->counter_0x16 = 0;
     for (i = 0; i < work->count; i++) {
@@ -133,7 +132,7 @@ extern "C" void eft045_start(_EFT* self) {
             return;
         }
         model = work->models[i];
-        copyVec3(&model->pos_0x04, &self->pos_0x18);
+        model->pos_0x04 = self->pos_0x18;
         if ((work->counter_0x16 & 1) == 0) {
             eft_rot_vec_copy(&model->rot_0x28, &self->rot_0x24);
             setVector3(&model->scale_0x1C, 2.5f, 2.5f, 1.0f);
@@ -154,10 +153,9 @@ extern "C" void eft045_start(_EFT* self) {
             nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)model->field_0x118, 0);
             if (copied_mat_access_valid_ck(&access) != 0) {
                 nw4r::g3d::ResTexSrt srt;
-                nw4r::math::MTX34 mtx;
 
                 res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
-                MTX34_ctor(&mtx);
+                nw4r::math::MTX34 mtx;
                 srt.GetEffectMtx(0, &mtx);
                 mtx.m[0][3] -= 0.5f;
                 if (mtx.m[0][3] < 0.0f) {
@@ -182,7 +180,6 @@ extern "C" void eft045_grow(_EFT* self) {
     MHchar* model;
     u32 i;
 
-    VEC3_ctor(&dir);
     for (i = 0; i < work->count; i++) {
         model = work->models[i];
         if (work->value_0x10[i] >= 0) {

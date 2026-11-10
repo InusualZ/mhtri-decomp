@@ -57,7 +57,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/math_triangular.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/string.h"
 #include "enemy/em_pop.h"
@@ -138,7 +138,7 @@ struct EmPopResLoad {
 
 /* One fixed point the 0x8 points move to (per map, the quest's or the hub's).  size: 0x10 */
 struct EmPopFixedPoint {
-    /* +0x00 */ nw4r::math::VEC3 pos;
+    /* +0x00 */ nw4r::math::_VEC3 pos;
     /* +0x0C */ u32 rot_y;
 };
 
@@ -264,7 +264,7 @@ void em_drop_pos_get(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out, u8 fl
             out->y = enemy->field_0x20C;
         } else if (flags & 2) {
             EmBreakPart* bp = &enemy->break_parts_0x488[part];
-            copyVec3(out, &bp->origin);
+            *out = bp->origin;
             if (bp->kind != 1) {
                 EmBreakPartData* data = em_break_part_data_get(enemy, part);
                 out->y -= data->lift * get_em_scale(enemy);
@@ -273,7 +273,7 @@ void em_drop_pos_get(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out, u8 fl
             get_joint_wpos_em(enemy, joint, out);
         }
     } else {
-        copyVec3(out, &enemy->pos);
+        *out = enemy->pos;
     }
 }
 
@@ -337,7 +337,6 @@ s32 em_roster_slot_effect_set(_ENEMY_WORK* self, s32 index, s32* slot, s32 a, s3
     s32 bonus;
     _PLW* pl;
 
-    VEC3_ctor(&pos);
     for (;;) {
         if (em_hagi_tbl[self->team] != NULL) {
             entry = &em_hagi_tbl[self->team][index];
@@ -382,8 +381,8 @@ s32 em_roster_slot_effect_set(_ENEMY_WORK* self, s32 index, s32* slot, s32 a, s3
                 rec->action_0x003 = 2;
                 rec->field_0x006 = 0;
                 rec->kind_0x004 = self->area_no;
-                copyVec3(&rec->pos_0x014, &pos);
-                copyVec3(&rec->aim_0x1D0, &pos);
+                rec->pos_0x014 = pos;
+                rec->aim_0x1D0 = pos;
                 rec->field_0x005 = 0;
                 rec->radius_0x1F0 = entry->radius_0x04;
                 rec->height_0x1F4 = 200.0f;
@@ -431,8 +430,8 @@ s32 em_roster_slot_effect_set(_ENEMY_WORK* self, s32 index, s32* slot, s32 a, s3
 void em_roster_record_pos_set(s32 index, nw4r::math::VEC3* pos, u8 area) {
     EmPopRec* rec = em_roster_record_get(index);
     if (rec != NULL) {
-        copyVec3(&rec->pos_0x014, pos);
-        copyVec3(&rec->aim_0x1D0, pos);
+        rec->pos_0x014 = *pos;
+        rec->aim_0x1D0 = *pos;
     }
 }
 
@@ -481,7 +480,6 @@ void em_drop_rec_step(EmPopObj* obj) {
     EmPopRec* rec = (EmPopRec*)obj;
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (rec->field_0x008) {
     case 0:
         rec->field_0x008++;
@@ -497,7 +495,7 @@ void em_drop_rec_step(EmPopObj* obj) {
         rec->life_0x1B8--;
         rec->counter_0x010++;
         if (rec->kind_0x004 == get_now_areano() && rec->slot_id_0x1FA != 0 && (rec->counter_0x010 & 0x1F) == 1) {
-            copyVec3(&pos, &rec->pos_0x014);
+            pos = rec->pos_0x014;
             pos.y += 40.0f;
             eft004_scaled_spawn(&pos, rec->kind_0x004, 1.5f);
         }
@@ -522,7 +520,6 @@ s32 em_drop_item_spawn(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent) {
     const EmWeightEntry** tbl;
     EmPopRec* rec;
 
-    VEC3_ctor(&at);
     for (;;) {
         if (self->drop_left_0x89E <= 0 || percent < ran_suu(1) % 100) {
             break;
@@ -561,7 +558,7 @@ s32 em_drop_item_spawn(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent) {
         if (rec == NULL) {
             break;
         }
-        copyVec3(&at, pos);
+        at = *pos;
         if (self->field_0x1E2 == 1) {
             at.y = self->field_0x20C;
         }
@@ -570,8 +567,8 @@ s32 em_drop_item_spawn(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 percent) {
         rec->action_0x003 = 2;
         rec->field_0x006 = 0;
         rec->kind_0x004 = self->area_no;
-        copyVec3(&rec->pos_0x014, &at);
-        copyVec3(&rec->aim_0x1D0, &at);
+        rec->pos_0x014 = at;
+        rec->aim_0x1D0 = at;
         rec->field_0x005 = 0;
         rec->radius_0x1F0 = 150.0f;
         rec->height_0x1F4 = 200.0f;
@@ -790,9 +787,9 @@ u32 em_roster_spare_draw(EmPopRec* rec) {
                 }
                 if (i < 8) {
                     kind = &kind[i];
-                    copyVec3(&rec->aim_0x1D0, &place->pos_0x04);
+                    rec->aim_0x1D0 = static_cast<const nw4r::math::VEC3&>(place->pos_0x04);
                     eft_rot_vec_copy(&rec->aim_rot_0x1DC, &place->rot_0x10);
-                    copyVec3(&rec->pos_0x014, &place->pos_0x04);
+                    rec->pos_0x014 = static_cast<const nw4r::math::VEC3&>(place->pos_0x04);
                     eft_rot_vec_copy(&rec->rot_0x020, &place->rot_0x10);
                     rec->radius_0x1F0 = place->radius_0x1C;
                     rec->height_0x1F4 = place->height_0x20;
@@ -1015,7 +1012,7 @@ u16 em_roster_area_hit_find(u8 player, u8 area, nw4r::math::VEC3* pos, s16* out_
             calcVecDistXZ(pos, &rec->aim_0x1D0) <= rec->radius_0x1F0) {
             id = rec->state_0x1F8;
             *out_kind = rec->state_0x1FC;
-            copyVec3(out_pos, &rec->aim_0x1D0);
+            *out_pos = rec->aim_0x1D0;
             eft_rot_vec_copy(out_rot, &rec->aim_rot_0x1DC);
             if (out_word != NULL) {
                 *out_word = (s32)rec->drops_0x1EC;
@@ -1179,7 +1176,7 @@ u16 em_roster_area_near_find(u8 area, nw4r::math::VEC3* pos, f32 range, s16* out
         if (calcVecDistXZ(pos, &rec->aim_0x1D0) <= range) {
             id = rec->state_0x1F8;
             *out_kind = rec->state_0x1FC;
-            copyVec3(out_pos, &rec->aim_0x1D0);
+            *out_pos = rec->aim_0x1D0;
             *out_word = (u32)rec->drops_0x1EC;
             *out_radius = rec->radius_0x1F0;
             if (rec->uses_0x204 != 0) {
@@ -1253,12 +1250,11 @@ void em_pop_obj_tint_set(EmPopRec* rec) {
     u32 color1;
     s32 model;
 
-    VEC3_ctor(&pos);
     model = rec->field_0x005;
     if ((u32)(model - 0xA) <= 3 || (u32)(model - 0x10) <= 3 || model == 0xFF) {
         return;
     }
-    copyVec3(&pos, &rec->pos_0x014);
+    pos = rec->pos_0x014;
     pos.y += 50.0f;
     rec->on_ground_0x21C = pl_area_ground_probe(&pos, rec->kind_0x004, &rec->ground_0x208, -5);
     if (rec->on_ground_0x21C == 0) {
@@ -1508,9 +1504,9 @@ void em_pop_rec_step(EmPopObj* obj) {
                     em_pop_rec_bob_step(rec);
                     em_pop_obj_glow_step(rec);
                     if (rec->visible_0x1C5 != 0) {
-                        copyVec3(&rec->model_0x038.pos_0x04, &rec->pos_0x014);
+                        rec->model_0x038.pos_0x04 = rec->pos_0x014;
                         eft_rot_vec_copy(&rec->model_0x038.rot_0x28, &rec->rot_0x020);
-                        copyVec3(&rec->model_0x038.scale_0x1C, &rec->scale_0x02C);
+                        rec->model_0x038.scale_0x1C = rec->scale_0x02C;
                         if (rec->field_0x005 == 0x81) {
                             rec->model_0x038.ready = 1;
                         } else {
@@ -1547,9 +1543,9 @@ void em_pop_rec_step(EmPopObj* obj) {
                 em_pop_rec_bob_step(rec);
                 em_pop_obj_glow_step(rec);
                 if (rec->visible_0x1C5 != 0) {
-                    copyVec3(&rec->model_0x038.pos_0x04, &rec->pos_0x014);
+                    rec->model_0x038.pos_0x04 = rec->pos_0x014;
                     eft_rot_vec_copy(&rec->model_0x038.rot_0x28, &rec->rot_0x020);
-                    copyVec3(&rec->model_0x038.scale_0x1C, &rec->scale_0x02C);
+                    rec->model_0x038.scale_0x1C = rec->scale_0x02C;
                     if (rec->field_0x005 == 0x81) {
                         rec->model_0x038.ready = 1;
                     } else {
@@ -1684,9 +1680,9 @@ void em_pop_spare_step(EmPopObj* obj) {
                     em_pop_rec_bob_step(rec);
                     em_pop_obj_glow_step(rec);
                     if (rec->visible_0x1C5 != 0) {
-                        copyVec3(&rec->model_0x038.pos_0x04, &rec->pos_0x014);
+                        rec->model_0x038.pos_0x04 = rec->pos_0x014;
                         eft_rot_vec_copy(&rec->model_0x038.rot_0x28, &rec->rot_0x020);
-                        copyVec3(&rec->model_0x038.scale_0x1C, &rec->scale_0x02C);
+                        rec->model_0x038.scale_0x1C = rec->scale_0x02C;
                         if (rec->field_0x005 == 0x81) {
                             rec->model_0x038.ready = 1;
                         } else if (alpha < 1.0f) {
@@ -1711,9 +1707,9 @@ void em_pop_spare_step(EmPopObj* obj) {
             if (rec->field_0x005 == 0x81) {
                 em_pop_obj_glow_step(rec);
                 if (rec->visible_0x1C5 != 0) {
-                    copyVec3(&rec->model_0x038.pos_0x04, &rec->pos_0x014);
+                    rec->model_0x038.pos_0x04 = rec->pos_0x014;
                     eft_rot_vec_copy(&rec->model_0x038.rot_0x28, &rec->rot_0x020);
-                    copyVec3(&rec->model_0x038.scale_0x1C, &rec->scale_0x02C);
+                    rec->model_0x038.scale_0x1C = rec->scale_0x02C;
                     rec->model_0x038.ready = 1;
                     rec->model_0x038.move(0);
                     g3d_root_model_bind(pRoot, rec->model_0x038.field_0x118);
@@ -1743,13 +1739,10 @@ void em_pop_spare_step(EmPopObj* obj) {
  * it. */
 void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area) {
     nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 at;
-    nw4r::math::VEC3 at2;
     EmPopWork* work;
     EmPopSubRec* sub;
     s32 i;
 
-    VEC3_ctor(&ofs);
     work = em_pop_w.work;
     if (work == NULL) {
         return;
@@ -1762,8 +1755,7 @@ void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area) {
             sub->action_0x003 = 0;
             sub->kind_0x004 = area;
             sub->field_0x005 = 0xA;
-            addVec3(&at, pos, &ofs);
-            copyVec3(&sub->pos_0x014, &at);
+            sub->pos_0x014 = *pos + ofs;
             sub->pos_0x014.y -= height / 2.0f;
             mhchar_reset(&sub->model_0x038);
             mhchar_model_create(&sub->model_0x038, &work->res_file_0x00C, 0x68, 7);
@@ -1778,8 +1770,7 @@ void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area) {
             sub->action_0x003 = 1;
             sub->kind_0x004 = area;
             sub->field_0x005 = 0xB;
-            addVec3(&at2, pos, &ofs);
-            copyVec3(&sub->pos_0x014, &at2);
+            sub->pos_0x014 = *pos + ofs;
             mhchar_reset(&sub->model_0x038);
             mhchar_model_create(&sub->model_0x038, &work->res_file_0x00C, 0x68, 7);
             sub->step_0x1BC = em_pop_sub_bubble_step;
@@ -1791,21 +1782,17 @@ void em_pop_spring_bubble_spawn(nw4r::math::VEC3* pos, f32 height, u8 area) {
 void em_pop_bubble_offset_get(nw4r::math::VEC3* out, f32 radius) {
     nw4r::math::VEC3 v;
 
-    VEC3_ctor(&v);
     v.z = 0.0f;
     v.y = 0.0f;
     v.x = 0.0f;
     vec3_random_offset(&v, &v, radius, 0);
-    copyVec3(out, &v);
+    *out = v;
 }
 
 /* A spring bubble's step: it picks its rise speed, direction and wobble, then rises (orbiting for the second
  * bubble) until its time runs out. */
 void em_pop_sub_bubble_step(EmPopObj* obj) {
     EmPopSubRec* sub = (EmPopSubRec*)obj;
-    nw4r::math::VEC3 scale;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 at;
     f32 half;
     f32 speed;
 
@@ -1859,8 +1846,8 @@ void em_pop_sub_bubble_step(EmPopObj* obj) {
         case 1:
             if (--sub->counter_0x010 > 0) {
                 if (sub->field_0x005 != 0xFF) {
-                    VEC3_ctor(&scale);
-                    VEC3_ctor(&ofs);
+                    nw4r::math::VEC3 scale;
+                    nw4r::math::VEC3 ofs;
                     scale.x = math_sin_deg((360.0f * (f32)sub->wobble_x_0x1D8) / 65536.0f);
                     scale.y = math_sin_deg((360.0f * (f32)sub->wobble_z_0x1DC) / 65536.0f);
                     scale.z = sub->speed_0x1D4;
@@ -1876,7 +1863,7 @@ void em_pop_sub_bubble_step(EmPopObj* obj) {
                     scale.y = speed - scale.y * half;
                     sub->wobble_x_0x1D8 = (u16)(sub->wobble_x_0x1D8 + 0x1000);
                     sub->wobble_z_0x1DC = (u16)(sub->wobble_z_0x1DC + 0x1000);
-                    addVec3To(&sub->pos_0x014, &sub->vel_0x1C8);
+                    sub->pos_0x014 += sub->vel_0x1C8;
                     if (sub->field_0x005 == 0x81) {
                         sub->model_0x038.ready = 1;
                     } else {
@@ -1890,12 +1877,11 @@ void em_pop_sub_bubble_step(EmPopObj* obj) {
                         rotVecY(&ofs, sub->orbit_0x1F0);
                         rotVecX(&ofs, sub->tilt_0x1E8);
                         rotVecY(&ofs, sub->turn_0x1EC);
-                        addVec3(&at, &sub->pos_0x014, &ofs);
-                        copyVec3(&sub->model_0x038.pos_0x04, &at);
+                        sub->model_0x038.pos_0x04 = sub->pos_0x014 + ofs;
                     } else {
-                        copyVec3(&sub->model_0x038.pos_0x04, &sub->pos_0x014);
+                        sub->model_0x038.pos_0x04 = sub->pos_0x014;
                     }
-                    copyVec3(&sub->model_0x038.scale_0x1C, &scale);
+                    sub->model_0x038.scale_0x1C = scale;
                     sub->model_0x038.ready = em_pop_model_show_tbl[sub->field_0x005];
                 }
                 sub->model_0x038.move(0);
@@ -1938,14 +1924,10 @@ void EmModelCallback::ExecCallbackA(nw4r::g3d::ChrAnmResult* result, nw4r::g3d::
     nw4r::math::MTX34 rot;
     nw4r::math::MTX34 view;
     nw4r::math::MTX33 rot33;
-    nw4r::math::VEC3 scale;
     u32 node;
     f32* keys;
 
-    MTX34_ctor(&rot);
-    MTX34_ctor(&view);
-    MTX33_ctor(&rot33);
-    VEC3_ctor(&scale);
+    nw4r::math::VEC3 scale;
     node = func->GetCallbackNodeID();
     if (obj->callback_mode_0x1C4 == 0) {
         cpSetRotMatrix(&obj->spin_0x19C[obj->spin_index_0x1B7], &rot);
@@ -2058,8 +2040,8 @@ void em_pop_mote_spawn(nw4r::math::VEC3* pos, u8 area) {
             sub->action_0x003 = 0;
             sub->kind_0x004 = area;
             sub->field_0x005 = 0x81;
-            copyVec3(&sub->pos_0x014, pos);
-            copyVec3(&sub->base_0x200, pos);
+            sub->pos_0x014 = *pos;
+            sub->base_0x200 = *pos;
             sub->frame_0x1C6 = 0;
             mhchar_reset(&sub->model_0x038);
             mhchar_model_create(&sub->model_0x038, &work->res_file_0x018, 0x64, 7);
@@ -2082,7 +2064,7 @@ void em_pop_sub_mote_step(EmPopObj* obj) {
             break;
         }
         sub->field_0x008++;
-        copyVec3(&sub->pos_0x014, &sub->base_0x200);
+        sub->pos_0x014 = sub->base_0x200;
         x = (f32)((s32)ran_suu(0) % 50);
         if (ran_suu(0) & 1) {
             x *= -1.0f;
@@ -2111,9 +2093,9 @@ void em_pop_sub_mote_step(EmPopObj* obj) {
             break;
         }
         sub->frame_0x1C6++;
-        copyVec3(&sub->model_0x038.pos_0x04, &sub->pos_0x014);
+        sub->model_0x038.pos_0x04 = sub->pos_0x014;
         eft_rot_vec_copy(&sub->model_0x038.rot_0x28, &sub->rot_0x020);
-        copyVec3(&sub->model_0x038.scale_0x1C, &sub->scale_0x02C);
+        sub->model_0x038.scale_0x1C = sub->scale_0x02C;
         sub->model_0x038.ready = 1;
         sub->model_0x038.move(0);
         g3d_root_model_bind(pRoot, sub->model_0x038.field_0x118);
@@ -2137,7 +2119,6 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
     EmPopRec* rec;
     u8 map;
     const EmPopFixedPoint* fixed;
-    nw4r::math::VEC3 at;
     s32 num;
     s32 i;
     const char* name;
@@ -2158,9 +2139,9 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
     rec->action_0x003 = 0;
     rec->field_0x006 = 0;
     rec->kind_0x004 = area;
-    copyVec3(&rec->aim_0x1D0, &entry->pos_0x00);
+    rec->aim_0x1D0 = entry->pos_0x00;
     eft_rot_vec_copy(&rec->aim_rot_0x1DC, (_CP_VECTOR*)&entry->rot_0x0C);
-    copyVec3(&rec->pos_0x014, &entry->pos_0x00);
+    rec->pos_0x014 = entry->pos_0x00;
     eft_rot_vec_copy(&rec->rot_0x020, (_CP_VECTOR*)&entry->rot_0x0C);
     rec->radius_0x1F0 = entry->radius_0x18;
     rec->height_0x1F4 = entry->height_0x1C;
@@ -2183,8 +2164,8 @@ EmPopRec* em_roster_pop_entry_add(const EmPopEntry* entry, u8 area) {
         } else {
             fixed = &em_pop_fixed_point_tbl[1];
         }
-        copyVec3(&rec->aim_0x1D0, setVec3(&at, fixed->pos.x, fixed->pos.y, fixed->pos.z));
-        copyVec3(&rec->pos_0x014, &rec->aim_0x1D0);
+        rec->aim_0x1D0 = VEC3(fixed->pos.x, fixed->pos.y, fixed->pos.z);
+        rec->pos_0x014 = rec->aim_0x1D0;
         rec->aim_rot_0x1DC.z = 0;
         rec->aim_rot_0x1DC.x = 0;
         rec->aim_rot_0x1DC.y = fixed->rot_y;

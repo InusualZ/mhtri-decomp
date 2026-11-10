@@ -8,7 +8,7 @@
  * NAMES. `eft028_set_koware` is the runtime dump's own name (C++ linkage, the map row carries the mangling); the rest
  *   are plain `extern "C"`.  GUESS: the file name `eft028_set` (from the family's setters; no `__FILE__` string);
  *   GUESS (from its body and its caller): eft028_set_scaled.
- * RESIDUALS. The unreferenced 0.0f at 0x80796B24 is not in the linked object: a dead store `param.c = 0.0f` pools it
+ * RESIDUALS. The unreferenced 0.0f at 0x80796B24 is not in the linked object: a dead store `param.radius = 0.0f` pools it
  *   (object 0x8) and an unreferenced `return 0.0f` function under `exceptions off` too, but the link strips the
  *   unreferenced entry either way (flipcheck NOT READY; the stripped-function trial flip fails the DOL hash).
  *   Open: whether this TU also holds `ef/fn_80119C44.c` (its pool 0x80796B2C = 1.0f follows with no duplicate), and the eft028 data
@@ -29,7 +29,8 @@
 #include "ef/effect.h"
 #include "ef/eft001.h"
 #include "ef/eft028_set_scaled.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "Pl/pl_hit_sphere.h" /* PlCapsule, PlCapsuleBox, pl_capsule_box_set (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 /* The eft028 work block `eft_res_slot_get(0x48)` attaches (the next unit, `ef/fn_80119C44.c`, owns the
  * record itself). size: 0x18 (lower bound). */
@@ -48,12 +49,7 @@ typedef struct _EFT28_WORK {
     /* +0x17 */ u8 key_0x17;
 } _EFT28_WORK;
 
-/* The 0x1C-byte parameter record `eft_capsule_ctor` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
-typedef struct _EFT28_PARAM {
-    /* +0x00 */ VEC3 a;
-    /* +0x0C */ VEC3 b;
-    /* +0x18 */ f32 c;
-} _EFT28_PARAM; /* size: 0x1C */
+/* The 0x1C-byte parameter record `CAPSULE::CAPSULE()` builds and `pl_capsule_box_set` reads in eft028_set_capsule. */
 
 extern "C" {
 /* the plain callees with no reconstructed owner header yet (declared here, never `extern`-spelled, so the
@@ -62,8 +58,6 @@ _EFT* fn_80119C44(u8 kind, u8 variant, u32 arg);
 void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
 
-void pl_capsule_box_set(_EFT28_PARAM* param, void* out);
-void eft_capsule_ctor(_EFT28_PARAM* param);
 }
 
 #pragma peephole off
@@ -109,7 +103,7 @@ void eft028_set_koware(u8 kind, nw4r::math::VEC3* pos, u8 variant, long timer)
     if (rec == 0) {
         return;
     }
-    copyVec3(&rec->pos_0x18, pos);
+    rec->pos_0x18 = *pos;
     rec->timer_0x0C = timer;
 }
 
@@ -118,9 +112,8 @@ extern "C" void eft028_set_capsule(u8 area)
 {
     _EFT* rec;
     _EFT28_WORK* work;
-    _EFT28_PARAM param;
 
-    eft_capsule_ctor(&param);
+    PlCapsule param;
     if (area != get_now_areano()) {
         return;
     }
@@ -134,15 +127,15 @@ extern "C" void eft028_set_capsule(u8 area)
     eft_state_flags_set(rec, 0, 0);
     work = (_EFT28_WORK*)rec->work_0x38;
     work->mode = 1;
-    copyVec3(&param.a, &eft028_capsule_ends[0]);
-    copyVec3(&param.b, &eft028_capsule_ends[1]);
-    param.c = 410.0f;
-    pl_capsule_box_set(&param, &work->param_0x0C[0]);
+    param.start = eft028_capsule_ends[0];
+    param.end = eft028_capsule_ends[1];
+    param.radius = 410.0f;
+    pl_capsule_box_set(&param, (PlCapsuleBox*)&work->param_0x0C[0]);
     work->col_r = 0xff;
     work->col_g = 0xff;
     work->col_b = 0xff;
     work->col_a = 0;
-    copyVec3(&rec->pos_0x18, &param.a);
+    rec->pos_0x18 = param.start;
     rec->timer_0x0C = 0;
     rec->release_0x40 = fn_80119D10;
     rec->dispatch_0x34 = fn_80119D9C;
@@ -159,7 +152,7 @@ extern "C" void eft028_set_scaled(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* ro
     }
     work = (_EFT28_WORK*)rec->work_0x38;
     work->field_0x10 = scale;
-    copyVec3(&rec->pos_0x18, pos);
+    rec->pos_0x18 = *pos;
     eft_rot_vec_copy(&rec->rot_0x24, rot);
     rec->timer_0x0C = timer;
 }

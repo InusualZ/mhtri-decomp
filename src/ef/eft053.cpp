@@ -56,7 +56,7 @@
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_8012BDF4.h" /* em_act_ck, em_work_die_ck */
-#include "fn_8004CAD8.h"       /* setVector3, mulVecMatAddTrans, rotVecY, VEC3_ctor, MTX34_ctor */
+#include "fn_8004CAD8.h"       /* setVector3, mulVecMatAddTrans, rotVecY, VEC3::VEC3(), MTX34::MTX34() */
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
 #include "unsplit/unknown.h"
 #include "enemy/em_pop.h"   /* the band's unnamed callees */
@@ -69,7 +69,7 @@
 #include "unsplit/Pl.h"        /* PlSlotGate lbl_806BB7A0 (the family's timing block) */
 #include "ef/fn_800CDB2C.h"    /* ran_suu (the family's frame randomiser) */
 #include "ef/eft001.h"         /* eft_rot_vec_copy (the rotation copy) */
-#include "g3d/g3d_calcworld.h"  /* addVec3To (the vector add) */
+#include "g3d/g3d_calcworld.h"  /* VEC3::operator+= (the vector add) */
 #include "quest/quest_entry.h"   /* quest_grade_rank_get */
 #include "enemy/em025_prog.h"    /* fn_8019E70C */
 #include "Pl/Pl_master_ck.h"     /* Pl_master_ck */
@@ -283,7 +283,6 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
     s32 a;
     s16 v;
 
-    MTX34_ctor(&mtx);
     zero = 0.0f;
     setVector3(out, zero, zero, zero);
     eft_rot_vec_copy(&rot, (_CP_VECTOR*)&plw->param_0x54); /* +0x54 is the actor's 3-word rotation */
@@ -305,7 +304,7 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
         scale = 2000.0f;
     }
     rotVecY(out, plw->field_0x058);
-    addVec3To(out, &plw->vec_0x03C);
+    *out += plw->vec_0x03C;
     mtx.m[0][3] = out->x;
     mtx.m[1][3] = out->y;
     mtx.m[2][3] = out->z;
@@ -388,9 +387,6 @@ extern "C" s32 eft053_model_list_get(u8* out_kind, s32* out_count)
  * map has no record for it. */
 s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
 {
-    VEC3 tmp_a;
-    VEC3 tmp_c;
-    VEC3 tmp_b;
     EftModelRec* list;
     u8 kind;
     s32 count;
@@ -560,11 +556,9 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             rotVecY(c, list[i].rot_y);
             vec3_normalize_into(c, c);
             vec_to_mh_vec3(b, &list[i].pos_0x04);
-            vec3_scale(&tmp_a, c, scale_off);
-            addVec3To(b, &tmp_a);
-            vec3_scale(&tmp_b, c, off_a);
-            addVec3(&tmp_c, b, &tmp_b);
-            copyVec3(a, &tmp_c);
+            VEC3 tmp_a = *c * scale_off;
+            *b += tmp_a;
+            *a = *b + (*c * off_a);
             vec3_scale_in_place(c, ang / 4.0f);
             return 1;
         }
@@ -662,7 +656,6 @@ extern "C" void eft053_dispatch(_EFT* self)
 extern "C" void eft053_init(_EFT* self)
 {
     Eft053Work* work = (Eft053Work*)self->work_0x38;
-    VEC3 offset;
     PlSlotGate* gate = stg_place_timers;
     EftModelRec* rec;
     u16 id;
@@ -672,7 +665,7 @@ extern "C" void eft053_init(_EFT* self)
     s32 found;
     u32 max;
 
-    VEC3_ctor(&offset);
+    VEC3 offset;
     self->state_0x05++;
     self->flag_0x01 = 1;
     self->field_0x10 = 0;
@@ -774,7 +767,7 @@ extern "C" void eft053_init(_EFT* self)
             if (work->sub_0x25[i] == 2 || work->sub_0x25[i] == 3) {
                 vec_to_mh_vec3(&offset, &eft053_lever_offset);
                 rotVecY(&offset, work->models[i]->field_0x2C);
-                addVec3To(&work->models[i]->pos_0x04, &offset);
+                work->models[i]->pos_0x04 += offset;
             }
             break;
         case 7:
@@ -782,7 +775,7 @@ extern "C" void eft053_init(_EFT* self)
             if (work->sub_0x25[i] == 4) {
                 vec_to_mh_vec3(&offset, &eft053_lever_offset);
                 rotVecY(&offset, work->models[i]->field_0x2C);
-                addVec3To(&work->models[i]->pos_0x04, &offset);
+                work->models[i]->pos_0x04 += offset;
             }
             break;
         }
@@ -883,14 +876,6 @@ extern "C" void eft053_init(_EFT* self)
  * position pushed along its facing by the program's reach. */
 extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
 {
-    VEC3 dir;
-    VEC3 jitter;
-    VEC3 se_pos;
-    _CP_VECTOR rot;
-    VEC3 tmp_a;
-    VEC3 tmp_b;
-    VEC3 tmp_c;
-    VEC3 step;
     f32 reach;
     f32 dist;
     s32 speed;
@@ -901,12 +886,13 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
     PlSlotGate* gate;
 
     speed = 0;
-    setVec3(&dir, 0.0f, 0.0f, 1.0f);
+    VEC3 dir(0.0f, 0.0f, 1.0f);
     dist = 0.0f;
     work = (Eft053Work*)self->work_0x38;
-    setVec3(&jitter, dist, dist, dist);
+    VEC3 jitter(dist, dist, dist);
     gate = stg_place_timers;
-    setVec3(&se_pos, 0.0f, 0.0f, 0.0f);
+    VEC3 se_pos(0.0f, 0.0f, 0.0f);
+    _CP_VECTOR rot;
     switch (work->kind_0x24) {
     default:
         kind = 0;
@@ -995,7 +981,7 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             if (work->counters[index] == 15 && self->area_0x44 == get_now_areano()) {
                 setVector3(&se_pos, 0.0f, 0.0f, reach);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
-                addVec3To(&se_pos, &work->models[index]->pos_0x04);
+                se_pos += work->models[index]->pos_0x04;
                 map_se_req(14, &se_pos);
             }
             jitter.y = (f32)(ran_suu(1) % 16 - 8);
@@ -1009,18 +995,18 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             if (work->kind_0x24 == 2) {
                 eft026_ramp_place_set(7, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                       self->area_0x44, reach);
-                copyVec3(&se_pos, setVec3(&tmp_a, 0.0f, 0.0f, -3200.0f));
+                se_pos = VEC3(0.0f, 0.0f, -3200.0f);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
-                addVec3To(&se_pos, &work->models[index]->pos_0x04);
+                se_pos += work->models[index]->pos_0x04;
                 eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
                 rot.y += 0x8000;
                 eft028_set_scaled(8, &se_pos, &rot, 10.0f, self->area_0x44, 0);
             } else if (work->kind_0x24 == 5 || work->kind_0x24 == 6) {
                 eft026_ramp_place_set(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                       self->area_0x44, reach);
-                copyVec3(&se_pos, setVec3(&tmp_b, 0.0f, 0.0f, -980.0f));
+                se_pos = VEC3(0.0f, 0.0f, -980.0f);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
-                addVec3To(&se_pos, &work->models[index]->pos_0x04);
+                se_pos += work->models[index]->pos_0x04;
                 eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
                 rot.y += 0x8000;
                 eft028_set_scaled(13, &se_pos, &rot, 5.0f, self->area_0x44, 0);
@@ -1028,7 +1014,7 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
             if (self->area_0x44 == get_now_areano()) {
                 setVector3(&se_pos, 0.0f, 0.0f, reach / 2.0f);
                 rotVecY(&se_pos, work->models[index]->field_0x2C);
-                addVec3To(&se_pos, &work->models[index]->pos_0x04);
+                se_pos += work->models[index]->pos_0x04;
                 map_se_req(2, &se_pos);
             }
         }
@@ -1043,9 +1029,9 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         if (work->counters[index] == 1 && (work->kind_0x24 == 5 || work->kind_0x24 == 6)) {
             eft026_ramp_place_set(10, &work->models[index]->pos_0x04, &work->models[index]->rot_0x28,
                                   self->area_0x44, reach);
-            copyVec3(&se_pos, setVec3(&tmp_c, 0.0f, 0.0f, -1240.0f));
+            se_pos = VEC3(0.0f, 0.0f, -1240.0f);
             rotVecY(&se_pos, work->models[index]->field_0x2C);
-            addVec3To(&se_pos, &work->models[index]->pos_0x04);
+            se_pos += work->models[index]->pos_0x04;
             eft_rot_vec_copy(&rot, &work->models[index]->rot_0x28);
             rot.y += 0x8000;
             eft028_set_scaled(13, &se_pos, &rot, 5.0f, self->area_0x44, 0);
@@ -1119,7 +1105,7 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         if (self->area_0x44 == get_now_areano()) {
             setVector3(&se_pos, 0.0f, 0.0f, reach / 2.0f);
             rotVecY(&se_pos, work->models[index]->field_0x2C);
-            addVec3To(&se_pos, &work->models[index]->pos_0x04);
+            se_pos += work->models[index]->pos_0x04;
             map_se_req(3, &se_pos);
         }
         /* fall through */
@@ -1208,10 +1194,9 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
         setVector3(&dir, 0.0f, 0.0f, 1.0f);
     }
     vec_to_mh_vec3(&work->models[index]->pos_0x04, &eft053_model_lists[work->kind_0x24][index].pos_0x04);
-    vec3_scale(&step, &dir, dist);
-    addVec3To(&work->models[index]->pos_0x04, &step);
+    work->models[index]->pos_0x04 += dir * dist;
     rotVecY(&jitter, work->models[index]->field_0x2C);
-    addVec3To(&work->models[index]->pos_0x04, &jitter);
+    work->models[index]->pos_0x04 += jitter;
 }
 
 /* Runs a lever slot (models `index` and `index + 1`): a player of the area standing in it with the lever action and
@@ -1220,7 +1205,6 @@ extern "C" void eft053_slot_swing_step(_EFT* self, s32 index)
 extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
 {
     Eft053Work* work;
-    VEC3 pos;
     s32 tilt;
     _PLW* plw;
     u32 max;
@@ -1233,7 +1217,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
     EftModelRec* recs;
 
     work = (Eft053Work*)self->work_0x38;
-    VEC3_ctor(&pos);
+    VEC3 pos;
     moved = 0;
     master = 0;
     tilt = 0;
@@ -1319,7 +1303,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
         work->models[index]->field_0x2C = (u16)work->counters[index];
         vec_to_mh_vec3(&pos, &eft053_lever_offset);
         rotVecY(&pos, work->models[index]->field_0x2C);
-        addVec3To(&work->models[index]->pos_0x04, &pos);
+        work->models[index]->pos_0x04 += pos;
         work->models[index + 1]->field_0x2C = (u16)work->counters[index];
         return;
     }
@@ -1332,7 +1316,7 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
                 vec_to_mh_vec3(&work->models[index]->pos_0x04, &recs[i].pos_0x04);
                 vec_to_mh_vec3(&pos, &eft053_lever_offset);
                 rotVecY(&pos, work->models[index]->field_0x2C);
-                addVec3To(&work->models[index]->pos_0x04, &pos);
+                work->models[index]->pos_0x04 += pos;
                 work->states[index] = 0;
                 work->models[index + 1]->field_0x28 = recs[i + 1].rot_x;
                 work->models[index + 1]->field_0x2C = recs[i + 1].rot_y;
@@ -1346,14 +1330,13 @@ extern "C" void eft053_slot_lever_step(_EFT* self, s32 index)
  * model's rotation. */
 extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
 {
-    VEC3 pos;
     Eft053Work* work;
     PlSlotGate* timer;
     s32 c;
 
     work = (Eft053Work*)self->work_0x38;
     timer = stg_place_timers;
-    VEC3_ctor(&pos);
+    VEC3 pos;
     work->counters[index] += 1;
     switch (self->area_0x44) {
     case 1:
@@ -1442,7 +1425,6 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
  * when a stage completes; returns 1 on the last stage. */
 extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 randomize)
 {
-    VEC3 pos;
     Eft053Work* work;
     f32 step;
     s32 ret;
@@ -1453,7 +1435,7 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
     work = (Eft053Work*)self->work_0x38;
     ret = 0;
     step = (f32)work->field_0x6E[work->field_0x35[index]];
-    VEC3_ctor(&pos);
+    VEC3 pos;
     if (randomize != 0) {
         seed = ran_suu(1) % 5;
         start = ran_suu(1) % (s32)(500.0f / step);
@@ -1528,18 +1510,13 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
  * decelerate), banking its Y/Z rotation by the heading's X; returns 1 when the last stage ends. */
 extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
 {
-    VEC3 dir;
-    VEC3 target;
-    VEC3 step_a;
-    VEC3 step_b;
-    VEC3 step_c;
     Eft053Work* work;
     u32 ang;
     s32 ret;
 
     work = (Eft053Work*)self->work_0x38;
-    VEC3_ctor(&dir);
-    VEC3_ctor(&target);
+    VEC3 dir;
+    VEC3 target;
     ret = 0;
     switch (work->states[index]) {
     case 0:
@@ -1548,8 +1525,8 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
         setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_a, &dir, 0.5f * (f32)work->counters[index]);
-        addVec3To(&work->models[index]->pos_0x04, &step_a);
+        VEC3 step_a = dir * (0.5f * (f32)work->counters[index]);
+        work->models[index]->pos_0x04 += step_a;
         if (0.5f * (f32)work->counters[index] >= 20.0f) {
             work->states[index] += 1;
             work->counters[index] = 0;
@@ -1614,8 +1591,8 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
         setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_b, &dir, 20.0f);
-        addVec3To(&work->models[index]->pos_0x04, &step_b);
+        VEC3 step_b = dir * 20.0f;
+        work->models[index]->pos_0x04 += step_b;
         if (vec3_dist_sq(&work->models[index]->pos_0x04, &target) <= 270400.0f) {
             work->states[index] += 1;
             work->counters[index] = 0;
@@ -1681,8 +1658,8 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
         ang = calcVecAng2(&work->models[index]->pos_0x04, &target);
         setVector3(&dir, 0.0f, 0.0f, 1.0f);
         rotVecY(&dir, ang);
-        vec3_scale(&step_c, &dir, 20.0f - 0.5f * (f32)work->counters[index]);
-        addVec3To(&work->models[index]->pos_0x04, &step_c);
+        VEC3 step_c = dir * (20.0f - 0.5f * (f32)work->counters[index]);
+        work->models[index]->pos_0x04 += step_c;
         if (20.0f - 0.5f * (f32)work->counters[index] <= 0.0f) {
             work->states[index] = 0;
             work->models[index]->field_0x30 = 0;
@@ -1723,15 +1700,12 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
 {
     Eft053Work* work = (Eft053Work*)self->work_0x38;
     MTX34 mtx;
-    MTX34_ctor(&mtx);
     u32 ang[3] = {0, 0x8000, 0};
     VEC3 joint;
     VEC3 shot;
     VEC3 dir;
     VEC3 ground;
     VEC3 offset;
-    VEC3 sum;
-    VEC3 diff;
     _ENEMY_WORK* enemy;
     _ENEMY_WORK* target;
     MHchar** model;
@@ -1742,11 +1716,6 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
     s32 e;
     u8 phase;
 
-    VEC3_ctor(&joint);
-    VEC3_ctor(&shot);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&ground);
-    VEC3_ctor(&offset);
     enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
     for (i = 0; i < (u16)max; i++, enemy++) {
@@ -1896,10 +1865,8 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
                     joint.z = mtx.m[2][3];
                     setVector3(&offset, 0.0f, 150.0f, -400.0f);
                     rotVecY(&offset, (*model)->field_0x2C);
-                    addVec3(&sum, &(*model)->pos_0x04, &offset);
-                    copyVec3(&shot, &sum);
-                    subVec3(&diff, &joint, &shot);
-                    copyVec3(&dir, &diff);
+                    shot = *(&(*model)->pos_0x04) + offset;
+                    dir = joint - shot;
                     calcVecAngXY(&dir, &ang[0], &ang[1]);
                     shell_set_func_ptr->method_0x7C(&shot, ang, self->area_0x44, shell_set_func_ptr);
                     work->field_0x72[work->field_0x35[index]][e] = 2;
@@ -1914,7 +1881,7 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
         case 0:
             if (quest_grade_rank_get(75) != 0) {
                 work->field_0x68[work->field_0x35[index]] = 10;
-                copyVec3(&ground, &(*model)->pos_0x04);
+                ground = *(&(*model)->pos_0x04);
                 ground.y = GetGroundHit(&ground, 0x1000, self->area_0x44);
                 eft019_set(&ground, self->area_0x44, 2);
             }
@@ -1922,7 +1889,7 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
         case 1:
             if (quest_grade_rank_get(50) != 0) {
                 work->field_0x68[work->field_0x35[index]] = 10;
-                copyVec3(&ground, &(*model)->pos_0x04);
+                ground = *(&(*model)->pos_0x04);
                 ground.y = GetGroundHit(&ground, 0x1000, self->area_0x44);
                 eft019_set(&ground, self->area_0x44, 2);
             }

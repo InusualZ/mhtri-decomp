@@ -52,7 +52,7 @@
 #include "nw4r/db_assert.h"   /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"      /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
-#include "fn_8004CAD8.h"     /* MTX34_ctor, abs_f32 (rule 2) */
+#include "fn_8004CAD8.h"     /* MTX34::MTX34(), abs_f32 (rule 2) */
 #include "g3d/g3d_dcc.h"
 #include "MSL/mathf.h"
 
@@ -981,7 +981,6 @@ extern "C" void apply_tex_srt_anm_result(struct ResHandle texSrt, struct ResHand
     for (; indFlag != 0; pSrt++, i++, indFlag >>= 4) {
         if (indFlag & 1) {
             nw4r::math::MTX34 m;
-            MTX34_ctor(&m);
             g3d_calc_tex_mtx_dcc(&m, true, pSrt, indFlag & 0xF);
             f32 maxVal = fn_8006E6A4(minVal, abs_f32(m.m[0][0]));
             maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[0][1]));

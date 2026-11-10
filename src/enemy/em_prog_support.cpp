@@ -49,7 +49,7 @@
 #include "sound/mhchar.h"
 #include "enemy/ENEMY_WORK.h"
 #include "sound/fn_800DD1F0.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/note_work.h" /* NoteWork and the pane/slot types (rule 1) */
 #include "lobby/lb_quest_screen.h" /* note_pane_get_motion, note_pane_init, note_pane_step (the owner's header) */
 #include "lobby/note_talk_init.h"
@@ -1416,9 +1416,9 @@ extern "C" void note_npc_create(u8 id) {
 extern "C" void note_work_release(NoteWork* self) {
     if (self->field_0x000 != 0) {
         mhchar_model_release(&self->model);
-        if (self->view.g3d_0x110 != 0) {
-            push_g3d_wk(self->view.g3d_0x110);
-            self->view.g3d_0x110 = 0;
+        if (self->model.g3d_0x10C != 0) {
+            push_g3d_wk(self->model.g3d_0x10C);
+            self->model.g3d_0x10C = 0;
         }
         if (self->field_0x1F4 != 0) {
             se_handle_clear((u8*)self->field_0x1F4);
@@ -1566,12 +1566,12 @@ extern "C" void note_work_frame(NoteWork* self) {
     }
     note_work_pose_sync(self);
     self->model.move(0);
-    copyVec3(&self->vec_0x170, &self->model.pos_0x04);
+    self->vec_0x170 = self->model.pos_0x04;
     if (self->flag_0x1AC != 0) {
         note_work_wall_slide(self);
     }
     self->vec_0x170.y = self->effect_y_ofs_0x1A4 = GetGroundHit(&self->vec_0x170, 0xFFFF, self->field_0x195);
-    copyVec3(&self->vec_0x17C, &self->vec_0x170);
+    self->vec_0x17C = self->vec_0x170;
     note_work_pose_sync(self);
     mhchar_model_mtx_update(&self->model);
     note_work_motion_post(self);
@@ -1594,7 +1594,7 @@ extern "C" void note_work_pose_sync(NoteWork* self) {
     self->model.field_0x28 = self->field_0x188;
     self->model.field_0x2C = self->field_0x18C;
     self->model.field_0x30 = self->field_0x190;
-    copyVec3(&self->model.pos_0x04, &self->vec_0x170);
+    self->model.pos_0x04 = self->vec_0x170;
 }
 
 /* 0x80385AA0 (0x8): stores the pane's mode byte. */
@@ -1719,18 +1719,12 @@ extern "C" void note_work_wall_slide(NoteWork* self) {
     nw4r::math::VEC3 to;
     nw4r::math::VEC3 unused;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
-    VEC3_ctor(&unused);
-    copyVec3(&from, &self->vec_0x17C);
+    from = self->vec_0x17C;
     from.y += 24.0f;
-    copyVec3(&to, &self->vec_0x170);
+    to = self->vec_0x170;
     coll_wall_slide_c1(&from, &to, 48.0f, &self->vec_0x170, 0xFFFF, 0, 1, self->field_0x195);
 }
 
 /* 0x80385E9C (0x44): constructs a record's model and its two positions. */
 inline NoteWork::NoteWork() {
-    mhchar_construct(&model);
-    VEC3_ctor(&vec_0x170);
-    VEC3_ctor(&vec_0x17C);
 }

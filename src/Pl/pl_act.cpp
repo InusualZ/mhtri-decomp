@@ -248,8 +248,8 @@
 #include "camera/camera_main.h"   /* get_camera_rot_x / get_camera_rot_y / camera_tilt_state_get (rule 2) */
 #include "menu/get_pop_dat_ptr.h" /* option_cfg_eq_ck (rule 2) */
 #include "ef/get_move_work_adrs.h"
-#include "fn_8004CAD8.h"          /* calcVecAngX / rotVecX / rotVecY / MTX34_ctor (rule 2) */
-#include "mh3_pad.h"              /* VEC3_ctor (rule 2) */
+#include "fn_8004CAD8.h"          /* calcVecAngX / rotVecX / rotVecY / MTX34::MTX34() (rule 2) */
+#include "mh3_pad.h"              /* the owner header (rule 2) */
 #include "ef/fn_800CDB2C.h"       /* my_player_no (rule 2) */
 #include "Pl/equip_variant_get.h"
 #include "Pl/set_demo_equip_data_func.h"
@@ -524,7 +524,7 @@ void pl_net_slot_bind(_PLW* plw, s32 slot)
     plw->vec_0x03C.x = pl_act_float_zero;
     plw->vec_0x03C.y = pl_act_float_zero;
     plw->vec_0x03C.z = pl_act_float_zero;
-    copyVec3(&plw->vec_0x048, &plw->vec_0x03C);
+    plw->vec_0x048 = plw->vec_0x03C;
     plw->field_0x068 = pl_act_float_zero;
     plw->field_0x06C = pl_act_float_zero;
     plw->field_0x070 = pl_act_float_zero;
@@ -924,19 +924,13 @@ void pl_camera_heading_update(_PLW* self)
 {
     nw4r::math::MTX34 m0;
     nw4r::math::MTX34 m1;
+    u32 cam;
+    u32 yaw;
+
     VEC3 dir;
     VEC3 v1;
     VEC3 v2;
     VEC3 v3;
-    u32 cam;
-    u32 yaw;
-
-    MTX34_ctor(&m0);
-    MTX34_ctor(&m1);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&v1);
-    VEC3_ctor(&v2);
-    VEC3_ctor(&v3);
     cam = (u16)get_camera_rot_y() - 0x4000;
     self->field_0x0A8 = (u16)(self->part_tbl_a_0xD0[0] + cam);
     if (option_cfg_eq_ck(self->chunk_ofs, 10, 1) != 1 && camera_tilt_state_get() == 0) {
@@ -1009,7 +1003,7 @@ u32 fn_8026BA04(_PLW* self)
 
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 
 typedef nw4r::math::VEC3 Vec3;
 
@@ -1204,12 +1198,6 @@ extern "C" void fn_8026BF98(_PLW* self, u8 pad)
 {
     ActState* st = (ActState*)&self->field_0x0B8;
     Vec3 vec[16];
-    Vec3* p = vec;
-
-    do {
-        VEC3_ctor(p);
-        p++;
-    } while (p < &vec[16]);
 
     switch (st->mode) {
     case 2:
@@ -2739,12 +2727,11 @@ extern "C" void pl_model_pos_sync(_PLW* self)
     Vec3 vec;
     u32* p;
 
-    VEC3_ctor(&vec);
     p = (u32*)&((PlJointHolder*)self->physics_0x13C)->chr_0x04;
     p[10] = self->param_0x54;
     p[11] = self->field_0x058;
     p[12] = self->rot_z_0x5C;
-    copyVec3((nw4r::math::VEC3*)&p[1], (const nw4r::math::VEC3*)((u8*)self + 60));
+    *(nw4r::math::VEC3*)&p[1] = *((const nw4r::math::VEC3*)((u8*)self + 60));
     vec.x = self->field_0x068;
     vec.y = self->unk6C;
     vec.z = self->unk70;
@@ -5457,14 +5444,14 @@ void Pl_decide_mot_get(u16* motion, u16* param)
         case 1:
             mask = row[2];
             if (i < 4) {
-                if ((Psw[0].control_0x104 & mask) != 0) {
+                if ((Psw[0].fs_block.btn.stick_hold & mask) != 0) {
                     index = (u16)i;
                 }
             } else if (i < 8) {
-                if ((Psw[0].control_0x104 & mask) != 0 && (Psw[0].control_0x0FC & 4) != 0) {
+                if ((Psw[0].fs_block.btn.stick_hold & mask) != 0 && (Psw[0].fs_block.btn.hold & 4) != 0) {
                     index = (u16)i;
                 }
-            } else if ((Psw[0].control_0x0FC & mask) != 0) {
+            } else if ((Psw[0].fs_block.btn.hold & mask) != 0) {
                 index = (u16)i;
             }
             break;
@@ -5861,7 +5848,6 @@ extern "C" s32 pl_health_damage_apply(struct _PLW* plw, s16 delta, s8* out)
     nw4r::math::VEC3 pos;
     s16 before;
 
-    VEC3_ctor(&pos);
     if (out != NULL) {
         *out = 0;
     }
@@ -6094,7 +6080,7 @@ extern "C" void pl_guard_break_apply(struct _PLW* plw)
 #include "types.h"
 #include "enemy/enemy_control.h"
 #include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/system_core.cpp`) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
@@ -7238,7 +7224,6 @@ extern "C" void pl_eye_mtx_get(_PLW* self, nw4r::math::MTX34* mtx)
 {
     _CP_VECTOR pos;
     nw4r::math::VEC3 v;
-    VEC3_ctor(&v);
     eft_rot_vec_copy(&pos, (u8*)self + 84);
     pos.x = pos.x + (u16)(lbl_8079A110 * ((f32)self->gauge_0x64F / lbl_8079A0D0) * lbl_8079A0DC / lbl_8079A0E4 + lbl_8079A088);
     cpSetRotMatrixZXY(&pos, mtx);
@@ -7523,7 +7508,6 @@ extern "C" u32 pl_ground_probe_ahead(_PLW* self, f32 ahead, f32 height, nw4r::ma
 {
     nw4r::math::VEC3 v;
     u8 hit;
-    VEC3_ctor(&v);
     out->x = lbl_8079A084;
     v.x = lbl_8079A084;
     v.y = ahead + height;
@@ -8935,7 +8919,6 @@ extern "C" u32 pl_ground_band_ck(_PLW* self, f32 ahead, f32 band, s32 above)
 {
     nw4r::math::VEC3 v;
     u8 hit;
-    VEC3_ctor(&v);
     v.x = lbl_8079A084;
     v.y = lbl_8079A084;
     v.z = ahead;
@@ -9543,14 +9526,10 @@ extern "C" void pl_shell_ids_set(_PLW* self, u8 arg1, u8 arg2)
  * hit matrix and the actor's world offset. */
 extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
 {
-    nw4r::math::VEC3 v;
-    u8 buf[12];
     nw4r::math::MTX34 m;
     nw4r::math::MTX34 m2;
     s32 part;
-    MTX34_ctor(&m);
-    MTX34_ctor(&m2);
-    VEC3_ctor(&v);
+    nw4r::math::VEC3 v;
     u8 t = pl_slot_motion_allow_get(self, pl_rig_attach_kind_tbl[self->field_0x002]);
     out->x = lbl_8079A084;
     out->y = lbl_8079A084;
@@ -9562,8 +9541,7 @@ extern "C" void pl_impact_pos_get(_PLW* self, nw4r::math::VEC3* out)
         break;
     case 1:
         if (self->field_0x002 == 3) {
-            copyVec3(&v, (const nw4r::math::VEC3*)em_vec3_copy(buf, pl_rig_pose_drawn + self->field_0x002 * 0x18 + 0xC,
-                                                              self->field_0x002 * 0x18));
+            v = nw4r::math::VEC3(*(const Vec*)(pl_rig_pose_drawn + self->field_0x002 * 0x18 + 0xC));
         }
         /* fall through */
     case 0:
@@ -9590,7 +9568,6 @@ extern "C" s32 pl_item_now_usable_ck(_PLW* self, u16 arg1)
     s32 sp10;
     s32 spC;
     s16 sp8;
-    VEC3_ctor(&sp24);
     if (self->field_0x00A == 7) {
         if (arg1 == 0x15B) {
             if ((u32)self->act_no <= 1U) {
@@ -9998,7 +9975,6 @@ extern "C" s32 pl_stg_weapon_near_find(_PLW* self, nw4r::math::VEC3* out_pos, s3
     f32 dist;
     f32 height;
 
-    VEC3_ctor(&pos);
     table = get_stg_weapon_work(self, &count);
     *out_word = 0;
     if (self->kind_0x09 == 3) {
@@ -10008,7 +9984,7 @@ extern "C" s32 pl_stg_weapon_near_find(_PLW* self, nw4r::math::VEC3* out_pos, s3
                 dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
                 height = rec->height * s_80276B58::lbl_8079A088 - lb_fabsf(self->field_0x040 - pos.y);
                 if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084) {
-                    copyVec3(out_pos, &pos);
+                    *out_pos = pos;
                     *out_id = table[i].id;
                     *out_word = table[i].word_0x04;
                     return table[i].kind;
@@ -10017,7 +9993,7 @@ extern "C" s32 pl_stg_weapon_near_find(_PLW* self, nw4r::math::VEC3* out_pos, s3
                 dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
                 height = self->field_0x040 - (pos.y - pl_stg_weapon_foot_ofs);
                 if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084 && height <= rec->height) {
-                    copyVec3(out_pos, &pos);
+                    *out_pos = pos;
                     *out_id = table[i].id;
                     *out_word = table[i].word_0x04;
                     return table[i].kind;
@@ -10032,13 +10008,13 @@ extern "C" s32 pl_stg_weapon_near_find(_PLW* self, nw4r::math::VEC3* out_pos, s3
             dist = calcDistanceSqXZ(&self->vec_0x03C, &pos);
             height = rec->height * s_80276B58::lbl_8079A088 - lb_fabsf(self->field_0x040 - pos.y);
             if (dist <= rec->radius * rec->radius && height >= s_80276B58::lbl_8079A084) {
-                copyVec3(out_pos, &pos);
+                *out_pos = pos;
                 *out_id = table[i].id;
                 *out_word = table[i].word_0x04;
                 return table[i].kind;
             }
         } else if (calcDistanceSqXZ(&self->vec_0x03C, &pos) <= rec->radius * rec->radius) {
-            copyVec3(out_pos, &pos);
+            *out_pos = pos;
             *out_id = table[i].id;
             *out_word = table[i].word_0x04;
             return table[i].kind;
@@ -11351,7 +11327,7 @@ u8 fn_8027FE50(u8 kind, u16 item_id)
 #include "Pl/pl_hit_result_best_get.h"
 #include "camera/camera_main.h" /* camera_pl_quake_req (rule 2: the owner is `camera/camera_main.cpp`) */
 #include "ef/eft004.h"          /* eft004_set_pl2 (rule 2: the owner is `ef/eft004_fx.cpp`) */
-#include "g3d/g3d_calcworld.h"  /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h"  /* VEC3::operator+= (rule 2) */
 #include "ef/eft029_fx.h"       /* eft029_set_scale/_kaihou/_half (rule 2) */
 #include "sound/pl_se_charge_level_req.h"
 
@@ -11768,7 +11744,6 @@ void pl_weapon0_act_rows_c(_PLW* self, s32 kind)
 {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -11791,7 +11766,7 @@ void pl_weapon0_act_rows_c(_PLW* self, s32 kind)
             step.y = pl_weapon0_float_zero;
             step.z = pl_weapon0_float_8;
             rotVecXYZ(&step, &self->rot_0x54);
-            addVec3To(&self->vec_0x03C, &step);
+            self->vec_0x03C += step;
         }
         break;
     case 2:
@@ -11804,7 +11779,7 @@ void pl_weapon0_act_rows_c(_PLW* self, s32 kind)
                 step.y = pl_weapon0_float_zero;
                 step.z = pl_weapon0_float_18;
                 rotVecXYZ(&step, &self->rot_0x54);
-                addVec3To(&self->vec_0x03C, &step);
+                self->vec_0x03C += step;
             }
         }
         break;
@@ -11907,7 +11882,6 @@ void pl_weapon0_charge_se(_PLW* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (self->field_0x312 != 0 && self->field_0x312 > self->charge_stage_seen_0x368) {
         pl_impact_pos_get(self, &pos);
         pl_se_charge_level_req(self, &pos);
@@ -12124,8 +12098,6 @@ void pl_weapon0_act_charge_release(_PLW* self, s32 kind)
     VEC3 a;
     VEC3 b;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -13002,7 +12974,6 @@ void pl_weapon1_act_rise(_PLW* self, s32 kind)
     VEC3 bob;
     f32 frame;
 
-    VEC3_ctor(&bob);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -13490,7 +13461,7 @@ void pl_input_pause_flag_set(_PLW* self, u8 pad)
 
     if ((u8)get_ControlType(pad) == 1) {
         rec = &Psw[pad];
-        if ((rec->field_0x100 & 0x40) != 0) {
+        if ((rec->fs_block.btn.trig & 0x40) != 0) {
             pl_id_bit_set(self, 24);
         }
     } else {
@@ -13507,8 +13478,6 @@ void pl_input_refresh(_PLW* self, u32 value)
 {
     PlInput* in = (PlInput*)&self->field_0x0B8;
     Vec3 hist[16];
-    Vec3* p = hist;
-    Vec3 unused;
     SysQuestMove* move;
     PlayerPad* pad;
     s32 swung;
@@ -13518,11 +13487,7 @@ void pl_input_refresh(_PLW* self, u32 value)
     u16 held;
     u16 held_alt;
 
-    do {
-        VEC3_ctor(p);
-        p++;
-    } while (p < &hist[16]);
-    VEC3_ctor(&unused);
+    Vec3 unused;
     move = (SysQuestMove*)get_move_work_adrs(0);
     in->id_flags = 0;
     in->pad_kind = 0;
@@ -13583,19 +13548,19 @@ void pl_input_refresh(_PLW* self, u32 value)
     if ((u8)get_ControlType((u8)value) == 1) {
         pad = &Psw[(u8)value];
         in->pad_kind = 1;
-        in->stick_flags[1] = pad->fs_stick_prev_0x106;
-        in->stick_flags[0] = pad->control_0x104;
+        in->stick_flags[1] = pad->fs_block.btn.stick_prev;
+        in->stick_flags[0] = pad->fs_block.btn.stick_hold;
         in->stick_flags[3] = in->stick_flags[2];
-        in->stick_flags[2] = pad->fs_stick_trig_0x108;
-        in->stick_angle[0] = pad->fs_angle_0x10C[0];
-        in->stick_angle[1] = pad->fs_angle_0x10C[1];
-        in->stick_dist[0] = pad->fs_dist_0x118[0];
-        in->stick_dist[1] = pad->fs_dist_0x118[1];
-        in->held_alt = held_alt = pad->fs_prev_0xFE & ~0x8000;
-        in->held = held = pad->control_0x0FC & ~0x8000;
+        in->stick_flags[2] = pad->fs_block.btn.stick_trig;
+        in->stick_angle[0] = pad->fs_block.btn.angle[0];
+        in->stick_angle[1] = pad->fs_block.btn.angle[1];
+        in->stick_dist[0] = pad->fs_block.btn.dist[0];
+        in->stick_dist[1] = pad->fs_block.btn.dist[1];
+        in->held_alt = held_alt = pad->fs_block.btn.prev & ~0x8000;
+        in->held = held = pad->fs_block.btn.hold & ~0x8000;
         in->pressed_prev = pressed_prev = in->pressed & ~0x8000;
-        in->pressed = pressed = pad->field_0x100 & ~0x8000;
-        in->extra_pressed = pad->field_0x11e & ~0x8000;
+        in->pressed = pressed = pad->fs_block.btn.trig & ~0x8000;
+        in->extra_pressed = pad->fs_block.btn.rept & ~0x8000;
         in->copy_0x08[0] = held;
         in->copy_0x08[1] = held_alt;
         in->copy_0x08[2] = pressed;
@@ -13607,7 +13572,7 @@ void pl_input_refresh(_PLW* self, u32 value)
         pl_input_menu_clear(self, in);
         if (s_8026BA1C::pl_id_bit_ck(self, 11) != 1 && menu_item_frame_update((MenuFrameWork*)self) != 1) {
             pad_acc_hist_get((u8)value, hist, 4);
-            copyVec3(&in->accel_a, hist);
+            in->accel_a = *hist;
             in->accel_a_state = pad_acc_y_delta((u8)value);
             if (vec3_len((f32*)&in->accel_a) >= pl_input_acc_swing_min) {
                 in->accel_flags |= 1;
@@ -13618,7 +13583,7 @@ void pl_input_refresh(_PLW* self, u32 value)
                 }
             }
             pad_fs_acc_hist_get((u8)value, hist, 4);
-            copyVec3(&in->accel_b, hist);
+            in->accel_b = *hist;
             in->accel_b_state = pad_fs_acc_y_delta((u8)value);
             if (vec3_len((f32*)&in->accel_b) >= pl_input_fs_acc_swing_min) {
                 in->accel_flags |= 2;
@@ -13630,14 +13595,14 @@ void pl_input_refresh(_PLW* self, u32 value)
             }
         }
         if (s_8026BA1C::pl_id_bit_ck(self, 11) == 1) {
-            u32 dpad = in->pressed | pad->field_0x11e;
+            u32 dpad = in->pressed | pad->fs_block.btn.rept;
 
             if ((dpad & 0x400) != 0) {
                 pl_id_bit_set(self, 15);
             } else if ((dpad & 0x800) != 0) {
                 pl_id_bit_set(self, 14);
             }
-            dpad = in->pressed | pad->field_0x11e;
+            dpad = in->pressed | pad->fs_block.btn.rept;
             if ((dpad & 0x1000) != 0) {
                 pl_id_bit_set(self, 13);
             } else if ((dpad & 0x2000) != 0) {

@@ -239,8 +239,6 @@ void emc_mini_step(struct _ENEMY_MINI_WORK* mini);
 void emc_marker_replay(struct _ENEMY_MINI_WORK* mini, u8 team, u8 entry, u16 order, u8 area, u8 request, u8 flags,
                        const nw4r::math::VEC3* pos, s32* rot, u8 remote);
 
-/* 0x80143174 - copies a `VEC3` (`src` -> `dst`) and returns `dst`; the callers pass a third word it ignores. */
-void* em_vec3_copy(void* a, void* b, s32 c);
 /* The demo-camera helpers the enemy programs call. */
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 x, f32 y, f32 z);
 void em_demo_rot_set(struct _ENEMY_WORK* self, f32 x, f32 y, f32 z);

@@ -15,6 +15,7 @@
 #define MHTRI_MH3_PAD_PLAYER_PAD_H
 
 #include "types.h"
+#include "nw4r/math.h" /* VEC3, the accelerometer samples (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,14 +73,17 @@ typedef struct PadStickBlock {
 } PadStickBlock; /* size: 0x26 */
 
 /* The Nunchuk block at +0xFC: the shared button/stick block, then the two 16-sample accelerometer rings and
- * their write index. size: 0x1C4 */
+ * their write index.  Retail constructs it out of line (0x80046C28: one loop over the 32 ring samples), after
+ * the pad record's constructor, its first user. size: 0x1C4 */
 typedef struct PadFsBlock {
     /* +0x000 */ PadStickBlock btn;
     /* +0x026 */ u8 pad_0x026[0x2];
-    /* +0x028 */ f32 fs_acc[16][3];  /* the Nunchuk accelerometer, one sample per frame */
-    /* +0x0E8 */ f32 acc[16][3];     /* the remote accelerometer, one sample per frame */
+    /* +0x028 */ VEC3 acc_ring[2][16]; /* [0] the Nunchuk accelerometer, [1] the remote's; one sample per frame */
     /* +0x1A8 */ u8 index;           /* the ring slot of this frame (mod 16) */
     /* +0x1A9 */ u8 pad_0x1a9[0x1B];
+#ifdef __cplusplus
+    PadFsBlock() __attribute__((never_inline)) {}
+#endif
 } PadFsBlock; /* size: 0x1C4 */
 
 typedef struct PlayerPad {
@@ -132,27 +136,13 @@ typedef struct PlayerPad {
     /* +0x0F6 */ u8 cl_dir_0xF6[2];
     /* +0x0F8 */ u16 field_0xf8;
     /* +0x0FA */ u16 cl_rept_count_0xFA;
-    /* +0x0FC */ u16 control_0x0FC;  /* the Nunchuk block (`PadFsBlock`): its held-button word */
-    /* +0x0FE */ u16 fs_prev_0xFE;
-    /* +0x100 */ u16 field_0x100;
-    /* +0x102 */ u16 wpad_word2_0x102; /* the Nunchuk block's released word (the software keyboard reads it) */
-    /* +0x104 */ u16 control_0x104;  /* the Nunchuk stick's direction buttons */
-    /* +0x106 */ u16 fs_stick_prev_0x106;
-    /* +0x108 */ u16 fs_stick_trig_0x108;
-    /* +0x10A */ u16 fs_stick_release_0x10A;
-    /* +0x10C */ u16 fs_angle_0x10C[2];
-    /* +0x110 */ u16 fs_mag_0x110[2];
-    /* +0x114 */ u16 fs_deg_0x114[2];
-    /* +0x118 */ u16 fs_dist_0x118[2];
-    /* +0x11C */ u8 fs_dir_0x11C[2];
-    /* +0x11E */ u16 field_0x11e;
-    /* +0x120 */ u16 fs_rept_count_0x120;
-    /* +0x122 */ u8 pad_0x122[0x2];
-    /* +0x124 */ f32 fs_acc_hist_0x124[16][3];
-    /* +0x1E4 */ f32 acc_hist_0x1E4[16][3];
-    /* +0x2A4 */ u8 acc_hist_index_0x2A4;
-    /* +0x2A5 */ u8 pad_0x2a5[0x1B];
+    /* +0x0FC */ PadFsBlock fs_block; /* the Nunchuk block: its buttons, stick and accelerometer rings */
     /* +0x2C0 */ PadButtons button_0x2C0;
+#ifdef __cplusplus
+    /* Retail's out-of-line constructor (0x80046BF4) builds the Nunchuk block; the static initialiser runs it
+     * over `Psw` and `Psw_prev` (`__construct_array`). */
+    PlayerPad() __attribute__((never_inline)) {}
+#endif
 } PlayerPad; /* size: 0x350 */
 
 

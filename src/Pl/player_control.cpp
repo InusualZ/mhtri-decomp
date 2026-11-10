@@ -453,7 +453,7 @@ void pl_player_first_step(_PLW* plw) {
         plw->drift_on_0x582 = 0;
         pl_model_pos_sync(plw);
         pl_rig_model_move((PlSeRig*)plw->physics_0x13C);
-        copyVec3(&plw->vec_0x03C, &model->pos_0x04);
+        plw->vec_0x03C = model->pos_0x04;
         mhchar_model_mtx_update(model);
         break;
     }

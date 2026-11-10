@@ -12,17 +12,22 @@
  * RESIDUALS. none: the row and the claimed sections match (`.sdata` the two id tables, `.sdata2` the body's literals).
  * SHAPES. The pool-block store is its own statement (`if ((work->effect = ...) == 0)` does not reload even with the
  *   pragma).  `source` is declared before `work` (the other order swaps their callee-saved registers).
- *   `VEC3_ctor` and `MTX34_ctor` are one-instruction `blr` stubs in the DOL, so their calls stay written out.
+ *   `VEC3::VEC3()` and `MTX34::MTX34()` are one-instruction `blr` stubs in the DOL, so their calls stay written out.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
-#include "ef/fn_800FD718.h"
+#include "ef/eft002_follow.h"
 #include "unsplit/sound.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "Pl/plw.h"
+#include "ef/eft_res.h"      /* res_eft_create (rule 2) */
+#include "ef/effect.h"       /* SetRootMtxTrans (rule 2) */
+
+/* The unit was written in C: its own symbols and the plain-named callees keep C linkage. */
+extern "C" {
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math types the mangled callees take
@@ -51,12 +56,8 @@ struct _EfPlBody {
 
       /* a `blr` stub in the DOL: a no-op, but the call is in the bytes */
      /* likewise */
-extern u32 eft_res_spawn_gate_ck(struct _EFT* self, u32 mode);
 /* fn_800FD718 / fn_800FD860 come from their owner's header (rule 2). */
 
-extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 idx);
-extern void mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(VEC3* out, MTX34* mtx);
-extern void SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(void* effect, VEC3* pos);
 
 /* The unit's `.sdata`: the effect and parameter id per effect type (`self->type_0x02`); the twelve per-class
  * muzzle offsets are the body's float literals (`.sdata2`, first-use order). */
@@ -70,26 +71,24 @@ u16 eft002_param_ids[2] = { 0x003E, 0x0014 };
 #pragma peephole off /* the pool-block store keeps the target's reload - see the unit header */
 
 /* Creates the actor's effect and places it at the weapon joint the pool block names. */
-void fn_800FD520(struct _EFT* self)
+void eft002_effect_create(struct _EFT* self)
 {
     struct _PLW* source;
-    VEC3 v;
-    MTX34 mtx;
     struct _EFT_WORK* work;
 
     work = self->work_0x38;
-    VEC3_ctor(&v);
-    MTX34_ctor(&mtx);
+    VEC3 v;
+    MTX34 mtx;
 
     self->state_0x05++;
-    work->effect = res_eft_create__FUsUsUl(eft002_effect_ids[self->type_0x02],
+    work->effect = res_eft_create(eft002_effect_ids[self->type_0x02],
                                            eft002_param_ids[self->type_0x02], 0);
     if (work->effect == 0) {
-        fn_800FD860(self);
+        eft002_release(self);
         return;
     }
     if (self->type_0x02 == 0) {
-        source = self->source_0x30;
+        source = (struct _PLW*)self->source_0x30;
         if (eft_res_spawn_gate_ck(self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -126,14 +125,16 @@ void fn_800FD520(struct _EFT* self)
             v.z = 190.0f;
             break;
         }
-        mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&v, &mtx);
+        mulVecMat(&v, &mtx);
         self->pos_0x18.x = mtx.m[0][3] + v.x;
         self->pos_0x18.y = mtx.m[1][3] + v.y;
         self->pos_0x18.z = mtx.m[2][3] + v.z;
-        SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effect, &self->pos_0x18);
+        SetRootMtxTrans((nw4r::ef::Effect*)work->effect, &self->pos_0x18);
     }
     self->flag_0x01 = 1;
-    fn_800FD718(self);
+    eft002_follow(self);
 }
 
 #pragma peephole reset
+
+} /* extern "C" */

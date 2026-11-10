@@ -49,12 +49,15 @@
  *     permuted), stage_area_model_load_req, stage_part_joints_hide, stage_parts_check, stage_area_timer_arm,
  *     stage_area_colour_update (a 4-byte stack slot): register allocation and scheduling.
  * SHAPES.
- *   - `stage_w` is a `StageWork` object and the three entry points `StageVec3` objects, so `__sinit` constructs them.
+ *   - `stage_w` is a `StageWork` object and the three entry points `VEC3` objects, so `__sinit` constructs them.
  *     The member classes with constructors (`StageSlot`, `StageArea`, `StageAreaRow`, `StagePart`, `StageEftSeat` and
  *     `StageWork` itself) keep them out of line with `__attribute__((never_inline))`, which emits them after `__sinit`
- *     in retail's order (playbook 193, 242); the leaf constructors (`StageVec3`, `StageChar`, `StageEftSphere`,
- *     `StageEftCapsule`) are inline wrappers of the out-of-line `VEC3_ctor`/`setVec3`/`mhchar_construct`/
- *     `eft_vec_ctor`/`eft_capsule_ctor` calls retail makes.
+ *     in retail's order (playbook 193, 242); the leaf constructors (`StageChar`, `StageEftSphere`, `StageEftCapsule`)
+ *     are inline wrappers of the out-of-line `mhchar_construct`/`eft_vec_ctor`/`CAPSULE::CAPSULE()` calls retail makes.
+ *   - The area accessors return VEC3 by value (`get_now_area_pos`, `get_worldworld_pos`, `get_worldlocal_pos`,
+ *     `stage_cell_vec_get`): retail constructs or copies into the hidden return slot (r3).
+ *   - __ct__9StageSlotFv / __ct__12StageEftSeatFv: `MHchar`'s and `CAPSULE`'s implicit constructors construct their
+ *     VEC3 members before the explicit `mhchar_construct`/`CAPSULE::CAPSULE()` (requests vec3-world#3, #5).
  *   - A function that reads several `stage_w` fields takes a local `StageWork* w = SW` first; retail materialises
  *     the block once (`lis`/`addi` into a saved register) and a direct `SW->` spelling re-materialises it per use.
  *     stage_work_init additionally writes its first field through `SW->` (the `stb rN,stage_w@l(rM)` form).
@@ -106,9 +109,7 @@
 
 #include "ef/effect.h"                /* eft_vec_ctor (rule 2) */
 
-#include "ef/eft_capsule_ctor.h"      /* eft_capsule_ctor (rule 2) */
 
-#include "lobby/mhchar_construct.h"   /* mhchar_construct (rule 2) */
 
 /* The stage kind of each map id (`stage_map_kind_get`); 0xFF maps to itself. */
 u8 stg_map_kind_table[23] = {
@@ -554,23 +555,16 @@ static inline void stage_area_eft_assign(StageEftEntry** list_tbl, u8 mapno, u8 
     eft_pro_slot_list_set(0, list_tbl[areano], ids);
 }
 
-extern "C" StageVec3 stg_entry_pos_none;
+extern "C" VEC3 stg_entry_pos_none;
 
-extern "C" StageVec3 stg_entry_pos_menu;
+extern "C" VEC3 stg_entry_pos_menu;
 
-extern "C" StageVec3 stg_entry_pos_work;
+extern "C" VEC3 stg_entry_pos_work;
 
-/* The returned-vector view of `VEC3`: the inline copy constructor lets MWCC build the result in the return slot
- * (playbook 176); the layout and the mangling are VEC3's. */
-/* size: 0xC */
-struct StageRetVec3 : VEC3 {
-    StageRetVec3() {}
-    StageRetVec3(const StageRetVec3& o) { x = o.x; y = o.y; z = o.z; }
-};
 
 /* A fixed start point: its position and its facing in degrees. */
 typedef struct StagePoint {
-    /* +0x00 */ VEC3 pos;
+    /* +0x00 */ _VEC3 pos;
     /* +0x0C */ f32 degrees;
 } StagePoint; /* size: 0x10 */
 
@@ -1199,7 +1193,6 @@ extern "C" void stage_area_light_setup(StageWork* w)
     u32 colour;
     u8 i;
 
-    VEC3_ctor(&pos);
     area = &w->areas[w->areano];
     stage_fog_apply(&area->fog);
     stage_area_ambient_apply();
@@ -1502,7 +1495,6 @@ u8 get_now_areano()
 /* Returns the position of entry point `entry` of map `mapno` (a static vector). */
 extern "C" VEC3* stage_entry_pos_get(u8 mapno, u8 entry)
 {
-    VEC3 pos;
     StageElem* e;
 
     if (mapno == 0xFF)
@@ -1510,28 +1502,27 @@ extern "C" VEC3* stage_entry_pos_get(u8 mapno, u8 entry)
     if ((move_work_state_ck() != 0 || quest_select_ready_ck() != 0) && entry == 1)
         return &stg_entry_pos_menu;
     e = ((StageGroup*)stage_map_group_get(mapno))->elems[entry];
-    copyVec3(&stg_entry_pos_work, setVec3(&pos, e->entry_pos.x, e->entry_pos.y, e->entry_pos.z));
+    stg_entry_pos_work = VEC3(e->entry_pos.x, e->entry_pos.y, e->entry_pos.z);
     return &stg_entry_pos_work;
 }
 
 /* Writes the start position and facing of the stage quest phase `phase` names. */
 extern "C" void stage_start_get(u8 phase, VEC3* pos, s32* angle)
 {
-    VEC3 tmp;
     StageStart* start;
 
     if (phase == 0xFF) {
-        copyVec3(pos, &stg_entry_pos_none);
+        *pos = stg_entry_pos_none;
         *angle = 0;
         return;
     }
     start = ((StageGroup*)stage_map_group_get(phase))->start;
     if (start == 0) {
-        copyVec3(pos, &stg_entry_pos_none);
+        *pos = stg_entry_pos_none;
         *angle = 0;
         return;
     }
-    copyVec3(pos, setVec3(&tmp, start->pos.x, start->pos.y, start->pos.z));
+    *pos = VEC3(start->pos.x, start->pos.y, start->pos.z);
     *angle = start->angle;
 }
 
@@ -1650,42 +1641,38 @@ extern "C" u32 stage_water_area_ck(void)
     return 0;
 }
 
-/* Writes the current area's position (the area light's position) into `out`. */
-extern "C" void get_now_area_pos(VEC3* out, u8 area)
+/* Returns the current area's position (the area light's position). */
+extern "C" VEC3 get_now_area_pos(u8 area)
 {
     StageArea* a;
+    VEC3 out;
 
-    VEC3_ctor(out);
     a = &SW->areas[SW->areano];
-    setVector3(out, a->light.dir.x, a->light.dir.y, a->light.dir.z);
-}
-
-/* Returns the world position of the area-local point `pos` in area `area`. */
-StageRetVec3 get_worldworld_pos(VEC3* pos, u8 area)
-{
-    StageRetVec3 out;
-    VEC3 origin;
-    StageAreaOrigin* o;
-
-    if (get_now_mapno() == 0xFF) {
-        setVec3(&out, 0.0f, 0.0f, 0.0f);
-    } else {
-        o = &((StageGroup*)stage_map_group_get(get_now_mapno()))->map->origins[area];
-        setVec3(&origin, o->x, 0.0f, o->z);
-        addVec3(&out, pos, &origin);
-    }
+    setVector3(&out, a->light.dir.x, a->light.dir.y, a->light.dir.z);
     return out;
 }
 
-/* Writes the area-local position of the world point `pos` in area `area` into `out`. */
-extern "C" void get_worldlocal_pos(VEC3* out, VEC3* pos, u8 area)
+/* Returns the world position of the area-local point `pos` in area `area`. */
+VEC3 get_worldworld_pos(VEC3* pos, u8 area)
 {
-    VEC3 origin;
+    StageAreaOrigin* o;
+
+    if (get_now_mapno() == 0xFF) {
+        return VEC3(0.0f, 0.0f, 0.0f);
+    }
+    o = &((StageGroup*)stage_map_group_get(get_now_mapno()))->map->origins[area];
+    VEC3 origin(o->x, 0.0f, o->z);
+    return *pos + origin;
+}
+
+/* Returns the area-local position of the world point `pos` in area `area`. */
+extern "C" VEC3 get_worldlocal_pos(VEC3* pos, u8 area)
+{
     StageAreaOrigin* o;
 
     o = &((StageGroup*)stage_map_group_get(get_now_mapno()))->map->origins[area];
-    setVec3(&origin, o->x, 0.0f, o->z);
-    subVec3(out, pos, &origin);
+    VEC3 origin(o->x, 0.0f, o->z);
+    return *pos - origin;
 }
 
 /* Returns the word at +8 of the current map/area group. */
@@ -1709,10 +1696,11 @@ extern "C" u32 stage_area_cell_get(u8 i, u8 j, u8 area)
     return r->words[(u8)j];
 }
 
-/* Copies the current area's row [i] 12-byte element [k] into `out`. */
-extern "C" void stage_cell_vec_get(void* out, u8 i, u8 k)
+/* Returns a copy of the current area's row [i] vector [k]. */
+/* free: C linkage evidenced - the map row is the unmangled `stage_cell_vec_get` */
+extern "C" VEC3 stage_cell_vec_get(u8 i, u8 k)
 {
-    assignVec3((Vec*)out, (Vec*)&SW->areas[SW->areano].rows[(u8)i].vecs[(u8)k]);
+    return SW->areas[SW->areano].rows[(u8)i].vecs[(u8)k];
 }
 
 /* Returns effect colour `which` (0 or 1) of the current map's record `index`, -1 when there is none. */
@@ -1875,7 +1863,7 @@ extern "C" void stage_area_point_get(u8 area, u8 idx, VEC3* pos, u32* angle)
     StagePoint* p = 0;
 
     if (idx == 0) {
-        copyVec3(pos, stage_entry_pos_get(9, area));
+        *pos = *stage_entry_pos_get(9, area);
         *angle = stage_entry_angle_get(9, area);
         return;
     }
@@ -2048,7 +2036,6 @@ extern "C" void stage_parts_seat(StageWork* w)
     u8 j;
     u8 k;
 
-    VEC3_ctor(&rot);
     chr = &w->chars[0]->chr;
     water = &w->chars[1]->chr;
     alt = 0;
@@ -2100,8 +2087,8 @@ extern "C" void stage_parts_seat(StageWork* w)
             if (defs[j]->joints[k] == 0xFF)
                 break;
             mhchar_res_node_get(chr, &node, defs[j]->joints[k]);
-            copyVec3(&part->joint_base[k], (VEC3*)em_res_node_trans_get(&node));
-            copyVec3(&rot, (VEC3*)em_res_node_rot_get(&node));
+            part->joint_base[k] = *((VEC3*)em_res_node_trans_get(&node));
+            rot = *((VEC3*)em_res_node_rot_get(&node));
             part->joint_angle[k][0] = (u16)(0.5f + (65536.0f * rot.x) / 360.0f);
             part->joint_angle[k][1] = (u16)(0.5f + (65536.0f * rot.y) / 360.0f);
             part->joint_angle[k][2] = (u16)(0.5f + (65536.0f * rot.z) / 360.0f);
@@ -2275,18 +2262,12 @@ StagePoint stg_koware_points[2] = {
  * plays its sound. */
 extern "C" void stage_part_break(StageWork* w, u8 index)
 {
-    VEC3 kpos;
-    VEC3 ppos;
-    VEC3 epos;
-    VEC3 tmp0;
-    VEC3 tmp1;
-    VEC3 tmp2;
     StagePartDef** defs;
     s32 quake = 0;
 
-    VEC3_ctor(&kpos);
-    VEC3_ctor(&ppos);
-    VEC3_ctor(&epos);
+    VEC3 kpos;
+    VEC3 ppos;
+    VEC3 epos;
     defs = stage_part_defs_get(w, w->areano);
     if (defs[index] == 0)
         return;
@@ -2322,15 +2303,15 @@ extern "C" void stage_part_break(StageWork* w, u8 index)
         camera_quake_req(quake | 0x40);
     switch (defs[index]->eft_kind) {
     case 0:
-        copyVec3(&epos, setVec3(&tmp0, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        epos = VEC3(defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z);
         eft_area_part_break_set(0, &epos, defs[index]->eft_scale, w->areano, defs[index]->eft_param);
         break;
     case 1:
-        copyVec3(&epos, setVec3(&tmp1, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        epos = VEC3(defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z);
         eft028_set_koware(1, &epos, w->areano, defs[index]->eft_param);
         break;
     case 2:
-        copyVec3(&epos, setVec3(&tmp2, defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z));
+        epos = VEC3(defs[index]->eft_pos.x, defs[index]->eft_pos.y, defs[index]->eft_pos.z);
         eft_area_part_break_set(6, &epos, defs[index]->eft_scale, w->areano, defs[index]->eft_param);
         break;
     }
@@ -2345,7 +2326,7 @@ extern "C" void stage_part_break(StageWork* w, u8 index)
         kpos.z = p[1].pos.z;
         eft028_set_koware(1, &kpos, w->areano, p[1].degrees);
     }
-    copyVec3(&ppos, &w->parts[index].joint_base[0]);
+    ppos = w->parts[index].joint_base[0];
     se_area_part_play(index, &ppos);
 }
 
@@ -2614,7 +2595,7 @@ extern "C" void stage_part_scatter_step(StageWork* w, StagePart* part, MHchar* c
             part->joint_pos[i].x += def->gravity[i * 3];
             part->joint_pos[i].y += def->gravity[i * 3 + 1];
             part->joint_pos[i].z += def->gravity[i * 3 + 2];
-            addVec3To(&part->joint_base[i], &part->joint_pos[i]);
+            part->joint_base[i] += part->joint_pos[i];
             part->joint_rot[i][0] = (u16)(s32)(part->joint_rot[i][0] * def->rot_damp[i * 3]);
             part->joint_rot[i][1] = (u16)(s32)(part->joint_rot[i][1] * def->rot_damp[i * 3 + 1]);
             part->joint_rot[i][2] = (u16)(s32)(part->joint_rot[i][2] * def->rot_damp[i * 3 + 2]);
@@ -2645,7 +2626,6 @@ extern "C" void stage_part_scatter_start(StageWork* w, StagePart* part, MHchar* 
     u8 i;
     StageScatterDef* def;
 
-    VEC3_ctor(&v);
     def = stg_scatter_defs[kind];
     for (i = 0; i < 3; i++) {
         part->joint_done[i] = 0;
@@ -2680,7 +2660,6 @@ extern "C" void stage_part_joints_hide(StageWork* w, MHchar* chr, u8* ids)
     u32 i;
     u8 j;
 
-    VEC3_ctor(&v);
     k = 0;
     for (i = 0; i < 2; i++, ids++) {
         if (*ids == 0xFF)
@@ -2854,8 +2833,6 @@ extern "C" u32 stage_zone_hit_ck(StageZone* zone, StageZone** out, VEC3* pos)
     VEC3 a;
     VEC3 b;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     if (zone == 0)
         return 0;
     for (; zone->dest != 0xFF; zone++) {
@@ -2892,7 +2869,6 @@ extern "C" u32 stage_warp_zone_check(void)
     _PLW* plw;
     u8 area;
 
-    VEC3_ctor(&pos);
     plw = (_PLW*)get_move_work_adrs(2);
     plw = &plw[(s8)my_player_no()];
     if (plw == 0)
@@ -2922,7 +2898,6 @@ extern "C" void stage_warp_zone_check_split(void)
     u8 player;
     s8 i;
 
-    VEC3_ctor(&pos);
     move = (StageMoveView*)get_move_work_adrs(0);
     if (move == 0)
         return;
@@ -2981,8 +2956,6 @@ namespace view_fn_802B2AA0 {
 extern "C" void stage_light_blend_set(StageBlendRec* rec, void* obj, u8 store)
 {
     nw4r::math::VEC3 poly;
-    nw4r::math::VEC3 world;
-    nw4r::math::VEC3 cam;
     u32 ang_x;
     u32 ang_y;
     s32 base;
@@ -2990,10 +2963,8 @@ extern "C" void stage_light_blend_set(StageBlendRec* rec, void* obj, u8 store)
     u16 delta;
     f32 t;
 
-    VEC3_ctor(&poly);
     base = camera_angle_y_get();
-    subVec3(&world, &::get_camera_pos(), obj);
-    copyVec3(&poly, &world);
+    poly = ::get_camera_pos() - *(VEC3*)obj;
     calcVecAngXY(&poly, &ang_x, &ang_y);
 
     delta = (u16)(ang_y - base);
@@ -3359,7 +3330,6 @@ u8 stg_toggle_m22a1_show[14] = {0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 
  * visible-joint events and hides the dropped ones. */
 extern "C" void stage_area_visibility_build(StageWork* st, u8 kind)
 {
-    nw4r::math::VEC3 poly;
     u8* keep;
     StageJointLists* list;
     MHchar* chr;
@@ -3374,7 +3344,7 @@ extern "C" void stage_area_visibility_build(StageWork* st, u8 kind)
     player = 0;
     changed = 0;
     chr = &st->chars[kind]->chr;
-    VEC3_ctor(&poly);
+    nw4r::math::VEC3 poly;
 
     if (kind == 1) {
         if (stg_vis_maps[st->mapno] != NULL) {
@@ -3407,7 +3377,7 @@ extern "C" void stage_area_visibility_build(StageWork* st, u8 kind)
         return;
     }
     if (group == 1U && kind == 0) {
-        copyVec3(&poly, &::get_camera_pos());
+        poly = *(&::get_camera_pos());
         player = my_player_no();
         if (stage_pos_z_low_ck(&poly) == 1U) {
             keep = list->show;
@@ -4047,7 +4017,6 @@ extern "C" void stage_eft_strips_spawn(StageWork* st)
     f32* strip;
     u8* slot;
 
-    VEC3_ctor(&pos);
     if (st->mapno == 0xA && st->areano == 1) {
         strip = stg_eft_strip_frames;
         slot = (u8*)stg_eft_strip_points;
@@ -4071,7 +4040,6 @@ extern "C" void stage_area_break_effects_spawn(StageWork* st)
     u8 mapno;
     u8 areano;
 
-    VEC3_ctor(&pos);
     stage_eft_strips_spawn(st);
     mapno = st->mapno;
     if (mapno != 5 && mapno != 0x10) {
@@ -4162,7 +4130,6 @@ extern "C" void stg_ground_impact_set(MHchar* chr, u8 kind, u16 flags)
     u8 index;
     u8 mapno;
 
-    VEC3_ctor(&pos);
     strip = NULL;
     mapno = get_now_mapno();
     if (((s32)mapno == 4 || (s32)mapno == 0xF) && (s32)kind == 5) {
@@ -4348,7 +4315,6 @@ extern "C" void stage_joint_se_update(StageWork* st)
     s32 target;
     u8* p;
 
-    VEC3_ctor(&pos);
     list = NULL;
     switch (st->mapno) {
     case 21:
@@ -4480,7 +4446,6 @@ extern "C" void stage_demo_markers_place(StageWork* st)
     s32 now;
     s32 base;
 
-    VEC3_ctor(&pos);
     entry = NULL;
     mapno = get_now_mapno();
     if (mapno != 5 && mapno != 0x10 && mapno != 0xA) {
@@ -4704,10 +4669,10 @@ StageWork stage_w;
 
 PlSlotGate stg_place_timers[3];
 
-StageVec3 stg_entry_pos_none(0.0f, 0.0f, 0.0f);
+VEC3 stg_entry_pos_none(0.0f, 0.0f, 0.0f);
 
-StageVec3 stg_entry_pos_menu(52.0f, (-573.0f), 1465.0f);
+VEC3 stg_entry_pos_menu(52.0f, (-573.0f), 1465.0f);
 
-StageVec3 stg_entry_pos_work(0.0f, 0.0f, 0.0f);
+VEC3 stg_entry_pos_work(0.0f, 0.0f, 0.0f);
 
 }

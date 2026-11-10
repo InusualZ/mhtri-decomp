@@ -21,7 +21,7 @@
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80147CE0.h"
 #include "sound/fn_800DD1F0.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/note_work.h" /* NoteWork and the pane/slot/layout types (rule 1) */
 #include "lobby/lb_quest_screen.h" /* note_pane_get_motion (rule 2: the owner's header) */
 #include "ef/pRoot.h"
@@ -33,7 +33,7 @@
 #include "ef/get_move_work_adrs.h"
 #include "ef/eft001.h" /* eft_rot_vec_copy (the owner's header, rule 2) */
 #include "enemy/fn_80382310.h" /* note_pane_anim_pair_ck / qn_get_motion_no (the owner's header, rule 2) */
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() */
 #include "ef/eft004_set.h" /* eft004_set */
 
 /* the mode-1 frame check with the frame pair retail passes through in f1/f2 (the owner reads only the slot). */
@@ -178,13 +178,13 @@ extern "C" void fn_803861F8(NoteWork* self) {
         note_pane_mode_set(self, 0);
         note_pane_motion_set(self, 2, 0, 0);
         self->field_0x1B0 = 1.0f;
-        copyVec3(&self->vec_0x170, &plw->vec_0x03C);
+        self->vec_0x170 = plw->vec_0x03C;
         eft_rot_vec_copy((_CP_VECTOR*)&self->field_0x188, &plw->rot_0x54);
         qn_chr_flag_set((_QNPC_W*)self, 90);
         break;
     case 1:
         if (Pl_act_ck(plw, 9, 0) == 1) {
-            copyVec3(&self->vec_0x170, &plw->vec_0x03C);
+            self->vec_0x170 = plw->vec_0x03C;
             eft_rot_vec_copy((_CP_VECTOR*)&self->field_0x188, &plw->rot_0x54);
             qn_chr_flag_set((_QNPC_W*)self, 90);
         } else if (Pl_act_ck(plw, 9, 1) == 1) {
@@ -270,8 +270,6 @@ extern "C" void note_pane_joint_effect_set(NoteWork* self, u8 type, u32 joint, n
     nw4r::math::VEC3 pos;
     nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     mhchar_joint_mtx_get(&self->model, joint, &mtx);
     mulVecMat(ofs, &mtx);
     mtx34_trans_add(&mtx, ofs);
@@ -284,7 +282,6 @@ extern "C" void note_pane_joint_effect_set(NoteWork* self, u8 type, u32 joint, n
 extern "C" void note_pane_motion_effects(NoteWork* self) {
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     switch (qn_get_motion_no((_QNPC_W*)self)) {
     case 2:
         if (note_pane_motion_frame_pass_ck_c1(self, 0, 4.0f, 0.0f) || note_pane_motion_frame_pass_ck_c1(self, 0, 14.0f, 0.0f) ||

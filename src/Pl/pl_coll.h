@@ -1,9 +1,9 @@
 /*
  * Pl/pl_coll.h - `Pl/pl_coll.cpp`'s `.bss` collision-work run 0x806AB848..0x806AC8A8 (0x1060 B, 12 arrays, declared,
  *   never defined) and the record types its readers share.  The readers are `Pl/pl_coll.cpp`, `Pl/pl_act_step.cpp`,
- *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the static initialiser `pl_coll_static_init` builds the arrays with
- *   `__construct_array`, and each member's comment gives its element constructor and stride.  The shape tests and
- *   their records (`HitSphere`, `PlPlane`, the push/contact tests) are `Pl/pl_hit_sphere.cpp`'s, included below.
+ *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the unit's `__sinit` constructs the arrays (each
+ *   element type's own constructor) from their definitions in `Pl/pl_coll.cpp`.  The shape tests and
+ *   their records (`HitSphere`, `nw4r::math::PLANE`, the push/contact tests) are `Pl/pl_hit_sphere.cpp`'s, included below.
  * `pl_move_work` is `[4][11]`, the shape the motion layer's addressing spells (`pl_move_work[chunk_ofs][i]`): a flat
  *   `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
  * GUESSes, named from the read sites beside each (no written body spells them): `pl_coll_slot_free`,
@@ -15,7 +15,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "Pl/pl_hit_sphere.h" /* `HitSphere`, `PlPlane` and the shape tests (rule 2) */
+#include "Pl/pl_hit_sphere.h" /* `HitSphere`, `nw4r::math::PLANE` and the shape tests (rule 2) */
 
 /* One entry of the per-chunk move-work table (`.bss` `pl_move_work`, 0x420 B of 24-byte entries,
  * 264 B - 11 entries - per `_PLW::chunk_ofs` chunk).  Only the fields the readers name are spelled;
@@ -25,16 +25,22 @@ struct PlMoveEntry {
     /* +0x00 */ u16 kind;        /* non-zero marks a live entry; bit 1 is the "armed" flag */
     /* +0x02 */ u8 pad_0x02[0x2];
     /* +0x04 */ u32 angle;       /* the wall's yaw relative to the player's facing (`pl_coll_shape_hits`) */
-    /* +0x08 */ union {          /* the position, read whole by the constructor and by x/z by the motion layer */
-        /* +0x08 */ nw4r::math::VEC3 pos;
-        struct { /* size: 0xC */
-            /* +0x08 */ f32 x_0x08;
-            /* +0x0C */ u8 pad_0x0C[0x4];
-            /* +0x10 */ f32 z_0x10;
-        };
-    };
+    /* +0x08 */ nw4r::math::VEC3 pos;   /* the wall's normal, constructed by the entry's constructor */
     /* +0x14 */ u8 carve_0x14;   /* `pl_step_se_kind_get` returns the first live entry's byte here */
     /* +0x15 */ u8 pad_0x15[0x3];
+
+    /* 0x80295544 (0x34): constructs the position (emitted after its first user, `pl_coll_shape_hits`'s swap). */
+    PlMoveEntry() __attribute__((never_inline)) {}
+};
+
+/* The enemy body sphere `em_coll_shape_set` builds (GUESS name): the same layout as `HitSphere`, but a class with its
+ * own out-of-line constructor, where the body-shape tables are `HitSphere` aggregates.  size: 0x10 */
+struct PlCollSphere {
+    /* +0x0 */ nw4r::math::VEC3 pos;
+    /* +0xC */ f32 radius;
+
+    /* 0x8029573C (0x30): constructs the position (emitted after its first user, `em_coll_shape_set`). */
+    PlCollSphere() __attribute__((never_inline)) {}
 };
 
 /* One collision polygon of the stage's land file: the cells of a `PlLandGrid` list pointers to these, ended by
@@ -55,6 +61,9 @@ struct PlCollPoly {
     /* +0x20 */ nw4r::math::VEC3 vtx2;
     /* +0x2C */ nw4r::math::VEC3 normal;
     /* +0x38 */ f32 dist;              /* the plane offset: `normal . p + dist == 0` on the plane */
+
+    /* 0x80297DE8 (0x4C): constructs the three corners and the normal (emitted after the unit's `__sinit`). */
+    PlCollPoly() __attribute__((never_inline)) {}
 };
 
 /* The ceiling record a ground query fills when it meets a ceiling polygon (attribute bit 0x10): the hit flag, the
@@ -87,8 +96,7 @@ struct PlLandGrid {
 };
 
 /* One record of the land table (`.bss` `pl_land_data`, 15 records of 0x88 bytes - the count and the stride are
- * the `__construct_array` call `pl_coll_static_init` makes with `pl_land_cell_ctor` as the element constructor, which constructs
- * the two grids' corner vectors).  `loaded_b`/`loaded_a` are set by the two grid loaders.
+ * the `__sinit`'s `__construct_array` call, whose element constructor constructs the two grids' corner vectors).  `loaded_b`/`loaded_a` are set by the two grid loaders.
  * size: 0x88 */
 struct PlLandCell {
     /* +0x00 */ u8 loaded_b;           /* `pl_land_grid_b_load` sets it */
@@ -98,13 +106,16 @@ struct PlLandCell {
     /* +0x08 */ PlLandGrid grid_a;
     /* +0x44 */ PlLandGrid grid_b;
     /* +0x80 */ u8 unused_0x80[0x88 - 0x80];
+
+    /* 0x80297D9C (0x4C): constructs the two grids' corner vectors (emitted after the unit's `__sinit`). */
+    PlLandCell() __attribute__((never_inline)) {}
 };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* The run, in address order: each comment is the construction `pl_coll_static_init` performs or the read site that
+/* The run, in address order: each comment is the construction `__sinit` performs or the read site that
  * fixes the shape. */
 
 extern PlMoveEntry pl_move_work[4][11];       /* 0x806AB848: 4 chunks x 11 x 0x18, element ctor
@@ -113,10 +124,10 @@ extern PlMoveEntry pl_move_work[4][11];       /* 0x806AB848: 4 chunks x 11 x 0x1
 extern s8 pl_coll_slot_free[0x10];               /* 0x806ABC68: 16 free/used bytes - `fn_802929DC`
                                                   * releases a slot with `pl_coll_slot_free[i] = 0` */
 extern PlCollPoly pl_hit_box[0x258 / 0x3C];     /* 0x806ABC78: the wall polygons hit, 10 x 0x3C, element ctor
-                                                  * `pl_hit_box_ctor` */
-extern nw4r::math::VEC3 pl_coll_closest_0[0x78 / 0xC]; /* 0x806ABED0: 10 x VEC3, `VEC3_ctor` */
-extern nw4r::math::VEC3 pl_coll_closest_1[0x78 / 0xC]; /* 0x806ABF48: 10 x VEC3, `VEC3_ctor` */
-extern nw4r::math::VEC3 pl_coll_closest_2[0x78 / 0xC]; /* 0x806ABFC0: 10 x VEC3, `VEC3_ctor` */
+                                                  * `PlCollPoly()` */
+extern nw4r::math::VEC3 pl_coll_closest_0[0x78 / 0xC]; /* 0x806ABED0: 10 x VEC3 */
+extern nw4r::math::VEC3 pl_coll_closest_1[0x78 / 0xC]; /* 0x806ABF48: 10 x VEC3 */
+extern nw4r::math::VEC3 pl_coll_closest_2[0x78 / 0xC]; /* 0x806ABFC0: 10 x VEC3 */
 extern f32 pl_coll_slot_dist[0x28 / 4];          /* 0x806AC038: 10 per-slot distances; cleared with the
                                                   * two flag arrays by `coll_line_check`/`findInterSection3`,
                                                   * read one slot at a time by `fn_80294EFC` */
@@ -126,7 +137,7 @@ extern s8 pl_coll_slot_kind[0x0C];               /* 0x806AC06C: 12 per-slot kind
                                                   * `pl_coll_slot_*` writers of `fn_802924C0` */
 extern s8 pl_coll_slot_used[0x10];               /* 0x806AC078: 16 per-slot liveness bytes (0/1),
                                                   * written beside `pl_coll_slot_kind` */
-extern PlLandCell pl_land_data[0x7F8 / 0x88];      /* 0x806AC088: 15 x 0x88, element ctor `pl_land_cell_ctor` */
+extern PlLandCell pl_land_data[0x7F8 / 0x88];      /* 0x806AC088: 15 x 0x88, element ctor `PlLandCell()` */
 extern PlCollPoly* pl_hit_id_list[0x28 / 4];     /* 0x806AC880: the polygons the ground query has taken,
                                                   * scanned by `pl_hit_id_listed` */
 

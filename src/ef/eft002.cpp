@@ -47,10 +47,10 @@
 #undef fn_800FD2AC
 #undef fn_800FD29C
 #undef fn_800FCED4
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
-#include "ef/fn_800FD520.h"
-#include "ef/fn_800FD718.h"
+#include "ef/eft002_create.h"
+#include "ef/eft002_follow.h"
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* res_tex_srt_copy_ctor (rule 2) */
 #include "g3d/g3d_state.h"
@@ -161,7 +161,6 @@ void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
 void setVector3(nw4r::math::VEC3* v, f32 x, f32 y, f32 z);
 
 extern "C" {
-void VEC2_ctor(void* p);
 
 void fn_800DB6CC(nw4r::math::VEC3* pos);
 void fn_800DB714(nw4r::math::VEC3* pos);
@@ -382,7 +381,7 @@ extern "C" void eft002_pair_spawn(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* 
     effect->demo_flag_0x08 = color_set;
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->area_0x44 = src->area_0x0F;
     if (src->kind_0x30 == 1) {
         _EFT001_SRC_SHELL* shell = src->shell_0x2C;
@@ -477,7 +476,7 @@ extern "C" void eft_model_effect_spawn(nw4r::math::VEC3* pos, u32 type, u8 field
     effect->demo_flag_0x08 = field_08;
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     eft_rot_vec_copy(&effect->rot_0x24, rot);
     effect->area_0x44 = area;
     work->value_0x18 = scale;
@@ -540,7 +539,7 @@ extern "C" _EFT* fn_800FC27C(nw4r::math::VEC3* pos, u32 type, u32 param, u8 area
     work->scale_0x0C = scale;
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
-    copyVec3(&effect->pos_0x18, pos);
+    effect->pos_0x18 = *pos;
     effect->rot_0x24.y = param;
     effect->area_0x44 = area;
     eft_state_flags_set_c1(effect, 0, 4);
@@ -612,14 +611,11 @@ static void eft002_create(_EFT* self)
 extern "C" void fn_800FC484(_EFT* self)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 unused_a;
-    nw4r::math::VEC3 unused_b;
     _EFT001_EFFECT_WORK* work;
     s32 i;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
+    nw4r::math::VEC3 unused_a;
+    nw4r::math::VEC3 unused_b;
     work = (_EFT001_EFFECT_WORK*)self->work_0x38;
     self->state_0x05++;
 
@@ -743,7 +739,7 @@ extern "C" void fn_800FC7EC(_EFT* self)
     }
 
     SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
-    copyVec3(&work->model_0x08->pos_0x04, &self->pos_0x18);
+    work->model_0x08->pos_0x04 = self->pos_0x18;
     eft_rot_vec_copy(&work->model_0x08->rot_0x28, &self->rot_0x24);
 
     work->model_0x08->field_0x2C -= 3641;
@@ -810,13 +806,11 @@ extern "C" void fn_800FCA34(_EFT* self)
 extern "C" void fn_800FCA54(_EFT* self)
 {
     nw4r::math::VEC2 scale;
-    nw4r::math::VEC3 vec;
     _EFT001_EFFECT_WORK* work;
     s32 i;
     u8 live;
 
-    VEC2_ctor(&scale);
-    VEC3_ctor(&vec);
+    nw4r::math::VEC3 vec;
     live = 0;
     work = (_EFT001_EFFECT_WORK*)self->work_0x38;
 
@@ -984,8 +978,6 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
     nw4r::math::MTX34 mtx_b;
     _GXColor color;
 
-    MTX34_ctor(&mtx_a);
-    MTX34_ctor(&mtx_b);
 
     _EFT_MODEL_WORK* work = self->work_0x38;
     s32 timer = --self->timer_0x0C;
@@ -1197,16 +1189,16 @@ extern "C" void fn_800FD4E4(_EFT* self)
 {
     switch (self->state_0x05) {
     case 0:
-        fn_800FD520(self);
+        eft002_effect_create(self);
         break;
     case 1:
-        fn_800FD718(self);
+        eft002_follow(self);
         break;
     case 2:
-        fn_800FD850(self);
+        eft002_state_next(self);
         break;
     case 3:
-        fn_800FD860(self);
+        eft002_release(self);
         break;
     }
 }

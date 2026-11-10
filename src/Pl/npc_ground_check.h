@@ -7,14 +7,14 @@
 #include "nw4r/math.h"
 
 struct _LB_NPC;
-struct LbNpcGround;
+struct LandData;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* 0x80291B48 - finds the ground under NPC `self` at `pos` (hit_ground_comon); 1 on a hit */
-s32 npc_ground_check(struct _LB_NPC* self, VEC3* pos, struct LbNpcGround* ground, f32* height, s32 mask);
+s32 npc_ground_check(struct _LB_NPC* self, VEC3* pos, struct LandData* ground, f32* height, s32 mask);
 
 #ifdef __cplusplus
 }

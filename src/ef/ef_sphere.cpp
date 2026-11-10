@@ -98,7 +98,6 @@ void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int 
             f32 theta = 1.5707964f + 3.1415927f * ((f32)ring / (f32)(rings - 1));
             f32 phi;
             f32 r;
-            VEC3 pos, out, norm, side;
 
             if (per_ring == 1) {
                 phi = base;
@@ -124,10 +123,10 @@ void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int 
             }
             dist = hollow + r * (1.0f - hollow);
 
-            VEC3_ctor(&pos);
-            VEC3_ctor(&out);
-            VEC3_ctor(&norm);
-            VEC3_ctor(&side);
+            VEC3 pos;
+            VEC3 out;
+            VEC3 norm;
+            VEC3 side;
             side.y = 0.0f;
             ef_sin_cos(&side.x, &side.z, phi);
             side.x *= -1.0f;
@@ -141,7 +140,7 @@ void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int 
                 side.z = -side.z;
             }
             CalcVelocity((Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&side);
-            pm->CreateParticle(CalcLife(id, scale, em), pos, out, spawn_arg,
+            pm->CreateParticle(CalcLife(id, scale, em), (const _VEC3&)pos, (const _VEC3&)out, spawn_arg,
                                1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                                em->spawn_extra, em->spawn_flag);
         }
@@ -152,10 +151,8 @@ void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int 
         f32 r;
         f32 phi;
         f32 sin_lat, cos_lat, sin_lon, cos_lon;
-        VEC3 pos, out, norm, flat;
+        VEC3 pos, out;
 
-        VEC3_ctor(&pos);
-        VEC3_ctor(&out);
         r = ef_random_float(&em->progress);
         hollow = params->rate / 100.0f;
         if (flags & 0x01000000) {
@@ -170,13 +167,13 @@ void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int 
         pos.x = sin_lon * (-cos_lat * (radius_x * dist));
         pos.y = -sin_lat * (radius_y * dist);
         pos.z = cos_lon * (cos_lat * (radius_z * dist));
-        VEC3_ctor(&norm);
+        VEC3 norm;
         ef_vec3_normalize_to(&norm, &pos);
-        assignVec3((Vec*)&flat, (Vec*)&pos);
+        VEC3 flat = pos;
         flat.y = 0.0f;
         ef_vec3_normalize_to(&flat, &flat);
         CalcVelocity((Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&flat);
-        pm->CreateParticle(CalcLife(id, scale, em), pos, out, spawn_arg,
+        pm->CreateParticle(CalcLife(id, scale, em), (const _VEC3&)pos, (const _VEC3&)out, spawn_arg,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                            em->spawn_extra, em->spawn_flag);
     }

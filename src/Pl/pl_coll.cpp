@@ -17,13 +17,9 @@
  *   `pl_*`/`em_coll_*` function name, `vec3_scale_inv`, `vec3_scale_to`, `coll_wall_slide`, `coll_line_check`,
  *   `npc_ground_check`, the data names `pl_coll_hit_count`, `pl_coll_free_count`, `pl_coll_shared_vtx_table`,
  *   `pl_coll_body_shape(_alt)`, and the registry names `floorf_thunk`, `sqrtf_thunk`, `stage_area_bit_get`,
- *   `calc_xz_angle`; the rows `pl_coll_static_init` (it is MWCC's `__sinit_\pl_coll_cpp` in retail), `pl_land_data_reset`,
+ *   `calc_xz_angle`; the GUESS class `PlCollSphere` (0x8029573C's own constructor), the rows `pl_land_data_reset`,
  *   `pl_ground_check_all_layers`.
  * RESIDUALS.
- *  - `pl_coll_static_init` (0x80297C30) is a plain function calling `__construct_array` itself: the element
- *    constructors it passes are the C-named `pl_move_entry_ctor`/`pl_hit_box_ctor`/`VEC3_ctor`/`pl_land_cell_ctor`,
- *    and `VEC3_ctor` is another unit's C-named row, so a compiler-generated `__sinit` cannot pass it. The code
- *    matches; the `.ctors` word that runs it is missing.
  *  - `GetGroundHit2`, `hit_ground_comon`: the five-hit cap leaves both loops with one branch in retail (`goto`-shaped);
  *    the conformant double `break` costs three instructions in each (100 % with a `goto`, refused by rule 8). An
  *    inline helper whose `return` leaves both loops measures worse (`blt`+`b` for retail's `bge`, and the count's copy).
@@ -37,6 +33,11 @@
  *  - `pl_wall_slot_push`: retail reuses the edge branch's `slot * 0xC` for `pl_coll_closest_0[slot]`; ours recomputes.
  *  - register colouring only (declaration orders hill-climbed, no gain): `coll_wall_slide`, `coll_line_check`,
  *    `pl_coll_sweep_ck`, `findInterSection3`, `em_coll_shape_hits`.
+ * SHAPES. Locals are declared in retail's construction order: a box or plane right before its first use, a slide
+ *   work after the vectors; `PlSlideWork::ends` is an array (its constructor loops), `PlBodySegment` has no
+ *   constructor of its own (the implicit one constructs its two ends).  `pl_hit_box_set`/`pl_land_copy` copy through
+ *   the plain images `PlCollPolyImage`/`LandDataImage` (retail's trivial record copy).  `#pragma pool_data off`
+ *   over the definitions at the foot of the file makes the `__sinit` load each object's address.
  *  - Data: `.data`, `.sdata` and `.sbss` are defined here; the `.bss` arrays stay declared in `Pl/pl_coll.h` (defined
  *    here, MWCC addresses them from one section base where retail relocates each by name: 4 rows dropped to 61/81);
  *    `.ctors` is missing
@@ -54,13 +55,13 @@
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
-#include "pl.h"              /* the Pl module header; pulls in `ef.h`'s `VEC3_ctor` */
+#include "pl.h"              /* the Pl module header */
 #include "fn_8004CAD8.h"     /* the vector helpers this unit calls (rule 2) */
 #include "ef/fn_800AEE48.h"  /* `vec3_sub_assign` (rule 2) */
 #include "Pl/fn_80288CEC.h"
 #include "Pl/fn_8028F66C.h"  /* `LandData` and the record initialisers this unit calls (rule 2) */
 #include "Pl/pl_hit_sphere.h" /* the capsule boxes and `hit_point_sphr` (rule 2) */
-#include "ef/effect.h"    /* `eft_vec_ctor` (rule 2) */
+#include "ef/effect.h"    /* `CAPSULE::CAPSULE()` (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Runtime.PPCEABI.H/CPlusLibPPC.h" /* `__construct_array` (rule 2) */
 #include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/system_core.cpp`) */
@@ -71,12 +72,8 @@
 #include "g3d/floorf_thunk.h"
 #include "sqrtf_thunk.h"
 #include "ef/ef_vec3_dist_sq.h"
-#include "g3d/g3d_calcworld.h" /* `addVec3To` (rule 2) */
+#include "g3d/g3d_calcworld.h" /* `VEC3::operator+=` (rule 2) */
 #include "g3d/g3d_draw.h"      /* `vec3_negate` (rule 2) */
-#include "g3d/vec3_ctor_return.h"
-#include "ef/eft_capsule_ctor.h"
-#include "ef/pl_segment_init.h"
-#include "ef/pl_segment_box_init.h"
 #include "calc_xz_angle.h"
 #include "enemy/fn_801251D0.h" /* `get_enemy_data` (rule 2) */
 #include "enemy/EnemyData.h"
@@ -96,15 +93,24 @@ struct PlPushBound {
 };
 
 /* The swept segment a wall query works on: the two ends, the radius around it, its length and the mode flags the
- * caller picked (`coll_wall_slide`'s `mode`: 0 neither, 1 both, 2 `slide` only).  `pl_vec3_pair_ctor` constructs
+ * caller picked (`coll_wall_slide`'s `mode`: 0 neither, 1 both, 2 `slide` only).  Its constructor constructs
  * the two ends.  size: 0x24 */
 struct PlSlideWork {
-    /* +0x00 */ nw4r::math::VEC3 start;
-    /* +0x0C */ nw4r::math::VEC3 end;
+    /* +0x00 */ nw4r::math::VEC3 ends[2];   /* [0] the start, [1] the end of the move */
     /* +0x18 */ f32 radius;
     /* +0x1C */ f32 length;
     /* +0x20 */ u16 slide;              /* the resolver lets the move slide along the walls */
     /* +0x22 */ u16 skip_below;         /* polygons wholly below the query point are ignored */
+
+    /* 0x80292468 (0x58): constructs the two end points (emitted after its first user, `coll_wall_slide`). */
+    PlSlideWork() __attribute__((never_inline)) {}
+};
+
+/* The body segment the shape setters sweep: two end points with no constructor of their own (the implicit one
+ * constructs them member by member).  size: 0x18 */
+struct PlBodySegment {
+    /* +0x00 */ nw4r::math::VEC3 start;
+    /* +0x0C */ nw4r::math::VEC3 end;
 };
 
 /* One collision grid as the stage's land file stores it: the box, the cell size, the dimensions and the byte offsets
@@ -150,11 +156,8 @@ void pl_vec3_snap_zero(VEC3* out, VEC3* in);
 void pl_push_bound_add(VEC3* move, PlPushBound* bound, f32 limit);
 u32 pl_coll_poly_usable(PlCollPoly* poly, u32* list, s32 list_count, u32 kind, u16 layers, s32 taken_count, u8 area);
 u32 pl_id_list_find(u32 key, u32* list, s32 count);
-PlMoveEntry* pl_move_entry_ctor(PlMoveEntry* self);
-PlLandCell* pl_land_cell_ctor(PlLandCell* self);
-PlCollPoly* pl_hit_box_ctor(PlCollPoly* self);
-void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self);
-void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self);
+void pl_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self);
+void em_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self);
 void pl_land_copy(LandData* dst, LandData* src);
 s32 pl_land_grid_a_clip(VEC3* out, VEC3* from, VEC3* to, PlLandCell* land);
 void pl_land_grid_a_span(VEC3* from, VEC3* to, s32* count_x, s32* count_y, s32* count_z, PlLandCell* land, s32* start_x,
@@ -169,7 +172,6 @@ s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect);
 s32 pl_sweep_poly_hit(PlSlideWork* work, PlCollPoly* poly);
 s32 pl_line_hit_nearest(PlSlideWork* work, VEC3* hit);
 s32 pl_inter_poly_hit(VEC3* to, VEC3* from, PlCollPoly* poly, u8 grid);
-VEC3* pl_vec3_pair_ctor(VEC3* pair);
 u32 pl_vec3_fraction_ck(VEC3* v);
 u32 pl_land_box_ck(VEC3* pos, PlLandCell* land);
 s32 pl_land_grid_b_range_ck(s32 x, s32 y, s32 z, PlLandCell* land);
@@ -189,22 +191,12 @@ void pl_land_data_reset(LandData* land);
 s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
 void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind);
 void vec3_scale_inv(VEC3* v, f32 divisor);
-VEC3* pl_vec3_ctor_ret(VEC3* v);
 s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 layers, u8 mode, u8 area);
 s32 coll_line_check(VEC3* to, VEC3* from, f32 radius, VEC3* hit, u8 flags, u32 kind, u8 area, u16 layers);
 void pl_coll_shape_set(_PLW* self, u8 mode, u16 layers);
 void em_coll_shape_set(_ENEMY_WORK* self, u8 mode, u16 layers);
 }
 
-HitSphere pl_coll_body_shape[2] = {
-    {{0.0f, 0.0f, 0.0f}, 48.0f},
-    {{0.0f, 0.0f, 0.0f}, -1.0f},
-};
-HitSphere pl_coll_body_shape_alt[2] = {
-    {{0.0f, 0.0f, 0.0f}, 60.0f},
-    {{0.0f, 0.0f, 0.0f}, -1.0f},
-};
-u8 pl_coll_shared_vtx_table[8] = {0xFF, 0xFF, 0xFF, 2, 0xFF, 1, 0, 0xFF};
 s8 pl_coll_hit_count;
 s8 pl_coll_free_count;
 
@@ -226,8 +218,8 @@ void pl_land_grid_b_load(PlLandFile* file, s32 index) {
     cell = &pl_land_data[index];
     src = &file->grid;
     cell->loaded_b = 1;
-    copyVec3(&cell->grid_b.min, &src->min);
-    copyVec3(&cell->grid_b.max, &src->max);
+    cell->grid_b.min = src->min;
+    cell->grid_b.max = src->max;
     if (pl_vec3_fraction_ck(&cell->grid_b.min) == 0 && pl_vec3_fraction_ck(&cell->grid_b.max) == 0) {
         cell->grid_b.off_grid = 0;
     } else {
@@ -268,8 +260,8 @@ void pl_land_grid_a_load(PlLandFile* file, s32 index) {
     cell = &pl_land_data[index];
     src = &file->grid;
     cell->loaded_a = 1;
-    copyVec3(&cell->grid_a.min, &src->min);
-    copyVec3(&cell->grid_a.max, &src->max);
+    cell->grid_a.min = src->min;
+    cell->grid_a.max = src->max;
     if (pl_vec3_fraction_ck(&cell->grid_a.min) == 0 && pl_vec3_fraction_ck(&cell->grid_a.max) == 0) {
         cell->grid_a.off_grid = 0;
     } else {
@@ -308,10 +300,8 @@ f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag) {
  * attributes meet `mask`: the highest one at most 50 above `pos`, else the lowest; `*hit` is 0 when none is found
  * (the height is then `pos->y`). */
 f32 GetGroundHit2(nw4r::math::VEC3* pos, u32 mask, u8 area, u8* hit) {
-    VEC3 tri[3];
     f32 heights[5];
     f32 below[5];
-    VEC3 flat_pos;
     u32 grid_x;
     u32 grid_z;
     PlCollPoly** taken;
@@ -337,10 +327,8 @@ f32 GetGroundHit2(nw4r::math::VEC3* pos, u32 mask, u8 area, u8* hit) {
     }
     heights[0] = pos->y;
     if (pl_land_box_ck(pos, cell) == 1) {
-        VEC3_ctor(&flat_pos);
-        VEC3_ctor(&tri[0]);
-        VEC3_ctor(&tri[1]);
-        VEC3_ctor(&tri[2]);
+        VEC3 flat_pos;
+        VEC3 tri[3];
         pl_land_cell_index(pos, cell, &grid_x, &grid_z);
         flat_pos.x = pos->x;
         flat_pos.y = pos->z;
@@ -457,7 +445,6 @@ s32 stage_water_surface_get(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 ki
     LandData land;
     s32 found;
 
-    em_land_data_init(&land);
     pl_land_data_reset(&land);
     *hit_layer = 0;
     found = hit_ground_comon(pos, flag, &land, out, kind, 1, 0, 0, 0);
@@ -480,9 +467,7 @@ void pl_area_ground_probe(VEC3* pos, u8 flag, LandData* land, u32 kind) {
 s32 hit_ground_comon(nw4r::math::VEC3* pos, u8 area, LandData* land, f32* out, u32 kind, u16 layers, f32* surface,
                      f32* extra, _HIT_TENJO_DATA* tenjo) {
     LandData lands[5];
-    VEC3 tri[3];
     f32 heights[5];
-    VEC3 flat_pos;
     u32 grid_x;
     u32 grid_z;
     f32* height_at;
@@ -496,11 +481,6 @@ s32 hit_ground_comon(nw4r::math::VEC3* pos, u8 area, LandData* land, f32* out, u
     u32 y;
     PlCollPoly* poly;
 
-    em_land_data_init(&lands[0]);
-    em_land_data_init(&lands[1]);
-    em_land_data_init(&lands[2]);
-    em_land_data_init(&lands[3]);
-    em_land_data_init(&lands[4]);
     count = 0;
     found = 0;
     if (area == 0xFF || GameMode_ck() == 2) {
@@ -511,10 +491,8 @@ s32 hit_ground_comon(nw4r::math::VEC3* pos, u8 area, LandData* land, f32* out, u
         return -1;
     }
     if (pl_land_box_ck(pos, cell) == 1) {
-        VEC3_ctor(&flat_pos);
-        VEC3_ctor(&tri[0]);
-        VEC3_ctor(&tri[1]);
-        VEC3_ctor(&tri[2]);
+        VEC3 flat_pos;
+        VEC3 tri[3];
         pl_land_cell_index(pos, cell, &grid_x, &grid_z);
         flat_pos.x = pos->x;
         flat_pos.y = pos->z;
@@ -570,7 +548,7 @@ s32 hit_ground_comon(nw4r::math::VEC3* pos, u8 area, LandData* land, f32* out, u
                 land_at->field_0x04 = poly->layer;
                 land_at->field_0x06 = poly->field_0x06;
                 land_at->field_0x07 = poly->area_mask & 0xF;
-                copyVec3(&land_at->vec_0x08, &poly->normal);
+                land_at->vec_0x08 = poly->normal;
                 *taken = poly;
                 height_at++;
                 land_at++;
@@ -610,20 +588,13 @@ s32 hit_ground_comon(nw4r::math::VEC3* pos, u8 area, LandData* land, f32* out, u
  * or game mode 2, the current one) that meet `kind` and not `layers`, and resolves the hits into `pos`; -1 when the
  * area has no wall grid or the move leaves it. */
 s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 layers, u8 mode, u8 area) {
-    PlSlideWork work;
-    PlCollPoly* seen[10];
     VEC3 clipped;
     VEC3 mid;
     VEC3 dir;
     VEC3 lo;
     VEC3 hi;
-    VEC3 sub;
-    VEC3 mid_sum;
-    VEC3 half;
-    VEC3 lo_sum;
-    VEC3 lo_step;
-    VEC3 hi_sum;
-    VEC3 hi_step;
+    PlSlideWork work;
+    PlCollPoly* seen[10];
     s32 start_x;
     s32 start_y;
     s32 start_z;
@@ -643,12 +614,6 @@ s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 l
     s32 grid_x;
     s32 grid_z;
 
-    VEC3_ctor(&clipped);
-    VEC3_ctor(&mid);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&lo);
-    VEC3_ctor(&hi);
-    pl_vec3_pair_ctor(&work.start);
     if (area == 0xFF || GameMode_ck() == 2) {
         area = get_now_areano();
     }
@@ -666,8 +631,8 @@ s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 l
     taken_count = 0;
     pl_coll_free_count = 0;
     pl_coll_hit_count = 0;
-    copyVec3(&work.start, from);
-    copyVec3(&work.end, to);
+    work.ends[0] = *from;
+    work.ends[1] = *to;
     work.radius = radius;
     switch (mode) {
     case 0:
@@ -683,21 +648,14 @@ s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 l
         work.skip_below = 0;
         break;
     }
-    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.start, &work.end));
-    subVec3(&sub, &work.start, &work.end);
-    copyVec3(&dir, &sub);
-    vec3_scale(&half, &dir, 0.5f);
-    addVec3(&mid_sum, &work.end, &half);
-    copyVec3(&mid, &mid_sum);
+    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.ends[0], &work.ends[1]));
+    dir = work.ends[0] - work.ends[1];
+    mid = work.ends[1] + (dir * 0.5f);
     if (vec3_length_sq(&dir.x) > 0.001f) {
         vec3_normalize_into(&dir, &dir);
     }
-    vec3_scale(&lo_step, &dir, radius);
-    addVec3(&lo_sum, from, &lo_step);
-    copyVec3(&lo, &lo_sum);
-    vec3_scale(&hi_step, &dir, -radius);
-    addVec3(&hi_sum, to, &hi_step);
-    copyVec3(&hi, &hi_sum);
+    lo = *from + (dir * radius);
+    hi = *to + (dir * -radius);
     pl_land_grid_a_span(&lo, &hi, &count_x, &count_y, &count_z, cell, &start_x, &start_y, &start_z);
     for (x = 0; x < count_x; x++) {
         for (y = 0; y < count_y; y++) {
@@ -727,18 +685,6 @@ s32 coll_wall_slide(VEC3* to, VEC3* from, f32 radius, VEC3* pos, u32 kind, u16 l
     return pl_wall_resolve(&work, pos, &flag);
 }
 
-/* 0x80292468 - construct both vectors of a two-vector pair and return it. */
-VEC3* pl_vec3_pair_ctor(VEC3* pair) {
-    VEC3* p;
-
-    p = pair;
-    do {
-        VEC3_ctor(p);
-        p++;
-    } while (p < pair + 2);
-    return pair;
-}
-
 /* 0x802924C0 (0x480): records polygon `poly` in the next hit-box slot when the swept sphere of `work` touches it:
  * the slot keeps the polygon, the sweep start, the touch point (and, for an edge touch, the plane point), and the
  * side/crossing flags; 1 when recorded. */
@@ -747,16 +693,6 @@ s32 pl_wall_poly_hit(PlSlideWork* work, PlCollPoly* poly, VEC3* pos) {
     VEC3 rel;
     VEC3 unused;
     VEC3* edges[4];
-    VEC3 edge_best;
-    VEC3 on_plane;
-    VEC3 probe;
-    VEC3 sub_end;
-    VEC3 sub_start;
-    VEC3 step;
-    VEC3 back;
-    VEC3 sub_seg;
-    VEC3 cross_step;
-    VEC3 cross_sum;
     f32 dist;
     f32 best;
     f32 dd;
@@ -764,60 +700,50 @@ s32 pl_wall_poly_hit(PlSlideWork* work, PlCollPoly* poly, VEC3* pos) {
     VEC3** edge;
     s32 i;
 
-    VEC3_ctor(&touch);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&unused);
     if (pl_coll_hit_count >= 9) {
         return 0;
     }
     if (work->skip_below == 1 && pos->y >= poly->vtx0.y && pos->y >= poly->vtx1.y && pos->y >= poly->vtx2.y) {
         return 0;
     }
-    subVec3(&sub_end, &work->end, &poly->vtx0);
-    copyVec3(&rel, &sub_end);
+    rel = work->ends[1] - poly->vtx0;
     if (vec3_dot(&rel.x, &poly->normal.x) < 0.0f) {
         return 0;
     }
-    subVec3(&sub_start, &work->start, &poly->vtx0);
-    copyVec3(&rel, &sub_start);
+    rel = work->ends[0] - poly->vtx0;
     dist = vec3_dot(&rel.x, &poly->normal.x);
     flags = !(dist > 0.0f);
     if (dist > work->radius) {
         return 0;
     }
     if (dist >= -work->radius) {
-        vec3_scale(&step, &poly->normal, dist);
-        copyVec3(&touch, &step);
-        subVec3(&back, &work->start, &touch);
-        copyVec3(&touch, &back);
+        touch = poly->normal * dist;
+        touch = work->ends[0] - touch;
     } else {
-        subVec3(&sub_seg, &work->start, &work->end);
-        copyVec3(&rel, &sub_seg);
+        rel = work->ends[0] - work->ends[1];
         dd = vec3_dot(&rel.x, &poly->normal.x);
         if (dd == 0.0f) {
             return 0;
         }
-        vec3_scale(&cross_step, &rel, -(dist / dd));
-        copyVec3(&rel, &cross_step);
-        addVec3(&cross_sum, &work->start, &rel);
-        copyVec3(&touch, &cross_sum);
+        rel = rel * (-(dist / dd));
+        touch = work->ends[0] + rel;
         flags |= 2;
     }
     if (pl_tri_point_inside(&touch, &poly->vtx0, &poly->normal) != 0) {
         pl_hit_box_set(&pl_hit_box[pl_coll_hit_count], poly);
         pl_vec3_snap_zero(&pl_hit_box[pl_coll_hit_count].normal, &pl_hit_box[pl_coll_hit_count].normal);
-        copyVec3(&pl_coll_closest_0[pl_coll_hit_count], &work->start);
+        pl_coll_closest_0[pl_coll_hit_count] = work->ends[0];
         pl_coll_slot_kind[pl_coll_hit_count] = flags;
         pl_coll_slot_used[pl_coll_hit_count] = 0;
-        copyVec3(&pl_coll_closest_1[pl_coll_hit_count], &touch);
+        pl_coll_closest_1[pl_coll_hit_count] = touch;
         pl_coll_hit_count++;
         return 1;
     }
     pl_coll_slot_used[pl_coll_hit_count] = 1;
-    VEC3_ctor(&edge_best);
-    VEC3_ctor(&on_plane);
-    VEC3_ctor(&probe);
-    copyVec3(&on_plane, &touch);
+    VEC3 edge_best;
+    VEC3 on_plane;
+    VEC3 probe;
+    on_plane = touch;
     edges[0] = &poly->vtx0;
     edges[1] = &poly->vtx1;
     edges[2] = &poly->vtx2;
@@ -825,49 +751,60 @@ s32 pl_wall_poly_hit(PlSlideWork* work, PlCollPoly* poly, VEC3* pos) {
     edge = edges;
     best = 8000.0f;
     if ((flags & 2) == 0) {
-        copyVec3(&probe, &work->start);
+        probe = work->ends[0];
     } else {
-        copyVec3(&probe, &on_plane);
+        probe = on_plane;
     }
     for (i = 3; i > 0; i--, edge++) {
         dd = sqrt_f32(pl_segment_closest_point(edge[0], edge[1], &probe, &touch));
         if (dd < best) {
             best = dd;
-            copyVec3(&edge_best, &touch);
+            edge_best = touch;
         }
     }
     if (best < work->radius) {
         pl_hit_box_set(&pl_hit_box[pl_coll_hit_count], poly);
         pl_vec3_snap_zero(&pl_hit_box[pl_coll_hit_count].normal, &pl_hit_box[pl_coll_hit_count].normal);
-        copyVec3(&pl_coll_closest_0[pl_coll_hit_count], &work->start);
+        pl_coll_closest_0[pl_coll_hit_count] = work->ends[0];
         pl_coll_slot_kind[pl_coll_hit_count] = flags;
-        copyVec3(&pl_coll_closest_1[pl_coll_hit_count], &edge_best);
-        copyVec3(&pl_coll_closest_2[pl_coll_hit_count], &on_plane);
+        pl_coll_closest_1[pl_coll_hit_count] = edge_best;
+        pl_coll_closest_2[pl_coll_hit_count] = on_plane;
         pl_coll_hit_count++;
         return 1;
     }
     return 0;
 }
 
+/* A polygon as a plain record: copied as one aggregate, field by field with the vectors word by word (retail's
+ * copy).  size: 0x3C */
+struct PlCollPolyImage {
+    /* +0x00 */ u16 attr;
+    /* +0x02 */ u8 kind;
+    /* +0x03 */ u8 field_0x03;
+    /* +0x04 */ u16 layer;
+    /* +0x06 */ u8 field_0x06;
+    /* +0x07 */ u8 area_mask;
+    /* +0x08 */ nw4r::math::_VEC3 vtx0;
+    /* +0x14 */ nw4r::math::_VEC3 vtx1;
+    /* +0x20 */ nw4r::math::_VEC3 vtx2;
+    /* +0x2C */ nw4r::math::_VEC3 normal;
+    /* +0x38 */ f32 dist;
+};
+
 /* 0x80292940 (0x9C): copies one polygon into a hit box. */
 void pl_hit_box_set(PlCollPoly* dst, PlCollPoly* src) {
-    *dst = *src;
+    *(PlCollPolyImage*)dst = *(PlCollPolyImage*)src;
 }
 
 /* 0x802929DC (0xB28): resolves the hit boxes the sweep recorded into one push of `pos`: face hits push along their
  * normals, edge hits are dropped when a face hit shares their plane or a corner they lie behind, the per-axis
  * pushes are merged and the total is capped at 1.8 sweep lengths; returns the number of hits. */
 s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
-    PlPushBound bound;
     VEC3 push;
     s8 faces[10];
     s8 edges[10];
     s8 drop_kind[10];
     s8 dropped[10];
-    VEC3 face_rel;
-    VEC3 corner_rel;
-    VEC3 sub_face;
-    VEC3 sub_corner;
     PlCollPoly* a;
     PlCollPoly* b;
     nw4r::math::VEC3* corner;
@@ -892,7 +829,6 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
     nw4r::math::VEC3* other;
     nw4r::math::VEC3* first;
 
-    VEC3_ctor(&push);
     if (pl_coll_hit_count != 0) {
         if (pl_coll_hit_count == 1) {
             if (pl_wall_slot_push(work, &push, 0, flag) != 0) {
@@ -903,14 +839,11 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                         vec3_scale_in_place(&push, cap / len);
                     }
                 }
-                addVec3To(pos, &push);
+                *pos += push;
                 pl_coll_slot_free[pl_coll_free_count++] = 0;
             }
         } else {
-            VEC3_ctor(&bound.pos);
-            VEC3_ctor(&bound.neg);
-            VEC3_ctor(&bound.pos_rest);
-            VEC3_ctor(&bound.neg_rest);
+            PlPushBound bound;
             drop_count = 0;
             face_count = 0;
             edge_count = 0;
@@ -940,7 +873,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                         dropped[drop_count++] = *edge_at;
                         continue;
                     }
-                    VEC3_ctor(&face_rel);
+                    VEC3 face_rel;
                     a = &pl_hit_box[*face_at];
                     if (a->normal.y == 1.0f || a->normal.y == -1.0f) {
                         continue;
@@ -971,8 +904,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                     default:
                         continue;
                     }
-                    subVec3(&sub_face, corner, first);
-                    copyVec3(&face_rel, &sub_face);
+                    face_rel = *corner - *first;
                     if (vec3_dot(&face_rel.x, &pl_hit_box[*face_at].normal.x) <= 0.0f) {
                         drop_kind[drop_count] = 2;
                         dropped[drop_count++] = *edge_at;
@@ -1025,7 +957,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                         if (*edge_at == *face_at) {
                             continue;
                         }
-                        VEC3_ctor(&corner_rel);
+                        VEC3 corner_rel;
                         a = &pl_hit_box[*face_at];
                         if (a->normal.y == 1.0f || a->normal.y == -1.0f) {
                             continue;
@@ -1056,8 +988,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                         default:
                             continue;
                         }
-                        subVec3(&sub_corner, corner, first);
-                        copyVec3(&corner_rel, &sub_corner);
+                        corner_rel = *corner - *first;
                         if (vec3_dot(&corner_rel.x, &pl_hit_box[*face_at].normal.x) <= 0.0f) {
                             *kind_at++ = 2;
                             dropped[drop_count++] = *edge_at;
@@ -1124,7 +1055,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
                     vec3_scale_in_place(&push, cap / len);
                 }
             }
-            addVec3To(pos, &push);
+            *pos += push;
         }
     }
     return pl_coll_hit_count;
@@ -1135,28 +1066,6 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
  * is zero.  `*flag` is set for a crossing hit. */
 s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
     PlBox unused_box;
-    VEC3 normal;
-    VEC3 offset;
-    VEC3 point;
-    VEC3 flat;
-    VEC3 probe;
-    VEC3 nearest;
-    VEC3 start;
-    VEC3 scaled;
-    VEC3 sum_touch;
-    VEC3 sub_push;
-    VEC3 sum_probe;
-    VEC3 sub_near;
-    VEC3 sub_probe;
-    VEC3 back;
-    VEC3 sub_c0;
-    VEC3 sub_c2;
-    VEC3 scaled_edge;
-    VEC3 sum_edge;
-    VEC3 sub_edge;
-    VEC3 sub_flat;
-    VEC3 sub_rel;
-    VEC3 sum_rel;
     PlCollPoly* box;
     nw4r::math::VEC3* touch;
     nw4r::math::VEC3* from;
@@ -1164,42 +1073,36 @@ s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
     f32 dy;
     f32 side;
 
-    em_pl_box_init(&unused_box);
-    VEC3_ctor(&normal);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&point);
-    VEC3_ctor(&flat);
-    VEC3_ctor(&probe);
-    VEC3_ctor(&nearest);
+    VEC3 normal;
+    VEC3 offset;
+    VEC3 point;
+    VEC3 flat;
+    VEC3 probe;
+    VEC3 nearest;
     if (pl_coll_slot_used[slot] != 1) {
         box = &pl_hit_box[slot];
-        copyVec3(&normal, &box->normal);
-        vec3_scale(&scaled, &normal, work->radius);
-        copyVec3(&offset, &scaled);
-        addVec3(&sum_touch, &pl_coll_closest_1[slot], &offset);
-        copyVec3(&point, &sum_touch);
+        normal = box->normal;
+        offset = normal * work->radius;
+        point = pl_coll_closest_1[slot] + offset;
         from = &pl_coll_closest_0[slot];
-        subVec3(&sub_push, &point, from);
-        copyVec3(push, &sub_push);
+        *push = point - *from;
         if (work->slide == 1) {
             push->y = 0.0f;
             if (abs_f32(normal.x) >= 0.001f || abs_f32(normal.z) >= 0.001f) {
                 normal.y = 0.0f;
                 if ((len = vec3_length_sq(&normal.x)) > 0.001f) {
                     vec3_scale_inv(push, len);
-                    addVec3(&sum_probe, from, push);
-                    copyVec3(&probe, &sum_probe);
+                    probe = *from + *push;
                     if ((u8)pl_triangle_closest_point(&probe, &box->vtx0, &box->vtx1, &box->vtx2, &nearest) != 6) {
-                        subVec3(&sub_near, &nearest, from);
-                        copyVec3(&offset, &sub_near);
+                        offset = nearest - *from;
                         if (offset.x * normal.x + offset.z * normal.z > 0.0f) {
-                            subVec3(&sub_probe, &probe, &nearest);
-                            copyVec3(&offset, &sub_probe);
+                            offset = probe - nearest;
                             if (offset.x * normal.x + offset.z * normal.z > 0.0f) {
                                 if (vec3_length_sq(&offset.x) > work->radius * work->radius) {
                                     dy = nearest.y - probe.y;
-                                    vec3_scale_to(&back, sqrt_f32(work->radius * work->radius - dy * dy), &normal);
-                                    vec3_sub_assign((Vec*)push, (Vec*)&back);
+                                    vec3_sub_assign((Vec*)push,
+                                                    (Vec*)&static_cast<const VEC3&>(vec3_scale_to(
+                                                        sqrt_f32(work->radius * work->radius - dy * dy), normal)));
                                 }
                             }
                         }
@@ -1210,36 +1113,31 @@ s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
     } else {
         if (pl_coll_slot_kind[slot] == 0) {
             touch = &pl_coll_closest_1[slot];
-            subVec3(&sub_c0, &pl_coll_closest_0[slot], touch);
-            copyVec3(&point, &sub_c0);
+            point = pl_coll_closest_0[slot] - *touch;
         } else {
             touch = &pl_coll_closest_1[slot];
-            subVec3(&sub_c2, &pl_coll_closest_2[slot], touch);
-            copyVec3(&point, &sub_c2);
+            point = pl_coll_closest_2[slot] - *touch;
         }
         if (work->slide == 0) {
-            copyVec3(&normal, &point);
+            normal = point;
             if (vec3_length_sq(&normal.x) > 0.001f) {
                 vec3_normalize_into(&normal, &normal);
             } else {
-                addVec3To(&normal, &pl_hit_box[slot].normal);
+                normal += pl_hit_box[slot].normal;
             }
-            vec3_scale(&scaled_edge, &normal, work->radius);
-            copyVec3(&offset, &scaled_edge);
-            addVec3(&sum_edge, touch, &offset);
-            copyVec3(&point, &sum_edge);
-            VEC3_ctor(&start);
+            offset = normal * work->radius;
+            point = *touch + offset;
+            VEC3 start;
             setVector3(&start, pl_coll_closest_0[slot].x, pl_coll_closest_0[slot].y, pl_coll_closest_0[slot].z);
-            subVec3(&sub_edge, &point, &start);
-            copyVec3(&offset, &sub_edge);
+            offset = point - start;
         } else {
-            copyVec3(&flat, &point);
-            copyVec3(&normal, &flat);
+            flat = point;
+            normal = flat;
             normal.y = 0.0f;
             if (vec3_length_sq(&normal.x) > 0.001f) {
                 vec3_normalize_into(&normal, &normal);
             } else {
-                copyVec3(&normal, &pl_hit_box[slot].normal);
+                normal = pl_hit_box[slot].normal;
                 normal.y = 0.0f;
                 if (vec3_length_sq(&normal.x) > 0.001f) {
                     vec3_normalize_into(&normal, &normal);
@@ -1250,19 +1148,16 @@ s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
             point.z = side * normal.z;
             point.y = flat.y;
             if (pl_coll_slot_kind[slot] == 0) {
-                subVec3(&sub_flat, &point, &flat);
-                copyVec3(&offset, &sub_flat);
+                offset = point - flat;
             } else {
-                addVec3(&sum_rel, &point, touch);
-                subVec3(&sub_rel, &sum_rel, &pl_coll_closest_0[slot]);
-                copyVec3(&offset, &sub_rel);
+                offset = (point + *touch) - pl_coll_closest_0[slot];
             }
             offset.y = 0.0f;
         }
         if (vec3_len(&offset.x) == 0.0f) {
             return 0;
         }
-        copyVec3(push, &offset);
+        *push = offset;
     }
     if (pl_coll_slot_kind[slot] == 1) {
         *flag = 1;
@@ -1281,22 +1176,10 @@ void vec3_scale_inv(VEC3* v, f32 divisor) {
  * answers 1 on the first hit, else it collects every hit and returns `pl_line_hit_nearest`'s answer (the nearest one
  * in `hit`); -1 when the area has no land data. */
 s32 coll_line_check(VEC3* to, VEC3* from, f32 radius, VEC3* hit, u8 flags, u32 kind, u8 area, u16 layers) {
-    PlSlideWork work;
-    PlCollPoly* seen[10];
     VEC3 lo_copy;
     VEC3 lo_copy2;
-    VEC3 lo;
-    VEC3 hi;
-    VEC3 dir;
-    VEC3 mid;
-    VEC3 sub;
-    VEC3 lo_sum;
-    VEC3 lo_step;
-    VEC3 hi_sum;
-    VEC3 hi_step;
-    VEC3 seg;
-    VEC3 mid_sum;
-    VEC3 half;
+    PlSlideWork work;
+    PlCollPoly* seen[10];
     s32 start_x;
     s32 start_y;
     s32 start_z;
@@ -1317,34 +1200,26 @@ s32 coll_line_check(VEC3* to, VEC3* from, f32 radius, VEC3* hit, u8 flags, u32 k
     PlLandCell* cell;
     s32 taken_count;
 
-    VEC3_ctor(&lo_copy);
-    VEC3_ctor(&lo_copy2);
-    pl_vec3_pair_ctor(&work.start);
     collect = hit != NULL;
     if (area == 0xFF) {
         area = get_now_areano();
     }
     cell = &pl_land_data[area];
-    VEC3_ctor(&lo);
-    VEC3_ctor(&hi);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&mid);
+    VEC3 lo;
+    VEC3 hi;
+    VEC3 dir;
+    VEC3 mid;
     if (cell->loaded_b == 0 && cell->loaded_a == 0) {
         return -1;
     }
-    subVec3(&sub, to, from);
-    copyVec3(&dir, &sub);
+    dir = *to - *from;
     if (vec3_length_sq(&dir.x) > 0.001f) {
         vec3_normalize_into(&dir, &dir);
     }
-    vec3_scale(&lo_step, &dir, radius);
-    addVec3(&lo_sum, to, &lo_step);
-    copyVec3(&lo, &lo_sum);
-    vec3_scale(&hi_step, &dir, -radius);
-    addVec3(&hi_sum, from, &hi_step);
-    copyVec3(&hi, &hi_sum);
-    copyVec3(&lo_copy, &lo);
-    copyVec3(&lo_copy2, &lo);
+    lo = *to + (dir * radius);
+    hi = *from + (dir * -radius);
+    lo_copy = lo;
+    lo_copy2 = lo;
     for (i = 0; i < 10; i++) {
         seen[i] = 0;
         pl_coll_slot_dist[i] = 0.0f;
@@ -1354,17 +1229,14 @@ s32 coll_line_check(VEC3* to, VEC3* from, f32 radius, VEC3* hit, u8 flags, u32 k
     taken_count = 0;
     pl_coll_free_count = 0;
     pl_coll_hit_count = 0;
-    copyVec3(&work.start, to);
-    copyVec3(&work.end, from);
+    work.ends[0] = *to;
+    work.ends[1] = *from;
     work.radius = radius;
     work.slide = 0;
     work.skip_below = 0;
-    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.start, &work.end));
-    subVec3(&seg, &work.start, &work.end);
-    copyVec3(&dir, &seg);
-    vec3_scale(&half, &dir, 0.5f);
-    addVec3(&mid_sum, &work.end, &half);
-    copyVec3(&mid, &mid_sum);
+    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.ends[0], &work.ends[1]));
+    dir = work.ends[0] - work.ends[1];
+    mid = work.ends[1] + (dir * 0.5f);
     if ((u8)flags & 1) {
         pl_land_grid_a_span(&lo, &hi, &count_x, &count_y, &count_z, cell, &start_x, &start_y, &start_z);
         for (x = 0; x < count_x; x++) {
@@ -1436,22 +1308,10 @@ s32 coll_line_check(VEC3* to, VEC3* from, f32 radius, VEC3* hit, u8 flags, u32 k
 /* 0x8029403C (0x4FC): the yes/no form of the sweep: 1 on the first polygon the sphere of
  * `radius` meets between `from` and `to` in grid A (`flags` bit 0) or grid B (bit 1) of area `area`. */
 s32 pl_coll_sweep_ck(VEC3* to, VEC3* from, f32 radius, u32 flags, u32 kind, u8 area, u16 layers) {
-    PlSlideWork work;
-    PlCollPoly* seen[10];
     VEC3 lo_copy;
     VEC3 lo_copy2;
-    VEC3 lo;
-    VEC3 hi;
-    VEC3 dir;
-    VEC3 mid;
-    VEC3 sub;
-    VEC3 lo_sum;
-    VEC3 lo_step;
-    VEC3 hi_sum;
-    VEC3 hi_step;
-    VEC3 seg;
-    VEC3 mid_sum;
-    VEC3 half;
+    PlSlideWork work;
+    PlCollPoly* seen[10];
     s32 start_x;
     s32 start_y;
     s32 start_z;
@@ -1469,33 +1329,25 @@ s32 pl_coll_sweep_ck(VEC3* to, VEC3* from, f32 radius, u32 flags, u32 kind, u8 a
     s32 grid_z;
     s32 i;
 
-    VEC3_ctor(&lo_copy);
-    VEC3_ctor(&lo_copy2);
-    pl_vec3_pair_ctor(&work.start);
     if (area == 0xFF) {
         area = get_now_areano();
     }
     cell = &pl_land_data[area];
-    VEC3_ctor(&lo);
-    VEC3_ctor(&hi);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&mid);
+    VEC3 lo;
+    VEC3 hi;
+    VEC3 dir;
+    VEC3 mid;
     if (cell->loaded_b == 0 && cell->loaded_a == 0) {
         return 0;
     }
-    subVec3(&sub, to, from);
-    copyVec3(&dir, &sub);
+    dir = *to - *from;
     if (vec3_length_sq(&dir.x) > 0.001f) {
         vec3_normalize_into(&dir, &dir);
     }
-    vec3_scale(&lo_step, &dir, radius);
-    addVec3(&lo_sum, to, &lo_step);
-    copyVec3(&lo, &lo_sum);
-    vec3_scale(&hi_step, &dir, -radius);
-    addVec3(&hi_sum, from, &hi_step);
-    copyVec3(&hi, &hi_sum);
-    copyVec3(&lo_copy, &lo);
-    copyVec3(&lo_copy2, &lo);
+    lo = *to + (dir * radius);
+    hi = *from + (dir * -radius);
+    lo_copy = lo;
+    lo_copy2 = lo;
     for (i = 0; i < 10; i++) {
         seen[i] = 0;
         pl_coll_slot_dist[i] = 0.0f;
@@ -1503,17 +1355,14 @@ s32 pl_coll_sweep_ck(VEC3* to, VEC3* from, f32 radius, u32 flags, u32 kind, u8 a
     }
     pl_coll_free_count = 0;
     pl_coll_hit_count = 0;
-    copyVec3(&work.start, to);
-    copyVec3(&work.end, from);
+    work.ends[0] = *to;
+    work.ends[1] = *from;
     work.radius = radius;
     work.slide = 0;
     work.skip_below = 0;
-    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.start, &work.end));
-    subVec3(&seg, &work.start, &work.end);
-    copyVec3(&dir, &seg);
-    vec3_scale(&half, &dir, 0.5f);
-    addVec3(&mid_sum, &work.end, &half);
-    copyVec3(&mid, &mid_sum);
+    work.length = sqrtf_thunk(ef_vec3_dist_sq(&work.ends[0], &work.ends[1]));
+    dir = work.ends[0] - work.ends[1];
+    mid = work.ends[1] + (dir * 0.5f);
     if ((u8)flags & 1) {
         pl_land_grid_a_span(&lo, &hi, &count_x, &count_y, &count_z, cell, &start_x, &start_y, &start_z);
         for (x = 0; x < count_x; x++) {
@@ -1570,36 +1419,6 @@ s32 pl_coll_sweep_ck(VEC3* to, VEC3* from, f32 radius, u32 flags, u32 kind, u8 a
  * against the three edges and the nearest edge hit is kept (kind 127).  With `collect` 0 it only answers. */
 s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect) {
     PlCapsuleBox edge_box;
-    VEC3 corners[4];
-    PlSegmentBox sweep_box;
-    PlCapsule edge;
-    PlSegment seg;
-    PlPlane plane;
-    VEC3 point;
-    VEC3 unused_a;
-    VEC3 rel;
-    VEC3 unused_b;
-    VEC3 back;
-    VEC3 dir;
-    VEC3 travel;
-    VEC3 best_seg;
-    VEC3 best_cap;
-    VEC3 on_seg;
-    VEC3 on_cap;
-    VEC3 unused_c;
-    VEC3 unused_d;
-    VEC3 best_dir;
-    VEC3 rev;
-    VEC3 half;
-    VEC3 sub_end;
-    VEC3 sub_start;
-    VEC3 sum_end;
-    VEC3 step_end;
-    VEC3 sum_start;
-    VEC3 step_start;
-    VEC3 sub_box;
-    VEC3 sum_mid;
-    VEC3 sub_hit;
     f32 dist;
     f32 best;
     s8 flags;
@@ -1607,28 +1426,22 @@ s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect) {
     s32 hits;
     u32 i;
 
-    eft_shape_init((struct EftShape*)&edge_box);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&edge);
-    VEC3_ctor(&corners[0]);
-    VEC3_ctor(&corners[1]);
-    VEC3_ctor(&corners[2]);
-    VEC3_ctor(&corners[3]);
-    pl_segment_init(&seg);
-    vec3_ctor_return(&plane.normal);
-    VEC3_ctor(&point);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&unused_b);
+    PlCapsule edge;
+    VEC3 corners[4];
+    PlSegment seg;
+    nw4r::math::PLANE plane;
+    VEC3 point;
+    VEC3 unused_a;
+    VEC3 rel;
+    VEC3 unused_b;
     if (pl_coll_hit_count >= 9) {
         return 0;
     }
-    subVec3(&sub_end, &work->end, &poly->vtx0);
-    copyVec3(&rel, &sub_end);
+    rel = work->ends[1] - poly->vtx0;
     if (vec3_dot(&rel.x, &poly->normal.x) < 0.0f) {
         return 0;
     }
-    subVec3(&sub_start, &work->start, &poly->vtx0);
-    copyVec3(&rel, &sub_start);
+    rel = work->ends[0] - poly->vtx0;
     dist = vec3_dot(&rel.x, &poly->normal.x);
     flags = !(dist > 0.0f);
     if (dist > work->radius) {
@@ -1637,72 +1450,65 @@ s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect) {
     if (dist < -work->radius) {
         flags |= 2;
     }
-    vec3_scale(&back, &poly->normal, -1.0f);
-    vec3_scale(&step_end, &back, work->radius);
-    addVec3(&sum_end, &work->end, &step_end);
-    copyVec3(&point, &sum_end);
-    subVec3(&dir, &work->start, &work->end);
-    copyVec3(&seg.start, &point);
-    vec3_scale(&step_start, &back, work->radius);
-    addVec3(&sum_start, &work->start, &step_start);
-    copyVec3(&seg.end, &sum_start);
-    copyVec3(&plane.normal, &poly->normal);
-    plane.dist = vec3_dot(&poly->normal.x, &poly->vtx0.x);
+    VEC3 back = poly->normal * -1.0f;
+    point = work->ends[1] + (back * work->radius);
+    VEC3 dir = work->ends[0] - work->ends[1];
+    seg.start = point;
+    seg.end = work->ends[0] + (back * work->radius);
+    plane.N = poly->normal;
+    plane.d = vec3_dot(&poly->normal.x, &poly->vtx0.x);
     if (pl_segment_plane_hit(&seg, &plane, &point) == 1 && pl_tri_point_inside(&point, &poly->vtx0, &poly->normal) != 0) {
         if (collect == 0) {
             return 1;
         }
-        subVec3(&travel, &point, &seg.start);
+        VEC3 travel = point - seg.start;
         pl_hit_box_set(&pl_hit_box[pl_coll_hit_count], poly);
         pl_vec3_snap_zero(&pl_hit_box[pl_coll_hit_count].normal, &pl_hit_box[pl_coll_hit_count].normal);
-        copyVec3(&pl_coll_closest_0[pl_coll_hit_count], &work->end);
+        pl_coll_closest_0[pl_coll_hit_count] = work->ends[1];
         slot = pl_coll_hit_count;
         pl_coll_slot_kind[slot] = flags;
         pl_coll_slot_used[slot] = 0;
         pl_coll_slot_dist[slot] = vec3_len(&travel.x);
-        copyVec3(&pl_coll_closest_1[slot], &point);
+        pl_coll_closest_1[slot] = point;
         pl_coll_hit_count++;
         return 1;
     }
     pl_coll_slot_used[pl_coll_hit_count] = 1;
-    VEC3_ctor(&best_seg);
-    VEC3_ctor(&best_cap);
-    VEC3_ctor(&on_seg);
-    VEC3_ctor(&on_cap);
-    VEC3_ctor(&unused_c);
-    VEC3_ctor(&unused_d);
-    VEC3_ctor(&best_dir);
-    vec3_negate(&rev, &dir);
-    pl_segment_box_init(&sweep_box);
-    copyVec3(&sweep_box.start, &work->end);
-    copyVec3(&sweep_box.end, &work->start);
-    subVec3(&sub_box, &sweep_box.end, &sweep_box.start);
-    copyVec3(&sweep_box.dir, &sub_box);
-    vec3_scale(&half, &sweep_box.dir, 0.5f);
-    addVec3(&sum_mid, &work->end, &half);
-    copyVec3(&sweep_box.center, &sum_mid);
+    VEC3 best_seg;
+    VEC3 best_cap;
+    VEC3 on_seg;
+    VEC3 on_cap;
+    VEC3 unused_c;
+    VEC3 unused_d;
+    VEC3 best_dir;
+    VEC3 rev = -dir;
+    PlSegmentBox sweep_box;
+    sweep_box.start = work->ends[1];
+    sweep_box.end = work->ends[0];
+    sweep_box.dir = sweep_box.end - sweep_box.start;
+    VEC3 half = sweep_box.dir * 0.5f;
+    sweep_box.center = work->ends[1] + half;
     sweep_box.half_length = vec3_len(&half.x);
-    copyVec3(&corners[0], &poly->vtx0);
-    copyVec3(&corners[1], &poly->vtx1);
-    copyVec3(&corners[2], &poly->vtx2);
-    copyVec3(&corners[3], &poly->vtx0);
+    corners[0] = poly->vtx0;
+    corners[1] = poly->vtx1;
+    corners[2] = poly->vtx2;
+    corners[3] = poly->vtx0;
     hits = 0;
     best = 1000000.0f;
     for (i = 0; i < 3; i++) {
-        copyVec3(&edge.start, &corners[i]);
-        copyVec3(&edge.end, &corners[i + 1]);
+        edge.start = corners[i];
+        edge.end = corners[i + 1];
         edge.radius = work->radius;
         pl_capsule_box_set(&edge, &edge_box);
         if (pl_segment_capsule_hit(&sweep_box, &edge_box, &on_seg, &on_cap) != 0) {
             hits++;
-            subVec3(&sub_hit, &on_seg, &work->end);
-            copyVec3(&dir, &sub_hit);
+            dir = on_seg - work->ends[1];
             dist = vec3_len(&dir.x);
             if (best > dist) {
                 best = dist;
-                copyVec3(&best_seg, &on_seg);
-                copyVec3(&best_cap, &on_cap);
-                copyVec3(&best_dir, &dir);
+                best_seg = on_seg;
+                best_cap = on_cap;
+                best_dir = dir;
             }
         }
     }
@@ -1714,12 +1520,12 @@ s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect) {
         if (vec3_length_sq(&best_dir.x) > 0.001f) {
             vec3_normalize_into(&best_dir, &best_dir);
         }
-        copyVec3(&pl_hit_box[pl_coll_hit_count].normal, &best_dir);
+        pl_hit_box[pl_coll_hit_count].normal = best_dir;
         pl_vec3_snap_zero(&pl_hit_box[pl_coll_hit_count].normal, &pl_hit_box[pl_coll_hit_count].normal);
-        copyVec3(&pl_coll_closest_0[pl_coll_hit_count], &work->end);
+        pl_coll_closest_0[pl_coll_hit_count] = work->ends[1];
         pl_coll_slot_kind[pl_coll_hit_count] = 127;
-        copyVec3(&pl_coll_closest_1[pl_coll_hit_count], &best_seg);
-        copyVec3(&pl_coll_closest_2[pl_coll_hit_count], &best_seg);
+        pl_coll_closest_1[pl_coll_hit_count] = best_seg;
+        pl_coll_closest_2[pl_coll_hit_count] = best_seg;
         pl_coll_slot_dist[pl_coll_hit_count] = best;
         pl_coll_hit_count++;
         return 1;
@@ -1730,17 +1536,32 @@ s32 pl_line_poly_hit(PlSlideWork* work, PlCollPoly* poly, u8 collect) {
 /* 0x80294B64 (0x398): 1 when the swept sphere of `work` crosses polygon `poly`, through its face or against one of its
  * edges (tested as capsules). */
 s32 pl_sweep_poly_hit(PlSlideWork* work, PlCollPoly* poly) {
-    PlSegmentBox sweep_box;
-    VEC3 corners[4];
-    PlCapsuleBox edge_box;
-    PlSegment seg;
     VEC3 point;
     VEC3 unused_a;
     VEC3 rel;
     VEC3 unused_b;
-    VEC3 back;
-    VEC3 dir;
-    PlPlane plane;
+    u32 i;
+
+    rel = work->ends[1] - poly->vtx0;
+    if (vec3_dot(&rel.x, &poly->normal.x) < 0.0f) {
+        return 0;
+    }
+    rel = work->ends[0] - poly->vtx0;
+    if (vec3_dot(&rel.x, &poly->normal.x) > work->radius) {
+        return 0;
+    }
+    VEC3 back = poly->normal * -1.0f;
+    point = work->ends[1] + (back * work->radius);
+    VEC3 dir = work->ends[0] - work->ends[1];
+    PlSegment seg;
+    nw4r::math::PLANE plane;
+    seg.start = point;
+    seg.end = work->ends[0] + (back * work->radius);
+    plane.N = poly->normal;
+    plane.d = vec3_dot(&poly->normal.x, &poly->vtx0.x);
+    if (pl_segment_plane_hit(&seg, &plane, &point) == 1 && pl_tri_point_inside(&point, &poly->vtx0, &poly->normal) != 0) {
+        return 1;
+    }
     VEC3 unused_c;
     VEC3 unused_d;
     VEC3 unused_e;
@@ -1748,86 +1569,26 @@ s32 pl_sweep_poly_hit(PlSlideWork* work, PlCollPoly* poly) {
     VEC3 unused_g;
     VEC3 unused_h;
     VEC3 unused_i;
-    VEC3 rev;
-    VEC3 half;
-    VEC3 sub_end;
-    VEC3 sub_start;
-    VEC3 sum_end;
-    VEC3 step_end;
-    VEC3 sum_start;
-    VEC3 step_start;
-    VEC3 sub_box;
-    VEC3 sum_mid;
-    VEC3 sub_edge;
-    VEC3 sum_edge;
-    VEC3 half_edge;
-    u32 i;
-
-    VEC3_ctor(&point);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&unused_b);
-    subVec3(&sub_end, &work->end, &poly->vtx0);
-    copyVec3(&rel, &sub_end);
-    if (vec3_dot(&rel.x, &poly->normal.x) < 0.0f) {
-        return 0;
-    }
-    subVec3(&sub_start, &work->start, &poly->vtx0);
-    copyVec3(&rel, &sub_start);
-    if (vec3_dot(&rel.x, &poly->normal.x) > work->radius) {
-        return 0;
-    }
-    vec3_scale(&back, &poly->normal, -1.0f);
-    vec3_scale(&step_end, &back, work->radius);
-    addVec3(&sum_end, &work->end, &step_end);
-    copyVec3(&point, &sum_end);
-    subVec3(&dir, &work->start, &work->end);
-    pl_segment_init(&seg);
-    vec3_ctor_return(&plane.normal);
-    copyVec3(&seg.start, &point);
-    vec3_scale(&step_start, &back, work->radius);
-    addVec3(&sum_start, &work->start, &step_start);
-    copyVec3(&seg.end, &sum_start);
-    copyVec3(&plane.normal, &poly->normal);
-    plane.dist = vec3_dot(&poly->normal.x, &poly->vtx0.x);
-    if (pl_segment_plane_hit(&seg, &plane, &point) == 1 && pl_tri_point_inside(&point, &poly->vtx0, &poly->normal) != 0) {
-        return 1;
-    }
-    VEC3_ctor(&unused_c);
-    VEC3_ctor(&unused_d);
-    VEC3_ctor(&unused_e);
-    VEC3_ctor(&unused_f);
-    VEC3_ctor(&unused_g);
-    VEC3_ctor(&unused_h);
-    VEC3_ctor(&unused_i);
-    vec3_negate(&rev, &dir);
-    pl_segment_box_init(&sweep_box);
-    copyVec3(&sweep_box.start, &work->end);
-    copyVec3(&sweep_box.end, &work->start);
-    subVec3(&sub_box, &sweep_box.end, &sweep_box.start);
-    copyVec3(&sweep_box.dir, &sub_box);
-    vec3_scale(&half, &sweep_box.dir, 0.5f);
-    addVec3(&sum_mid, &work->end, &half);
-    copyVec3(&sweep_box.center, &sum_mid);
+    VEC3 rev = -dir;
+    PlSegmentBox sweep_box;
+    sweep_box.start = work->ends[1];
+    sweep_box.end = work->ends[0];
+    sweep_box.dir = sweep_box.end - sweep_box.start;
+    VEC3 half = sweep_box.dir * 0.5f;
+    sweep_box.center = work->ends[1] + half;
     sweep_box.half_length = vec3_len(&half.x);
-    VEC3_ctor(&corners[0]);
-    VEC3_ctor(&corners[1]);
-    VEC3_ctor(&corners[2]);
-    VEC3_ctor(&corners[3]);
-    copyVec3(&corners[0], &poly->vtx0);
-    copyVec3(&corners[1], &poly->vtx1);
-    copyVec3(&corners[2], &poly->vtx2);
-    copyVec3(&corners[3], &poly->vtx0);
+    VEC3 corners[4];
+    corners[0] = poly->vtx0;
+    corners[1] = poly->vtx1;
+    corners[2] = poly->vtx2;
+    corners[3] = poly->vtx0;
     for (i = 0; i < 3; i++) {
-        eft_shape_init((struct EftShape*)&edge_box);
-        copyVec3(&edge_box.start, &corners[i]);
-        copyVec3(&edge_box.end, &corners[i + 1]);
+        PlCapsuleBox edge_box;
+        edge_box.start = corners[i];
+        edge_box.end = corners[i + 1];
         edge_box.radius = work->radius;
-        subVec3(&sub_edge, &edge_box.end, &edge_box.start);
-        copyVec3(&edge_box.dir, &sub_edge);
-        vec3_scale(&half_edge, &edge_box.dir, 0.5f);
-        addVec3(&sum_edge, &edge_box.start, &half_edge);
-        copyVec3(&edge_box.center, &sum_edge);
+        edge_box.dir = edge_box.end - edge_box.start;
+        edge_box.center = edge_box.start + (edge_box.dir * 0.5f);
         edge_box.reach = vec3_len(&edge_box.dir.x);
         if (pl_segment_capsule_hit(&sweep_box, &edge_box, NULL, NULL) != 0) {
             return 1;
@@ -1840,29 +1601,19 @@ s32 pl_sweep_poly_hit(PlSlideWork* work, PlCollPoly* poly) {
  * edge hit's sweep point at its distance); returns the hit count. */
 s32 pl_line_hit_nearest(PlSlideWork* work, VEC3* hit) {
     VEC3 unused;
-    VEC3 sum_one;
-    VEC3 scale_one;
-    VEC3 push_one;
-    VEC3 sum_best;
-    VEC3 scale_best;
-    VEC3 push_best;
     s32 nearest;
     f32 best;
     s32 count;
     s32 i;
 
-    VEC3_ctor(&unused);
     count = pl_coll_hit_count;
     if (count != 0) {
         if (count == 1) {
             if (pl_coll_slot_kind[0] == 127) {
-                vec3_scale(&scale_one, &pl_hit_box[0].normal, pl_coll_slot_dist[0]);
-                addVec3(&sum_one, &pl_coll_closest_0[0], &scale_one);
-                copyVec3(hit, &sum_one);
+                *hit = pl_coll_closest_0[0] + (pl_hit_box[0].normal * pl_coll_slot_dist[0]);
             } else {
-                copyVec3(hit, &pl_coll_closest_1[0]);
-                vec3_scale(&push_one, &pl_hit_box[0].normal, work->radius);
-                addVec3To(hit, &push_one);
+                *hit = pl_coll_closest_1[0];
+                *hit += pl_hit_box[0].normal * work->radius;
             }
         } else {
             best = 100000.0f;
@@ -1873,13 +1624,10 @@ s32 pl_line_hit_nearest(PlSlideWork* work, VEC3* hit) {
                 }
             }
             if (pl_coll_slot_kind[nearest] == 127) {
-                vec3_scale(&scale_best, &pl_hit_box[nearest].normal, pl_coll_slot_dist[nearest]);
-                addVec3(&sum_best, &pl_coll_closest_0[nearest], &scale_best);
-                copyVec3(hit, &sum_best);
+                *hit = pl_coll_closest_0[nearest] + (pl_hit_box[nearest].normal * pl_coll_slot_dist[nearest]);
             } else {
-                copyVec3(hit, &pl_coll_closest_1[nearest]);
-                vec3_scale(&push_best, &pl_hit_box[nearest].normal, work->radius);
-                addVec3To(hit, &push_best);
+                *hit = pl_coll_closest_1[nearest];
+                *hit += pl_hit_box[nearest].normal * work->radius;
             }
         }
     }
@@ -1889,16 +1637,12 @@ s32 pl_line_hit_nearest(PlSlideWork* work, VEC3* hit) {
 /* 0x802950D8 (0x1B8): sweeps the player's body shape from its old position (+0x48) to its new one (+0x3C) through
  * the walls; `mode` 0 first clears the wall-direction bits. */
 void pl_coll_shape_set(_PLW* self, u8 mode, u16 layers) {
-    PlSegment seg;
-    VEC3 scale;
-    VEC3 start_copy;
+    PlBodySegment seg;
     HitSphere* shape;
     f32 radius;
     f32 lift;
 
-    VEC3_ctor(&seg.start);
-    VEC3_ctor(&seg.end);
-    VEC3_ctor(&scale);
+    VEC3 scale;
     if (mode == 0) {
         self->field_0x364 = 0;
     }
@@ -1917,16 +1661,15 @@ void pl_coll_shape_set(_PLW* self, u8 mode, u16 layers) {
         seg.end.x = self->vec_0x03C.x + shape->pos.x * scale.x;
         seg.end.y = self->vec_0x03C.y + scale.y * (shape->pos.y - lift);
         seg.end.z = self->vec_0x03C.z + shape->pos.z * scale.z;
-        assignVec3((Vec*)&start_copy, (Vec*)&seg.start);
+        VEC3 start_copy = seg.start;
         pl_coll_shape_hits(&seg, radius, 0xFFFF, layers, self);
     }
 }
 
 /* 0x80295290 (0x2B4): slides the player's sphere `radius` along `seg` against the walls, then records the walls it
  * touched in its move-work chunk (a floor-kind wall moved to the front) and their directions in +0x364. */
-void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self) {
+void pl_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self) {
     VEC3 unused;
-    PlMoveEntry swap;
     PlCollPoly* poly;
     s8* free_at;
     u32 i;
@@ -1935,7 +1678,6 @@ void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* 
     s32 swapped;
     s32 last;
 
-    VEC3_ctor(&unused);
     coll_wall_slide(&seg->start, &seg->end, radius, &self->vec_0x03C, kind, layers, self->kind_0x09 != 3, self->area_0x16);
     if (self->chunk_ofs < 4) {
         count = 0;
@@ -1954,24 +1696,24 @@ void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* 
                 }
                 pl_move_work[self->chunk_ofs][count].carve_0x14 = poly->field_0x03;
                 pl_move_work[self->chunk_ofs][count].angle = angle;
-                copyVec3(&pl_move_work[self->chunk_ofs][count++].pos, &poly->normal);
+                pl_move_work[self->chunk_ofs][count++].pos = poly->normal;
                 if (swapped) {
                     swapped = 0;
                     if (count != 1) {
                         last = count - 1;
-                        pl_move_entry_ctor(&swap);
+                        PlMoveEntry swap;
                         swap.kind = pl_move_work[self->chunk_ofs][0].kind;
                         swap.carve_0x14 = pl_move_work[self->chunk_ofs][0].carve_0x14;
                         swap.angle = pl_move_work[self->chunk_ofs][0].angle;
-                        copyVec3(&swap.pos, &pl_move_work[self->chunk_ofs][0].pos);
+                        swap.pos = pl_move_work[self->chunk_ofs][0].pos;
                         pl_move_work[self->chunk_ofs][0].kind = pl_move_work[self->chunk_ofs][last].kind;
                         pl_move_work[self->chunk_ofs][0].carve_0x14 = pl_move_work[self->chunk_ofs][last].carve_0x14;
                         pl_move_work[self->chunk_ofs][0].angle = pl_move_work[self->chunk_ofs][last].angle;
-                        copyVec3(&pl_move_work[self->chunk_ofs][0].pos, &pl_move_work[self->chunk_ofs][last].pos);
+                        pl_move_work[self->chunk_ofs][0].pos = pl_move_work[self->chunk_ofs][last].pos;
                         pl_move_work[self->chunk_ofs][last].kind = swap.kind;
                         pl_move_work[self->chunk_ofs][last].carve_0x14 = swap.carve_0x14;
                         pl_move_work[self->chunk_ofs][last].angle = swap.angle;
-                        copyVec3(&pl_move_work[self->chunk_ofs][last].pos, &swap.pos);
+                        pl_move_work[self->chunk_ofs][last].pos = swap.pos;
                     }
                 }
                 self->field_0x364 |= 1 << (angle >> 11);
@@ -1981,31 +1723,21 @@ void pl_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _PLW* 
     }
 }
 
-/* 0x80295544 (0x34): constructs one move-work entry (its position vector). */
-PlMoveEntry* pl_move_entry_ctor(PlMoveEntry* self) {
-    VEC3_ctor(&self->pos);
-    return self;
-}
-
 /* 0x80295578 (0x1C4): sweeps the enemy's body sphere (its move-parameter offset turned by its yaw, sized from its
  * data and scale) from its previous position to its current one through the walls; `mode` 0 first clears the
  * wall-direction bits. */
 void em_coll_shape_set(_ENEMY_WORK* self, u8 mode, u16 layers) {
-    PlSegment seg;
+    PlBodySegment seg;
     VEC3 unused;
-    HitSphere body;
+    PlCollSphere body;
     f32* params;
     f32 radius;
 
-    VEC3_ctor(&seg.start);
-    VEC3_ctor(&seg.end);
-    VEC3_ctor(&unused);
-    pl_vec3_ctor_ret(&body.pos);
     if (mode == 0) {
         self->field_0x218 = 0;
     }
     params = get_enemy_data(self)->move_params_0x50;
-    copyVec3(&body.pos, &self->move_param_0x21C);
+    body.pos = self->move_param_0x21C;
     rotVecY(&body.pos, self->field_0x1C0);
     body.radius = params[9];
     if (self->team == 18 && stage_map_kind_get(self->field_0x1E0) == 3 && self->area_no == 3 &&
@@ -2029,15 +1761,9 @@ void em_coll_shape_set(_ENEMY_WORK* self, u8 mode, u16 layers) {
     em_coll_shape_hits(&seg, radius, 0xFFFF, layers, self);
 }
 
-/* 0x8029573C - construct one vector in place and return it. */
-VEC3* pl_vec3_ctor_ret(VEC3* v) {
-    VEC3_ctor(v);
-    return v;
-}
-
 /* 0x8029576C (0x1B8): slides the enemy's sphere `radius` along `seg` against the walls, then records the walls it
  * touched in its slot table (up to ten, ended by a zero flag word) and their directions in +0x218. */
-void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self) {
+void em_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self) {
     VEC3 unused;
     EmMotionSlot* slot;
     PlCollPoly* poly;
@@ -2047,9 +1773,8 @@ void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY
     u8 count;
     s32 mode;
 
-    VEC3_ctor(&unused);
     count = 0;
-    copyVec3(&unused, &self->pos);
+    unused = self->pos;
     if (self->field_0x1E2 == 2 || (self->field_0x1E2 == 1 && self->field_0x1E3 == 1)) {
         mode = 0;
     } else {
@@ -2068,7 +1793,7 @@ void em_coll_shape_hits(PlSegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY
             slot->kind = poly->kind;
             slot->value = angle;
             count++;
-            copyVec3(&slot->vec, &poly->normal);
+            slot->vec = poly->normal;
             self->field_0x218 |= 1 << (angle >> 11);
         }
         if (count < 10) {
@@ -2097,14 +1822,6 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
     PlCollPoly* seen[10];
     VEC3 copy_a;
     VEC3 copy_b;
-    VEC3 seg_to;
-    VEC3 seg_from;
-    VEC3 dir;
-    VEC3 mid;
-    VEC3 sub;
-    VEC3 seg;
-    VEC3 mid_sum;
-    VEC3 half;
     s32 start_x;
     s32 start_y;
     s32 start_z;
@@ -2124,24 +1841,21 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
     s32 seen_count;
     PlLandCell* cell;
 
-    VEC3_ctor(&copy_a);
-    VEC3_ctor(&copy_b);
     if (area == 0xFF) {
         area = get_now_areano();
     }
     cell = &pl_land_data[area];
-    VEC3_ctor(&seg_to);
-    VEC3_ctor(&seg_from);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&mid);
-    subVec3(&sub, to, from);
-    copyVec3(&dir, &sub);
+    VEC3 seg_to;
+    VEC3 seg_from;
+    VEC3 dir;
+    VEC3 mid;
+    dir = *to - *from;
     if (vec3_length_sq(&dir.x) > 0.001f) {
         vec3_normalize_into(&dir, &dir);
     }
-    copyVec3(&seg_to, to);
-    copyVec3(&seg_from, from);
-    copyVec3(&copy_a, copyVec3(&copy_b, &seg_to));
+    seg_to = *to;
+    seg_from = *from;
+    copy_a = copy_b = seg_to;
     for (i = 0; i < 10; i++) {
         pl_coll_slot_dist[i] = 0.0f;
         pl_coll_slot_free[i] = 0;
@@ -2151,11 +1865,8 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
     pl_coll_free_count = 0;
     pl_coll_hit_count = 0;
     sqrtf_thunk(ef_vec3_dist_sq(&seg_to, &seg_from));
-    subVec3(&seg, &seg_to, &seg_from);
-    copyVec3(&dir, &seg);
-    vec3_scale(&half, &dir, 0.5f);
-    addVec3(&mid_sum, &seg_from, &half);
-    copyVec3(&mid, &mid_sum);
+    dir = seg_to - seg_from;
+    mid = seg_from + (dir * 0.5f);
     if (flags & 1) {
         pl_land_grid_a_span(&seg_to, &seg_from, &count_x, &count_y, &count_z, cell, &start_x, &start_y, &start_z);
         for (x = 0; x < count_x; x++) {
@@ -2223,7 +1934,7 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
                 land++;
             }
         }
-        copyVec3(out, &pl_coll_closest_1[0]);
+        *out = pl_coll_closest_1[0];
         if (grid_hit != NULL) {
             *grid_hit = pl_coll_slot_hit[0];
         }
@@ -2234,53 +1945,41 @@ s32 findInterSection3(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
 /* 0x80295EF4 (0x304): records polygon `poly` (from grid `grid`) when the segment `from`..`to` crosses it, keeping the
  * crossings sorted by their distance from `from`; 1 when recorded. */
 s32 pl_inter_poly_hit(VEC3* to, VEC3* from, PlCollPoly* poly, u8 grid) {
-    PlSegment seg;
     VEC3 point;
     VEC3 unused_a;
     VEC3 rel;
     VEC3 unused_b;
     VEC3 unused_c;
-    PlPlane plane;
-    VEC3 sub_hit;
-    VEC3 sub_from;
-    VEC3 sub_to;
     f32 dist;
     s8 count;
     s32 i;
     s32 j;
 
-    VEC3_ctor(&point);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&rel);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     if (pl_coll_hit_count >= 9) {
         return 0;
     }
-    subVec3(&sub_from, from, &poly->vtx0);
-    copyVec3(&rel, &sub_from);
+    rel = *from - poly->vtx0;
     if (vec3_dot(&rel.x, &poly->normal.x) < 0.0f) {
         return 0;
     }
-    subVec3(&sub_to, to, &poly->vtx0);
-    copyVec3(&rel, &sub_to);
+    rel = *to - poly->vtx0;
     if (vec3_dot(&rel.x, &poly->normal.x) > 1e-05f) {
         return 0;
     }
-    pl_segment_init(&seg);
-    vec3_ctor_return(&plane.normal);
-    copyVec3(&seg.start, from);
-    copyVec3(&seg.end, to);
-    copyVec3(&plane.normal, &poly->normal);
-    plane.dist = vec3_dot(&poly->normal.x, &poly->vtx0.x);
+    PlSegment seg;
+    nw4r::math::PLANE plane;
+    seg.start = *from;
+    seg.end = *to;
+    plane.N = poly->normal;
+    plane.d = vec3_dot(&poly->normal.x, &poly->vtx0.x);
     if (pl_segment_plane_hit(&seg, &plane, &point) == 1 && pl_tri_point_inside(&point, &poly->vtx0, &poly->normal) != 0) {
-        subVec3(&sub_hit, &point, &seg.start);
+        VEC3 sub_hit = point - seg.start;
         dist = vec3_len(&sub_hit.x);
         count = pl_coll_hit_count;
         if (count == 0) {
             pl_coll_slot_dist[count] = dist;
             pl_hit_id_list[count] = poly;
-            copyVec3(&pl_coll_closest_1[count], &point);
+            pl_coll_closest_1[count] = point;
             pl_coll_slot_hit[pl_coll_hit_count] = grid;
         } else {
             for (i = 0; i < count; i++) {
@@ -2291,12 +1990,12 @@ s32 pl_inter_poly_hit(VEC3* to, VEC3* from, PlCollPoly* poly, u8 grid) {
             for (j = count; j > i; j--) {
                 pl_coll_slot_dist[j] = pl_coll_slot_dist[j - 1];
                 pl_hit_id_list[j] = pl_hit_id_list[j - 1];
-                copyVec3(&pl_coll_closest_1[j], &pl_coll_closest_1[j - 1]);
+                pl_coll_closest_1[j] = pl_coll_closest_1[j - 1];
                 pl_coll_slot_hit[j] = pl_coll_slot_hit[j - 1];
             }
             pl_coll_slot_dist[i] = dist;
             pl_hit_id_list[i] = poly;
-            copyVec3(&pl_coll_closest_1[i], &point);
+            pl_coll_closest_1[i] = point;
             pl_coll_slot_hit[i] = grid;
         }
         pl_coll_hit_count++;
@@ -2393,38 +2092,14 @@ extern "C" s32 pl_land_grid_a_clip(nw4r::math::VEC3* out, nw4r::math::VEC3* from
 {
     VEC3 dir;
     VEC3 clip;
-    VEC3 hi;
-    VEC3 lo;
-    VEC3 a;
-    VEC3 b;
-    VEC3 sub_x0;
-    VEC3 scale_x0;
-    VEC3 sum_x0;
-    VEC3 sub_x1;
-    VEC3 scale_x1;
-    VEC3 sum_x1;
-    VEC3 sub_y0;
-    VEC3 scale_y0;
-    VEC3 sum_y0;
-    VEC3 sub_y1;
-    VEC3 scale_y1;
-    VEC3 sum_y1;
-    VEC3 sub_z0;
-    VEC3 scale_z0;
-    VEC3 sum_z0;
-    VEC3 sub_z1;
-    VEC3 scale_z1;
-    VEC3 sum_z1;
     s32 clipped;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&clip);
-    assignVec3((Vec*)&hi, (Vec*)&land->grid_a.max);
-    assignVec3((Vec*)&lo, (Vec*)&land->grid_a.min);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
-    copyVec3(&a, from);
-    copyVec3(&b, to);
+    VEC3 hi = land->grid_a.max;
+    VEC3 lo = land->grid_a.min;
+    VEC3 a;
+    VEC3 b;
+    a = *from;
+    b = *to;
     if (b.x > hi.x || b.x < lo.x) {
         return -1;
     }
@@ -2435,68 +2110,50 @@ extern "C" s32 pl_land_grid_a_clip(nw4r::math::VEC3* out, nw4r::math::VEC3* from
         return -1;
     }
     clipped = 0;
-    copyVec3(&clip, &a);
+    clip = a;
     if (clip.x < lo.x) {
-        subVec3(&sub_x0, &clip, &b);
-        copyVec3(&dir, &sub_x0);
-        vec3_scale(&scale_x0, &dir, (lo.x - b.x) / dir.x);
-        copyVec3(&dir, &scale_x0);
-        addVec3(&sum_x0, &dir, &b);
-        copyVec3(&clip, &sum_x0);
+        dir = clip - b;
+        dir = dir * ((lo.x - b.x) / dir.x);
+        clip = dir + b;
         clip.x = lo.x;
         clipped = 1;
     }
     if (clip.x > hi.x) {
-        subVec3(&sub_x1, &clip, &b);
-        copyVec3(&dir, &sub_x1);
-        vec3_scale(&scale_x1, &dir, (hi.x - b.x) / dir.x);
-        copyVec3(&dir, &scale_x1);
-        addVec3(&sum_x1, &dir, &b);
-        copyVec3(&clip, &sum_x1);
+        dir = clip - b;
+        dir = dir * ((hi.x - b.x) / dir.x);
+        clip = dir + b;
         clip.x = hi.x;
         clipped = 1;
     }
     if (clip.y < lo.y) {
-        subVec3(&sub_y0, &clip, &b);
-        copyVec3(&dir, &sub_y0);
-        vec3_scale(&scale_y0, &dir, (lo.y - b.y) / dir.y);
-        copyVec3(&dir, &scale_y0);
-        addVec3(&sum_y0, &dir, &b);
-        copyVec3(&clip, &sum_y0);
+        dir = clip - b;
+        dir = dir * ((lo.y - b.y) / dir.y);
+        clip = dir + b;
         clip.y = lo.y;
         clipped = 1;
     }
     if (clip.y > hi.y) {
-        subVec3(&sub_y1, &clip, &b);
-        copyVec3(&dir, &sub_y1);
-        vec3_scale(&scale_y1, &dir, (hi.y - b.y) / dir.y);
-        copyVec3(&dir, &scale_y1);
-        addVec3(&sum_y1, &dir, &b);
-        copyVec3(&clip, &sum_y1);
+        dir = clip - b;
+        dir = dir * ((hi.y - b.y) / dir.y);
+        clip = dir + b;
         clip.y = hi.y;
         clipped = 1;
     }
     if (clip.z < lo.z) {
-        subVec3(&sub_z0, &clip, &b);
-        copyVec3(&dir, &sub_z0);
-        vec3_scale(&scale_z0, &dir, (lo.z - b.z) / dir.z);
-        copyVec3(&dir, &scale_z0);
-        addVec3(&sum_z0, &dir, &b);
-        copyVec3(&clip, &sum_z0);
+        dir = clip - b;
+        dir = dir * ((lo.z - b.z) / dir.z);
+        clip = dir + b;
         clip.z = lo.z;
         clipped = 1;
     }
     if (clip.z > hi.z) {
-        subVec3(&sub_z1, &clip, &b);
-        copyVec3(&dir, &sub_z1);
-        vec3_scale(&scale_z1, &dir, (hi.z - b.z) / dir.z);
-        copyVec3(&dir, &scale_z1);
-        addVec3(&sum_z1, &dir, &b);
-        copyVec3(&clip, &sum_z1);
+        dir = clip - b;
+        dir = dir * ((hi.z - b.z) / dir.z);
+        clip = dir + b;
         clip.z = hi.z;
         clipped = 1;
     }
-    copyVec3(out, &clip);
+    *out = clip;
     return clipped;
 }
 
@@ -2505,13 +2162,11 @@ extern "C" s32 pl_land_grid_a_clip(nw4r::math::VEC3* out, nw4r::math::VEC3* from
 extern "C" void pl_land_cell_index(nw4r::math::VEC3* pos, PlLandCell* land, u32* grid_x, u32* grid_z)
 {
     VEC3 rel;
-    VEC3 sub;
     s32 x;
     s32 z;
     s32 min_x;
     s32 min_z;
 
-    VEC3_ctor(&rel);
     if (land->grid_b.off_grid == 0) {
         x = (s32)floorf_thunk(pos->x);
         z = (s32)floorf_thunk(pos->z);
@@ -2522,8 +2177,7 @@ extern "C" void pl_land_cell_index(nw4r::math::VEC3* pos, PlLandCell* land, u32*
         *grid_x = x / land->grid_b.cell_x;
         *grid_z = z / land->grid_b.cell_z;
     } else {
-        subVec3(&sub, pos, &land->grid_b.min);
-        copyVec3(&rel, &sub);
+        rel = *pos - land->grid_b.min;
         *grid_x = (s32)(rel.x / (f32)land->grid_b.cell_x);
         *grid_z = (s32)(rel.z / (f32)land->grid_b.cell_z);
     }
@@ -2628,15 +2282,9 @@ extern "C" u32 pl_tri_normal(nw4r::math::VEC3* a, nw4r::math::VEC3* b, nw4r::mat
 {
     VEC3 edge_ba;
     VEC3 edge_bc;
-    VEC3 sub_ba;
-    VEC3 sub_bc;
 
-    VEC3_ctor(&edge_ba);
-    VEC3_ctor(&edge_bc);
-    subVec3(&sub_ba, a, b);
-    copyVec3(&edge_ba, &sub_ba);
-    subVec3(&sub_bc, c, b);
-    copyVec3(&edge_bc, &sub_bc);
+    edge_ba = *a - *b;
+    edge_bc = *c - *b;
     vec3_cross(&out->x, &edge_bc.x, &edge_ba.x);
     if (vec3_length_sq(&out->x) > 0.001f) {
         vec3_normalize_into(out, out);
@@ -2653,7 +2301,6 @@ extern "C" u32 pl_tri_point_inside(nw4r::math::VEC3* point, nw4r::math::VEC3* tr
 {
     VEC3 edge_normal;
 
-    VEC3_ctor(&edge_normal);
     pl_tri_normal(&tri[0], &tri[1], point, &edge_normal);
     if (vec3_dot(&edge_normal.x, &normal->x) < 0.0f) {
         return 0;
@@ -2669,7 +2316,7 @@ extern "C" u32 pl_tri_point_inside(nw4r::math::VEC3* point, nw4r::math::VEC3* tr
 /* 0x80296E4C (0x8C): copies `in` to `out` with every component under 0.001 in magnitude cleared. */
 extern "C" void pl_vec3_snap_zero(nw4r::math::VEC3* out, nw4r::math::VEC3* in)
 {
-    copyVec3(out, in);
+    *out = *in;
     if (abs_f32(in->x) < 0.001f) {
         out->x = 0.0f;
     }
@@ -2749,7 +2396,6 @@ extern "C" u32 pl_vec3_fraction_ck(nw4r::math::VEC3* v)
 {
     VEC3 whole;
 
-    VEC3_ctor(&whole);
     whole.x = floorf_thunk(v->x);
     whole.y = floorf_thunk(v->y);
     whole.z = floorf_thunk(v->z);
@@ -2782,8 +2428,6 @@ extern "C" void pl_land_grid_a_span(nw4r::math::VEC3* from, nw4r::math::VEC3* to
     s32 end_y;
     s32 end_z;
 
-    VEC3_ctor(&rel_from);
-    VEC3_ctor(&rel_to);
     if (land->grid_a.off_grid == 0) {
         from_x = (s32)floorf_thunk(from->x);
         from_y = (s32)floorf_thunk(from->y);
@@ -2807,8 +2451,8 @@ extern "C" void pl_land_grid_a_span(nw4r::math::VEC3* from, nw4r::math::VEC3* to
         end_y = to_y / (s32)land->grid_a.cell_y;
         end_z = to_z / (s32)land->grid_a.cell_z;
     } else {
-        copyVec3(&rel_from, from);
-        copyVec3(&rel_to, to);
+        rel_from = *from;
+        rel_to = *to;
         vec3_sub_assign((Vec*)&rel_from, (Vec*)&land->grid_a.min);
         vec3_sub_assign((Vec*)&rel_to, (Vec*)&land->grid_a.min);
         *start_x = (s32)(rel_from.x / (f32)land->grid_a.cell_x);
@@ -2867,8 +2511,6 @@ extern "C" void pl_land_grid_b_span(nw4r::math::VEC3* from, nw4r::math::VEC3* to
     s32 end_y;
     s32 end_z;
 
-    VEC3_ctor(&rel_from);
-    VEC3_ctor(&rel_to);
     if (land->grid_b.off_grid == 0) {
         from_x = (s32)floorf_thunk(from->x);
         from_y = (s32)floorf_thunk(from->y);
@@ -2892,8 +2534,8 @@ extern "C" void pl_land_grid_b_span(nw4r::math::VEC3* from, nw4r::math::VEC3* to
         end_y = to_y / (s32)land->grid_b.cell_y;
         end_z = to_z / (s32)land->grid_b.cell_z;
     } else {
-        copyVec3(&rel_from, from);
-        copyVec3(&rel_to, to);
+        rel_from = *from;
+        rel_to = *to;
         vec3_sub_assign((Vec*)&rel_from, (Vec*)&land->grid_b.min);
         vec3_sub_assign((Vec*)&rel_to, (Vec*)&land->grid_b.min);
         *start_x = (s32)(rel_from.x / (f32)land->grid_b.cell_x);
@@ -2944,7 +2586,7 @@ extern "C" void pl_land_data_reset(LandData* self)
     setVector3(&self->vec_0x08, 0.0f, 1.0f, 0.0f);
 }
 
-/* Copies one land record field by field (the hit normal through `copyVec3`). */
+/* Copies one land record field by field (the hit normal through `VEC3::operator=`). */
 inline void pl_land_set(LandData* dst, LandData* src) {
     dst->field_0x00 = src->field_0x00;
     dst->field_0x02 = src->field_0x02;
@@ -2952,7 +2594,7 @@ inline void pl_land_set(LandData* dst, LandData* src) {
     dst->field_0x04 = src->field_0x04;
     dst->field_0x06 = src->field_0x06;
     dst->field_0x07 = src->field_0x07;
-    copyVec3(&dst->vec_0x08, &src->vec_0x08);
+    dst->vec_0x08 = src->vec_0x08;
 }
 
 /* 0x80297814 (0x3D0): picks the ground among `count` candidates (`lands`/`heights`): the highest at most 50 above
@@ -2966,11 +2608,6 @@ extern "C" void pl_ground_select(LandData* out, nw4r::math::VEC3* pos, LandData*
     s8 i;
     s8 kept;
 
-    em_land_data_init(&near[0]);
-    em_land_data_init(&near[1]);
-    em_land_data_init(&near[2]);
-    em_land_data_init(&near[3]);
-    em_land_data_init(&near[4]);
     found = 0;
     kept = 0;
     if (count != 1) {
@@ -3017,48 +2654,44 @@ extern "C" void pl_ground_select(LandData* out, nw4r::math::VEC3* pos, LandData*
     }
 }
 
+/* A position record as a plain record (copied field by field, the vector word by word).  size: 0x14 */
+struct LandDataImage {
+    /* +0x00 */ u16 field_0x00;
+    /* +0x02 */ u8 field_0x02;
+    /* +0x03 */ u8 field_0x03;
+    /* +0x04 */ u16 field_0x04;
+    /* +0x06 */ u8 field_0x06;
+    /* +0x07 */ u8 field_0x07;
+    /* +0x08 */ nw4r::math::_VEC3 vec_0x08;
+};
+
 /* Copies one position record. */
 extern "C" void pl_land_copy(LandData* dst, LandData* src)
 {
-    *dst = *src;
+    *(LandDataImage*)dst = *(LandDataImage*)src;
 }
 
-/* 0x80297C30 (0x16C): constructs the unit's `.bss` arrays and sets the centres of the two body-shape lists. */
-extern "C" void pl_coll_static_init(void)
-{
-    nw4r::math::VEC3 c0;
-    nw4r::math::VEC3 c1;
-    nw4r::math::VEC3 c2;
-    nw4r::math::VEC3 c3;
-
-    __construct_array(pl_move_work, (void*)pl_move_entry_ctor, NULL, sizeof(PlMoveEntry), 44);
-    __construct_array(pl_hit_box, (void*)pl_hit_box_ctor, NULL, sizeof(PlCollPoly), 10);
-    __construct_array(pl_coll_closest_0, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
-    __construct_array(pl_coll_closest_1, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
-    __construct_array(pl_coll_closest_2, (void*)VEC3_ctor, NULL, sizeof(nw4r::math::VEC3), 10);
-    assignVec3((Vec*)&pl_coll_body_shape[0].pos, (Vec*)setVec3(&c0, 0.0f, 60.0f, 0.0f));
-    assignVec3((Vec*)&pl_coll_body_shape[1].pos, (Vec*)setVec3(&c1, 0.0f, 0.0f, 0.0f));
-    assignVec3((Vec*)&pl_coll_body_shape_alt[0].pos, (Vec*)setVec3(&c2, 0.0f, 40.0f, 0.0f));
-    assignVec3((Vec*)&pl_coll_body_shape_alt[1].pos, (Vec*)setVec3(&c3, 0.0f, 0.0f, 0.0f));
-    __construct_array(pl_land_data, (void*)pl_land_cell_ctor, NULL, sizeof(PlLandCell), 15);
-}
-
-/* Zeroes the four vectors of one land record. */
-extern "C" PlLandCell* pl_land_cell_ctor(PlLandCell* self)
-{
-    VEC3_ctor(&self->grid_a.min);
-    VEC3_ctor(&self->grid_a.max);
-    VEC3_ctor(&self->grid_b.min);
-    VEC3_ctor(&self->grid_b.max);
-    return self;
-}
-
-/* 0x80297DE8 (0x4C): constructs the vertices and the normal of one hit-box polygon. */
-extern "C" PlCollPoly* pl_hit_box_ctor(PlCollPoly* self)
-{
-    VEC3_ctor(&self->vtx0);
-    VEC3_ctor(&self->vtx1);
-    VEC3_ctor(&self->vtx2);
-    VEC3_ctor(&self->normal);
-    return self;
-}
+/* The unit's data, in address order, after every body.  `__sinit` constructs the arrays and builds the two
+ * body-shape lists' centres in this order. */
+#pragma pool_data off
+PlMoveEntry pl_move_work[4][11];
+s8 pl_coll_slot_free[0x10];
+PlCollPoly pl_hit_box[0x258 / 0x3C];
+nw4r::math::VEC3 pl_coll_closest_0[0x78 / 0xC];
+nw4r::math::VEC3 pl_coll_closest_1[0x78 / 0xC];
+nw4r::math::VEC3 pl_coll_closest_2[0x78 / 0xC];
+HitSphere pl_coll_body_shape[2] = {
+    {nw4r::math::VEC3(0.0f, 60.0f, 0.0f), 48.0f},
+    {nw4r::math::VEC3(0.0f, 0.0f, 0.0f), -1.0f},
+};
+HitSphere pl_coll_body_shape_alt[2] = {
+    {nw4r::math::VEC3(0.0f, 40.0f, 0.0f), 60.0f},
+    {nw4r::math::VEC3(0.0f, 0.0f, 0.0f), -1.0f},
+};
+u8 pl_coll_shared_vtx_table[8] = {0xFF, 0xFF, 0xFF, 2, 0xFF, 1, 0, 0xFF};
+f32 pl_coll_slot_dist[0x28 / 4];
+u8 pl_coll_slot_hit[0x0C];
+s8 pl_coll_slot_kind[0x0C];
+s8 pl_coll_slot_used[0x10];
+PlLandCell pl_land_data[0x7F8 / 0x88];
+PlCollPoly* pl_hit_id_list[0x28 / 4];

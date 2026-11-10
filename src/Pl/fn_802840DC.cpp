@@ -625,7 +625,6 @@ void pl_weapon2_act_lunge(_PLW* self, s32 kind)
 {
     nw4r::math::VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1115,7 +1114,6 @@ void pl_weapon2_alt_act_lunge(_PLW* self, s32 kind)
 {
     nw4r::math::VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1161,7 +1159,6 @@ void pl_weapon2_alt_act_lunge_b(_PLW* self, s32 kind)
 {
     nw4r::math::VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1195,7 +1192,6 @@ void pl_weapon2_alt_act_shell_fire(_PLW* self, s32 kind)
 {
     nw4r::math::VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -1342,7 +1338,6 @@ void pl_weapon2_act_dispatch(_PLW* self)
     s32 motion;
     s32 stage;
 
-    VEC3_ctor(&pos);
     switch (self->act_no) {
     case 0:
         pl_weapon2_act_row_a(self, 0);
@@ -1784,10 +1779,9 @@ void pl_weapon456_act_ready(_PLW* self)
  * position, in the actor's own area only. */
 void pl_weapon456_shot_se(_PLW* self, s32 alt)
 {
-    nw4r::math::VEC3 pos;
     u32 shot = 0xFF;
 
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     if (pl_now_area_ck(self) != 0) {
         switch (Get_motion_no(self)) {
         case 0x451:
@@ -1946,8 +1940,6 @@ void pl_weapon456_act_fire(_PLW* self, s32 index, s32 mode, s32 alt, u8 special)
                 nw4r::math::VEC3 pos;
                 _CP_VECTOR aim;
 
-                VEC3_ctor(&step);
-                VEC3_ctor(&pos);
                 Pl_get_gunner_pos(self, &pos, 0);
                 Pl_get_gunner_vec(self, &aim);
                 step.x = 0.0f;

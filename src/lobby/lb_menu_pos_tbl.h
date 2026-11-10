@@ -7,7 +7,7 @@
 
 #ifdef __cplusplus
 #include "nw4r/math.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "mh3_pad/task.h"
 
 extern "C" {

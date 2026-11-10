@@ -123,6 +123,8 @@ struct EmGroundRec {
         };
     };
     /* +0x08 */ nw4r::math::VEC3 pos_0x08;
+    /* 0x80125F54 (0x34): constructs the position; emitted out of line after its first user. */
+    EmGroundRec() __attribute__((never_inline)) {}
     union {
         struct {
             /* +0x14 */ u32 field_0x14;

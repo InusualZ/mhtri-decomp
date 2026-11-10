@@ -5,6 +5,24 @@
 #define MHTRI_ENEMY_EM_SE_RECORD_H
 
 #include "types.h"
+#include "nw4r/math.h"
+
+/* One sound-offset vector of an enemy program's `.bss` shift record: its constructor copies a `VEC3` temporary into
+ * it, the shape the programs' `__sinit`s build their records in (`VEC3(fff)` on a stack temporary, then the copy
+ * constructor).  size: 0x0C */
+struct EmSeShift {
+    /* +0x00 */ nw4r::math::VEC3 v;
+
+    EmSeShift(f32 x, f32 y, f32 z) : v(nw4r::math::VEC3(x, y, z)) {}
+};
+
+/* A sound-offset point and its per-frame step: an aggregate whose initialiser `{VEC3(...), VEC3(...)}` the
+ * programs' `__sinit`s build (each vector constructed on a stack temporary, then copy-constructed in place).
+ * size: 0x18 */
+struct EmSeShiftPair {
+    /* +0x00 */ nw4r::math::VEC3 pos;
+    /* +0x0C */ nw4r::math::VEC3 step;
+};
 
 /* The two-float `.sdata` offset a sound record can point at. */
 struct EmSeOffset {

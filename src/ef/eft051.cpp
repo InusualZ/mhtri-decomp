@@ -22,7 +22,7 @@
 #include "stage/stg_w.h"     /* get_now_areano (the owner header, rule 2) */
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "nw4r/math_types.h" /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h" /* the vector helpers (rule 2) */

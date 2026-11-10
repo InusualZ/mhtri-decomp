@@ -24,7 +24,7 @@
  *   4-byte tail call, so the object's `.text` is longer while the image is unchanged.
  * SHAPES. Definitions follow retail's address order.  The ResMdl constructor is `inline` and placed by a 4-byte
  *   referencer the link dead-strips, so its two strings are the weak inline tail after the vtable (retail's `.data`).
- *   setVec3 is defined `inline` ahead of the ScnLeaf constructor (called out of line under `dont_inline`): the visible
+ *   VEC3(x, y, z) is defined `inline` ahead of the ScnLeaf constructor (called out of line under `dont_inline`): the visible
  *   body cannot throw, so the constructor has no unwind range (retail's extab record).
  */
 
@@ -33,7 +33,7 @@
 
 #include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
 #include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
@@ -336,21 +336,10 @@ nw4r::g3d::ScnLeaf::~ScnLeaf()
 {
 }
 
-/* The vector's three-component constructor (its kept copy is `mh3_pad.cpp`'s 0x80041E8C), visible so the compiler
- * knows it does not throw. */
-extern "C" inline nw4r::math::VEC3* setVec3(nw4r::math::VEC3* out, float x, float y, float z)
-{
-    out->x = x;
-    out->y = y;
-    out->z = z;
-    return out;
-}
-
 #pragma dont_inline on
 /* 0x8007BAA0 (0x50): constructs the leaf with a unit scale. */
-nw4r::g3d::ScnLeaf::ScnLeaf(MEMAllocator* pHeap) : ScnObj(pHeap)
+nw4r::g3d::ScnLeaf::ScnLeaf(MEMAllocator* pHeap) : ScnObj(pHeap), mScale(1.0f, 1.0f, 1.0f)
 {
-    setVec3(&mScale, 1.0f, 1.0f, 1.0f);
 }
 #pragma dont_inline reset
 

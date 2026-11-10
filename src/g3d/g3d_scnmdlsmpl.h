@@ -22,9 +22,8 @@ extern "C" const nw4r::g3d::TypeNameData<sizeof("ScnMdlSimple")> scn_typename_Sc
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_calcworld_callback.h" /* nw4r::g3d::ICalcWorldCallback (rule 1) */
 
-/* 0x80080F44 - constructs an AABB's two corner records (two VEC3_ctor no-ops) and returns it: the element
+/* 0x80080F44 - constructs an AABB's two corner records (two VEC3::VEC3() no-ops) and returns it: the element
  * constructor ScnObj's bounding-box array is built with. */
-extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox);
 
 /* The fields of a model's `ResMdlInfo` block the ScnMdlSimple and ScnMdl constructors and Constructs read.  size: 0x40 (approximation: only
  * the read fields are named) */

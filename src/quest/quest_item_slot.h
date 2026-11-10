@@ -60,9 +60,6 @@ u32 quest_id_low_get(void);
 u8 quest_id_head_ck(void);
 u8 quest_id_tail_ck(void);
 
-/* The band's static initialiser (0x803AB1F0, the `.ctors` word's target): fills the quest zone tables. */
-void quest_zone_tbl_init(void);
-
 /* Warps to the hub in the entry state, else to the quest's start position (0x803AB0B8). */
 void quest_warp_by_state(struct _PLW* plw);
 /* The quest entry's notify path: a player's entry is announced to the lobby, charged against the quest

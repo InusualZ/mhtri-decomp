@@ -16,8 +16,8 @@
  * SHAPES. File-wide `#pragma peephole off` (retail compares each decremented `+0x020` timer as `addi` + `cmpwi`) and
  *   `#pragma pool_data off` (each sound table loads by name); the sub-state bumps are compound assignments (`+= 1`),
  *   which keeps the `u8` mask retail has; the pool constants are literals in first-use order; `em035_frame_tick` steps
- *   the field in place (a `weight`/`limit` local pair swaps f1/f2); `em035_part_node_init` hands `setVec3`'s result
- *   straight to `copyVec3`.
+ *   the field in place (a `weight`/`limit` local pair swaps f1/f2); `em035_part_node_init` hands `VEC3(x, y, z)`'s result
+ *   straight to `VEC3::operator=`.
  */
 
 #include "types.h"
@@ -44,7 +44,7 @@
 /* The node `em035_part_node_init` seeds at +0x34 of the caller's record (`EmPartNode`).
  * size: 0x44 (the extent this unit's body reaches) */
 struct EmNode {
-    /* +0x00 */ nw4r::math::VEC3 vec_0x00;  /* the three copies `copyVec3` writes */
+    /* +0x00 */ nw4r::math::VEC3 vec_0x00;  /* the three copies `VEC3::operator=` writes */
     /* +0x0C */ u16 field_0x0C;             /* 0 at entry, then the source word's low half */
     /* +0x0E */ u8 flags_0x0E;              /* bit 0 is set once the node has been seeded */
 };
@@ -492,12 +492,11 @@ extern "C" u32 em035_timer_done_ck(_ENEMY_WORK* work, u8 mode)
 extern "C" void em035_part_node_init(EmPartNode* part, const nw4r::math::VEC3* vec, EmPartSrc* src, u8 flags)
 {
     EmNode* node = &part->node_0x34;
-    nw4r::math::VEC3 scale;
 
-    copyVec3(&node->vec_0x00, setVec3(&scale, 0.0f, 0.0f, 0.0f));
+    node->vec_0x00 = VEC3(0.0f, 0.0f, 0.0f);
     node->field_0x0C = 0;
     if (flags & 2)
-        copyVec3(&node->vec_0x00, vec);
+        node->vec_0x00 = *vec;
     if (flags & 4)
         node->field_0x0C = (u16)src->field_0x04;
     node->flags_0x0E |= 1;

@@ -84,12 +84,11 @@ void nw4r::ef::EmitterFormDisc::Emission(EfWork* em, ParticleManager* pm, int co
     }
 
     for (i = 0; i < count; i++) {
-        VEC3 v88, v76, v64, v52, v40;
+        VEC3 v88, v76;
         f32 fC, f8;
         f32 scale, rate, t;
 
-        VEC3_ctor(&v88);   /* the declaration takes the nw4r vector; same 3-float layout */
-        VEC3_ctor(&v76);
+   /* the declaration takes the nw4r vector; same 3-float layout */
         t = ef_random_float(&em->progress);
         rate = params->rate / 100.0f;
         if (flags & 0x01000000) {
@@ -103,12 +102,12 @@ void nw4r::ef::EmitterFormDisc::Emission(EfWork* em, ParticleManager* pm, int co
             angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
         }
         ef_sin_cos(&fC, &f8, range + angle);
-        setVec3(&v64, fC, 0.0f, -f8);
+        VEC3 v64(fC, 0.0f, -f8);
         v88.x = scale_a * (v64.x * scale);
         v88.y = 0.0f;
         v88.z = scale_b * (v64.z * scale);
-        assignVec3((Vec*)&v52, (Vec*)&v64);
-        VEC3_ctor(&v40);
+        VEC3 v52 = v64;
+        VEC3 v40;
         if (0.0f == em->spread) {
             v40.x = 0.0f;
             v40.y = 1.0f;
@@ -120,7 +119,7 @@ void nw4r::ef::EmitterFormDisc::Emission(EfWork* em, ParticleManager* pm, int co
             v40.x = v40.x * fC;
         }
         CalcVelocity((Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
-        pm->CreateParticle(CalcLife(id, farg0, em), v88, v76, arg7,
+        pm->CreateParticle(CalcLife(id, farg0, em), (const _VEC3&)v88, (const _VEC3&)v76, arg7,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                            em->spawn_extra, em->spawn_flag);
         if (swept) {

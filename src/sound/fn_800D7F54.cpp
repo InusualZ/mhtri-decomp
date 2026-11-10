@@ -80,7 +80,7 @@
 #include "sound/fn_800E8150.h" /* fn_800E8150 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h"
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
 #include "sound/se_req.h" /* fn_800DFDCC / fn_800E0428, owned by se_req.cpp's range (rule 2) */
 #include "Pl/plw.h"
@@ -109,7 +109,7 @@ struct SeSlot {
     /* +0x02 */ u8 kind;
     /* +0x03 */ u8 pad_0x03;
     /* +0x04 */ nw4r::math::VEC3 pos;
-    /* +0x10 */ nw4r::math::VEC3 field_0x10;
+    /* +0x10 */ nw4r::math::_VEC3 field_0x10;
     /* +0x1C */ f32 field_0x1C;
     /* +0x20 */ f32 field_0x20;
     /* +0x24 */ u8 field_0x24;
@@ -550,7 +550,7 @@ struct SeSlotObj {
     /* +0x02 */ u8 kind;
     /* +0x03 */ u8 pad_0x03;
     /* +0x04 */ nw4r::math::VEC3 pos;
-    /* +0x10 */ nw4r::math::VEC3 field_0x10;
+    /* +0x10 */ nw4r::math::_VEC3 field_0x10;
     /* +0x1C */ u8 pad_0x1C[8];
     /* +0x24 */ u8 field_0x24;
     /* +0x25 */ u8 field_0x25;
@@ -828,7 +828,7 @@ void se_req_pos_ps(_se_w* work, s32 id, s32 param, nw4r::math::VEC3* pos) {
     s->field_0x30 = -1;
     s->field_0x34 = -2;
     s->param = p;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->field_0x10 = s->pos;
     fn_800D9B6C(work, s);
 }
@@ -1081,7 +1081,7 @@ extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     s->field_0x30 = -1;
     s->field_0x34 = -1;
     s->param = 0;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->field_0x10 = s->pos;
     return s;
 }
@@ -1110,7 +1110,7 @@ extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     s->field_0x30 = -1;
     s->field_0x34 = -1;
     s->param = 0;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->field_0x10 = s->pos;
     return s;
 }
@@ -1173,7 +1173,7 @@ extern "C" void fn_800DB974(_se_w* work, nw4r::math::VEC3* pos) {
     s->field_0x30 = -1;
     s->field_0x34 = -1;
     s->param = 0;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->field_0x10 = s->pos;
 }
 
@@ -1218,7 +1218,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
     s->field_0x30 = -1;
     s->field_0x34 = -1;
     s->param = 0;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->field_0x10 = s->pos;
     return s;
 }
@@ -1266,7 +1266,7 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * se_talk_point_set (89.19 %): 12 of 13 functions here are byte-identical; this one is one instruction long.
  *   The target keeps the *biased* base (`base + 0x30000`) in the callee-saved r31 and lets the loaded
  *   pointer die in r3; we keep the loaded pointer in r31 and recompute `addis r3, r31, 3` after the
- *   copyVec3 call. Same instruction count either way, so it is the allocator's tie-break between
+ *   VEC3::operator= call. Same instruction count either way, so it is the allocator's tie-break between
  *   "keep the pointer, rematerialise the bias" and "keep the bias" - not source-shaped. Tried: the
  *   target's statement order and the ascending order, the store duplicated, `if (self != NULL)` vs the
  *   early return, a second/`void*`/`u32` local, `se_pool` declared `SeSysWork*`/`void*`/`_se_w*`,
@@ -1299,7 +1299,7 @@ struct SeSysWork {
     /* +0x2961E */ u8 field_0x2961E;
     /* +0x2961F */ u8 field_0x2961F;
     /* +0x29620 */ nw4r::math::VEC3 field_0x29620;
-    /* +0x2962C */ nw4r::math::VEC3 field_0x2962C;
+    /* +0x2962C */ nw4r::math::_VEC3 field_0x2962C;
     /* +0x29638 */ u8 pad_0x29638[8];
     /* +0x29640 */ u8 field_0x29640;
     /* +0x29641 */ u8 pad_0x29641[3];
@@ -1490,7 +1490,7 @@ extern "C" void se_talk_point_set(nw4r::math::VEC3* pos) {
     self->field_0x2964C = -1;
     self->field_0x29650 = -1;
     self->field_0x29654 = 0;
-    copyVec3(&self->field_0x29620, pos);
+    self->field_0x29620 = *pos;
     self->field_0x2962C = self->field_0x29620;
 }
 
@@ -1877,7 +1877,7 @@ extern "C" void fn_800DCF0C(_se_w* work, nw4r::math::VEC3* pos) {
  *     trailing `SeSlot` at +0x2961C).
  *   - `em_area_ck` must return a *signed* value (`cmpwi r3,0`); e.cpp/manual.cpp declare it `u32`.
  *   - the camera helpers return their `VEC3`/`Mtx` by value (`get_camera_pos__Fv` has no parameters),
- *     and `copyVec3(&dst, &get_camera_pos())` - taking the address of the returned temporary - is the
+ *     and `VEC3::operator=(&dst, &get_camera_pos())` - taking the address of the returned temporary - is the
  *     only form that reproduces the target (a named local gets an extra copy).
  *   - `fn_800D8DDC` is declared exactly as a.cpp defines it (`extern "C" u8* fn_800D8DDC(u8*)`).
  *
@@ -2041,28 +2041,28 @@ extern "C" void se_frame_step(void) {
             u8 idx = (u8)my_player_no();
 
             my_player_no_set(0);
-            copyVec3(&self->field_0x004, &get_camera_pos());
-            copyVec3(&self->field_0x010, &get_camera_direction());
+            self->field_0x004 = *(&get_camera_pos());
+            self->field_0x010 = *(&get_camera_direction());
             mtx34_copy(&self->field_0x29280, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x29280, 0);
 
             my_player_no_set(1);
-            copyVec3(&self->field_0x01C, &get_camera_pos());
-            copyVec3(&self->field_0x028, &get_camera_direction());
+            self->field_0x01C = *(&get_camera_pos());
+            self->field_0x028 = *(&get_camera_direction());
             mtx34_copy(&self->field_0x292B0, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x292B0, 1);
 
             my_player_no_set((s8)idx);
         } else {
-            copyVec3(&self->field_0x004, &get_camera_pos());
-            copyVec3(&self->field_0x010, &get_camera_direction());
-            copyVec3(&self->field_0x01C, &self->field_0x004);
-            copyVec3(&self->field_0x028, &self->field_0x010);
+            self->field_0x004 = *(&get_camera_pos());
+            self->field_0x010 = *(&get_camera_direction());
+            self->field_0x01C = self->field_0x004;
+            self->field_0x028 = self->field_0x010;
             mtx34_copy(&self->field_0x29280, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x29280, 0);
             fn_800E8498_c1(NULL, 1);
             if (work != NULL) {
-                copyVec3(&self->field_0x01C, &work->pos);
+                self->field_0x01C = work->pos;
             }
         }
 
@@ -2081,8 +2081,8 @@ extern "C" void se_frame_step(void) {
             if (entry->callback != NULL) {
                 entry->callback(entry->enemy, entry->kind);
             }
-            copyVec3(&entry->field_0x018, &self->field_0x004);
-            copyVec3(&entry->field_0x024, &self->field_0x01C);
+            entry->field_0x018 = self->field_0x004;
+            entry->field_0x024 = self->field_0x01C;
             switch (entry->kind) {
             case 0:
                 break;
@@ -2383,7 +2383,7 @@ extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamV
             slot->field_0x30 = -1;
             slot->field_0x34 = -1;
             slot->param = 0;
-            copyVec3(&slot->pos, pos);
+            slot->pos = *pos;
             slot->field_0x10 = slot->pos;
         }
     }
@@ -2421,7 +2421,7 @@ extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamV
     slot->field_0x30 = -1;
     slot->field_0x34 = -1;
     slot->param = 0;
-    copyVec3(&slot->pos, pos);
+    slot->pos = *pos;
     slot->field_0x10 = slot->pos;
 }
 
@@ -2480,7 +2480,7 @@ struct SeSlotView {
     /* +0x02 */ u8 kind;
     /* +0x03 */ u8 pad_0x03;
     /* +0x04 */ nw4r::math::VEC3 pos;
-    /* +0x10 */ nw4r::math::VEC3 field_0x10;
+    /* +0x10 */ nw4r::math::_VEC3 field_0x10;
     /* +0x1C */ f32 field_0x1C;
     /* +0x20 */ f32 field_0x20;
     /* +0x24 */ u8 field_0x24;
@@ -2618,7 +2618,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
         case 2:
             if (s.field_0x34 < 0) {
                 if (s.field_0x34 == -1) {
-                    copyVec3(&s.pos, &((PlView*)plw)->field_0x03C);
+                    s.pos = *(&((PlView*)plw)->field_0x03C);
                 }
             } else {
                 pl_get_joint_wpos(plw, s.field_0x34, &s.pos);
@@ -2657,11 +2657,11 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
                             break;
                         }
                     } else {
-                        copyVec3(&s.pos, &w.field_0x030);
+                        s.pos = w.field_0x030;
                     }
                 } else if (s.field_0x34 < 0) {
                     if (s.field_0x34 == -1) {
-                        copyVec3(&s.pos, &((PlView*)plw)->field_0x188);
+                        s.pos = *(&((PlView*)plw)->field_0x188);
                     }
                 } else {
                     s32 joints = ((MHchar*)((PlView*)plw)->field_0x024)->get_joint_num();
@@ -2685,7 +2685,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
                             break;
                         }
                     } else {
-                        copyVec3(&s.pos, &w.field_0x030);
+                        s.pos = w.field_0x030;
                     }
                 } else {
                     s32 joints = ((MHchar*)((PlView*)plw)->field_0x024)->get_joint_num();
@@ -2711,7 +2711,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
         case 1:
         case 2:
             if (s.field_0x34 < 0) {
-                copyVec3(&s.pos, &((AiNpcView*)plw)->field_0x178);
+                s.pos = *(&((AiNpcView*)plw)->field_0x178);
             } else {
                 get_joint_wpos_ai((_AINPC_W*)plw, s.field_0x34, &s.pos);
             }
@@ -2731,7 +2731,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
         case 1:
         case 2:
             if (s.field_0x34 < 0) {
-                copyVec3(&s.pos, &((Case10View*)plw)->field_0x170);
+                s.pos = *(&((Case10View*)plw)->field_0x170);
             } else {
                 note_pane_joint_wpos_get(plw, s.field_0x34, &s.pos);
             }
@@ -2746,7 +2746,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
     }
     case 12:
         if ((u32)(s.field_0x34 + 2) > 2) {
-            copyVec3(&s.pos, (nw4r::math::VEC3*)(s.field_0x34 + 0x10));
+            s.pos = *((nw4r::math::VEC3*)(s.field_0x34 + 0x10));
             s.field_0x10 = s.pos;
         }
         break;
@@ -2998,7 +2998,6 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot);
  * one advance. */
 extern "C" void fn_800D84E8(_se_w* work) {
     nw4r::math::VEC3 scratch;
-    VEC3_ctor(&scratch);
     s32 i;
     SeSlot* slot = work->slots;
     for (i = 0; i < 32; i++, slot++) {
@@ -3029,7 +3028,6 @@ extern "C" void fn_800D84E8(_se_w* work) {
 extern "C" void fn_800D85B0(_se_w* work, s32 mode) {
     (void)mode;
     nw4r::math::VEC3 scratch;
-    VEC3_ctor(&scratch);
     s32 i;
     SeSlot* slot = work->slots;
     for (i = 0; i < 32; i++, slot++) {
@@ -3058,7 +3056,6 @@ extern "C" void fn_800D85B0(_se_w* work, s32 mode) {
 /* Same walk, but only the slots in the two "active" states are advanced. */
 extern "C" void fn_800D8730(_se_w* work) {
     nw4r::math::VEC3 scratch;
-    VEC3_ctor(&scratch);
     s32 i;
     SeSlot* slot = work->slots;
     for (i = 0; i < 32; i++, slot++) {
@@ -3305,7 +3302,7 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
             return;
         }
         fn_800F27C4(handle, slot->id, slot->field_0x25);
-        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, &slot->field_0x10, 1);
+        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, (nw4r::math::VEC3*)&slot->field_0x10, 1);
         if (slot->field_0x3C == 0) {
             slot->state = 7;
         } else {
@@ -3320,7 +3317,7 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
             }
         }
         if (slot->field_0x24 != 0 && slot->field_0x30 != -1) {
-            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, &slot->field_0x10, 1);
+            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, (nw4r::math::VEC3*)&slot->field_0x10, 1);
             if (slot->field_0x40 != 0) {
                 if (slot->field_0x4A != 0) {
                     fn_800E83CC_c1(slot->field_0x40, (s16)(fn_800E8444_c1() + slot->field_0x4C));
@@ -3389,7 +3386,7 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
             return;
         }
         fn_800F27C4(handle, slot->id, slot->field_0x25);
-        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, &slot->field_0x10, 1);
+        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, (nw4r::math::VEC3*)&slot->field_0x10, 1);
         if (slot->field_0x3C == 0) {
             slot->state = 7;
         } else {
@@ -3404,7 +3401,7 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
             slot->state = 4;
         }
         if (slot->field_0x24 != 0 && slot->field_0x30 != -1) {
-            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, &slot->field_0x10, 1);
+            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, (nw4r::math::VEC3*)&slot->field_0x10, 1);
             if (slot->field_0x40 != 0) {
                 if (slot->field_0x4A != 0) {
                     fn_800E83CC_c1(slot->field_0x40, (s16)(fn_800E8444_c1() + slot->field_0x4C));
@@ -3530,9 +3527,7 @@ extern "C" void se_area_part_play(u32 arg0, VEC3* pos)
             break;
         case 2:
             if ((u8)arg0 == 0) {
-                VEC3 fixed_pos;
-
-                setVec3(&fixed_pos, lbl_80796410, lbl_80796414, lbl_80796418);
+                VEC3 fixed_pos(lbl_80796410, lbl_80796414, lbl_80796418);
                 se_slot_req_pos(46, 8, &fixed_pos);
                 return;
             }
@@ -3582,8 +3577,7 @@ SeSlot* st_ice_break_se_req(nw4r::math::VEC3* pos)
 /* Positional SE: bank 46, id `30 + (arg & 3)`, at the caller's position broadcast over all three axes. */
 extern "C" SeSlot* se_torch_slot_req(u32 arg)
 {
-    nw4r::math::VEC3 v;
     f32 c = lbl_807963E0;
-    setVec3(&v, c, c, c);
+    nw4r::math::VEC3 v(c, c, c);
     return se_slot_req_pos(46, ((u8)arg & 3) + 30, &v);
 }

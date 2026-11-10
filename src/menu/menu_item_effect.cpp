@@ -39,7 +39,7 @@
 #include "ef/eft_res.h"
 #include "ef/effect.h"                /* eft_state_flags_set */
 #include "ef/fn_800CDB2C.h"           /* ran_suu */
-#include "g3d/g3d_calcworld.h"        /* addVec3To */
+#include "g3d/g3d_calcworld.h"        /* VEC3::operator+= */
 #include "ef/get_move_work_adrs.h"    /* get_move_work_adrs / get_move_work_max */
 #include "stage/get_now_mapno.h"
 #include "stage/stg_w.h"              /* get_now_areano */
@@ -318,18 +318,14 @@ extern "C" void eft027_move(_EFT* self)
     s32 k;
     f32 radius;
     f32 min_radius;
-    VEC3 offset;
-    VEC3 unused;
-    VEC3 centre;
-    VEC3 pos;
 
     work = (Eft027Work*)self->work_0x38;
     player = (_PLW*)get_move_work_adrs(2);
     enemy_max = get_move_work_max(3);
     near = 0;
-    VEC3_ctor(&offset);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&centre);
+    VEC3 offset;
+    VEC3 unused;
+    VEC3 centre;
     for (i = 0; i < work->count; i++) {
         part = &work->parts[i];
         enemy = (_ENEMY_WORK*)get_move_work_adrs(3);
@@ -343,7 +339,7 @@ extern "C" void eft027_move(_EFT* self)
             }
             radius = work->spots[work->spot].radius;
             vec_to_mh_vec3(&centre, &work->spots[work->spot].pos);
-            copyVec3(&part->centre, &centre);
+            part->centre = centre;
             work->spot_round++;
             if (work->spot_round >= 1)
                 work->spot_round = 0;
@@ -400,8 +396,7 @@ extern "C" void eft027_move(_EFT* self)
             setVector3(&offset, 0.0f, 0.0f, part->orbit_radius);
             part->model->field_0x2C = (u16)(part->model->field_0x2C + part->turn_speed);
             rotVecY(&offset, part->model->field_0x2C);
-            addVec3(&pos, &part->centre, &offset);
-            copyVec3(&part->model->pos_0x04, &pos);
+            part->model->pos_0x04 = part->centre + offset;
             if (vec3_dist_sq(&player->vec_0x03C, &part->model->pos_0x04) < 90000.0f)
                 near = 1;
             for (k = 0; k < enemy_max; k++, enemy++) {
@@ -422,12 +417,12 @@ extern "C" void eft027_move(_EFT* self)
             break;
         case 2:
             part->model->field_0x2C += (u16)((s16)(part->heading - part->model->field_0x2C) >> 4);
-            addVec3To(&part->vel, &part->accel);
+            part->vel += part->accel;
             if (part->vel.x > 40.0f)
                 part->vel.x = 40.0f;
-            copyVec3(&offset, &part->vel);
+            offset = part->vel;
             rotVecY(&offset, part->model->field_0x2C);
-            addVec3To(&part->model->pos_0x04, &offset);
+            part->model->pos_0x04 += offset;
             if (part->timer < 0) {
                 for (s32 j = 1; j < 4; j++)
                     part->model->setVisibility(j, false);

@@ -25,7 +25,7 @@
 
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterFormPoint, EfWork, ParticleManager (rule 1) */
 
@@ -93,7 +93,6 @@ extern void ef_vec3_normalize_to(nw4r::math::VEC3 *a, nw4r::math::VEC3 *b);
 
 void nw4r::ef::EmitterFormPoint::Emission(EfWork* em, ParticleManager* pm, int count, u32 flags, f32* params,
                                           u16 id, f32 f, const MTX34* arg7) {
-    EfVec3 v_44, v_38, v_2C, v_20;
     s32 i;
 
 #line 42
@@ -105,8 +104,8 @@ void nw4r::ef::EmitterFormPoint::Emission(EfWork* em, ParticleManager* pm, int c
         for (i = 0; i < count; i++) {
             f32 rate, t, s, r, scale;
 
-            setVec3(&v_44, 0.0f, 0.0f, 0.0f);
-            VEC3_ctor(&v_38);
+            EfVec3 v_44(0.0f, 0.0f, 0.0f);
+            EfVec3 v_38;
             rate = ef_random_float(&em->progress);
             t = 2.0f * rate - 1.0f;
             if (t >= 0.0f)
@@ -119,11 +118,11 @@ void nw4r::ef::EmitterFormPoint::Emission(EfWork* em, ParticleManager* pm, int c
                         2.0f * (3.1415927f * ef_random_float(&em->progress)));
             v_38.y = v_38.y * r;
             v_38.z = v_38.z * r;
-            setVec3(&v_2C, v_38.x, 0.0f, v_38.z);
+            EfVec3 v_2C(v_38.x, 0.0f, v_38.z);
             ef_vec3_normalize_to(&v_2C, &v_2C);
-            VEC3_ctor(&v_20);
+            EfVec3 v_20;
             CalcVelocity((Vec*)&v_20, em, (Vec*)&v_44, (Vec*)&v_38, (Vec*)&v_38, (Vec*)&v_2C);
-            pm->CreateParticle(CalcLife(id, f, em), v_44, v_20, arg7,
+            pm->CreateParticle(CalcLife(id, f, em), (const _VEC3&)v_44, (const _VEC3&)v_20, arg7,
                                1.0f + (0.01f * (f32)em->scale_rate) * ef_random_float(&em->progress),
                                &em->spawn_data, em->spawn_extra, em->spawn_flag);
         }

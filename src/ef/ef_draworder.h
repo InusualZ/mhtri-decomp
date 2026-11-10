@@ -9,7 +9,12 @@
 #include "types.h"
 
 struct ParticleManager;
-struct EfDrawInfo;
+namespace nw4r {
+namespace ef {
+struct DrawInfo;
+} // namespace ef
+} // namespace nw4r
+typedef nw4r::ef::DrawInfo EfDrawInfo;
 
 namespace nw4r {
 namespace ef {

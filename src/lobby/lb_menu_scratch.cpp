@@ -31,7 +31,7 @@
 
 #include "lobby/fn_8021E1EC.h"
 #include "lobby/fn_80208AC0.h" /* fn_80208AC0, owned by lobby/lb_npc.cpp (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "Pl/plw.h" /* `_PLW` (rule 1) */
 #include "Pl/Pl_master_ck.h" /* `Pl_act_ck`, owned by Pl/pl_act.cpp (rule 2) */
 #include "lobby/lb_npc.h" /* `_LB_NPC`/`lb_npc`/`LbSpot`, owned by lobby/lb_npc.cpp (rule 1/2) */
@@ -110,11 +110,10 @@ s32 lb_menu_candidate_add(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* w
     f32 dist_sq;
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (rec != 0) {
-        copyVec3(&pos, &rec->pos_0x03C);
+        pos = rec->pos_0x03C;
     } else {
-        copyVec3(&pos, &work->pos_0x10);
+        pos = work->pos_0x10;
     }
     if (lb_fabsf(pos.y - self->pos_0x03C.y) < 200.0f) {
         idx = lb_menu_actor_angle_get(self, &pos);
@@ -627,10 +626,4 @@ LbMenuScratch lb_menu_scratch;             /* .bss 0x806AA8C8 */
 /* 0x8021EFC8 (0x58): constructs the eight slot vectors. */
 __declspec(noinline) inline LbMenuScratch::LbMenuScratch()
 {
-    VEC3* p = slots_0x160;
-
-    do {
-        VEC3_ctor(&p[0]);
-        p++;
-    } while (p < slots_0x160 + 8);
 }

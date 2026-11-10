@@ -14,6 +14,7 @@
 #include "nw4r/math.h"
 #include "pl.h"
 #include "Pl/em_weak_point.h"
+#include "Pl/fn_8028F66C.h" /* LandData, the ground record at +0x324 (rule 1) */
 #include "Pl/hit_w.h"
 
 /* One tuning row of a formation: what it adjusts (0 attack, 1 defence, 2 speed, 3 gauge) and the amount per
@@ -78,6 +79,9 @@ struct HitSlot {
 };
 
 struct _AINPC_W {
+    /* 0x802D9E20 (0x84): constructs the model, the vectors and the land record (`ai/ai_npc.cpp`). */
+    _AINPC_W() __attribute__((never_inline));
+
     /* +0x000 */ u8 active;            /* non-zero while the record is in use */
     /* +0x001 */ u8 in_area;           /* set from `area_0x1A4 == get_now_areano()` */
     /* +0x002 */ u8 field_0x002;       /* set to 1 by the state setter; zero suppresses +0x3C */
@@ -174,10 +178,7 @@ struct _AINPC_W {
     /* +0x320 */ u8 hit_id_count;
     /* +0x321 */ u8 field_0x321;       /* `ai_npc_counter_roll` sets it, `fn_802D3F08` reads it */
     /* +0x322 */ u8 unused_0x322[0x324 - 0x322];
-    /* +0x324 */ u16 field_0x324;      /* the damage-type flag word `fn_802D4248` tests */
-    /* +0x326 */ u8 field_0x326;
-    /* +0x327 */ u8 unused_0x327[0x32C - 0x327];
-    /* +0x32C */ nw4r::math::VEC3 pos_0x32C;
+    /* +0x324 */ ::LandData land_0x324; /* the ground record: +0x00 the damage-type flag word `fn_802D4248` tests */
     /* +0x338 */ u8 field_0x338;
     /* +0x339 */ u8 field_0x339;       /* the 0..0x14 progress `fn_802D3984`/`fn_802D3F70`
                                         * interpolate with */

@@ -32,7 +32,7 @@
  */
 
 #include "types.h"
-#include "mh3_pad/vec3.h" /* the owner header (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "ef/ef_emitter.h" /* ef_random_float / ef_random_u16 (rule 2) */
 #include "ef/ef_torus.h" /* ef_fabsf (rule 2) */
 #include "MSL_C/alloc.h" /* fabsf / tanf (rule 2) */
@@ -86,9 +86,6 @@ typedef struct EfCubeParams {
 void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em, ParticleManager* pm, u16 d, f32 f,
                   const MTX34* e)
 {
-    VEC3 v1;
-    VEC3 v2;
-    VEC3 v3;
     f32 s;
     u16 r;
     int ok;
@@ -103,14 +100,14 @@ void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em,
     }
 
     ef_vec3_normalize_to(c, c);
-    assignVec3((Vec*)&v1, (Vec*)b);
+    VEC3 v1 = *b;
     if (vec3_length_sq(&v1) <= 1.17549435e-38f) {
         v1.x = ef_random_float(&em->progress) * 2.0f - 1.0f;
         v1.y = ef_random_float(&em->progress) * 2.0f - 1.0f;
         v1.z = ef_random_float(&em->progress) * 2.0f - 1.0f;
     }
     ef_vec3_normalize_to(&v1, &v1);
-    assignVec3((Vec*)&v2, (Vec*)b);
+    VEC3 v2 = *b;
     v2.y = 0.0f;
     if (vec3_length_sq(&v2) <= 1.17549435e-38f) {
         v2.x = ef_random_float(&em->progress) * 2.0f - 1.0f;
@@ -119,9 +116,9 @@ void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em,
     ef_vec3_normalize_to(&v2, &v2);
     /* This unit's `VEC3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
      * layout. */
-    VEC3_ctor((nw4r::math::VEC3*)&v3);
+    VEC3 v3;
     form->CalcVelocity((Vec*)&v3, em, (Vec*)b, (Vec*)c, (Vec*)&v1, (Vec*)&v2);
-    pm->CreateParticle(form->CalcLife(d, f, em), *b, v3, e,
+    pm->CreateParticle(form->CalcLife(d, f, em), (const _VEC3&)*b, (const _VEC3&)v3, e,
                        1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress),
                        &em->spawn_data, em->spawn_extra, em->spawn_flag);
 }
@@ -218,8 +215,6 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 f32 pz;
                 f32 spread;
                 f32 lean;
-                VEC3 pos;
-                VEC3 vel;
 
                 if (i != 0) {
                     switch (dir) {
@@ -254,8 +249,8 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 pz = v * sizeZ;
                 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                 lean = EF_CUBE_MAX_ABS(u, v);
-                VEC3_ctor((nw4r::math::VEC3*)&pos);
-                VEC3_ctor((nw4r::math::VEC3*)&vel);
+                VEC3 pos;
+                VEC3 vel;
                 pos.x = px;
                 pos.y = -sizeY;
                 pos.z = pz;
@@ -302,8 +297,6 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     VEC3 pos;
                     VEC3 vel;
 
-                    VEC3_ctor((nw4r::math::VEC3*)&pos);
-                    VEC3_ctor((nw4r::math::VEC3*)&vel);
                     pos.x = pu;
                     pos.y = y;
                     pos.z = -sizeZ;
@@ -336,11 +329,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     f32 pu = u * sizeZ;
                     f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
+
                     VEC3 pos;
                     VEC3 vel;
-
-                    VEC3_ctor((nw4r::math::VEC3*)&pos);
-                    VEC3_ctor((nw4r::math::VEC3*)&vel);
                     pos.x = sizeX;
                     pos.y = y;
                     pos.z = pu;
@@ -373,11 +364,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     f32 pu = u * sizeX;
                     f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
+
                     VEC3 pos;
                     VEC3 vel;
-
-                    VEC3_ctor((nw4r::math::VEC3*)&pos);
-                    VEC3_ctor((nw4r::math::VEC3*)&vel);
                     pos.x = pu;
                     pos.y = y;
                     pos.z = sizeZ;
@@ -410,11 +399,9 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                     f32 pu = u * sizeZ;
                     f32 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
+
                     VEC3 pos;
                     VEC3 vel;
-
-                    VEC3_ctor((nw4r::math::VEC3*)&pos);
-                    VEC3_ctor((nw4r::math::VEC3*)&vel);
                     pos.x = -sizeX;
                     pos.y = y;
                     pos.z = pu;
@@ -466,8 +453,6 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 f32 pz;
                 f32 spread;
                 f32 lean;
-                VEC3 pos;
-                VEC3 vel;
 
                 if (i != 0) {
                     switch (dir) {
@@ -499,8 +484,8 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 pz = v * sizeZ;
                 spread = 1.0f - EF_CUBE_MAX_ABS(u, v);
                 lean = EF_CUBE_MAX_ABS(u, v);
-                VEC3_ctor((nw4r::math::VEC3*)&pos);
-                VEC3_ctor((nw4r::math::VEC3*)&vel);
+                VEC3 pos;
+                VEC3 vel;
                 pos.x = px;
                 pos.y = sizeY;
                 pos.z = pz;
@@ -536,8 +521,6 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
             f32 x;
             f32 y;
             f32 z;
-            VEC3 pos;
-            VEC3 vel;
 
             if (0.0f == hollow) {
                 /* A solid cube: anywhere inside. */
@@ -615,8 +598,8 @@ void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n,
                 }
             }
 
-            VEC3_ctor((nw4r::math::VEC3*)&pos);
-            setVec3((nw4r::math::VEC3*)&vel, 0.0f, 0.0f, 0.0f);
+            VEC3 pos;
+            VEC3 vel(0.0f, 0.0f, 0.0f);
             if (y >= 0.0f && y >= ef_fabsf(x) && y >= ef_fabsf(z)) {
                 vel.y = 1.0f;
             } else if (y < 0.0f && -y >= ef_fabsf(x) && -y >= ef_fabsf(z)) {

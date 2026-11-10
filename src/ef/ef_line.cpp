@@ -22,7 +22,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterFormLine, EfWork, ParticleManager (rule 1) */
 
@@ -62,7 +62,6 @@ void nw4r::ef::EmitterFormLine::Emission(EfWork* em, ParticleManager* pm, int co
         for (i = 0; i < count; i++) {
             f32 pos;
             f32 sx, cx, sy, cy, sz, cz;
-            VEC3 p, normal, fromYAxis, v;
 
             if ((optionFlag & 0x00020000) == 0) {
                 pos = ef_random_float(&em->progress);
@@ -79,22 +78,22 @@ void nw4r::ef::EmitterFormLine::Emission(EfWork* em, ParticleManager* pm, int co
             ef_sin_cos(&sy, &cy, params[2]);
             ef_sin_cos(&sz, &cz, params[3]);
 
-            VEC3_ctor(&p);
+            VEC3 p;
             p.x = (cx * cz * sy + sx * sz) * pos;
             p.y = (-cz * sx + cx * sy * sz) * pos;
             p.z = (cx * cy) * pos;
 
-            VEC3_ctor(&normal);
+            VEC3 normal;
             normal.x = 0.0f;
             normal.y = 1.0f;
             normal.z = 0.0f;
 
-            setVec3(&fromYAxis, p.x, 0.0f, p.z);
+            VEC3 fromYAxis(p.x, 0.0f, p.z);
 
-            VEC3_ctor(&v);
+            VEC3 v;
             CalcVelocity((Vec*)&v, em, (Vec*)&p, (Vec*)&normal, (Vec*)&p, (Vec*)&fromYAxis);
 
-            pm->CreateParticle(CalcLife(aPtclLife, aPtclLifeRnd, em), p, v, space,
+            pm->CreateParticle(CalcLife(aPtclLife, aPtclLifeRnd, em), (const _VEC3&)p, (const _VEC3&)v, space,
                                1.0f + 0.01f * (f32)(s32)em->scale_rate *
                                                   ef_random_float(&em->progress),
                                &em->spawn_data, em->spawn_extra, em->spawn_flag);

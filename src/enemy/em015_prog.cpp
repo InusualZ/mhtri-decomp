@@ -89,7 +89,7 @@
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "enemy/em_eft_fx.h"
 #include "fn_8004CAD8.h"       /* sin_idx_get/fn_80051378/rotVecY/calcDistanceSqXZ */
-#include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
+#include "mh3_pad.h"           /* VEC3::VEC3()/VEC3::operator=/VEC3(x, y, z) */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
 #include "stage/stg_w.h"
 #include "ef/eft009.h"          /* eft009_spawn_at_joint */
@@ -104,7 +104,7 @@
 #include "enemy/em_se_tbl_play.h" /* em_se_tbl_play */
 #include "ef/eft007.h"          /* eft007_part_set / eft007_part_spawn */
 #include "ef/fn_8010D1A8.h"     /* eft_spawn_pos_in_area */
-#include "g3d/g3d_calcworld.h"  /* addVec3To */
+#include "g3d/g3d_calcworld.h"  /* VEC3::operator+= */
 #include "enemy/em_common.h"    /* em_mot_layer_blend_set/em_rest_flag_set/em_surface_clamp/em_mot_frame_get */
 #include "enemy/em_eft_fx_spawn_at.h" /* em_eft_fx_spawn_at/em_eft_fx_spawn_free */
 #include "ef/eft013_em_place.h" /* eft013_em_place/eft013_em_spawn_head */
@@ -131,7 +131,6 @@
 #define eft026_pl_spawn_c1 ((void (*)(_ENEMY_WORK*, u8, nw4r::math::VEC3*, u32, f32))eft026_pl_spawn)
 #define em_turn_to_target_h ((u32 (*)(_ENEMY_WORK*, u16))em_turn_to_target)
 #define calcVecAngX_s32 ((s32 (*)(nw4r::math::VEC3*))calcVecAngX)
-#define assignVec3_c1 ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))assignVec3)
 #define em_fall_start_c1 ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 #define em_water_check_c1 ((u32 (*)(_ENEMY_WORK*))em_water_check)
 #define em_move_offset_step_update_c1 ((u32 (*)(_ENEMY_WORK*, u32*, f32))em_move_offset_step_update)
@@ -269,27 +268,17 @@ void em015_aim_set(_ENEMY_WORK* self);
 void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c);
 
 /* The two sound-offset pairs (a point and its per-frame step each), built as one object by MWCC's `__sinit`
- * (0x80182B94): each vector is set through `setVec3` into a temporary and copied with `assignVec3`; the sound
+ * (0x80182B94): each vector is constructed into a temporary and copied (`EmSeShift`); the sound
  * records point at `pos_a` and `pos_b`.  size: 0x30 */
 struct Em015SeShift {
-    /* +0x00 */ nw4r::math::VEC3 pos_a;
-    /* +0x0C */ nw4r::math::VEC3 step_a;
-    /* +0x18 */ nw4r::math::VEC3 pos_b;
-    /* +0x24 */ nw4r::math::VEC3 step_b;
+    /* +0x00 */ EmSeShift pos_a;
+    /* +0x0C */ EmSeShift step_a;
+    /* +0x18 */ EmSeShift pos_b;
+    /* +0x24 */ EmSeShift step_b;
 
     /* Builds (0, 0, 12.5), (0, 0, 0), (2, 0, 0) and (0, 0, 0). */
     Em015SeShift()
-    {
-        nw4r::math::VEC3 d;
-        nw4r::math::VEC3 c;
-        nw4r::math::VEC3 b;
-        nw4r::math::VEC3 a;
-
-        assignVec3_c1(&pos_a, setVec3(&a, 0.0f, 0.0f, 12.5f));
-        assignVec3_c1(&step_a, setVec3(&b, 0.0f, 0.0f, 0.0f));
-        assignVec3_c1(&pos_b, setVec3(&c, 2.0f, 0.0f, 0.0f));
-        assignVec3_c1(&step_b, setVec3(&d, 0.0f, 0.0f, 0.0f));
-    }
+        : pos_a(0.0f, 0.0f, 12.5f), step_a(0.0f, 0.0f, 0.0f), pos_b(2.0f, 0.0f, 0.0f), step_b(0.0f, 0.0f, 0.0f) {}
 };
 
 /* The sound-offset object `__sinit` seeds (`.bss`, defined at the end). */
@@ -430,7 +419,6 @@ extern "C" void em015_init(_ENEMY_WORK* self, u32 arg) {
     u8 kind;
     u8 mode;
 
-    VEC3_ctor(&v);
     if (em_res_user_data_ck(self) == 0) {
         helper = (Em015UserData*)operator new(sizeof(Em015UserData));
         new (helper) Em015UserData;
@@ -786,7 +774,6 @@ extern "C" void em015_act0_dispatch(_ENEMY_WORK* self) {
 extern "C" void em015_act1_charge(_ENEMY_WORK* self) {
     VEC3 v;
 
-    VEC3_ctor(&v);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1405,7 +1392,7 @@ extern "C" void em015_circle_attack(_ENEMY_WORK* self, u32 dir, u32 mode) {
             em_approach_start(self, 0.0f, 0xA);
         } else {
             angle = 0x3000;
-            copyVec3(&self->action_0x328.vec_0x334, &self->vec_0x36C);
+            self->action_0x328.vec_0x334 = self->vec_0x36C;
             self->vec_0x36C.y += 2000.0f;
             if (self->vec_0x36C.y > self->field_0x210) {
                 self->vec_0x36C.y = self->field_0x210;
@@ -1494,7 +1481,7 @@ extern "C" void em015_circle_attack(_ENEMY_WORK* self, u32 dir, u32 mode) {
                     self->state++;
                     self->state_0x006 = 0;
                     em_mot_set_blend(self, 0x13, 0x14, 0, 1);
-                    copyVec3(&self->vec_0x36C, &self->action_0x328.vec_0x334);
+                    self->vec_0x36C = self->action_0x328.vec_0x334;
                     break;
                 }
             }
@@ -1541,7 +1528,6 @@ extern "C" void em015_circle_attack(_ENEMY_WORK* self, u32 dir, u32 mode) {
 extern "C" void em015_discharge(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1584,7 +1570,6 @@ extern "C" void em015_discharge(_ENEMY_WORK* self) {
 extern "C" void em015_leap(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1640,7 +1625,6 @@ extern "C" void em015_leap(_ENEMY_WORK* self) {
 extern "C" void em015_dive(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1866,7 +1850,6 @@ extern "C" void em015_act5_shake(_ENEMY_WORK* self) {
 extern "C" void em015_surface(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -2207,7 +2190,7 @@ extern "C" void em015_lunge(_ENEMY_WORK* self, u32 kind) {
         case 2:
             motion = 0x46;
             em_approach_start(self, 0.0f, 0x12);
-            copyVec3(&self->action_0x328.vec_0x334, &self->pos);
+            self->action_0x328.vec_0x334 = self->pos;
             break;
         case 3:
             motion = 0x39;
@@ -2361,7 +2344,6 @@ extern "C" void em015_lunge(_ENEMY_WORK* self, u32 kind) {
 extern "C" void em015_charge_field(_ENEMY_WORK* self, u32 kind) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2425,8 +2407,6 @@ extern "C" void em015_great_discharge(_ENEMY_WORK* self, u32 kind) {
     VEC3 vec;
     MTX34 mtx;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2523,8 +2503,6 @@ extern "C" void em015_tail_slam(_ENEMY_WORK* self, u32 kind, u32 chain) {
     VEC3 vec;
     MTX34 mtx;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2816,12 +2794,9 @@ extern "C" void em015_back_step(_ENEMY_WORK* self, u8 kind) {
  * for the ball on frame 52. */
 extern "C" void em015_thunder_ball(_ENEMY_WORK* self) {
     VEC3 vec;
-    EmSpawnRec rec;
     MTX34 mtx;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2892,12 +2867,9 @@ extern "C" void em015_thunder_ball(_ENEMY_WORK* self) {
  * joint 0x19's matrix, and on frame 98 the shell job for the ball (`kind` 1 angles it by 0x71C). */
 extern "C" void em015_thunder_ball_aimed(_ENEMY_WORK* self, u32 kind) {
     VEC3 vec;
-    EmSpawnRec rec;
     MTX34 mtx;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3003,8 +2975,6 @@ extern "C" void em015_rolling_charge(_ENEMY_WORK* self, u32 kind) {
     VEC3 pos;
     VEC3 vec;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3057,7 +3027,6 @@ extern "C" void em015_rolling_charge(_ENEMY_WORK* self, u32 kind) {
 extern "C" void em015_act7_spin_turn(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0: {
         self->state++;
@@ -3120,8 +3089,6 @@ extern "C" void em015_turn_slam(_ENEMY_WORK* self, u32 kind) {
     VEC3 vec;
     MTX34 mtx;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3199,12 +3166,9 @@ extern "C" void em015_turn_slam(_ENEMY_WORK* self, u32 kind) {
  * window over 50..110, the part effects, and the shell job for the burst (mode 0x13) on frame 110. */
 extern "C" void em015_thunder_burst(_ENEMY_WORK* self, u32 kind) {
     VEC3 vec;
-    EmSpawnRec rec;
     MTX34 mtx;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3251,12 +3215,9 @@ extern "C" void em015_thunder_burst(_ENEMY_WORK* self, u32 kind) {
  * the burst (mode 0x21) on frame 90, then the hand-off on frame 130 (`chain` 0) or the motion's end. */
 extern "C" void em015_thunder_burst_great(_ENEMY_WORK* self, u32 kind, u32 chain) {
     VEC3 vec;
-    EmSpawnRec rec;
     MTX34 mtx;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3524,11 +3485,11 @@ __declspec(section ".data") EmSeOffset em015_se_ofs_1C_a = {10.0f, 82.0f};
 
 __declspec(section ".data") EmSeOffset em015_se_ofs_1C_b = {64.0f, 114.0f};
 
-EmSeRecord em015_se_rec_1C_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a};
+EmSeRecord em015_se_rec_1C_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a.v};
 
 EmSeRecord em015_se_rec_1C_b = {126, 0, 0, 0, 0, {0, 4, 0, 0}, 0};
 
-EmSeRecord em015_se_rec_1C_c = {127, 0, 8, 0, 0, {0, 1, 0, 0}, (const EmSeOffset*)&em015_se_shift.pos_b};
+EmSeRecord em015_se_rec_1C_c = {127, 0, 8, 0, 0, {0, 1, 0, 0}, (const EmSeOffset*)&em015_se_shift.pos_b.v};
 
 EmSeEntry em015_se_seq_1C[9] = {
     {0x0A, {0, 0, 0}, (const EmSeRecord*)&em015_se_pos_1C_a},
@@ -3589,11 +3550,11 @@ EmSeEntry em015_se_seq_7E[6] = {
     {0xFE, {0, 0, 0}, 0},
 };
 
-EmSeRecord em015_se_rec_7F_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a};
+EmSeRecord em015_se_rec_7F_a = {125, 0, 6, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_a.v};
 
 EmSeRecord em015_se_rec_7F_b = {126, 0, 0, 0, 0, {1, 0, 0, 0}, 0};
 
-EmSeRecord em015_se_rec_7F_c = {127, 0, 8, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_b};
+EmSeRecord em015_se_rec_7F_c = {127, 0, 8, 0, 0, {0, 1, 2, 0}, (const EmSeOffset*)&em015_se_shift.pos_b.v};
 
 EmSeEntry em015_se_seq_7F[8] = {
     {0x0A, {0, 0, 0}, (const EmSeRecord*)&em015_se_pos_1C_a},
@@ -4139,8 +4100,6 @@ extern "C" void em015_reposition(_ENEMY_WORK* self) {
     VEC3 dir;
     VEC3 unused;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&unused);
     switch (self->state) {
     case 0: {
         u16 angle;
@@ -4151,9 +4110,7 @@ extern "C" void em015_reposition(_ENEMY_WORK* self) {
         em_move_mode_set(self, 2);
         em_turn_seq_start(self, (void*)em015_turn_seq_swim, 0, 1, 0);
         {
-            VEC3 diff;
-            subVec3(&diff, &self->vec_0x36C, &self->pos);
-            copyVec3(&dir, &diff);
+            dir = self->vec_0x36C - self->pos;
         }
         angle = calcVecAng3(&dir);
         dist = vec3_len((f32*)&dir);
@@ -4315,7 +4272,6 @@ extern "C" void em015_demo_dive_in(_ENEMY_WORK* self) {
 extern "C" void em015_demo_wake(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -4411,7 +4367,6 @@ extern "C" void em015_demo_wake(_ENEMY_WORK* self) {
 extern "C" void em015_demo_arena(_ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -4699,8 +4654,6 @@ extern "C" void em015_mouth_sparks(_ENEMY_WORK* self) {
     VEC3 vec;
     MTX34 mtx;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     if (em_alt_mode_ck(self) == 1) {
         u16 pitch;
 
@@ -4747,12 +4700,8 @@ extern "C" void em015_motion_events(_ENEMY_WORK* self) {
     VEC3 from;
     VEC3 to;
     VEC3 vec;
-    VEC3 sum;
     u8 ground;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
-    VEC3_ctor(&vec);
     em015_mouth_sparks(self);
     switch (em_get_mot_no(self)) {
     case 0x2:
@@ -4951,7 +4900,7 @@ extern "C" void em015_motion_events(_ENEMY_WORK* self) {
         } else if (em_after_frame_check(self, 0, 2.0f, 0.0f) == 1) {
             setVector3(&vec, 0.0f, 0.0f, 200.0f);
             rotVecY(&vec, self->field_0x1C0);
-            addVec3To(&vec, &self->pos);
+            vec += self->pos;
             eft_spawn_pos_in_area(&self->pos, self->area_no, 4, 0, 1.0f);
         }
         break;
@@ -5022,8 +4971,7 @@ extern "C" void em015_motion_events(_ENEMY_WORK* self) {
                 eft026_pl_spawn_c1(self, 1, &vec, 3, get_em_chg_scale(self));
                 setVector3(&vec, 0.0f, 0.0f, 700.0f * get_em_chg_scale(self));
                 rotVecY(&vec, self->field_0x1C0);
-                addVec3(&sum, &self->pos, &vec);
-                copyVec3(&from, copyVec3(&to, &sum));
+                from = to = self->pos + vec;
                 from.y -= 500.0f * get_em_chg_scale(self);
                 to.y += 500.0f * get_em_chg_scale(self);
                 ((ShellJobPairFn)shell_set_func_ptr->method_0x30)(self, 4, &from, &to, 1.0f, 0xFFFF);
@@ -5604,20 +5552,15 @@ void Em015UserData::Attach() {
 u32 em015_ally_front_ck(_ENEMY_WORK* self, u32 arg) {
     VEC3 a;
     VEC3 b;
-    VEC3 rel;
-    VEC3 probe;
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     _ENEMY_WORK* target = em_ally_find(self, 23, 0);
     if (target != 0 && em_act11_wait_ck(target) == 1) {
         if ((arg & 0xFF) == 0) {
             return 1;
         }
         {
-            copyVec3(&b, setVec3(&rel, 0.0f, 0.0f, 900.0f * get_em_chg_scale(self)));
+            b = VEC3(0.0f, 0.0f, 900.0f * get_em_chg_scale(self));
             rotVecY(&b, self->field_0x1C0);
-            addVec3(&probe, &self->pos, &b);
-            copyVec3(&a, &probe);
+            a = self->pos + b;
             f32 dist = calcDistanceSqXZ(&a, &target->pos);
             if (dist < 400.0f * get_em_chg_scale(self) * (400.0f * get_em_chg_scale(self))) {
                 return 1;
@@ -5797,10 +5740,9 @@ void em015_aim_set(_ENEMY_WORK* self) {
 
 /* Fills the shell job's spawn record: type 0x1A, the fixed offset and the three scalars. */
 void em015_spawn_rec_set(EmSpawnRec* out, u8 a, u16 b, u16 c) {
-    VEC3 vec;
-    setVec3(&vec, 0.0f, -45.0f, 70.0f);
+    VEC3 vec(0.0f, -45.0f, 70.0f);
     out->id = 0x1A;
-    copyVec3(&out->pos, &vec);
+    out->pos = vec;
     out->field_0x10 = a;
     out->field_0x12 = b;
     out->field_0x14 = c;

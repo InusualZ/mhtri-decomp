@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-void vec3_scale(VEC3* out, VEC3* in, f32 scale);
 
 #ifdef __cplusplus
 }

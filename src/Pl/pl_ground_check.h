@@ -7,14 +7,14 @@
 #include "nw4r/math.h"
 
 struct _PLW;
-struct LbNpcGround;
+struct LandData;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* 0x802919FC - finds the ground under the player at `pos` (hit_ground_comon); 1 on a hit, the height in `height` */
-s32 pl_ground_check(struct _PLW* self, VEC3* pos, struct LbNpcGround* ground, f32* height, s32 mask);
+s32 pl_ground_check(struct _PLW* self, VEC3* pos, struct LandData* ground, f32* height, s32 mask);
 
 #ifdef __cplusplus
 }

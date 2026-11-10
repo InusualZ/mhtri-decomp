@@ -26,7 +26,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/ENEMY_DATA.h"
 #include "enemy/EnemyData.h"
@@ -71,25 +71,17 @@
 #define em_act_arm_unless_act11_c1 ((void (*)(_ENEMY_WORK *, s32, s32))em_act_arm_unless_act11)
 #define em_hit_window_set_default_c1 ((void (*)(_ENEMY_WORK *, s32, s32))em_hit_window_set_default)
 #define em_act_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 #define em_ground_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))em_ground_ck)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x8017054C): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x8017054C): each vector is constructed into
+ * a temporary and copied (`EmSeShift`).  size: 0x18 */
 struct Em011VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, z) and (0, dy, 0). */
-    Em011VecPair(f32 y, f32 z, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&pos, setVec3(&a, 0.0f, y, z));
-        assignVec3_c1(&step, setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em011VecPair(f32 y, f32 z, f32 dy) : pos(0.0f, y, z), step(0.0f, dy, 0.0f) {}
 };
 
 /* The two vector pairs (`.bss`, defined at the end); three sound records point at them. */
@@ -240,7 +232,7 @@ void em011_frame_update(_ENEMY_WORK *self) {
         }
         entry = (_ENEMY_DATA *)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
         if (entry != NULL) {
-            copyVec3(&self->aim, &entry->vec_0x24);
+            self->aim = entry->vec_0x24;
             if (self->field_0x011 == 0 && entry->work_0x18 != NULL && entry->work_0x18->area_no == self->area_no
                 && em_act_ck_c1(entry->work_0x18, 1, 6) == 1
                 && em_frame_check(entry->work_0x18, 0, 120.0f, 0.0f) == 1 && self->field_0x916 <= 0) {
@@ -1418,19 +1410,16 @@ void em011_act12_dispatch(_ENEMY_WORK *self) {
  * data's sleep offset (default: joint 2, 100 up). */
 void em011_demo_sleep_fx(_ENEMY_WORK *self, u8 phase) {
     VEC3 offset;
-    VEC3 a;
-    VEC3 b;
     EmAilmentFx *fx;
 
-    VEC3_ctor(&offset);
     if (phase == (em_demo_frame_get() & 0x1F)) {
         fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
         if (fx != NULL) {
-            copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
+            offset = VEC3(fx->x, fx->y, fx->z);
             eft013_em_place(self, &offset, fx->joint, fx->scale, 0xA);
             return;
         }
-        copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
+        offset = VEC3(0.0f, 100.0f, 0.0f);
         eft013_em_place(self, &offset, 2, 2.0f, 0xA);
     }
 }
@@ -1715,7 +1704,6 @@ void em011_action_dispatch(_ENEMY_WORK *self) {
 void em011_effect_spawn(_ENEMY_WORK *self, u8 where, u8 id, s32 joint, s32 delta, f32 scale) {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (where) {
     case 0x0:
         eft009_spawn_at_joint(self, (u32)joint, (u32)id, delta, scale);
@@ -1765,7 +1753,6 @@ void em011_guard_state_update(_ENEMY_WORK *self) {
 void em011_motion_events(_ENEMY_WORK *self) {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     em011_guard_state_update(self);
     switch (em_get_mot_no(self)) {
     case 0xB:

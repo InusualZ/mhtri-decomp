@@ -38,7 +38,7 @@
  *     `em_net_recv_target` (three temporaries' stack slots).
  *   - the step tables carry dtk's guessed relocations on words like 0x80190016 (they are data, the linked bytes
  *     agree); `EftFrameStateWork` is `enemy/em_act_step_tail.cpp`'s `EftFrameWork` block (merged by the seam).
- * SHAPES. `&get_worldworld_pos(...)` as `copyVec3`'s source; a `switch` with `default:` first (the `& 0x50`
+ * SHAPES. `&get_worldworld_pos(...)` as `VEC3::operator=`'s source; a `switch` with `default:` first (the `& 0x50`
  *   selections, `emc_net_recv_status`); `(u32)pl_part_flag2_ck(...) == 1` (retail `cmplwi`); the impact act's
  *   `(u32)(step - 2) > 1` range test; `(i * 240) / 2` for the frame records' key frames; local-declaration
  *   order for `pl_frame_hit_set`/`pl_act_hit_react`'s registers; the act tables are each handler's own local
@@ -203,7 +203,7 @@ void eft_frame_state_init(_EFT* self) {
         rec->color_frame = (i * 240) / 2;
         rec->alpha_frame = (i * 60) / 2;
         rec->scale = scale;
-        copyVec3(&rec->pos, &self->pos_0x18);
+        rec->pos = self->pos_0x18;
         rec->color.r = opaque;
         rec->color.g = opaque;
         rec->color.b = opaque;
@@ -260,11 +260,6 @@ void eft_frame_state_step(_EFT* self) {
     s32 i;
     _GXColor color;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&joint_a);
-    VEC3_ctor(&joint_b);
-    VEC3_ctor(&spawn_pos);
     work = (EftFrameStateWork*)self->work_0x38;
     rec = work->recs;
     if (eft_res_spawn_gate_ck(self, self->field_0x07) == 0) {
@@ -294,9 +289,9 @@ void eft_frame_state_step(_EFT* self) {
             mode = eft_stage_spawn_flag(plw) | 1;
         }
         ((EftFramePhysics*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(0, &pos);
-        copyVec3(&self->pos_0x18, &pos);
+        self->pos_0x18 = pos;
         ((EftFramePhysics*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(14, &pos);
-        copyVec3(&spawn_pos, &pos);
+        spawn_pos = pos;
         if (plw->kind_0x09 == 3) {
             pos.y = self->pos_0x18.y - 120.0f;
         } else if (plw->kind_0x09 == 2) {
@@ -348,9 +343,9 @@ void eft_frame_state_step(_EFT* self) {
             return;
         }
         npc->model.get_joint_wpos(0, &pos);
-        copyVec3(&self->pos_0x18, &pos);
+        self->pos_0x18 = pos;
         npc->model.get_joint_wpos(3, &pos);
-        copyVec3(&spawn_pos, &pos);
+        spawn_pos = pos;
         switch (npc->variant) {
         case 3:
             pos.y = self->pos_0x18.y - 60.0f;
@@ -390,7 +385,7 @@ void eft_frame_state_step(_EFT* self) {
     for (i = 0; i < work->count; i++, rec++) {
         switch (self->field_0x06) {
         case 0:
-            copyVec3(&rec->pos, &pos);
+            rec->pos = pos;
             break;
         case 1:
         case 2:
@@ -417,7 +412,7 @@ void eft_frame_state_step(_EFT* self) {
         if (rec->color_frame > 240) {
             rec->color_frame = 0;
         }
-        copyVec3(&rec->pos, &pos);
+        rec->pos = pos;
         if (rec->alpha_frame >= 60) {
             if (++self->field_0x10 >= 2) {
                 self->field_0x10 = 0;
@@ -477,7 +472,7 @@ void eft_frame_state_step(_EFT* self) {
             rec->model->scale_0x1C.x = rec->scale;
             rec->model->scale_0x1C.y = rec->scale * (f32)rec->alpha_frame / 60.0f;
             rec->model->scale_0x1C.z = rec->scale;
-            copyVec3(&rec->model->pos_0x04, &rec->pos);
+            rec->model->pos_0x04 = rec->pos;
             rec->model->field_0x28 = rec->spin;
             rec->model->field_0x2C = rec->seed;
             rec->model->field_0x30 = 0;
@@ -1209,7 +1204,6 @@ void pl_act_lunge_slide(_PLW* plw, s32 variant) {
     f32 start;
     f32 end;
 
-    VEC3_ctor(&step);
     step.x = 0.0f;
     step.y = 0.0f;
     step.z = 0.0f;
@@ -1418,7 +1412,6 @@ void pl_act_handler_08(_PLW* plw, s32 variant) {
     VEC3 pos;
     s32 step;
 
-    VEC3_ctor(&pos);
     pl_act_set_motion_gate(plw, 2);
     step = plw->act_step_0x05;
     if ((u32)(step - 2) > 1) {
@@ -1511,11 +1504,7 @@ void pl_act_handler_10(_PLW* plw, s32 variant) {
     VEC3 pos;
     VEC3 base;
     VEC3 ofs;
-    VEC3 sum;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&base);
-    VEC3_ctor(&ofs);
     switch (plw->act_step_0x05) {
     case 0:
         plw->act_step_0x05 += 1;
@@ -1530,13 +1519,12 @@ void pl_act_handler_10(_PLW* plw, s32 variant) {
         if (Pl_motion_end_ck(plw) == 1) {
             Pl_act_set_motion_slot(plw, 0, 4, 0);
         } else if (Pl_frame_check(plw, 0, 12.0f, 0.0f) == 1) {
-            copyVec3(&base, &plw->vec_0x03C);
+            base = plw->vec_0x03C;
             ofs.x = -30.0f;
             ofs.y = 180.0f;
             ofs.z = 155.0f;
             rotVecY(&ofs, plw->field_0x058);
-            addVec3(&sum, &base, &ofs);
-            copyVec3(&pos, &sum);
+            pos = base + ofs;
             if (variant == 0) {
                 eft019_shot_set(plw, 102, 0, &pos, &plw->rot_0x54, 1.0f);
                 shell_set_func_ptr->method_0x4C(plw, 2, shell_set_func_ptr);
@@ -1967,7 +1955,6 @@ void pl_act_lunge_slide_xyz(_PLW* plw, s32 variant) {
     f32 start;
     f32 end;
 
-    VEC3_ctor(&step);
     step.x = 0.0f;
     step.y = 0.0f;
     step.z = 0.0f;
@@ -1992,7 +1979,7 @@ void pl_act_lunge_slide_xyz(_PLW* plw, s32 variant) {
     }
     if (Pl_frame_check(plw, 3, start, end) == 1) {
         rotVecXYZ(&step, &plw->rot_0x54);
-        addVec3To(&plw->vec_0x03C, &step);
+        plw->vec_0x03C += step;
     }
 }
 
@@ -2011,7 +1998,6 @@ void pl_act_handler_23(_PLW* plw, s32 variant) {
     };
     VEC3 unused_pos;
 
-    VEC3_ctor(&unused_pos);
 
     switch (plw->act_step_0x05) {
     case 0:
@@ -2145,7 +2131,6 @@ void pl_act_handler_27(_PLW* plw, s32 variant) {
     VEC3 pos;
     s32 step;
 
-    VEC3_ctor(&pos);
     pl_act_set_motion_gate(plw, 2);
     step = plw->act_step_0x05;
     switch (step) {
@@ -2236,11 +2221,7 @@ void pl_act_handler_29(_PLW* plw, s32 variant) {
     VEC3 pos;
     VEC3 base;
     VEC3 ofs;
-    VEC3 sum;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&base);
-    VEC3_ctor(&ofs);
     switch (plw->act_step_0x05) {
     case 0:
         plw->act_step_0x05 += 1;
@@ -2255,13 +2236,12 @@ void pl_act_handler_29(_PLW* plw, s32 variant) {
         if (Pl_motion_end_ck(plw) == 1) {
             Pl_act_set_motion_slot(plw, 3, 4, 0);
         } else if (Pl_frame_check(plw, 0, 12.0f, 0.0f) == 1) {
-            copyVec3(&base, &plw->vec_0x03C);
+            base = plw->vec_0x03C;
             ofs.x = -30.0f;
             ofs.y = 180.0f;
             ofs.z = 155.0f;
             rotVecXYZ(&ofs, &plw->rot_0x54);
-            addVec3(&sum, &base, &ofs);
-            copyVec3(&pos, &sum);
+            pos = base + ofs;
             if (variant == 0) {
                 eft019_shot_set(plw, 102, 0, &pos, &plw->rot_0x54, 1.0f);
                 shell_set_func_ptr->method_0x4C(plw, 3, shell_set_func_ptr);
@@ -3090,7 +3070,7 @@ void Pl_net_send_state(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
     msg.hdr.fill(from, to, kind);
     msg.act_mode = plw->field_0x018;
     msg.field_0x04 = param;
-    msg.pos = plw->vec_0x03C;
+    static_cast<_VEC3&>(msg.pos) = plw->vec_0x03C;
     msg.field_0x14 = plw->field_0x0AC;
     msg.field_0x18 = plw->field_0x0A8;
     msg.act_kind = plw->field_0x00A;
@@ -3128,7 +3108,6 @@ void Pl_net_send_state(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */
 NetPlStateMsg::NetPlStateMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received player-state message to the addressed slot's player work: its position target, act,
@@ -3144,7 +3123,7 @@ void Pl_net_recv_state(u8 slot, const NetPlStateMsg* msg) {
         plw->field_0x3D8 = msg->field_0x3D8;
         plw->field_0x3DC = msg->field_0x3DC;
         plw->field_0x018 = msg->act_mode;
-        plw->target_pos_0x090 = msg->pos;
+        static_cast<_VEC3&>(plw->target_pos_0x090) = msg->pos;
         if ((msg->field_0x04 & 4) != 0 || msg->act_kind == 4) {
             pl_pos_blend_start(plw, 0);
         } else {
@@ -3251,7 +3230,7 @@ void Pl_net_send_pos(_PLW* plw, u8 from, u8 to, u8 kind) {
 
     memset(&msg, 0, sizeof(msg));
     msg.hdr.fill(from, to, kind);
-    copyVec3(&msg.pos, &plw->vec_0x03C);
+    msg.pos = plw->vec_0x03C;
     msg.field_0x10 = plw->field_0x0AC;
     msg.field_0x14 = plw->field_0x0A8;
     msg.field_0x18 = 0;
@@ -3268,7 +3247,6 @@ void Pl_net_send_pos(_PLW* plw, u8 from, u8 to, u8 kind) {
 
 /* Constructs the 0x30-byte player message's position sub-object and returns the message. */
 NetPlPosMsg::NetPlPosMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received position message to the addressed slot's player work: the position target, the
@@ -3279,7 +3257,7 @@ void Pl_net_recv_pos(u8 slot, const NetPlPosMsg* msg) {
     if (base != NULL) {
         _PLW* plw = &base[slot].pl;
 
-        copyVec3(&plw->target_pos_0x090, &msg->pos);
+        plw->target_pos_0x090 = msg->pos;
         plw->field_0x0AC = msg->field_0x10;
         plw->field_0x0A8 = msg->field_0x14;
         pl_pos_blend_start(plw, 0x14);
@@ -3320,7 +3298,7 @@ void Pl_net_send_hit(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
         return;
     }
     msg.hdr.fill(my, next, kind);
-    copyVec3(&msg.pos, pos);
+    msg.pos = *pos;
     msg.rot_0x10.x = 0;
     msg.rot_0x10.y = param;
     msg.rot_0x10.z = 0;
@@ -3338,7 +3316,6 @@ void Pl_net_send_hit(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
 
 /* Constructs the 0x28-byte attack message's position sub-object and returns the message. */
 NetPlAtkMsg::NetPlAtkMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Sends the attack message with the caller's attack kind and position, tagged as kind 3. */
@@ -3359,8 +3336,8 @@ void Pl_net_recv_hit(u8 slot, const NetPlAtkMsg* msg, u32 extra) {
     if (base != NULL) {
         _PLW* plw = &base[slot].pl;
 
-        copyVec3(&plw->target_pos_0x090, &msg->pos);
-        copyVec3(&plw->vec_0x03C, &msg->pos);
+        plw->target_pos_0x090 = msg->pos;
+        plw->vec_0x03C = msg->pos;
         eft_rot_vec_copy(&plw->rot_0x54, const_cast<_CP_VECTOR*>(&msg->rot_0x10));
         plw->kind_0x015 = msg->kind_0x15;
         plw->area_0x16 = msg->area_0x16;
@@ -3384,7 +3361,7 @@ void Pl_net_send_extra(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
     msg.hdr.fill(from, to, kind);
     msg.act_mode = plw->field_0x018;
     msg.field_0x04 = param;
-    msg.pos = plw->vec_0x03C;
+    static_cast<_VEC3&>(msg.pos) = plw->vec_0x03C;
     msg.field_0x14 = plw->field_0x0AC;
     msg.field_0x18 = plw->field_0x0A8;
     msg.act_kind = plw->field_0x00A;
@@ -3404,7 +3381,6 @@ void Pl_net_send_extra(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
 
 /* Constructs the 0x38-byte player message's position sub-object and returns the message. */
 NetPlExtraMsg::NetPlExtraMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received extra-state message to the addressed slot's player work: the position target, the
@@ -3417,7 +3393,7 @@ void Pl_net_recv_extra(u8 slot, const NetPlExtraMsg* msg) {
 
         plw->kind_0x015 = msg->kind_0x15;
         plw->area_0x16 = msg->area_0x16;
-        plw->target_pos_0x090 = msg->pos;
+        static_cast<_VEC3&>(plw->target_pos_0x090) = msg->pos;
         if ((msg->field_0x04 & 4) != 0 || msg->act_kind == 4) {
             pl_pos_blend_start(plw, 0);
         } else {
@@ -3517,7 +3493,7 @@ void Pl_net_send_state_alt(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
     msg.hdr.fill(from, to, kind);
     msg.act_mode = plw->field_0x018;
     msg.field_0x04 = param;
-    msg.pos = plw->vec_0x03C;
+    static_cast<_VEC3&>(msg.pos) = plw->vec_0x03C;
     msg.field_0x14 = plw->field_0x0AC;
     msg.field_0x18 = plw->field_0x0A8;
     msg.act_kind = plw->field_0x00A;
@@ -3546,7 +3522,6 @@ void Pl_net_send_state_alt(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */
 NetPlStateAltMsg::NetPlStateAltMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received alternate player-state message to the addressed slot's player work, then re-enters the
@@ -3562,7 +3537,7 @@ void Pl_net_recv_state_alt(u8 slot, const NetPlStateAltMsg* msg) {
         plw->field_0x3D8 = msg->field_0x3D8;
         plw->field_0x3DC = msg->field_0x3DC;
         plw->field_0x018 = msg->act_mode;
-        plw->target_pos_0x090 = msg->pos;
+        static_cast<_VEC3&>(plw->target_pos_0x090) = msg->pos;
         if ((msg->field_0x04 & 4) != 0) {
             pl_pos_blend_start(plw, 0);
         } else {
@@ -3731,9 +3706,9 @@ void em_net_send_state(_ENEMY_WORK* work, u8 from, s32 to, u8 kind, u8 param) {
     msg.hdr.fill(from, to, kind);
     em_net_ident_set(work, work->net_seq_0x01E++, &msg.ident);
     work->sync_flag_0x468 = 0;
-    copyVec3(&msg.pos, &work->pos);
+    msg.pos = work->pos;
     msg.height = work->field_0x1AC;
-    copyVec3(&msg.target, &work->vec_0x36C);
+    msg.target = work->vec_0x36C;
     msg.rot_x = (u16)work->field_0x1BC;
     msg.rot_y = (u16)work->field_0x1C0;
     msg.rot_z = (u16)work->field_0x1C4;
@@ -3827,8 +3802,6 @@ void em_net_send_state(_ENEMY_WORK* work, u8 from, s32 to, u8 kind, u8 param) {
 
 /* Constructs the 0x6C-byte enemy-state message's two position sub-objects and returns the message. */
 NetEmStateMsg::NetEmStateMsg() {
-    VEC3_ctor(&pos);
-    VEC3_ctor(&target);
 }
 
 /* Applies a received enemy-state message: position, target, rotation, the special part and the status
@@ -3844,7 +3817,7 @@ void em_net_recv_state(_ENEMY_WORK* work, NetEmStateMsg* msg) {
         work->field_0x012 = 0;
         em_act_advance(work, 1);
     }
-    copyVec3(&work->pos, &msg->pos);
+    work->pos = msg->pos;
     work->field_0x1AC = msg->height;
     work->field_0x1BC = msg->rot_x;
     work->field_0x1C0 = msg->rot_y;
@@ -3857,7 +3830,7 @@ void em_net_recv_state(_ENEMY_WORK* work, NetEmStateMsg* msg) {
         em_area_change(work, 0);
     }
     work->field_0x9F7 = msg->field_0x9F7;
-    copyVec3(&work->vec_0x36C, &msg->target);
+    work->vec_0x36C = msg->target;
     kind = msg->field_0x380;
     work->field_0x380 = kind;
     mode = msg->state_0x381;
@@ -3984,7 +3957,7 @@ void em_net_send_target(_ENEMY_WORK* work, u8 from, s32 to, u8 kind, u8 param) {
     msg.hdr.fill(from, to, kind);
     em_net_ident_set(work, work->net_seq_0x01E++, &msg.ident);
     work->sync_flag_0x468 = 0;
-    copyVec3(&msg.pos, &work->pos);
+    msg.pos = work->pos;
     msg.height = work->field_0x1AC;
     msg.rot_x = (u16)work->field_0x1BC;
     msg.rot_y = (u16)work->field_0x1C0;
@@ -4018,7 +3991,6 @@ void em_net_send_target(_ENEMY_WORK* work, u8 from, s32 to, u8 kind, u8 param) {
 
 /* Constructs the 0x60-byte enemy-target message's position sub-object and returns the message. */
 NetEmTargetMsg::NetEmTargetMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received enemy-target message: when it is confirmed (or the ready count is one) it moves the
@@ -4029,18 +4001,14 @@ void em_net_recv_target(_ENEMY_WORK* work, const NetEmTargetMsg* msg) {
     VEC3 cur_pos;
     VEC3 new_pos;
 
-    VEC3_ctor(&cur_pos);
-    VEC3_ctor(&new_pos);
     work->sync_flag_0x468 = 0;
     if (msg->confirmed != 0 || isReadyCountOne() == 1) {
         if (work->area_no != msg->area_no && work->field_0x9F7 == msg->area_no) {
-            VEC3 delta;
-
-            copyVec3(&cur_pos, &get_worldworld_pos(&work->pos, work->area_no));
-            copyVec3(&new_pos, &get_worldworld_pos(const_cast<VEC3*>(&msg->pos), msg->area_no));
-            subVec3(&delta, &new_pos, &cur_pos);
-            addVec3To(&work->pos_offset_0x470, &delta);
-            copyVec3(&work->pos, &msg->pos);
+            cur_pos = *(&get_worldworld_pos(&work->pos, work->area_no));
+            new_pos = *(&get_worldworld_pos(const_cast<VEC3*>(&msg->pos), msg->area_no));
+            VEC3 delta = new_pos - cur_pos;
+            work->pos_offset_0x470 += delta;
+            work->pos = msg->pos;
             work->field_0x1AC = msg->height;
             work->field_0x1BC = msg->rot_x;
             work->field_0x1C0 = msg->rot_y;
@@ -4499,7 +4467,7 @@ void emc_net_send_marker(EmcWork* emc, u8 from, s32 to, u8 kind, u16 index) {
     msg.field_0x07 = rec->field_0x07;
     msg.field_0x08 = rec->field_0x08;
     msg.field_0x0A = rec->field_0x0A;
-    copyVec3(&msg.pos, &rec->pos_0x0C);
+    msg.pos = rec->pos_0x0C;
     msg.field_0x18 = (u16)rec->field_0x18;
     msg.field_0x1C = (u16)rec->field_0x1C;
     msg.field_0x20 = (u16)rec->field_0x20;
@@ -4508,7 +4476,6 @@ void emc_net_send_marker(EmcWork* emc, u8 from, s32 to, u8 kind, u16 index) {
 
 /* Constructs the 0x20-byte marker message's position sub-object and returns the message. */
 NetEmcMarkerMsg::NetEmcMarkerMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Replays a received marker on the mini enemy it belongs to, when that enemy is in its first mode. */
@@ -4703,20 +4670,19 @@ void eft_net_send_pos(EftSlot* slot, u8 from, s32 to, u8 kind) {
     msg.hdr.fill(from, to, kind);
     eft_net_ident_set(slot, slot->field_0x04++, &msg.ident);
     slot->field_0x06 = 0;
-    copyVec3(&msg.pos, &slot->pos_0x24);
+    msg.pos = slot->pos_0x24;
     slot->field_0x1E = 0;
     broadcastSessionCommand(&msg, 0x14);
 }
 
 /* Constructs the 0x14-byte effect-slot position message's position sub-object and returns the message. */
 NetEftPosMsg::NetEftPosMsg() {
-    VEC3_ctor(&pos);
 }
 
 /* Applies a received effect-slot position message: the slot's position is replaced. */
 void eft_net_recv_pos(EftSlot* slot, NetEftPosMsg* msg) {
     slot->field_0x06 = 0;
-    copyVec3(&slot->pos_0x24, &msg->pos);
+    slot->pos_0x24 = msg->pos;
     slot->field_0x1E = 0;
 }
 

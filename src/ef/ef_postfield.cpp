@@ -52,7 +52,7 @@
 #include "ef/ef_postfield.h"
 #include "sys_mem.h"
 #include "unsplit/ef.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8.h" /* vec3_length_sq, abs_f32 (rule 2) */
 #include "nw4r/mtx34_mult_vec3.h" /* mtx34_mult_vec3 (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
@@ -111,10 +111,9 @@ typedef struct EfPostFieldTransform {
 /* 0x800AEE48 (0x13C): where `pos` (in the field's unit space) lies against the unit sphere: 3 outside, 1 on its
  * surface (or on the cut plane of a hemisphere), 2 inside; `option` bit 0 keeps the upper half, bit 1 the lower. */
 s32 ef_pf_collision_sphere(const VEC3* pos, u8 option) {
-    VEC3 p;
     f32 length;
 
-    assignVec3((Vec*)&p, (Vec*)pos);
+    VEC3 p = *pos;
     if (p.y < -1.0f || p.y > 1.0f) {
         return 3;
     }
@@ -145,10 +144,9 @@ s32 ef_pf_collision_sphere(const VEC3* pos, u8 option) {
 
 /* 0x800AEF84 (0xE4): where `pos` lies against the unit cube: 3 outside, 1 on a face, 2 inside. */
 s32 ef_pf_collision_cube(const VEC3* pos, u8 option) {
-    VEC3 p;
     bool surface;
 
-    assignVec3((Vec*)&p, (Vec*)pos);
+    VEC3 p = *pos;
     surface = false;
     if (p.x < -1.0f || p.x > 1.0f) {
         return 3;
@@ -173,10 +171,9 @@ s32 ef_pf_collision_cube(const VEC3* pos, u8 option) {
 
 /* 0x800AF068 (0xCC): where `pos` lies against the unit cylinder (axis Y): 3 outside, 1 on its surface, 2 inside. */
 s32 ef_pf_collision_cylinder(const VEC3* pos, u8 option) {
-    VEC3 p;
     f32 radius;
 
-    assignVec3((Vec*)&p, (Vec*)pos);
+    VEC3 p = *pos;
     if (p.y < -1.0f || p.y > 1.0f) {
         return 3;
     }
@@ -204,10 +201,9 @@ s32 ef_pf_collision_cylinder(const VEC3* pos, u8 option) {
 s32 ef_pf_collision_circle(const VEC3* pos, u8 axis) {
     VEC3 p;
 
-    VEC3_ctor(&p);
     switch (axis) {
     case 0:
-        copyVec3(&p, pos);
+        p = *pos;
         break;
     case 1:
         p.x = pos->x;
@@ -243,10 +239,9 @@ s32 ef_pf_collision_circle(const VEC3* pos, u8 axis) {
 s32 ef_pf_collision_rectangle(const VEC3* pos, u8 axis) {
     VEC3 p;
 
-    VEC3_ctor(&p);
     switch (axis) {
     case 0:
-        copyVec3(&p, pos);
+        p = *pos;
         break;
     case 1:
         p.x = pos->x;
@@ -278,10 +273,9 @@ s32 ef_pf_collision_rectangle(const VEC3* pos, u8 axis) {
 s32 ef_pf_collision_plane(const VEC3* pos, u8 axis) {
     VEC3 p;
 
-    VEC3_ctor(&p);
     switch (axis) {
     case 0:
-        copyVec3(&p, pos);
+        p = *pos;
         break;
     case 1:
         p.x = pos->x;
@@ -343,7 +337,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_a1;
             f32 t;
 
-            VEC3_ctor(&unused_a1);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -358,7 +351,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_a2;
             f32 t;
 
-            VEC3_ctor(&unused_a2);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -378,7 +370,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_b1;
             f32 t;
 
-            VEC3_ctor(&unused_b1);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -393,7 +384,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_b2;
             f32 t;
 
-            VEC3_ctor(&unused_b2);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -413,7 +403,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_c1;
             f32 t;
 
-            VEC3_ctor(&unused_c1);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -428,7 +417,6 @@ f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* c
             VEC3 unused_c2;
             f32 t;
 
-            VEC3_ctor(&unused_c2);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if ((info->flags & 2) != 0) {
@@ -475,7 +463,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_a1;
             f32 t;
 
-            VEC3_ctor(&unused_a1);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
@@ -493,7 +480,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_a2;
             f32 t;
 
-            VEC3_ctor(&unused_a2);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
@@ -516,7 +502,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_b1;
             f32 t;
 
-            VEC3_ctor(&unused_b1);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->y) < EF_PF_ONE_ULP1) {
@@ -534,7 +519,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_b2;
             f32 t;
 
-            VEC3_ctor(&unused_b2);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->y) < EF_PF_ONE_ULP1) {
@@ -557,7 +541,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_c1;
             f32 t;
 
-            VEC3_ctor(&unused_c1);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->y) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
@@ -575,7 +558,6 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
             VEC3 unused_c2;
             f32 t;
 
-            VEC3_ctor(&unused_c2);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if (abs_f32(hit->y) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
@@ -609,7 +591,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_a1;
             f32 t;
 
-            VEC3_ctor(&unused_a1);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->x * hit->x + hit->z * hit->z < EF_PF_ONE_ULP2) {
@@ -627,7 +608,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_a2;
             f32 t;
 
-            VEC3_ctor(&unused_a2);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->x * hit->x + hit->z * hit->z < EF_PF_ONE_ULP2) {
@@ -650,7 +630,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_b1;
             f32 t;
 
-            VEC3_ctor(&unused_b1);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->x * hit->x + hit->y * hit->y < EF_PF_ONE_ULP2) {
@@ -668,7 +647,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_b2;
             f32 t;
 
-            VEC3_ctor(&unused_b2);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->x * hit->x + hit->y * hit->y < EF_PF_ONE_ULP2) {
@@ -691,7 +669,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_c1;
             f32 t;
 
-            VEC3_ctor(&unused_c1);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->y * hit->y + hit->z * hit->z < EF_PF_ONE_ULP2) {
@@ -709,7 +686,6 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 unused_c2;
             f32 t;
 
-            VEC3_ctor(&unused_c2);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
             if (hit->y * hit->y + hit->z * hit->z < EF_PF_ONE_ULP2) {
@@ -764,11 +740,10 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
     if (t1 > 0.0f && t1 < EF_PF_ONE_ULP1 && t1 < best) {
         VEC3 far_hit;
 
-        VEC3_ctor(&far_hit);
         ef_vec3_lerp(&far_hit, prev, cur, t1);
         if (!(info->option == 1 && far_hit.y < -EF_PF_EPSILON) &&
             !(info->option == 2 && far_hit.y > EF_PF_EPSILON)) {
-            copyVec3(hit, &far_hit);
+            *hit = far_hit;
             best = t1;
         }
     }
@@ -777,11 +752,10 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 cap_hit_a;
             f32 t;
 
-            VEC3_ctor(&cap_hit_a);
             t = -prev->y / dir->y;
             ef_vec3_lerp(&cap_hit_a, prev, cur, t);
             if (t < best && cap_hit_a.x * cap_hit_a.x + cap_hit_a.z * cap_hit_a.z < EF_PF_ONE_ULP2) {
-                copyVec3(hit, &cap_hit_a);
+                *hit = cap_hit_a;
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
@@ -794,11 +768,10 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3 cap_hit_b;
             f32 t;
 
-            VEC3_ctor(&cap_hit_b);
             t = -prev->y / dir->y;
             ef_vec3_lerp(&cap_hit_b, prev, cur, t);
             if (t < best && cap_hit_b.x * cap_hit_b.x + cap_hit_b.z * cap_hit_b.z < EF_PF_ONE_ULP2) {
-                copyVec3(hit, &cap_hit_b);
+                *hit = cap_hit_b;
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
@@ -811,9 +784,6 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
     }
     if (best < 2.0f) {
         if ((info->flags & 2) != 0) {
-            MTX34 frame;
-            VEC3 local;
-            VEC3 normal_part;
             f32 r = sqrt_f32(1.0f - hit->z * hit->z);
             f32 s;
             f32 c;
@@ -825,7 +795,7 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
                 c = 1.0f;
                 s = 0.0f;
             }
-            MTX34_ctor(&frame);
+            MTX34 frame;
             frame.m[0][0] = c;
             frame.m[0][1] = hit->x;
             frame.m[0][2] = hit->z * s;
@@ -839,8 +809,8 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             frame.m[2][2] = r;
             frame.m[2][3] = 0.0f;
             mtx34_inverse(&frame, &frame);
-            VEC3_ctor(&local);
-            VEC3_ctor(&normal_part);
+            VEC3 local;
+            VEC3 normal_part;
             mtx34_mult_vec3(&local, &frame, dir);
             vec3_scale_by((f32*)&normal_part, (const f32*)hit, local.y);
             vec3_sub_assign((Vec*)dir, (Vec*)&normal_part);
@@ -899,10 +869,9 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
     if (t1 > 0.0f && t1 < EF_PF_ONE_ULP1 && t1 < best) {
         VEC3 far_hit;
 
-        VEC3_ctor(&far_hit);
         ef_vec3_lerp(&far_hit, prev, cur, t1);
         if (abs_f32(far_hit.y) < EF_PF_ONE_ULP1) {
-            copyVec3(hit, &far_hit);
+            *hit = far_hit;
             best = t1;
         }
     }
@@ -913,11 +882,10 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             if (prev->y > level && cur->y < EF_PF_EPSILON + level) {
                 VEC3 cap_hit_a1;
 
-                VEC3_ctor(&cap_hit_a1);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_a1, prev, cur, t1);
                 if (t1 < best && cap_hit_a1.x * cap_hit_a1.x + cap_hit_a1.z * cap_hit_a1.z < EF_PF_ONE_ULP2) {
-                    copyVec3(hit, &cap_hit_a1);
+                    *hit = cap_hit_a1;
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
@@ -929,11 +897,10 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             } else if (prev->y < level && cur->y > EF_PF_EPSILON + level) {
                 VEC3 cap_hit_a2;
 
-                VEC3_ctor(&cap_hit_a2);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_a2, prev, cur, t1);
                 if (t1 < best && cap_hit_a2.x * cap_hit_a2.x + cap_hit_a2.z * cap_hit_a2.z < EF_PF_ONE_ULP2) {
-                    copyVec3(hit, &cap_hit_a2);
+                    *hit = cap_hit_a2;
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
@@ -952,11 +919,10 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             if (prev->y > level && cur->y < EF_PF_EPSILON + level) {
                 VEC3 cap_hit_b1;
 
-                VEC3_ctor(&cap_hit_b1);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_b1, prev, cur, t1);
                 if (t1 < best && cap_hit_b1.x * cap_hit_b1.x + cap_hit_b1.z * cap_hit_b1.z < EF_PF_ONE_ULP2) {
-                    copyVec3(hit, &cap_hit_b1);
+                    *hit = cap_hit_b1;
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
@@ -968,11 +934,10 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             } else if (prev->y < level && cur->y > EF_PF_EPSILON + level) {
                 VEC3 cap_hit_b2;
 
-                VEC3_ctor(&cap_hit_b2);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_b2, prev, cur, t1);
                 if (t1 < best && cap_hit_b2.x * cap_hit_b2.x + cap_hit_b2.z * cap_hit_b2.z < EF_PF_ONE_ULP2) {
-                    copyVec3(hit, &cap_hit_b2);
+                    *hit = cap_hit_b2;
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
@@ -989,7 +954,6 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             VEC3 normal;
             f32 d;
 
-            VEC3_ctor(&normal);
             sqrt_f32(dir->x * dir->x + dir->z * dir->z);
             d = dir->x * hit->x + dir->z * hit->z;
             normal.x = hit->x;
@@ -1035,7 +999,6 @@ f32 ef_pf_hit_cube(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cu
     VEC3 face_hit;
     f32 t;
 
-    VEC3_ctor(&face_hit);
     t = (1.0f - prev->x) / dir->x;
     if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
@@ -1145,11 +1108,10 @@ f32 ef_pf_hit_cube(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cu
 s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInfo* info, EffectHandle* eh,
                   EfDrawParticle* p, const VEC3* prev, const VEC3* cur, VEC3* velocity, u8* killed, VEC3* hit,
                   VEC3* hit_world, VEC3* out_pos, VEC3* out_velocity) {
-    VEC3 dir;
     f32 t;
 
     ef_pf_collision_test(info->shape, cur, info->option);
-    VEC3_ctor(&dir);
+    VEC3 dir;
     PSVECSubtract((f32*)&dir, (const f32*)cur, (const f32*)prev);
     t = 2.0f;
     switch (info->shape) {
@@ -1179,13 +1141,11 @@ s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInf
         return 0;
     }
     if ((info->flags & 2) != 0 || (info->flags & 8) != 0) {
-        VEC3 rest;
-
         mtx34_mult_vec3(out_velocity, world_mtx, velocity);
         out_velocity->x *= info->scale.x;
         out_velocity->y *= info->scale.y;
         out_velocity->z *= info->scale.z;
-        VEC3_ctor(&rest);
+        VEC3 rest;
         vec3_scale_by((f32*)&rest, (const f32*)&dir, 1.0f - t);
         mtx34_mult_vec3(&rest, world_mtx, &rest);
         rest.x *= info->scale.x;
@@ -1195,7 +1155,7 @@ s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInf
     }
     if ((info->flags & 0x40) != 0) {
         *killed = 1;
-        copyVec3(out_pos, hit_world);
+        *out_pos = *hit_world;
     }
     if ((info->flags & 0x10) != 0 && eh != NULL) {
         ef_creation_queue_add_type0((CreationQueue*)p->manager->emitter->effect->system->creation_queue,
@@ -1219,42 +1179,35 @@ s32 ef_pf_calc_particle(EfDrawParticle* p, const EfPostFieldTransform* xform, Ef
                         EffectHandle* eh, const MTX34* emitter_mtx, const MTX34* pm_mtx, const VEC3* pos,
                         VEC3* offset, VEC3* velocity, u8* killed) {
     MTX34 mtx;
-    MTX34 rot;
-    MTX34 rot_mtx;
-    MTX34 inv;
-    MTX34 rot_inv;
-    VEC3 emitter_pos;
-    VEC3 local_pos;
-    VEC3 local_next;
-    VEC3 local_vel;
     u8 state;
     u8 prev_state;
     f32 speed_sq;
     s32 i;
 
-    MTX34_ctor(&mtx);
     mtx34_identity(&mtx);
     ef_mtx34_scale_columns((f32*)&mtx, (const f32*)&xform->scale, (const f32*)&mtx);
-    MTX34_ctor(&rot);
+    MTX34 rot;
+    _MTX34 rot_mtx;
     ef_mtx34_rotate_xyz((f32*)&rot, xform->rotate.x, xform->rotate.y, xform->rotate.z);
     mtx34_concat(&mtx, &rot, &mtx);
     mtx34_trans_apply(&mtx, &xform->translate, &mtx);
     if ((info->flags & 1) != 0) {
-        setVec3(&emitter_pos, emitter_mtx->m[0][3], emitter_mtx->m[1][3], emitter_mtx->m[2][3]);
+        VEC3 emitter_pos(emitter_mtx->m[0][3], emitter_mtx->m[1][3], emitter_mtx->m[2][3]);
         mtx34_trans_apply(&mtx, &emitter_pos, &mtx);
     }
     mtx34_concat(&mtx, pm_mtx, &mtx);
-    ef_mtx34_copy(&rot_mtx, &mtx);
+    ef_mtx34_copy((MTX34*)&rot_mtx, &mtx);
     rot_mtx.m[0][3] = 0.0f;
     rot_mtx.m[1][3] = 0.0f;
     rot_mtx.m[2][3] = 0.0f;
-    MTX34_ctor(&inv);
+    MTX34 inv;
+    _MTX34 rot_inv;
     mtx34_inverse(&inv, &mtx);
-    ef_mtx34_copy(&rot_inv, &inv);
+    ef_mtx34_copy((MTX34*)&rot_inv, &inv);
     rot_inv.m[0][3] = 0.0f;
     rot_inv.m[1][3] = 0.0f;
     rot_inv.m[2][3] = 0.0f;
-    VEC3_ctor(&local_pos);
+    VEC3 local_pos;
     mtx34_mult_vec3(&local_pos, &inv, pos);
     state = ef_pf_collision_test(info->shape, &local_pos, info->option);
     prev_state = p->collision_state;
@@ -1327,13 +1280,13 @@ s32 ef_pf_calc_particle(EfDrawParticle* p, const EfPostFieldTransform* xform, Ef
         }
         return 1;
     }
-    VEC3_ctor(&local_next);
+    VEC3 local_next;
     local_next.x = pos->x + p->step * (offset->x + velocity->x);
     local_next.y = pos->y + p->step * (offset->y + velocity->y);
     local_next.z = pos->z + p->step * (offset->z + velocity->z);
     mtx34_mult_vec3(&local_next, &inv, &local_next);
-    VEC3_ctor(&local_vel);
-    mtx34_mult_vec3(&local_vel, &rot_inv, velocity);
+    VEC3 local_vel;
+    mtx34_mult_vec3(&local_vel, (MTX34*)&rot_inv, velocity);
     for (i = 0; i < 5; i++) {
         VEC3 hit;
         VEC3 hit_world;
@@ -1341,29 +1294,25 @@ s32 ef_pf_calc_particle(EfDrawParticle* p, const EfPostFieldTransform* xform, Ef
         VEC3 out_vel;
         s32 collided;
 
-        VEC3_ctor(&hit);
-        VEC3_ctor(&hit_world);
-        VEC3_ctor(&out_pos);
-        VEC3_ctor(&out_vel);
         if (ef_vec3_dist_sq(&local_pos, &local_next) < 1.4210855e-14f) {
             collided = 0;
         } else {
-            VEC3 step_vel = local_vel;
+            _VEC3 step_vel = local_vel;
 
-            collided = ef_pf_collide(&mtx, &rot_mtx, info, eh, p, &local_pos, &local_next, &step_vel, killed, &hit,
+            collided = ef_pf_collide(&mtx, (MTX34*)&rot_mtx, info, eh, p, &local_pos, &local_next, (VEC3*)&step_vel, killed, &hit,
                                      &hit_world, &out_pos, &out_vel);
         }
         if (collided != 0) {
-            copyVec3((VEC3*)&p->world_pos, &out_pos);
-            copyVec3(&p->velocity, &out_vel);
+            *(VEC3*)&p->world_pos = out_pos;
+            p->velocity = out_vel;
             p->collision_state |= 0x80;
             if (*killed != 0) {
                 return 0;
             }
             state = 1;
-            copyVec3(&local_pos, &hit);
+            local_pos = hit;
             mtx34_mult_vec3(&local_next, &inv, &out_pos);
-            mtx34_mult_vec3(&local_vel, &rot_inv, &out_vel);
+            mtx34_mult_vec3(&local_vel, (MTX34*)&rot_inv, &out_vel);
         } else {
             if (i == 0) {
                 if (p->age > info->start_age &&
@@ -1534,7 +1483,7 @@ void ef_res_emitterparam_set_scale(void* self, f32 value) {
 
 /* Copies a source block over the resolved parameter's second block. */
 void ef_res_emitterparam_set_vec(void* self, const nw4r::math::VEC3* src) {
-    copyVec3(&ef_res_emitterparam_data((EfResAccessor*)self)->field_0x54, src);
+    *(&ef_res_emitterparam_data((EfResAccessor*)self)->field_0x54) = *src;
 }
 
 #pragma dont_inline reset

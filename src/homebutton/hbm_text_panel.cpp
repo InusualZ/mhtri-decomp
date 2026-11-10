@@ -5392,7 +5392,7 @@ void hbmKbWidgetCreatePanel(HbmPanelView* self, MEMAllocator* allocator, HbmText
     self->writer.fontWidth = box->mFontSize.width;
     self->writer.fontHeight = box->mFontSize.height;
     self->textRect = box->GetPaneRect(self->drawInfo);
-    self->anim.v_0x06C(self->textMtx, &self->drawInfo, &box->mGlbMtx);
+    self->anim.v_0x06C(self->textMtx, &self->drawInfo, (const nw4r::math::MTX34*)&box->mGlbMtx);
     s_colorShadow = box->GetTextColor(0);
     hbmPanelPaneManager(self)->setPaneVisible("N_2line", 1);
     hbmPanelPaneManager(self)->mpRoot->setVisible(0);
@@ -5449,7 +5449,7 @@ void hbmKbWidgetReset(HbmPanelView* self)
     self->writer.fontWidth = box->mFontSize.width;
     self->writer.fontHeight = box->mFontSize.height;
     self->textRect = box->GetPaneRect(self->drawInfo);
-    self->anim.v_0x06C(self->textMtx, &self->drawInfo, &box->mGlbMtx);
+    self->anim.v_0x06C(self->textMtx, &self->drawInfo, (const nw4r::math::MTX34*)&box->mGlbMtx);
     self->anim.layout->v_0x038(0);
     self->anim.layout->v_0x030(&self->drawInfo);
     self->writer.textHeight = 1.0f + self->scrollY;
@@ -5470,7 +5470,7 @@ void hbmKbWidgetCalc(HbmPanelView* self)
     ((HbmPaneManager*)&self->anim)->HbmPaneManager::calcComponents();
     self->textAlpha = ((nw4r::lyt::Pane*)self->anim.v_0x028()->rootPane)->mAlpha;
     box = (nw4r::lyt::Pane*)self->anim.layout->rootPane->v_0x03C(self->textBoxName, 1);
-    self->anim.v_0x06C(self->textMtx, &self->drawInfo, &box->mGlbMtx);
+    self->anim.v_0x06C(self->textMtx, &self->drawInfo, (const nw4r::math::MTX34*)&box->mGlbMtx);
     hbmPanelLayoutText(self);
 }
 

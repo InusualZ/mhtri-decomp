@@ -66,11 +66,6 @@ extern const f32 ef_emitterform_life_max;
  * `offset` and the two rotated axes `rot`/`rot2`; each stage sits behind a non-zero weight in `em`. */
 void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot, Vec* rot2)
 {
-    Mtx34 mtx_a;
-    VEC3 tmp;
-    VEC3 axis_a;
-    Mtx34 mtx_b;
-    Mtx34 axis_b;
     f32 ang;
     f32 s1;
     f32 c1;
@@ -95,7 +90,7 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
         nw4r::db::Panic("ef_emitterform.cpp", 49, "NW4R:Pointer Error\nem(=%p) is not valid pointer.", em);
     }
 
-    VEC3_ctor(&tmp);
+    VEC3 tmp;
 
     if (0.0f != (dir_weight = em->dir_weight)) {
         vec3_scale_by(out, rot);
@@ -131,18 +126,18 @@ void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* of
 
     if (0.0f != em->axis_angle_scale) {
         if (0.0f == em->axis_angle_y) {
-            MTX34_ctor(&mtx_a);
+            Mtx34 mtx_a;
             ef_mtx34_rotate_xyz(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
-            setVec3(&axis_a, 0.0f, 1.0f, 0.0f);
+            VEC3 axis_a(0.0f, 1.0f, 0.0f);
             mtx34_mult_vec3(&axis_a, &mtx_a, &axis_a);
             out->x += em->axis_angle_scale * axis_a.x;
             out->y += em->axis_angle_scale * axis_a.y;
             out->z += em->axis_angle_scale * axis_a.z;
         } else {
-            MTX34_ctor(&mtx_b);
+            Mtx34 mtx_b;
             ang = 2.0f * (3.1415927f * ef_random_float(&em->progress));
             ef_mtx34_rotate_xyz(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, 0.0f);
-            MTX34_ctor(&axis_b);
+            Mtx34 axis_b;
             ef_mtx34_rotate_xyz(&axis_b, em->euler_x, em->euler_y, em->euler_z);
             mtx34_concat(&mtx_b, &axis_b, &mtx_b);
             out->x += mtx_b.m[0][1] * em->axis_angle_scale;

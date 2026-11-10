@@ -78,7 +78,7 @@
 #include "enemy/em_common.h"
 #include "enemy/fn_8012BDF4.h"
 #include "stage/get_now_mapno.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "nw4r/math.h"
 #include "ef/mtx34_trans_add.h"
 #include "ef/mtx34_trans_get.h"
@@ -1661,7 +1661,7 @@ _EFT* eft_em_create(struct _ENEMY_WORK* self, u8 id, u32 joint, nw4r::math::VEC3
     work->scale_0x08 = scale;
     work->joint_0x0C = joint;
     if (pos != NULL) {
-        copyVec3(&work->offset_0x10, pos);
+        work->offset_0x10 = *pos;
     } else {
         setVector3(&work->offset_0x10, 0.0f, 0.0f, 0.0f);
     }
@@ -1725,8 +1725,6 @@ void eft_em_model_create(_EFT* self) {
     u16 res;
     s32 i;
 
-    VEC3_ctor(&ofs);
-    MTX34_ctor(&mtx);
     work = (EftEmWork*)self->work_0x38;
     enemy = (struct _ENEMY_WORK*)self->source_0x30;
     self->state_0x05++;
@@ -1776,16 +1774,16 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
         break;
     case 0x1D: case 0x29: case 0x2A: case 0x3A: case 0x52: case 0x61: case 0x6F: case 0x89: case 0x90: case 0x94:
     case 0x95: case 0x96: case 0x97: case 0x98: case 0x99: case 0xA9: case 0xAA: case 0xB5: case 0xC4: case 0xC5:
     case 0xC8: case 0xCC:
         get_joint_wmat_em(enemy, work->joint_0x0C, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
         mtx34_trans_add(&mtx, &ofs);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -1797,7 +1795,7 @@ void eft_em_model_create(_EFT* self) {
         SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
         break;
     case 0x30: case 0xCF: case 0xD1:
-        copyVec3(&self->pos_0x18, &enemy->pos);
+        self->pos_0x18 = enemy->pos;
         self->pos_0x18.y = enemy->field_0x210 - 5.0f;
         SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
         break;
@@ -1813,9 +1811,9 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         work->effect_0x04->SetRootMtx(mtx);
         break;
@@ -1831,9 +1829,9 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         self->pos_0x18.y = 5.0f + enemy->field_0x20C;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         work->effect_0x04->SetRootMtx(mtx);
@@ -1842,9 +1840,9 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         self->pos_0x18.y = 5.0f + enemy->field_0x210;
         SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
         break;
@@ -1853,9 +1851,9 @@ void eft_em_model_create(_EFT* self) {
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         self->rot_0x24.y += 0x4000;
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         work->effect_0x04->SetRootMtx(mtx);
         break;
@@ -1864,9 +1862,9 @@ void eft_em_model_create(_EFT* self) {
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         self->rot_0x24.y += 0xC000;
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         work->effect_0x04->SetRootMtx(mtx);
         break;
@@ -1874,16 +1872,16 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         rotLocalMatY(work->param_0x1C, &mtx);
         work->effect_0x04->SetRootMtx(mtx);
         break;
     case 0x91:
         get_joint_wmat_em(enemy, work->joint_0x0C, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
         mtx34_trans_add(&mtx, &ofs);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -1894,9 +1892,9 @@ void eft_em_model_create(_EFT* self) {
         work->scale_0x08 *= get_em_scale(enemy);
         get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         self->pos_0x18.y = enemy->field_0x20C;
         mtx34_set_trans(&mtx, &self->pos_0x18);
         rotLocalMatY(work->param_0x1C, &mtx);
@@ -1904,7 +1902,7 @@ void eft_em_model_create(_EFT* self) {
         break;
     case 0xBD: case 0xBE: case 0xBF: case 0xC0: case 0xC1: case 0xC9:
         get_joint_wmat_em(enemy, work->joint_0x0C, &mtx);
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
         mtx34_trans_add(&mtx, &ofs);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -1940,9 +1938,9 @@ void eft_em_model_create(_EFT* self) {
         case 0xAB:
             get_joint_wpos_em(enemy, work->joint_0x0C, &self->pos_0x18);
             cpSetRotMatrix(&self->rot_0x24, &mtx);
-            copyVec3(&ofs, &work->offset_0x10);
+            ofs = work->offset_0x10;
             mulVecMat(&ofs, &mtx);
-            addVec3To(&self->pos_0x18, &ofs);
+            self->pos_0x18 += ofs;
             se_req_pos_ps(enemy->se_0xB14, 0xAA, 2, &self->pos_0x18);
             break;
         case 0xAF:
@@ -1951,9 +1949,9 @@ void eft_em_model_create(_EFT* self) {
         case 0xBC:
             get_joint_wmat_em(enemy, work->joint_0x0C, &mtx);
             mtx34_trans_get(&mtx, &self->pos_0x18);
-            copyVec3(&ofs, &work->offset_0x10);
+            ofs = work->offset_0x10;
             mulVecMat(&ofs, &mtx);
-            addVec3To(&self->pos_0x18, &ofs);
+            self->pos_0x18 += ofs;
             se_req_pos_ps(enemy->se_0xB14, 0xB4, 2, &self->pos_0x18);
             break;
         case 0xD1:
@@ -1979,9 +1977,6 @@ void eft_em_move(_EFT* self) {
     u8* keys;
     u32 c;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&scale);
-    MTX34_ctor(&mtx);
     work = (EftEmWork*)self->work_0x38;
     enemy = (struct _ENEMY_WORK*)self->source_0x30;
     if (em_work_die_ck(enemy) != 0) {
@@ -2031,7 +2026,7 @@ void eft_em_move(_EFT* self) {
         break;
     }
     if (placed == 1) {
-        copyVec3(&ofs, &work->offset_0x10);
+        ofs = work->offset_0x10;
         mulVecMat(&ofs, &mtx);
         mtx34_trans_add(&mtx, &ofs);
         switch (self->type_0x02) {

@@ -53,15 +53,15 @@
 #include "gx.h"
 #include "ef.h"
 #include "pl.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() */
 #include "fn_8004CAD8.h" /* mtx34_identity, mtx34_concat_assign, cpSetRotMatrix, rotVecY, rotMatrixY (rule 2) */
 #include "scaleMat34W.h"
 #include "rotMatrixXYZ.h"
 #include "ef/pRoot.h"
 #include "ef/eft004.h" /* mtx34_trans_add / mtx34_trans_get */
 #include "ef/eft001.h" /* mtx34_set_trans */
-#include "g3d/g3d_calcworld.h" /* addVec3To */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode */
 #include "g3d/res_node_mtx_id_get.h"
 #include "rotLocalMatX.h" /* rotLocalMatZ */
@@ -270,7 +270,7 @@ void eft_spawn_pos_in_area(VEC3* arg0, u8 arg1, u8 arg2, u32 arg3, f32 farg0)
             work->head.fx.scale_0x0C = farg0;
             eft->field_0x03 = 0x11;
             eft->type_0x02 = arg2;
-            copyVec3(&eft->pos_0x18, arg0);
+            eft->pos_0x18 = *arg0;
             eft->rot_0x24.y = arg3;
             eft->area_0x44 = arg1;
             eft->release_0x40 = eft_area_effect_release;
@@ -319,7 +319,6 @@ void eft_area_effect_create(_EFT* self)
     EftWork* work;
     u32 color;
 
-    MTX34_ctor(&mtx);
     work = EFT_WORK(self);
     self->state_0x05++;
     work->head.fx.effect = res_eft_create(eft_area_effect_groups[self->type_0x02], eft_area_effect_ids[self->type_0x02], 0);
@@ -527,7 +526,7 @@ void eft_light_lantern_init(_EFT* self)
     eft_light_sub_part_show(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3(&work->slots_0x10.items.items_0x10[i]->scale_0x1C, 1.0f, 1.0f, 1.0f);
-        copyVec3(&work->head.scale_0x04, &work->slots_0x10.items.items_0x10[i]->scale_0x1C);
+        work->head.scale_0x04 = work->slots_0x10.items.items_0x10[i]->scale_0x1C;
         work->slots_0x10.items.items_0x10[i]->ready = 0;
     }
     work->light_id_0x2C = light_id_next();
@@ -542,10 +541,6 @@ void eft_light_lantern_init(_EFT* self)
 void eft_light_drop_init(_EFT* self)
 {
     EftWork* work;
-    VEC3 offset;
-    MTX34 unused;
-    MTX34 local;
-    MTX34 tex_mtx;
     s32 i;
     s32 joint;
     u16 id;
@@ -554,10 +549,10 @@ void eft_light_drop_init(_EFT* self)
 
     source = (_PLW*)self->source_0x30;
     work = EFT_WORK(self);
-    VEC3_ctor(&offset);
-    MTX34_ctor(&unused);
-    MTX34_ctor(&local);
-    MTX34_ctor(&tex_mtx);
+    VEC3 offset;
+    MTX34 unused;
+    MTX34 local;
+    MTX34 tex_mtx;
     self->state_0x05++;
     if (GameMode_ck() == 2) {
         id = 0xA7;
@@ -665,7 +660,7 @@ void eft_light_npc_init(_EFT* self)
     eft_light_npc_part_show(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3(&work->slots_0x10.items.items_0x10[i]->scale_0x1C, 1.0f, 1.0f, 1.0f);
-        copyVec3(&work->head.scale_0x04, &work->slots_0x10.items.items_0x10[i]->scale_0x1C);
+        work->head.scale_0x04 = work->slots_0x10.items.items_0x10[i]->scale_0x1C;
         work->slots_0x10.items.items_0x10[i]->ready = 0;
     }
     work->light_id_0x2C = light_id_next();
@@ -687,7 +682,7 @@ void eft_light_lobby_init(_EFT* self)
     eft_light_lobby_part_show(self, 0);
     for (i = 0; i < work->count; i++) {
         setVector3(&work->slots_0x10.items.items_0x10[i]->scale_0x1C, 1.0f, 1.0f, 1.0f);
-        copyVec3(&work->head.scale_0x04, &work->slots_0x10.items.items_0x10[i]->scale_0x1C);
+        work->head.scale_0x04 = work->slots_0x10.items.items_0x10[i]->scale_0x1C;
         work->slots_0x10.items.items_0x10[i]->ready = 0;
     }
     eft_light_update(self);
@@ -719,16 +714,13 @@ void eft_light_trail_update(_EFT* self, u8 active)
 {
     EftWork* work;
     _PLW* source;
-    MTX34 mtx;
-    VEC3 pos;
-    VEC3 offset;
     s32 i;
 
     work = EFT_WORK(self);
     source = (_PLW*)self->source_0x30;
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&offset);
+    MTX34 mtx;
+    VEC3 pos;
+    VEC3 offset;
     if (work->area_0x2E != self->area_0x44) {
         for (i = 0; i < 5; i++) {
             if (work->slots_0x10.handles.handles_0x18[i] != 0) {
@@ -743,18 +735,18 @@ void eft_light_trail_update(_EFT* self, u8 active)
             switch (self->field_0x07) {
             case 3:
                 cpSetRotMatrix(&source->rot_0x54, &mtx);
-                copyVec3(&pos, &source->vec_0x03C);
+                pos = source->vec_0x03C;
                 setVector3(&offset, 0.0f, 0.0f, 130.0f);
                 rotVecY(&offset, source->field_0x058);
                 break;
             default:
                 cpSetRotMatrix(&source->rot_0x54, &mtx);
-                copyVec3(&pos, &source->vec_0x03C);
+                pos = source->vec_0x03C;
                 setVector3(&offset, 0.0f, 30.0f, 145.0f);
                 rotVecY(&offset, source->field_0x058);
                 break;
             }
-            addVec3To(&pos, &offset);
+            pos += offset;
             mtx34_set_trans(&mtx, &pos);
             for (i = 0; i < 5; i++) {
                 if (work->slots_0x10.handles.handles_0x18[i] == 0) {
@@ -792,14 +784,6 @@ void eft_light_trail_update(_EFT* self, u8 active)
 #pragma optimization_level 4
 void eft_light_lantern_update(_EFT* self)
 {
-    VEC3 offset;
-    VEC3 pos;
-    VEC3 pivot;
-    VEC3 light_pos;
-    VEC3 sound_pos;
-    MTX34 mtx;
-    MTX34 local;
-    MTX34 pose;
     u32 show = 0;
     s32 placed = 0;
     u8 trail = 0;
@@ -814,7 +798,6 @@ void eft_light_lantern_update(_EFT* self)
     f32 y;
     f32 x;
     f32 z;
-    VEC3 diff;
     _GXColor color_a;
     _GXColor color_b;
     _GXColor ring_a;
@@ -822,14 +805,14 @@ void eft_light_lantern_update(_EFT* self)
     _GXColor core_a;
     _GXColor core_b;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&pivot);
-    VEC3_ctor(&light_pos);
-    VEC3_ctor(&sound_pos);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&local);
-    MTX34_ctor(&pose);
+    VEC3 offset;
+    VEC3 pos;
+    VEC3 pivot;
+    VEC3 light_pos;
+    VEC3 sound_pos;
+    MTX34 mtx;
+    MTX34 local;
+    MTX34 pose;
     work = EFT_WORK(self);
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -949,7 +932,7 @@ void eft_light_lantern_update(_EFT* self)
                         break;
                     case 26:
                         if (Pl_frame_check(source, 0, 26.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 15.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1160,7 +1143,7 @@ void eft_light_lantern_update(_EFT* self)
                             beam = 2;
                         }
                         if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1208,7 +1191,7 @@ void eft_light_lantern_update(_EFT* self)
                             work->color_index_0x66 = source->field_0x5BA;
                         }
                         if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1230,7 +1213,7 @@ void eft_light_lantern_update(_EFT* self)
                             work->color_index_0x66 = source->field_0x5BA;
                         }
                         if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1406,7 +1389,7 @@ void eft_light_lantern_update(_EFT* self)
                             show = 2;
                         }
                         if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1554,7 +1537,7 @@ void eft_light_lantern_update(_EFT* self)
                         }
                         Pl_frame_check(source, 1, 96.0f, 0.0f);
                         if (Pl_frame_check(source, 0, 28.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1602,7 +1585,7 @@ void eft_light_lantern_update(_EFT* self)
                             work->color_index_0x66 = source->field_0x5BA;
                         }
                         if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1624,7 +1607,7 @@ void eft_light_lantern_update(_EFT* self)
                             work->color_index_0x66 = source->field_0x5BA;
                         }
                         if (Pl_frame_check(source, 0, 18.0f, 0.0f) != 0) {
-                            copyVec3(&pos, &self->pos_0x18);
+                            pos = self->pos_0x18;
                             pos.y += 20.0f;
                             eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
                             if (self->area_0x44 == get_now_areano()) {
@@ -1787,8 +1770,7 @@ void eft_light_lantern_update(_EFT* self)
                 }
                 mhchar_joint_mtx_get(EFT_PL_CHR(source), 1, &mtx);
                 mtx34_trans_get(&mtx, &self->pos_0x18);
-                subVec3(&diff, &pos, &self->pos_0x18);
-                copyVec3(&offset, &diff);
+                offset = pos - self->pos_0x18;
                 x = vec3_len(&offset.x);
                 work->head.scale_0x04.x = 1.0f;
                 work->head.scale_0x04.y = 1.0f;
@@ -1821,9 +1803,9 @@ void eft_light_lantern_update(_EFT* self)
                     work->head.scale_0x04.z = 1.0f;
                     mtx34_trans_get(&mtx, &self->pos_0x18);
                     setVector3(&pos, 0.0f, 0.0f, 55.0f);
-                    addVec3To(&pos, &offset);
+                    pos += offset;
                     mulVecMat(&pos, &mtx);
-                    addVec3To(&pos, &self->pos_0x18);
+                    pos += self->pos_0x18;
                     self->field_0x10--;
                     if (motion != 401 || Pl_frame_check(source, 2, 26.0f, 0.0f) == 0) {
                         if (self->field_0x10 < 0) {
@@ -1841,7 +1823,7 @@ void eft_light_lantern_update(_EFT* self)
                             pivot.x += local.m[0][3];
                             pivot.y += local.m[1][3];
                             pivot.z += local.m[2][3];
-                            copyVec3(&light_pos, &pos);
+                            light_pos = pos;
                             coll_wall_slide_c1(&pivot, &pos, 40.0f, &light_pos, 0xFFFF, 0, 1, self->area_0x44);
                             light_point_scale_set(work->light_id_0x2C, &light_pos, 1.0f, 0);
                         }
@@ -1953,7 +1935,7 @@ void eft_light_drop_update(_EFT* self)
                     eft_light_main_part_show(self, 16);
                 }
                 setVector3(&work->head.scale_0x04, 1.0f, 1.0f, 1.0f);
-                copyVec3(&work->slots_0x10.items.items_0x10[0]->scale_0x1C, &work->head.scale_0x04);
+                work->slots_0x10.items.items_0x10[0]->scale_0x1C = work->head.scale_0x04;
                 work->slots_0x10.items.items_0x10[0]->ready = 1;
                 break;
             default:
@@ -2056,7 +2038,7 @@ void eft_light_drop_update(_EFT* self)
         work->slots_0x10.items.items_0x10[0]->move2(&work->body_0x34.matrix_0x34, 0);
         break;
     case 1:
-        copyVec3(&work->slots_0x10.items.items_0x10[0]->pos_0x04, &self->pos_0x18);
+        work->slots_0x10.items.items_0x10[0]->pos_0x04 = self->pos_0x18;
         eft_rot_vec_copy(&work->slots_0x10.items.items_0x10[0]->rot_0x28, &self->rot_0x24);
         work->slots_0x10.items.items_0x10[0]->move(0);
         break;
@@ -2084,10 +2066,6 @@ void eft_light_npc_update(_EFT* self)
     _GXColor color_a;
     _GXColor color_b;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&local);
     work = EFT_WORK(self);
     if (eft_res_spawn_gate_ck(self, 2) == 0) {
         self->flag_0x01 = 0;
@@ -2115,7 +2093,7 @@ void eft_light_npc_update(_EFT* self)
         case 26:
             color_index = 2;
             if (ai_npc_frame_ck(source, 0, 26.0f, 0.0f) != 0) {
-                copyVec3(&pos, &self->pos_0x18);
+                pos = self->pos_0x18;
                 pos.y += 15.0f;
                 eft019_set_core(&pos, self->area_0x44, 27, 0.7f, 0.7f);
             }
@@ -2191,13 +2169,6 @@ void eft_light_lobby_update(_EFT* self)
     u16 motion;
     s32 mode;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&local);
-    MTX34_ctor(&unused_mtx);
     work = EFT_WORK(self);
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -2368,12 +2339,6 @@ void eft_light_beam_aim_job(struct PrimRec* job)
     EftWork* work;
     _EFT* self;
     _PLW* source;
-    MTX34 beam_mtx;
-    MTX34 back_mtx;
-    VEC3 dir;
-    VEC3 unused;
-    VEC3 base;
-    VEC3 pivot;
     u32 angle;
     f32 y;
     f32 x;
@@ -2382,12 +2347,12 @@ void eft_light_beam_aim_job(struct PrimRec* job)
 
     self = ((EftLightJob*)job)->owner_0x2C;
     work = EFT_WORK(self);
-    MTX34_ctor(&beam_mtx);
-    MTX34_ctor(&back_mtx);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&base);
-    VEC3_ctor(&pivot);
+    MTX34 beam_mtx;
+    MTX34 back_mtx;
+    VEC3 dir;
+    VEC3 unused;
+    VEC3 base;
+    VEC3 pivot;
     source = (_PLW*)self->source_0x30;
     dir.x = 0.0f;
     dir.y = 0.0f;
@@ -2579,19 +2544,13 @@ void eft_light_blade_place(_EFT* self)
 {
     MTX34 grip_mtx;
     MTX34 tip_mtx;
+    _PLW* source;
+    EftWork* work;
+
     VEC3 offset;
     VEC3 blade;
     VEC3 tip;
     VEC3 light_pos;
-    _PLW* source;
-    EftWork* work;
-
-    MTX34_ctor(&grip_mtx);
-    MTX34_ctor(&tip_mtx);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&blade);
-    VEC3_ctor(&tip);
-    VEC3_ctor(&light_pos);
     work = EFT_WORK(self);
     if (self->area_0x44 == get_now_areano()) {
         source = (_PLW*)self->source_0x30;
@@ -2599,7 +2558,7 @@ void eft_light_blade_place(_EFT* self)
         mtx34_trans_get(&grip_mtx, &self->pos_0x18);
         setVector3(&blade, 0.0f, 0.0f, 55.0f);
         setVector3(&offset, -10.0f, 0.0f, 5.0f);
-        addVec3To(&blade, &offset);
+        blade += offset;
         mulVecMat(&blade, &grip_mtx);
         blade.x += grip_mtx.m[0][3];
         blade.y += grip_mtx.m[1][3];
@@ -2610,7 +2569,7 @@ void eft_light_blade_place(_EFT* self)
         tip.x += tip_mtx.m[0][3];
         tip.y += tip_mtx.m[1][3];
         tip.z += tip_mtx.m[2][3];
-        copyVec3(&light_pos, &blade);
+        light_pos = blade;
         coll_wall_slide_c1(&tip, &blade, 40.0f, &light_pos, 0xFFFF, 0, 1, self->area_0x44);
         if (light_pos.y < 10.0f + source->ground_y_0x060) {
             light_pos.y = 10.0f + source->ground_y_0x060;

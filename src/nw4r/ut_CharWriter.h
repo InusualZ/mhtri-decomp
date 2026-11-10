@@ -129,8 +129,8 @@ public:
     /* +0x00 */ ColorMapping mColorMapping;
     /* +0x08 */ VertexColor mVertexColor;
     /* +0x18 */ TextColor mTextColor;
-    /* +0x24 */ math::VEC2 mScale;
-    /* +0x2C */ math::VEC3 mCursorPos;
+    /* +0x24 */ math::_VEC2 mScale;
+    /* +0x2C */ math::_VEC3 mCursorPos;
     /* +0x38 */ TextureFilter mFilter;
     /* +0x40 */ u8 pad_0x40[0x2];
     /* +0x42 */ u8 mAlpha;

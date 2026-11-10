@@ -63,12 +63,6 @@ struct ReferencedObject {
 } // namespace ef
 } // namespace nw4r
 
-#ifdef MHTRI_EF_EFFECT_OWNER
-/* The full effect class, for its owner only: every other unit still reaches the effect through `ef.h`'s stub of
- * the same class until the two are folded (request ef-data#1). */
-#include "nw4r/math.h"
-#include "ef/ef_draworder.h" /* nw4r::ef::DrawOrderBase, the effect's draw-order object (rule 1) */
-
 /* `nw4r::ut::List` as the ef units build it: head, tail, live count and the link offset. */
 typedef struct EfEffList {
     /* +0x00 */ void* head;
@@ -79,11 +73,18 @@ typedef struct EfEffList {
 
 /* The effect's emitter group: the live list, the retired list and the live count. */
 typedef struct EfEffActivityList {
+    EfEffActivityList(u16 offset); /* 0x800A3FFC (0x34), ef/ef_effect.cpp */
     /* +0x00 */ EfEffList mActiveList;
     /* +0x0C */ EfEffList mRetireList;
     /* +0x18 */ u16 mNumActive;
     /* +0x1A */ u16 pad_0x1A;
 } EfEffActivityList; /* size: 0x1C */
+
+#ifdef MHTRI_EF_EFFECT_OWNER
+/* The full effect class, for its owner only: every other unit still reaches the effect through `ef.h`'s stub of
+ * the same class until the two are folded (request ef-data#1). */
+#include "nw4r/math.h"
+#include "ef/ef_draworder.h" /* nw4r::ef::DrawOrderBase, the effect's draw-order object (rule 1) */
 
 /* The object the effect keeps at +0x20 (`mManagerES`): its first word is the record `ef_system_memory_manager`
  * dereferences and its +0x04 word is the effect's +0xA0 back-pointer. */

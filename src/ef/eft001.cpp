@@ -31,7 +31,7 @@
 #include "sound/fn_800D7F54.h"
 #include "ef/eft001.h"
 #include "ef/eft002.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "fn_8004CAD8.h" /* the vector helpers, getKeyData, mtx34_identity (rule 2) */
 #include "vec3_scale.h"
@@ -227,7 +227,7 @@ extern "C" void fn_800FAE08(_EFT* self)
             }
 
             if (enemy->joint_0x204 == (u32)-1) {
-                copyVec3(&self->pos_0x18, &enemy->pos_0x188);
+                self->pos_0x18 = enemy->pos_0x188;
             } else {
                 get_joint_wpos_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &self->pos_0x18);
             }
@@ -275,8 +275,6 @@ extern "C" void fn_800FB160(_EFT* self)
 {
     nw4r::math::VEC3 dir;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 spawn_pos;
     u8 color[4];
     _EFT001_PLW_VIEW* plw;
     s32 i;
@@ -290,15 +288,12 @@ extern "C" void fn_800FB160(_EFT* self)
     f32 rate;
     _AINPC_W* npc;
 
-    VEC3_ctor(&dir);
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&spawn_pos);
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 spawn_pos;
     _EFT001_MODEL_WORK* work = (_EFT001_MODEL_WORK*)self->work_0x38;
     {
-        nw4r::math::VEC3 area_pos;
-        get_now_area_pos(&area_pos, self->area_0x44);
-        copyVec3(&work->area_pos_0x0C, &area_pos);
+        nw4r::math::VEC3 area_pos = get_now_area_pos(self->area_0x44);
+        work->area_pos_0x0C = area_pos;
     }
 
     switch (self->type_0x02) {
@@ -323,16 +318,10 @@ extern "C" void fn_800FB160(_EFT* self)
         fn_800FBBC0(self, 0, 20);
         fn_800FBBC0(self, 1, 17);
         {
-            nw4r::math::VEC3 mid;
-            nw4r::math::VEC3 sum;
-            addVec3(&sum, &work->models[0]->pos_0x04, &work->models[1]->pos_0x04);
-            vec3_scale(&mid, &sum, 0.5f);
-            copyVec3(&self->pos_0x18, &mid);
+            self->pos_0x18 = (work->models[0]->pos_0x04 + work->models[1]->pos_0x04) * 0.5f;
         }
         {
-            nw4r::math::VEC3 diff;
-            subVec3(&diff, &work->area_pos_0x0C, &plw->pos_0x03C);
-            copyVec3(&dir, &diff);
+            dir = work->area_pos_0x0C - plw->pos_0x03C;
         }
         vec3_normalize_into(&dir, &dir);
         self->rot_0x24.y = calcVecAng3(&dir);
@@ -379,10 +368,10 @@ extern "C" void fn_800FB160(_EFT* self)
             get_joint_wmat_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &mtx);
             setVector3(&offset, 0.0f, eft001_glow_offset_y, eft001_glow_offset_z);
             mulVecMat(&offset, &mtx);
-            copyVec3(&self->pos_0x18, &enemy->pos_0x188);
+            self->pos_0x18 = enemy->pos_0x188;
             vec3_sub_assign((Vec*)&self->pos_0x18, (Vec*)&offset);
-            copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
-            copyVec3(&spawn_pos, &self->pos_0x18);
+            work->models[0]->pos_0x04 = self->pos_0x18;
+            spawn_pos = self->pos_0x18;
             self->rot_0x24.y = enemy->rot_y_0x1C0;
             self->rot_0x24.x = enemy->rot_x_0x1BC;
             mtx34_identity(&mtx);
@@ -431,7 +420,7 @@ extern "C" void fn_800FB160(_EFT* self)
             }
             if (self->field_0x10 > (s32)(cycle * rate)) {
                 if (enemy->joint_0x204 == (u32)-1) {
-                    copyVec3(&self->pos_0x18, &enemy->pos_0x188);
+                    self->pos_0x18 = enemy->pos_0x188;
                 } else {
                     get_joint_wpos_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &self->pos_0x18);
                 }
@@ -470,7 +459,7 @@ extern "C" void fn_800FB160(_EFT* self)
             }
             self->field_0x10 = 24.0f * rate;
             if (enemy->joint_0x204 == (u32)-1) {
-                copyVec3(&self->pos_0x18, &enemy->pos_0x188);
+                self->pos_0x18 = enemy->pos_0x188;
             } else {
                 get_joint_wpos_em((_ENEMY_WORK*)enemy, enemy->joint_0x204, &self->pos_0x18);
             }
@@ -490,14 +479,12 @@ extern "C" void fn_800FB160(_EFT* self)
             self->demo_flag_0x08 = 0;
         } while (0);
 
-        copyVec3(&work->models[self->demo_flag_0x08]->pos_0x04, &self->pos_0x18);
+        work->models[self->demo_flag_0x08]->pos_0x04 = self->pos_0x18;
         setVector3(&offset, 0.0f, 0.0f, 350.0f);
         vec3_scale_in_place(&offset, size);
         rotVecY(&offset, (u16)get_camera_rot_y());
         {
-            nw4r::math::VEC3 sum;
-            addVec3(&sum, &self->pos_0x18, &offset);
-            copyVec3(&spawn_pos, &sum);
+            spawn_pos = self->pos_0x18 + offset;
         }
         work->models[self->demo_flag_0x08]->field_0x28 = 0;
         work->models[self->demo_flag_0x08]->field_0x2C = self->rot_0x24.y;
@@ -514,7 +501,7 @@ extern "C" void fn_800FB160(_EFT* self)
             return;
         }
         npc = (_AINPC_W*)self->source_0x30;
-        if (ai_npc_flag_ck(npc, 2) != 0 || (npc->field_0x324 & 0x4000) != 0) {
+        if (ai_npc_flag_ck(npc, 2) != 0 || (npc->land_0x324.field_0x00 & 0x4000) != 0) {
             self->flag_0x01 = 0;
         } else {
             self->flag_0x01 = npc->in_area;
@@ -522,7 +509,7 @@ extern "C" void fn_800FB160(_EFT* self)
         self->area_0x44 = npc->area;
         npc->model.get_joint_wpos(3, &self->pos_0x18);
         self->pos_0x18.y = 5.0f + npc->field_0x19C;
-        copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+        work->models[0]->pos_0x04 = self->pos_0x18;
         work->models[0]->move(0);
         eft_res_models_spawn(self, (void**)work->models, 2, work->count, NULL);
         return;
@@ -561,7 +548,6 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
     _EFT001_MODEL_WORK* work;
     _EFT001_PLW_VIEW* plw;
 
-    VEC3_ctor(&pos);
     work = (_EFT001_MODEL_WORK*)self->work_0x38;
     plw = (_EFT001_PLW_VIEW*)self->source_0x30;
 
@@ -598,7 +584,7 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
         }
     }
 
-    copyVec3(&work->models[index]->pos_0x04, &pos);
+    work->models[index]->pos_0x04 = pos;
 }
 
 /* Builds a new effect of `type`: allocates it from the 32-entry pool, installs the dispatcher and the

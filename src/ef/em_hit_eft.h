@@ -1,5 +1,5 @@
-#ifndef MHTRI_EF_FN_80104BD0_H
-#define MHTRI_EF_FN_80104BD0_H
+#ifndef MHTRI_EF_EM_HIT_EFT_H
+#define MHTRI_EF_EM_HIT_EFT_H
 
 #include "types.h"
 
@@ -13,10 +13,10 @@ extern "C" {
 #endif
 
 struct _EFT;
-void fn_80104BD0(struct _EFT* self);
+void em_hit_eft_step(struct _EFT* self);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MHTRI_EF_FN_80104BD0_H */
+#endif /* MHTRI_EF_EM_HIT_EFT_H */

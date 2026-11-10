@@ -8,7 +8,7 @@
  * is what a symbol-free header can hold - the band's record types, which the band's other units will
  * include once they register.  A declaration of a symbol *another* unit owns is still wrong here: it
  * belongs in that owner's header (`my_player_no` -> `ef/fn_800CDB2C.h`, `get_arena_cfg` ->
- * `menu/get_pop_dat_ptr.h`, `setVec3` -> `mh3_pad.h`, `multi_arena_clr_time` ->
+ * `menu/get_pop_dat_ptr.h`, `VEC3(x, y, z)` -> `mh3_pad.h`, `multi_arena_clr_time` ->
  * this file's sibling `unsplit/menu.h`; `quest_record_get` (owner `quest/quest_entry.cpp`)
  * has no published header yet - that absence is what blocks `dl_acdata_to_ar_eqdata`).
  *

@@ -18,8 +18,8 @@ u32 get_camera_rot_x(void);
 /* 0x802B8E48 - the camera's tilt state byte (0: level). */
 u8 camera_tilt_state_get(void);
 
-/* 0x802BDDB0 - the current camera's target (look-at) position, written through `out`. */
-void get_camera_target_pos(nw4r::math::VEC3* out);
+/* 0x802BDDB0 - the current camera's target (look-at) position, returned by value. */
+nw4r::math::VEC3 get_camera_target_pos(void);
 
 /* 0x802BE39C - 1 when the camera work is idle and the current camera's +0x188 mode byte is 1. */
 u32 camera_mode1_ck(void);

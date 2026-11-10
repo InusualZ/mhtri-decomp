@@ -37,7 +37,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "lobby/lb_server_sel_trans.h" /* event_demo_ck (rule 2: the owner's header) */
 #include "ef/fn_801173AC_types.h"
 
@@ -109,10 +109,8 @@ extern "C" void fn_801173AC(_EFT* self)
 {
     _EFT24_CHARA* work = (_EFT24_CHARA*)self->work_0x38;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
 
     work->spin_x = (s16)((f32)work->spin_x * 0.9f);
     work->spin_y = (s16)((f32)work->spin_y * 0.975f);
@@ -136,9 +134,9 @@ extern "C" void fn_801173AC(_EFT* self)
     work->pos.y *= 0.6f;
     work->pos.z *= 0.3f;
 
-    copyVec3(&pos, &work->pos);
+    pos = work->pos;
     mulVecMat(&pos, &mtx);
-    addVec3To(&work->chara[0]->pos_0x04, &pos);
+    work->chara[0]->pos_0x04 += pos;
     work->chara[0]->field_0x28 = work->rot_x;
     work->chara[0]->field_0x2C = work->rot_y;
     work->chara[0]->field_0x30 = work->rot_z;
@@ -246,8 +244,6 @@ extern "C" void fn_80117894(_EFT* self)
     nw4r::math::MTX34 mtx;
     _PLW* actor;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     self->state_0x05++;
     work->models[0] = res_eft_create(eft025_effect_ids[self->type_0x02], 0x16, 0);
     if (work->models[0] == 0) {
@@ -296,10 +292,6 @@ extern "C" void fn_80117A1C(_EFT* self)
     nw4r::math::MTX34 mtxB;
     s32 i;
 
-    VEC3_ctor(&vec);
-    VEC3_ctor(&vel);
-    MTX34_ctor(&mtxA);
-    MTX34_ctor(&mtxB);
     work = (_EFT25_WORK*)self->work_0x38;
 
     if (eft_res_spawn_gate_ck(self, 0) == 0) {

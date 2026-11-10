@@ -8,7 +8,7 @@
  *   unit's ScnObj vtable and reads the `.sdata2` word 0x80795E60, which is its claim).
  * NAMES. The ScnMdlSimple members are nw4r's (the asserts name `ScnMdlSimple::SetAnmObj`, `mpAnmObjChr` ..
  *   `mpAnmObjTexSrt`, `mdl.IsValid()`, the vtable gives the virtual order, the map rows carry the manglings).
- *   AABB_ctor (0x80080F44) is a GUESS in the `MTX34_ctor`/`VEC3_ctor` scheme: it runs the two corner records'
+ *   AABB_ctor (0x80080F44) is a GUESS in the `MTX34::MTX34()`/`VEC3::VEC3()` scheme: it runs the two corner records'
  *   constructors, the element constructor of ScnObj's bounding-box array.  scnmdlsmpl_align32 is a GUESS (the
  *   32-byte round-up the matrix-array sizes use), world_mtx_attr_ignore_anm_trans is a GUESS (bit 27 of a world-matrix
  *   attribute, set when the ignore-animation-translation option is on), EnableScnMdlCallbackTiming (sets the
@@ -39,16 +39,8 @@
 
 #include "types.h"
 #include "g3d/g3d_scnmdlsmpl.h" /* this unit's own declarations (rule 1) */
-#include "mh3_pad.h"            /* VEC3_ctor (rule 2) */
+#include "mh3_pad.h"            /* VEC3::VEC3() (rule 2) */
 #include "unsplit/g3d.h"
-
-/* 0x80080F44 (0x38): constructs the box's two corner records. */
-extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
-{
-    VEC3_ctor(&pBox->min);
-    VEC3_ctor(&pBox->max);
-    return pBox;
-}
 
 #include "g3d/g3d_obj.h"         /* nw4r::g3d::DynamicCast, AnmObjVis/MatClr/TexPat (rule 1) */
 #include "g3d/g3d_anmchr.h"      /* nw4r::g3d::AnmObjChr, type_obj_set_name_anmchr (rule 2) */
@@ -818,7 +810,6 @@ ScnMdlSimple::ScnMdlSimple(MEMAllocator* pHeap, ResMdl mdl, math::MTX34* pWorldM
         u32 infoMax = res_mdl_get_info(&mdl);
         const ScnMdlResMdlInfoData* pMaxInfo = (const ScnMdlResMdlInfoData*)res_mdl_info_ref(&infoMax);
         math::AABB box;
-        AABB_ctor(&box);
         box.min.x = pMinInfo->volumeMin.x;
         box.min.y = pMinInfo->volumeMin.y;
         box.min.z = pMinInfo->volumeMin.z;

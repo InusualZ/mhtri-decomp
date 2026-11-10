@@ -39,7 +39,7 @@
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/g3d_camera_types.h"
 #include "g3d/g3d_anmscn.h" /* fn_80067EE8, owned by g3d/g3d_anmscn.cpp (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 #pragma pool_data off
@@ -140,7 +140,6 @@ void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
 void camera_set_viewport(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
 void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
-void MTX44_ctor(nw4r::math::MTX44* pMtx);
 void camera_get_projection_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX44* pOut);
 void camera_get_projection_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pOut);
 void camera_get_environment_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pOut);
@@ -195,18 +194,18 @@ void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a
     ScissorSize* pSize = (ScissorSize*)fn_8004028C();
     CameraData* pData = camera_ref(pSelf);
     pData->mFlags = 0x21;
-    pData->mPosX = 0.0f;
-    pData->mPosY = 0.0f;
-    pData->mPosZ = 15.0f;
-    pData->mTargetX = 0.0f;
-    pData->mTargetY = 1.0f;
-    pData->mTargetZ = 0.0f;
-    pData->mUpX = 0.0f;
-    pData->mUpY = 0.0f;
-    pData->mUpZ = 0.0f;
-    pData->mUnk98 = 0.0f;
-    pData->mUnk9C = 0.0f;
-    pData->mUnkA0 = 0.0f;
+    pData->mPos.x = 0.0f;
+    pData->mPos.y = 0.0f;
+    pData->mPos.z = 15.0f;
+    pData->mTarget.x = 0.0f;
+    pData->mTarget.y = 1.0f;
+    pData->mTarget.z = 0.0f;
+    pData->mUp.x = 0.0f;
+    pData->mUp.y = 0.0f;
+    pData->mUp.z = 0.0f;
+    pData->mUnk98.x = 0.0f;
+    pData->mUnk98.y = 0.0f;
+    pData->mUnk98.z = 0.0f;
     pData->mUnkA4 = 0.0f;
     pData->mProjType = 0;
     pData->mProjA = 60.0f;
@@ -221,10 +220,10 @@ void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a
     pData->mUnkD0 = 0.5f;
     pData->mUnkD4 = 0.5f;
     pData->mUnkD8 = 0.5f;
-    pData->mViewportX = 0.0f;
-    pData->mViewportY = 0.0f;
-    pData->mViewportW = (f32)a3;
-    pData->mViewportH = 448.0f;
+    pData->mViewportPos.x = 0.0f;
+    pData->mViewportPos.y = 0.0f;
+    pData->mViewportSize.x = (f32)a3;
+    pData->mViewportSize.y = 448.0f;
     pData->mViewportNear = 0.0f;
     pData->mViewportFar = 1.0f;
     pData->mScissorX = 0;
@@ -241,7 +240,7 @@ void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
     }
     if (fn_80067EE8(this)) {
         CameraData* pData = camera_ref(this);
-        copyVec3((nw4r::math::VEC3*)&pData->mPosX, (const nw4r::math::VEC3*)&rPos);
+        pData->mPos = *((const nw4r::math::VEC3*)&rPos);
         pData->mFlags &= ~8;
     }
 }
@@ -252,9 +251,9 @@ void camera_get_position(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
     }
     if (pOut != NULL && fn_80067EE8(pSelf)) {
         CameraData* pData = camera_ref_const(pSelf);
-        /* `mPosX/mPosY/mPosZ` are three consecutive floats of the camera record, so the vector
+        /* `mPos.x/mPos.y/mPos.z` are three consecutive floats of the camera record, so the vector
          * is the address of the first of them (the engine's own view; rule 11). */
-        copyVec3(pOut, (const nw4r::math::VEC3*)&pData->mPosX);
+        *pOut = *(&pData->mPos);
     }
 }
 
@@ -265,13 +264,13 @@ void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ) {
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = camera_ref_const(pSelf);
         if (pX != NULL) {
-            *pX = pData->mPosX;
+            *pX = pData->mPos.x;
         }
         if (pY != NULL) {
-            *pY = pData->mPosY;
+            *pY = pData->mPos.y;
         }
         if (pZ != NULL) {
-            *pZ = pData->mPosZ;
+            *pZ = pData->mPos.z;
         }
     }
 }
@@ -286,31 +285,31 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
     CameraData* pData = camera_ref(this);
     switch (rInfo.mType) {
     case 0: {
-        if ((pData->mFlags & 1) == 0 || fn_80074D38(&rInfo.mPosX, &pData->mTargetX) != 0 ||
-            fn_80074D38(&rInfo.mTargetX, &pData->mUpX) != 0) {
+        if ((pData->mFlags & 1) == 0 || fn_80074D38(&rInfo.mPos.x, &pData->mTarget.x) != 0 ||
+            fn_80074D38(&rInfo.mTarget.x, &pData->mUp.x) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 1;
-            copyVec3((nw4r::math::VEC3*)&pData->mTargetX, (const nw4r::math::VEC3*)&rInfo.mPosX);
-            copyVec3((nw4r::math::VEC3*)&pData->mUpX, (const nw4r::math::VEC3*)&rInfo.mTargetX);
+            pData->mTarget = *(&rInfo.mPos);
+            pData->mUp = *(&rInfo.mTarget);
             pData->mFlags &= ~8;
         }
         break;
     }
     case 1: {
-        if ((pData->mFlags & 2) == 0 || fn_80074D38(&rInfo.mUpX, &pData->mUnk98) != 0) {
+        if ((pData->mFlags & 2) == 0 || fn_80074D38(&rInfo.mUp.x, &pData->mUnk98.x) != 0) {
             pData->mFlags &= ~7;
             pData->mFlags |= 2;
-            copyVec3((nw4r::math::VEC3*)&pData->mUnk98, (const nw4r::math::VEC3*)&rInfo.mUpX);
+            *(nw4r::math::VEC3*)&pData->mUnk98.x = *(&rInfo.mUp);
             pData->mFlags &= ~8;
         }
         break;
     }
     case 2: {
-        if ((pData->mFlags & 4) == 0 || fn_80074D38(&rInfo.mTargetX, &pData->mUpX) != 0 ||
+        if ((pData->mFlags & 4) == 0 || fn_80074D38(&rInfo.mTarget.x, &pData->mUp.x) != 0 ||
             rInfo.mUnk28 != pData->mUnkA4) {
             pData->mFlags &= ~7;
             pData->mFlags |= 4;
-            copyVec3((nw4r::math::VEC3*)&pData->mUpX, (const nw4r::math::VEC3*)&rInfo.mTargetX);
+            pData->mUp = *(&rInfo.mTarget);
             pData->mUnkA4 = rInfo.mUnk28;
             pData->mFlags &= ~8;
         }
@@ -337,17 +336,17 @@ void camera_posture_get(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo
         u32 flags = pData->mFlags;
         if ((flags & 1) != 0) {
             pOut->mType = 0;
-            copyVec3((nw4r::math::VEC3*)&pOut->mPosX, (const nw4r::math::VEC3*)&pData->mTargetX);
-            copyVec3((nw4r::math::VEC3*)&pOut->mTargetX, (const nw4r::math::VEC3*)&pData->mUpX);
+            pOut->mPos = *(&pData->mTarget);
+            pOut->mTarget = *(&pData->mUp);
             return;
         }
         if ((flags & 2) != 0) {
             pOut->mType = 1;
-            copyVec3((nw4r::math::VEC3*)&pOut->mUpX, (const nw4r::math::VEC3*)&pData->mUnk98);
+            pOut->mUp = *((const nw4r::math::VEC3*)&pData->mUnk98.x);
             return;
         }
         pOut->mType = 2;
-        copyVec3((nw4r::math::VEC3*)&pOut->mTargetX, (const nw4r::math::VEC3*)&pData->mUpX);
+        pOut->mTarget = *(&pData->mUp);
         pOut->mUnk28 = pData->mUnkA4;
     }
 }
@@ -405,10 +404,10 @@ void camera_set_viewport(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d) {
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = camera_ref(pSelf);
-        pData->mViewportX = a;
-        pData->mViewportY = b;
-        pData->mViewportW = c;
-        pData->mViewportH = d;
+        pData->mViewportPos.x = a;
+        pData->mViewportPos.y = b;
+        pData->mViewportSize.x = c;
+        pData->mViewportSize.y = d;
         fn_80074FEC(pSelf, (u32)a, (u32)b, (u32)c, (u32)d);
     }
 }
@@ -420,16 +419,16 @@ void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f3
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = camera_ref_const(pSelf);
         if (p1 != NULL) {
-            *p1 = pData->mViewportX;
+            *p1 = pData->mViewportPos.x;
         }
         if (p2 != NULL) {
-            *p2 = pData->mViewportY;
+            *p2 = pData->mViewportPos.y;
         }
         if (p3 != NULL) {
-            *p3 = pData->mViewportW;
+            *p3 = pData->mViewportSize.x;
         }
         if (p4 != NULL) {
-            *p4 = pData->mViewportH;
+            *p4 = pData->mViewportSize.y;
         }
         if (p5 != NULL) {
             *p5 = pData->mViewportNear;
@@ -444,36 +443,30 @@ void camera_world_to_screen(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math
     if (pOut == NULL) {
         return;
     }
-    f32 viewMtx[12];
-    f32 projMtx[16];
+    nw4r::math::MTX34 viewMtx;
+    nw4r::math::MTX44 projMtx;
     f32 frustum[6];
     ProjParams params;
-    MTX34_ctor((nw4r::math::MTX34*)viewMtx);
-    MTX44_ctor((nw4r::math::MTX44*)projMtx);
-    pSelf->GetCameraMtx((nw4r::math::MTX34*)viewMtx);
-    camera_get_projection_mtx(pSelf, (nw4r::math::MTX44*)projMtx);
+    pSelf->GetCameraMtx(&viewMtx);
+    camera_get_projection_mtx(pSelf, &projMtx);
     CameraData* pData = camera_ref_const(pSelf);
     f32 projType = (f32)pData->mProjType;
     params.mProjType = projType;
-    params.mUnk04 = projMtx[0];
-    params.mUnk0C = projMtx[5];
-    params.mUnk14 = projMtx[10];
-    params.mUnk18 = projMtx[11];
+    params.mUnk04 = projMtx.m[0][0];
+    params.mUnk0C = projMtx.m[1][1];
+    params.mUnk14 = projMtx.m[2][2];
+    params.mUnk18 = projMtx.m[2][3];
     if (1.0f == projType) {
-        params.mUnk08 = projMtx[3];
-        params.mUnk10 = projMtx[7];
+        params.mUnk08 = projMtx.m[0][3];
+        params.mUnk10 = projMtx.m[1][3];
     } else {
-        params.mUnk08 = projMtx[2];
-        params.mUnk10 = projMtx[6];
+        params.mUnk08 = projMtx.m[0][2];
+        params.mUnk10 = projMtx.m[1][2];
     }
     camera_get_viewport(pSelf, &frustum[0], &frustum[1], &frustum[2], &frustum[3], &frustum[4], &frustum[5]);
     nw4r::math::VEC3* pScreen = (nw4r::math::VEC3*)pOut;
-    GXProject(pVec->x, pVec->y, pVec->z, (const f32 (*)[4])mtx34_get_ptr(viewMtx), &params.mProjType, frustum,
+    GXProject(pVec->x, pVec->y, pVec->z, (const f32 (*)[4])mtx34_get_ptr(&viewMtx), &params.mProjType, frustum,
               &pScreen->x, &pScreen->y, &pScreen->z);
-}
-
-/* 0x80075390 (0x4): constructs a 4x4 matrix (nothing to initialise). */
-void MTX44_ctor(nw4r::math::MTX44* pMtx) {
 }
 
 void nw4r::g3d::Camera::GetCameraMtx(math::MTX34* pMtx) const {
@@ -550,11 +543,11 @@ void camera_gx_set_viewport(nw4r::g3d::Camera* pSelf) {
     }
     CameraData* pData = camera_ref_const(pSelf);
     if (g3d_state_get_render_mode()->mUnk18 != 0) {
-        GXSetViewportJitter(pData->mViewportX, pData->mViewportY, pData->mViewportW, pData->mViewportH,
+        GXSetViewportJitter(pData->mViewportPos.x, pData->mViewportPos.y, pData->mViewportSize.x, pData->mViewportSize.y,
                             pData->mViewportNear, pData->mViewportFar, (pData->mFlags & 0x100) != 0);
         return;
     }
-    GXSetViewport(pData->mViewportX, pData->mViewportY, pData->mViewportW, pData->mViewportH,
+    GXSetViewport(pData->mViewportPos.x, pData->mViewportPos.y, pData->mViewportSize.x, pData->mViewportSize.y,
                   pData->mViewportNear, pData->mViewportFar);
 }
 
@@ -569,7 +562,7 @@ void camera_gx_set_projection(nw4r::g3d::Camera* pSelf) {
     if ((pData->mFlags & 0x80) == 0) {
         fn_80075DD8(pSelf);
     }
-    GXSetProjection(mtx44_ptr(pData->mProjMtx), pData->mProjType);
+    GXSetProjection(mtx44_ptr(pData->mProjMtx.m), pData->mProjType);
 }
 
 /* 0x80075844 (0x4): the matrix as its first element's address (the MTX44 pointer conversion). */
@@ -605,86 +598,77 @@ void camera_gx_set_scissor_box_offset(nw4r::g3d::Camera* pSelf) {
 void fn_80075940(nw4r::g3d::Camera* pSelf) {
     CameraData* pData = camera_ref_const(pSelf);
     u32 flags = pData->mFlags;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 axisA;
-    nw4r::math::VEC3 axisB;
-    nw4r::math::VEC3 rowA;
-    nw4r::math::VEC3 rowB;
-    nw4r::math::VEC3 row0;
-    nw4r::math::VEC3 row1;
-    nw4r::math::VEC3 row2;
     f32 rotSin, rotCos;
     f32 sinX, sinY, sinZ, cosX, cosY, cosZ;
     if ((flags & 1) != 0) {
-        if (fn_80074D38(&pData->mPosX, &pData->mUpX) == 0) {
-            nw4r::db::Panic("g3d_camera.cpp", 832, "nw4r::g3d::Camera::UpdateCameraMtx:\ncamera position and target are the same(%f %f %f).", pData->mPosX, pData->mPosY,
-                            pData->mPosZ);
+        if (fn_80074D38(&pData->mPos.x, &pData->mUp.x) == 0) {
+            nw4r::db::Panic("g3d_camera.cpp", 832, "nw4r::g3d::Camera::UpdateCameraMtx:\ncamera position and target are the same(%f %f %f).", pData->mPos.x, pData->mPos.y,
+                            pData->mPos.z);
         }
-        C_MTXLookAt((f32 (*)[4])mtx34_get_ptr(pData), (const Vec*)vec3_to_vec(&pData->mPosX),
-                    (const Vec*)vec3_to_vec(&pData->mTargetX), (const Vec*)vec3_to_vec(&pData->mUpX));
+        C_MTXLookAt((f32 (*)[4])mtx34_get_ptr(pData), (const Vec*)vec3_to_vec(&pData->mPos.x),
+                    (const Vec*)vec3_to_vec(&pData->mTarget.x), (const Vec*)vec3_to_vec(&pData->mUp.x));
     } else if ((flags & 4) != 0) {
-        nw4r::math::VEC3* pPos = (nw4r::math::VEC3*)&pData->mPosX;
-        setVec3(&diff, pPos->x - pData->mUpX, pPos->y - pData->mUpY,
-                    pPos->z - pData->mUpZ);
+        nw4r::math::VEC3* pPos = &pData->mPos;
+        nw4r::math::VEC3 diff(pPos->x - pData->mUp.x, pPos->y - pData->mUp.y, pPos->z - pData->mUp.z);
         if (0.0f == diff.x && 0.0f == diff.z) {
-            pData->mViewMtx[0][0] = 1.0f;
-            pData->mViewMtx[0][1] = 0.0f;
-            pData->mViewMtx[0][2] = 0.0f;
-            pData->mViewMtx[0][3] = -pPos->x;
-            pData->mViewMtx[1][0] = 0.0f;
-            pData->mViewMtx[1][1] = 0.0f;
-            pData->mViewMtx[2][0] = 0.0f;
-            pData->mViewMtx[2][2] = 0.0f;
+            pData->mViewMtx.m[0][0] = 1.0f;
+            pData->mViewMtx.m[0][1] = 0.0f;
+            pData->mViewMtx.m[0][2] = 0.0f;
+            pData->mViewMtx.m[0][3] = -pPos->x;
+            pData->mViewMtx.m[1][0] = 0.0f;
+            pData->mViewMtx.m[1][1] = 0.0f;
+            pData->mViewMtx.m[2][0] = 0.0f;
+            pData->mViewMtx.m[2][2] = 0.0f;
             if (diff.y <= 0.0f) {
-                pData->mViewMtx[1][2] = 1.0f;
-                pData->mViewMtx[1][3] = -pPos->z;
-                pData->mViewMtx[2][1] = -1.0f;
-                pData->mViewMtx[2][3] = pPos->y;
+                pData->mViewMtx.m[1][2] = 1.0f;
+                pData->mViewMtx.m[1][3] = -pPos->z;
+                pData->mViewMtx.m[2][1] = -1.0f;
+                pData->mViewMtx.m[2][3] = pPos->y;
             } else {
-                pData->mViewMtx[1][2] = -1.0f;
-                pData->mViewMtx[1][3] = pPos->z;
-                pData->mViewMtx[2][1] = 1.0f;
-                pData->mViewMtx[2][3] = -pPos->y;
+                pData->mViewMtx.m[1][2] = -1.0f;
+                pData->mViewMtx.m[1][3] = pPos->z;
+                pData->mViewMtx.m[2][1] = 1.0f;
+                pData->mViewMtx.m[2][3] = -pPos->y;
             }
         } else {
-            setVec3(&axisA, diff.z, 0.0f, -diff.x);
-            VEC3_ctor(&axisB);
+            nw4r::math::VEC3 axisA(diff.z, 0.0f, -diff.x);
+            nw4r::math::VEC3 axisB;
             vec3_normalize_into(&diff, &diff);
             vec3_normalize_into(&axisA, &axisA);
             vec3_cross(&axisB, &diff, &axisA);
             sin_cos_deg(&rotSin, &rotCos, pData->mUnkA4);
-            VEC3_ctor(&rowA);
-            VEC3_ctor(&rowB);
+            nw4r::math::VEC3 rowA;
+            nw4r::math::VEC3 rowB;
             rowA.x = rotSin * axisB.x + rotCos * axisA.x;
             rowA.y = rotSin * axisB.y;
             rowA.z = rotSin * axisB.z + rotCos * axisA.z;
             rowB.x = rotCos * axisB.x - rotSin * axisA.x;
             rowB.y = rotCos * axisB.y;
             rowB.z = rotCos * axisB.z - rotSin * axisA.z;
-            pData->mViewMtx[0][0] = rowA.x;
-            pData->mViewMtx[0][1] = rowA.y;
-            pData->mViewMtx[0][2] = rowA.z;
-            pData->mViewMtx[0][3] = -vec3_dot(pPos, &rowA);
-            pData->mViewMtx[1][0] = rowB.x;
-            pData->mViewMtx[1][1] = rowB.y;
-            pData->mViewMtx[1][2] = rowB.z;
-            pData->mViewMtx[1][3] = -vec3_dot(pPos, &rowB);
-            pData->mViewMtx[2][0] = diff.x;
-            pData->mViewMtx[2][1] = diff.y;
-            pData->mViewMtx[2][2] = diff.z;
-            pData->mViewMtx[2][3] = -vec3_dot(pPos, &diff);
+            pData->mViewMtx.m[0][0] = rowA.x;
+            pData->mViewMtx.m[0][1] = rowA.y;
+            pData->mViewMtx.m[0][2] = rowA.z;
+            pData->mViewMtx.m[0][3] = -vec3_dot(pPos, &rowA);
+            pData->mViewMtx.m[1][0] = rowB.x;
+            pData->mViewMtx.m[1][1] = rowB.y;
+            pData->mViewMtx.m[1][2] = rowB.z;
+            pData->mViewMtx.m[1][3] = -vec3_dot(pPos, &rowB);
+            pData->mViewMtx.m[2][0] = diff.x;
+            pData->mViewMtx.m[2][1] = diff.y;
+            pData->mViewMtx.m[2][2] = diff.z;
+            pData->mViewMtx.m[2][3] = -vec3_dot(pPos, &diff);
         }
     } else {
         if ((flags & 2) == 0) {
             nw4r::db::Panic("g3d_camera.cpp", 926, "Unknown camera type(%x)", flags);
         }
-        nw4r::math::VEC3* pPos = (nw4r::math::VEC3*)&pData->mPosX;
-        sin_cos_deg(&sinX, &cosX, pData->mUnk98);
-        sin_cos_deg(&sinY, &cosY, pData->mUnk9C);
-        sin_cos_deg(&sinZ, &cosZ, pData->mUnkA0);
-        VEC3_ctor(&row0);
-        VEC3_ctor(&row1);
-        VEC3_ctor(&row2);
+        nw4r::math::VEC3* pPos = &pData->mPos;
+        sin_cos_deg(&sinX, &cosX, pData->mUnk98.x);
+        sin_cos_deg(&sinY, &cosY, pData->mUnk98.y);
+        sin_cos_deg(&sinZ, &cosZ, pData->mUnk98.z);
+        nw4r::math::VEC3 row0;
+        nw4r::math::VEC3 row1;
+        nw4r::math::VEC3 row2;
         row0.x = sinZ * (sinX * sinY) + cosY * cosZ;
         row0.y = cosX * sinZ;
         row0.z = sinZ * (sinX * cosY) - sinY * cosZ;
@@ -694,18 +678,18 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         row2.x = cosX * sinY;
         row2.y = -sinX;
         row2.z = cosX * cosY;
-        pData->mViewMtx[0][0] = row0.x;
-        pData->mViewMtx[0][1] = row0.y;
-        pData->mViewMtx[0][2] = row0.z;
-        pData->mViewMtx[0][3] = -vec3_dot(pPos, &row0);
-        pData->mViewMtx[1][0] = row1.x;
-        pData->mViewMtx[1][1] = row1.y;
-        pData->mViewMtx[1][2] = row1.z;
-        pData->mViewMtx[1][3] = -vec3_dot(pPos, &row1);
-        pData->mViewMtx[2][0] = row2.x;
-        pData->mViewMtx[2][1] = row2.y;
-        pData->mViewMtx[2][2] = row2.z;
-        pData->mViewMtx[2][3] = -vec3_dot(pPos, &row2);
+        pData->mViewMtx.m[0][0] = row0.x;
+        pData->mViewMtx.m[0][1] = row0.y;
+        pData->mViewMtx.m[0][2] = row0.z;
+        pData->mViewMtx.m[0][3] = -vec3_dot(pPos, &row0);
+        pData->mViewMtx.m[1][0] = row1.x;
+        pData->mViewMtx.m[1][1] = row1.y;
+        pData->mViewMtx.m[1][2] = row1.z;
+        pData->mViewMtx.m[1][3] = -vec3_dot(pPos, &row1);
+        pData->mViewMtx.m[2][0] = row2.x;
+        pData->mViewMtx.m[2][1] = row2.y;
+        pData->mViewMtx.m[2][2] = row2.z;
+        pData->mViewMtx.m[2][3] = -vec3_dot(pPos, &row2);
     }
     pData->mFlags |= 8;
 }
@@ -728,13 +712,13 @@ void fn_80075DD8(nw4r::g3d::Camera* pSelf) {
     CameraData* pData = camera_ref_const(pSelf);
 
     if (pData->mFlags & 0x40) {
-        C_MTXOrtho(fn_80075E98(pData->mProjMtx), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
+        C_MTXOrtho(fn_80075E98(pData->mProjMtx.m), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
                    pData->mProjC, pData->mProjD);
     } else if (pData->mFlags & 0x10) {
-        C_MTXFrustum(fn_80075E98(pData->mProjMtx), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
+        C_MTXFrustum(fn_80075E98(pData->mProjMtx.m), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
                      pData->mProjC, pData->mProjD);
     } else {
-        C_MTXPerspective(fn_80075E98(pData->mProjMtx), pData->mProjA, pData->mProjB, pData->mProjC,
+        C_MTXPerspective(fn_80075E98(pData->mProjMtx.m), pData->mProjA, pData->mProjB, pData->mProjC,
                          pData->mProjD);
     }
     pData->mFlags |= 0x80;

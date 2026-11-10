@@ -35,14 +35,14 @@
 #include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/fn_800FD864_fx_types.h"
 #include "pl.h" /* MHchar, _PLW */
 #include "ef/GameMode_ck.h"
 #include "unsplit/unknown.h" /* get_stg_eft_col */
 #include "fn_8004CAD8.h" /* cpSetRotMatrix, rotVecY, vec3_scale_in_place (rule 2) */
 #include "unsplit/sound.h" /* mhchar_joint_mtx_get */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "ef/eft001.h" /* mtx34_set_trans */
 #include "ef/effect.h"
 #include "stage/stg_w.h" /* get_stg_eft_col_pos (rule 2) */
@@ -178,7 +178,7 @@ void eft004_set(u8 type, nw4r::math::VEC3* pos, f32 scale, u32 param, u8 flag)
     params[2] = 0;
     effect = fn_801007BC(NULL, type, flag, 255, scale, 0.0f, 0.0f, params);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
     }
 }
 
@@ -193,7 +193,7 @@ void eft004_set_pl(_PLW* self, u8 type, f32 a, f32 b, f32 c, u32 param)
     params[2] = self->rot_z_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, 255, a, b, c, params);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, &self->vec_0x03C);
+        effect->pos_0x18 = self->vec_0x03C;
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl(self, 2, a, b, c, param);
         }
@@ -207,13 +207,12 @@ void eft004_set_pl2(_PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 ext
     s32 params[3];
     Eft004* effect;
 
-    VEC3_ctor(&dir);
     params[0] = self->param_0x54;
     params[1] = self->field_0x058 + extra;
     params[2] = self->rot_z_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, param, a, b, c, params);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, &self->vec_0x03C);
+        effect->pos_0x18 = self->vec_0x03C;
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl2(self, 2, param, a, b, c, extra);
         }
@@ -231,7 +230,7 @@ extern "C" void eft004_key_spawn(u8 type, nw4r::math::VEC3* pos, u32 param, u8 f
     params[2] = 0;
     effect = fn_801007BC(NULL, type, flag, 255, scale, 0.0f, 0.0f, params);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
         effect->byte_0x08 = key;
     }
 }
@@ -249,7 +248,7 @@ extern "C" void fn_8010072C(_PLW* owner, u8 type, nw4r::math::VEC3* pos, u32 par
                          0.0f, 0.0f, params);
     if (effect != NULL) {
         effect->owner_0x30 = owner;
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
         effect->byte_0x08 = 2;
     }
 }
@@ -388,9 +387,6 @@ extern "C" void fn_80100A6C(Eft004* self)
  * or at the record's position plus the rotated offset, picks the stage colour and the height, then runs state 1. */
 extern "C" void fn_80100AA8(Eft004* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 scale;
     u16 param_id;
     u16 effect_id;
     EftPlacePool* work;
@@ -399,9 +395,9 @@ extern "C" void fn_80100AA8(Eft004* self)
     u32 col;
     _EFT* eft = (_EFT*)self;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&scale);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 scale;
     work = (EftPlacePool*)self->work_0x38;
     if (self->byte_0x08 != 2) {
         owner = (_PLW*)self->owner_0x30;
@@ -531,9 +527,9 @@ extern "C" void fn_80100AA8(Eft004* self)
         if (owner != NULL) {
             mhchar_joint_mtx_get(&((EftPlwJoints*)owner->physics_0x13C)->joint_0x004, work->joint_0x0C,
                                  (Mtx34*)&mtx);
-            copyVec3(&offset, &work->offset_0x18);
+            offset = work->offset_0x18;
             mulVecMat(&offset, &mtx);
-            addVec3To(&self->pos_0x18, &offset);
+            self->pos_0x18 += offset;
             switch (self->type_0x02) {
             case 20:
                 self->pos_0x18.y = 5.0f + owner->ground_y_0x060;
@@ -545,9 +541,9 @@ extern "C" void fn_80100AA8(Eft004* self)
         }
     } else {
         cpSetRotMatrix(&eft->rot_0x24, &mtx);
-        copyVec3(&offset, &work->offset_0x18);
+        offset = work->offset_0x18;
         rotVecY(&offset, eft->rot_0x24.y);
-        addVec3To(&self->pos_0x18, &offset);
+        self->pos_0x18 += offset;
     }
     switch (self->type_0x02) {
     case 1:
@@ -662,8 +658,6 @@ extern "C" void fn_80100AA8(Eft004* self)
  * their side of the camera's y 0). */
 extern "C" void fn_801011B4(Eft004* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 offset;
     s32 i;
     u32 mode;
     u8 stopped;
@@ -673,11 +667,11 @@ extern "C" void fn_801011B4(Eft004* self)
     stopped = 0;
     work = (EftPlacePool*)self->work_0x38;
     owner = (_PLW*)self->owner_0x30;
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&offset);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 offset;
     if ((s32)self->type_0x02 == 31) {
         mhchar_joint_mtx_get(&((EftPlwJoints*)owner->physics_0x13C)->joint_0x004, work->joint_0x0C, (Mtx34*)&mtx);
-        copyVec3(&offset, &work->offset_0x18);
+        offset = work->offset_0x18;
         mulVecMat(&offset, &mtx);
         mtx34_trans_add(&mtx, &offset);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -861,7 +855,7 @@ extern "C" void eft004_scaled_spawn(nw4r::math::VEC3* pos, u8 area, f32 scale)
         effect->type_0x02 = 1;
         effect->owner_0x30 = NULL;
         effect->area_0x44 = area;
-        copyVec3(&effect->pos_0x18, pos);
+        effect->pos_0x18 = *pos;
         effect->timer_0x0C = 0;
         effect->field_0x10 = 0;
         eft_state_flags_set_c1(effect, 1, 0);
@@ -910,8 +904,6 @@ extern "C" void fn_801017B0(Eft004* self)
     u16 id;
     u16 kind;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     work = (EftEffectPool*)self->work_0x38;
     owner = (_PLW*)self->owner_0x30;
     self->state_0x05++;
@@ -960,8 +952,6 @@ extern "C" void fn_80101980(Eft004* self)
 {
     nw4r::math::VEC3 pos;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 unused_a;
-    nw4r::math::VEC3 unused_b;
     EftScaledPool* work;
     s32 i;
     _PLW* owner;
@@ -969,10 +959,8 @@ extern "C" void fn_80101980(Eft004* self)
     u32 col;
     _GXColor color;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
+    nw4r::math::VEC3 unused_a;
+    nw4r::math::VEC3 unused_b;
     owner = (_PLW*)self->owner_0x30;
     work = (EftScaledPool*)self->work_0x38;
     system = eft_control.effect_system_0x04;

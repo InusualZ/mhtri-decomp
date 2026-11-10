@@ -52,7 +52,6 @@ u32 pl_coll_shape_set(struct _PLW* self, u8 mode, u16 flags);
 u32 pl_act6_52_54_61_62_ck(struct _PLW* self);
 
 /* ---- callees another registered unit owns whose header does not declare them ---- */
-u32 em_land_data_init(void* out);
 u32 em_player_spotted_set(u8 index);
 u32 pl_rig_model_move(void* physics);
 u32 fn_8026F7B4(void);

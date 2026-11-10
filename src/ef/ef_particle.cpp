@@ -56,11 +56,11 @@
 #include "ef/ef_resource.h" /* ef_resource_instance (rule 2) */
 #include "ef/ef_pm_modulate_color.h" /* ef_pm_modulate_color (rule 2) */
 #include "ef/ef_emitter_tex_flags.h" /* ef_emitter_get_mtx (rule 2) */
-#include "mh3_pad/vec3.h" /* copyVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
 #include "nw4r/mtx34_mult_vec3.h" /* mtx34_mult_vec3 (rule 2) */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 
 #pragma fp_contract off
 #pragma peephole off
@@ -110,6 +110,9 @@ class Particle : public ReferencedObject {
 public:
     Particle();
 
+    /* +0x20 */ EfParticleParams mParams; /* the view `EfParticle::params` */
+    /* +0xCC */ VEC3 mPosition;           /* the view `EfParticle::field_0xCC` */
+
     virtual void SendClosing();
     virtual void DestroyFunc();
     virtual bool Initialize(u16 life, VEC3* pos, VEC3* vel, EfParticleMgr* pm, const MTX34* space, f32 momentum,
@@ -121,7 +124,6 @@ public:
 
 /* Forward declarations: the unit's own functions, in address order, since a later one is called by an
  * earlier one (the object lays them out the same way). */
-extern "C" EfParticleParams* ef_particle_params_ctor(EfParticleParams* self);
 extern "C" inline __attribute__((never_inline)) u8 ef_rad_to_byte_angle(f32 angle);
 extern "C" inline __attribute__((never_inline)) f32* fn_800AA75C(f32* dst, f32* src);
 extern "C" inline __attribute__((never_inline)) void fn_800AA78C(f32* dst, f32* src);
@@ -267,37 +269,13 @@ extern "C" inline __attribute__((never_inline)) void ef_particle_get_color(EfPar
 /* 0x800AA18C (0x4C): builds the particle: the base, its parameter sub-record and its position. */
 nw4r::ef::Particle::Particle()
 {
-    EfParticle* self = (EfParticle*)this;
-    ef_particle_params_ctor(&self->params);
-    VEC3_ctor(&self->field_0xCC);
 }
 #pragma dont_inline reset
 
-/* Builds the emitter-parameter sub-record: two single sub-objects, one vector, two arrays of three
- * sub-objects and three vectors. */
-extern "C" EfParticleParams* ef_particle_params_ctor(EfParticleParams* self)
+/* 0x800AA1D8 (0xA4): builds the emitter-parameter sub-record: two scale pairs, one vector, two arrays of three
+ * texture pairs and three vectors. */
+EfParticleParams::EfParticleParams()
 {
-    EfParticleNode* p;
-
-    VEC2_ctor(&self->scale_0x10);
-    VEC2_ctor(&self->scale_0x18);
-    VEC3_ctor(&self->field_0x20);
-
-    p = &self->field_0x2C[0];
-    do {
-        VEC2_ctor(p);
-        p++;
-    } while (p < &self->field_0x2C[3]);
-    p = &self->field_0x50[0];
-    do {
-        VEC2_ctor(p);
-        p++;
-    } while (p < &self->field_0x50[3]);
-
-    VEC3_ctor(&self->field_0x80);
-    VEC3_ctor(&self->field_0x8C);
-    VEC3_ctor(&self->field_0x98);
-    return self;
 }
 
 /* Frees the record when the caller asks for it (positive flag); always returns the pointer so a
@@ -352,7 +330,7 @@ extern "C" void ef_particle_param_init(EfParticleParams* self, EfParticleParamDe
     self->colors[1][1][3] = ppd->colors[1][1][3];
     fn_800AA75C(&self->scale_0x10.x, &ppd->size.x);
     fn_800AA75C(&self->scale_0x18.x, &ppd->scale.x);
-    copyVec3(&self->field_0x20, &ppd->rotate);
+    self->field_0x20 = ppd->rotate;
 
     for (i = 0; i < 3; i++) {
         f32 offset = ppd->rotate_offset[i];
@@ -366,9 +344,9 @@ extern "C" void ef_particle_param_init(EfParticleParams* self, EfParticleParamDe
 
     for (i = 0; i < 3; i++) {
         self->textures[i] = ppd->textures[i];
-        fn_800AA75C((f32*)self->field_0x2C[i].data, &ppd->tex_scale[i].x);
+        fn_800AA75C(&self->field_0x2C[i].x, &ppd->tex_scale[i].x);
         self->tex_rotate[i] = ppd->tex_rotate[i];
-        fn_800AA75C((f32*)self->field_0x50[i].data, &ppd->tex_translate[i].x);
+        fn_800AA75C(&self->field_0x50[i].x, &ppd->tex_translate[i].x);
     }
 
     self->tex_wrap = ppd->tex_wrap;
@@ -386,9 +364,6 @@ bool nw4r::ef::Particle::Initialize(u16 life, VEC3* pos, VEC3* vel, EfParticleMg
 {
     EfParticle* self = (EfParticle*)this;
     VEC3* effect_vel;
-    VEC3 effect_v;
-    VEC3 parent_v;
-    VEC3 tmp;
 
 #line 114
     NW4R_POINTER_ASSERT(ef_particle_file_name, pm, ef_particle_err_pm);
@@ -409,39 +384,37 @@ bool nw4r::ef::Particle::Initialize(u16 life, VEC3* pos, VEC3* vel, EfParticleMg
     self->life = life;
     self->random_byte = ef_random_u16(&pm->emitter->progress);
     self->params.field_0x79 = ef_random_u16(&pm->emitter->progress) % 254 - 126;
-    copyVec3(&self->params.field_0x8C, pos);
-    copyVec3(&self->params.field_0x98, &self->params.field_0x8C);
-    copyVec3(&self->params.field_0x80, vel);
+    self->params.field_0x8C = *pos;
+    self->params.field_0x98 = self->params.field_0x8C;
+    self->params.field_0x80 = *vel;
 
 #line 148
     NW4R_POINTER_ASSERT(ef_particle_file_name, pm->emitter->effect, ef_particle_err_manager_ef);
     effect_vel = ef_effect_get_velocity((nw4r::ef::Effect*)pm->emitter->effect);
     if (0.0f != effect_vel->x || 0.0f != effect_vel->y || 0.0f != effect_vel->z) {
         MTX34 mtx;
-        MTX34_ctor(&mtx);
         ef_emitter_get_mtx((EfDrawEmitter*)pm->emitter, &mtx);
         mtx34_inverse(&mtx, &mtx);
         mtx.m[0][3] = mtx.m[1][3] = mtx.m[2][3] = 0.0f;
-        VEC3_ctor(&effect_v);
+        VEC3 effect_v;
         mtx34_mult_vec3(&effect_v, &mtx, effect_vel);
-        addVec3To(&self->params.field_0x80, &effect_v);
+        self->params.field_0x80 += effect_v;
     }
 
     if (space != NULL) {
-        MTX34 mtx;
+        _MTX34 mtx;
         mtx34_mult_vec3(&self->params.field_0x8C, space, &self->params.field_0x8C);
-        ef_mtx34_copy(&mtx, space);
+        ef_mtx34_copy((MTX34*)&mtx, space);
         mtx.m[0][3] = mtx.m[1][3] = mtx.m[2][3] = 0.0f;
-        mtx34_mult_vec3(&self->params.field_0x80, &mtx, &self->params.field_0x80);
+        mtx34_mult_vec3(&self->params.field_0x80, (MTX34*)&mtx, &self->params.field_0x80);
     }
 
-    copyVec3(&self->field_0xCC, setVec3(&tmp, 2.0f, 0.0f, 0.0f));
+    self->field_0xCC = VEC3(2.0f, 0.0f, 0.0f);
 
     if (parent != NULL && inherit != NULL) {
         if (inherit->velocity != 0) {
+            VEC3 parent_v;
             MTX34 mtx;
-            VEC3_ctor(&parent_v);
-            MTX34_ctor(&mtx);
             ef_pm_get_mtx(parent->params.manager, &mtx);
             mtx.m[0][3] = mtx.m[1][3] = mtx.m[2][3] = 0.0f;
             mtx34_mult_vec3(&parent_v, &mtx, &parent->params.field_0x80);

@@ -24,7 +24,7 @@
 #include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "gx.h"
 #include "sys_mem.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/fn_800AEE48.h" /* ef_vec3_normalize / ef_pm_next_alive / ef_pm_prev_alive, owned by ef_drawstripestrategy.cpp's range (rule 2) */
 #include "ef/ef_drawstripestrategy.h" /* the walker family ef_ahead_manager_axis_y..ef_ahead_move_dir (rule 2) */
@@ -103,9 +103,9 @@ __declspec(section ".sdata") static u8 ef_directional_texcoords[32] __attribute_
     0, 1, 0, 0, 1, 0, 1, 1};
 
 /* The unit quad in the XY plane and its crossing quad in the YZ plane (`.rodata`). */
-static const VEC3 ef_directional_quad_vtx[4] = {
+static const _VEC3 ef_directional_quad_vtx[4] = {
     {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}};
-static const VEC3 ef_directional_cross_vtx[4] = {
+static const _VEC3 ef_directional_cross_vtx[4] = {
     {0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f}};
 
 #ifdef __cplusplus
@@ -127,36 +127,31 @@ extern "C" {
 
 /* The four-vertex matrix writer: transforms four positions by a matrix and emits them. */
 void ef_directional_write_quad(void* mtx, Vec* src, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
     if (!IsValidPointer((u32)src)) {
         nw4r::db::Panic(ef_directional_file_str, 92, ef_directional_p_assert_str, src);
     }
-    VEC3_ctor((VEC3*)&v0);
-    VEC3_ctor((VEC3*)&v1);
-    VEC3_ctor((VEC3*)&v2);
-    VEC3_ctor((VEC3*)&v3);
-    mtx34_mult_vec3((VEC3*)&v0, (const MTX34*)mtx, (const VEC3*)&src[0]);
-    mtx34_mult_vec3((VEC3*)&v1, (const MTX34*)mtx, (const VEC3*)&src[1]);
-    mtx34_mult_vec3((VEC3*)&v2, (const MTX34*)mtx, (const VEC3*)&src[2]);
-    mtx34_mult_vec3((VEC3*)&v3, (const MTX34*)mtx, (const VEC3*)&src[3]);
+    VEC3 v0;
+    VEC3 v1;
+    VEC3 v2;
+    VEC3 v3;
+    mtx34_mult_vec3(&v0, (const MTX34*)mtx, (const VEC3*)&src[0]);
+    mtx34_mult_vec3(&v1, (const MTX34*)mtx, (const VEC3*)&src[1]);
+    mtx34_mult_vec3(&v2, (const MTX34*)mtx, (const VEC3*)&src[2]);
+    mtx34_mult_vec3(&v3, (const MTX34*)mtx, (const VEC3*)&src[3]);
     GXBegin(0x80, 0, 4);
-    ef_directional_gx_position(&v0);
+    ef_directional_gx_position((Vec*)&v0);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(0);
     }
-    ef_directional_gx_position(&v1);
+    ef_directional_gx_position((Vec*)&v1);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(1);
     }
-    ef_directional_gx_position(&v2);
+    ef_directional_gx_position((Vec*)&v2);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(2);
     }
-    ef_directional_gx_position(&v3);
+    ef_directional_gx_position((Vec*)&v3);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(3);
     }
@@ -195,29 +190,24 @@ static void ef_directional_gx_position3f(f32 x, f32 y, f32 z) {
 
 /* The stripe writer (second copy): four vertices from the matrix and two positions. */
 void ef_directional_write_quad_center(void* mtx, Vec* a, Vec* b, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
     GXBegin(0x80, 0, 4);
-    subVec3(&v0, mtx, a);
-    ef_directional_gx_position(&v0);
+    VEC3 v0 = *(const VEC3*)mtx - *(const VEC3*)a;
+    ef_directional_gx_position((Vec*)&v0);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(0);
     }
-    subVec3(&v1, mtx, b);
-    ef_directional_gx_position(&v1);
+    VEC3 v1 = *(const VEC3*)mtx - *(const VEC3*)b;
+    ef_directional_gx_position((Vec*)&v1);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(1);
     }
-    addVec3((VEC3*)&v2, (VEC3*)mtx, (VEC3*)a);
-    ef_directional_gx_position(&v2);
+    VEC3 v2 = *(const VEC3*)mtx + *(const VEC3*)a;
+    ef_directional_gx_position((Vec*)&v2);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(2);
     }
-    addVec3((VEC3*)&v3, (VEC3*)mtx, (VEC3*)b);
-    ef_directional_gx_position(&v3);
+    VEC3 v3 = *(const VEC3*)mtx + *(const VEC3*)b;
+    ef_directional_gx_position((Vec*)&v3);
     if (ef_directional_tex_flag(flags) != 0) {
         ef_directional_gx_u8(3);
     }
@@ -264,17 +254,9 @@ s32 ef_directional_draw_mode(void* unused, EfParticleFlags* self) {
  * each oriented by its rotation and by a frame built from its ahead vector. */
 void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
                                EfDrawParticleManager* pm) {
-    MTX34 view;
     EfEmitterDrawSetting* ed;
     nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     u32 use_tex;
-    VEC3 axis_y;
-    VEC3 axis_z;
-    VEC3 move;
-    VEC3 side;
-    VEC3 ahead;
-    VEC3 normal;
-    VEC3 pos;
     EfDrawParticle* head;
     f32 pivot_x;
     f32 pivot_y;
@@ -292,46 +274,37 @@ void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const Ef
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_directional_file_str, 371, ef_directional_ed_assert_str, ed);
     }
-    MTX34_ctor(&view);
+    MTX34 view;
     ef_draw_info_view_mtx(info, &view);
     nw4r::ef::DrawStrategyImpl::AheadContext ctx(&view, pm);
     calc_ahead = self->GetCalcAheadFunc(pm);
     use_tex = self->mNumTexmap != 0;
-    VEC3_ctor(&axis_y);
-    VEC3_ctor(&axis_z);
+    VEC3 axis_y;
+    VEC3 axis_z;
     if (ed->type_direction == 7) {
         MTX34 mtx;
-        VEC3 col_y;
-        VEC3 col_z;
 
-        MTX34_ctor(&mtx);
         mtx34_concat(&mtx, &view, &ctx.manager_mtx);
         GXLoadPosMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), 0);
-        copyVec3(&axis_y, setVec3(&col_y, ctx.manager_mtx_inv.m[0][1], ctx.manager_mtx_inv.m[1][1],
-                                  ctx.manager_mtx_inv.m[2][1]));
-        copyVec3(&axis_z, setVec3(&col_z, ctx.manager_mtx_inv.m[0][2], ctx.manager_mtx_inv.m[1][2],
-                                  ctx.manager_mtx_inv.m[2][2]));
+        axis_y = VEC3(ctx.manager_mtx_inv.m[0][1], ctx.manager_mtx_inv.m[1][1], ctx.manager_mtx_inv.m[2][1]);
+        axis_z = VEC3(ctx.manager_mtx_inv.m[0][2], ctx.manager_mtx_inv.m[1][2], ctx.manager_mtx_inv.m[2][2]);
         ef_vec3_normalize(&axis_z);
     } else {
         MTX34 mtx;
-        MTX34 em_mtx;
-        VEC3 col_y;
-        VEC3 col_z;
 
-        MTX34_ctor(&mtx);
         mtx34_concat(&mtx, &view, &ctx.manager_mtx);
         GXLoadPosMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), 0);
         EF_VALID_PTR_ASSERT(ef_directional_file_str, 403, ef_directional_manager_em_assert_str, pm->emitter);
-        MTX34_ctor(&em_mtx);
+        MTX34 em_mtx;
         ef_emitter_get_mtx(pm->emitter, &em_mtx);
         mtx34_concat(&em_mtx, &ctx.manager_mtx_inv, &em_mtx);
-        copyVec3(&axis_y, setVec3(&col_y, em_mtx.m[0][1], em_mtx.m[1][1], em_mtx.m[2][1]));
-        copyVec3(&axis_z, setVec3(&col_z, em_mtx.m[0][2], em_mtx.m[1][2], em_mtx.m[2][2]));
+        axis_y = VEC3(em_mtx.m[0][1], em_mtx.m[1][1], em_mtx.m[2][1]);
+        axis_z = VEC3(em_mtx.m[0][2], em_mtx.m[1][2], em_mtx.m[2][2]);
         ef_vec3_normalize(&axis_z);
     }
     for (head = (EfDrawParticle*)ef_pm_list_head((EfParticleState*)pm); head != NULL && head->ahead.x > 1.0f;
          head = (EfDrawParticle*)ef_pm_list_next(pm, head)) {
-        copyVec3(&head->ahead, &axis_y);
+        head->ahead = axis_y;
     }
     pivot_x = ed->scale_a / 100.0f;
     pivot_y = ed->scale_b / 100.0f;
@@ -342,10 +315,9 @@ void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const Ef
         f32 scale_x;
         f32 scale_y;
         f32 stretch;
-        MTX34 rotate_mtx;
-        MTX34 local_mtx;
-        MTX34 frame_mtx;
-        MTX34 world_mtx;
+        _MTX34 rotate_mtx;
+        _MTX34 local_mtx;
+        _MTX34 frame_mtx;
 
         scale_x = ef_particle_get_scale((EfParticle*)p);
         if (scale_x < 1.1920929e-7f) {
@@ -357,30 +329,30 @@ void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const Ef
         }
         stretch = 1.0f;
         if (ed->type_option2 != 0) {
-            VEC3_ctor(&move);
+            VEC3 move;
             ef_particle_get_move_dir(p, &move);
             stretch += 0.5f * sqrt_f32(vec3_dot((const f32*)&move, (const f32*)&move)) / scale_y;
         }
         self->SetupGP(p, *ed, *info, first, false);
         first = false;
-        ef_directional_rotate_mtx(&rotate_mtx, p, ed->type_axis);
-        ef_directional_local_mtx(&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
-                                 &rotate_mtx);
-        VEC3_ctor(&side);
-        VEC3_ctor(&ahead);
-        VEC3_ctor(&normal);
+        ef_directional_rotate_mtx((MTX34*)&rotate_mtx, p, ed->type_axis);
+        ef_directional_local_mtx((MTX34*)&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
+                                 (MTX34*)&rotate_mtx);
+        VEC3 side;
+        VEC3 ahead;
+        VEC3 normal;
         calc_ahead(&ahead, &ctx, p);
         vec3_cross((f32*)&normal, (const f32*)&p->ahead, (const f32*)&ahead);
         if (ef_vec3_normalize(&normal) == 0) {
-            copyVec3(&normal, &axis_z);
+            normal = axis_z;
         }
         vec3_cross((f32*)&side, (const f32*)&ahead, (const f32*)&normal);
-        copyVec3(&p->ahead, &side);
-        assignVec3((Vec*)&pos, (Vec*)&p->world_pos);
-        mtx34_set(&frame_mtx, side.x, ahead.x, normal.x, pos.x, side.y, ahead.y, normal.y, pos.y, side.z, ahead.z,
+        p->ahead = side;
+        VEC3 pos = (const VEC3&)p->world_pos;
+        mtx34_set((MTX34*)&frame_mtx, side.x, ahead.x, normal.x, pos.x, side.y, ahead.y, normal.y, pos.y, side.z, ahead.z,
                   normal.z, pos.z);
-        MTX34_ctor(&world_mtx);
-        mtx34_concat(&world_mtx, &frame_mtx, &local_mtx);
+        MTX34 world_mtx;
+        mtx34_concat(&world_mtx, (MTX34*)&frame_mtx, (MTX34*)&local_mtx);
         ef_directional_write_quad(&world_mtx, (Vec*)ef_directional_quad_vtx, use_tex);
         if (ed->type_option == 1) {
             ef_directional_write_quad(&world_mtx, (Vec*)ef_directional_cross_vtx, use_tex);
@@ -414,7 +386,6 @@ void ef_directional_local_mtx(MTX34* out, u8 pivot_mode, f32 pivot_x, f32 pivot_
 
 /* 0x800BCE98 (0x39C): builds the rotation matrix of a particle's rotation about the X, Y or Z axis, or all three. */
 void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis) {
-    VEC3 rotate;
     f32 sin_x;
     f32 cos_x;
     f32 sin_y;
@@ -425,7 +396,7 @@ void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis) {
     if (!IsValidPointer((u32)p)) {
         nw4r::db::Panic(ef_directional_file_str, 239, ef_directional_pp_assert_str, p);
     }
-    VEC3_ctor(&rotate);
+    VEC3 rotate;
     ef_particle_get_rotate(p, (Vec3*)&rotate);
     sin_x = 0.0f;
     cos_x = 1.0f;
@@ -479,12 +450,9 @@ void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis) {
  * oriented by its rotation and by a frame that keeps its ahead vector upright on screen. */
 void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfDrawInfo* info,
                               EfDrawParticleManager* pm) {
-    MTX34 view;
     EfEmitterDrawSetting* ed;
     nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
     u32 use_tex;
-    MTX34 mtx;
-    MTX34 pm_mtx;
     f32 axis_x;
     f32 axis_y;
     f32 axis_z;
@@ -495,23 +463,6 @@ void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfD
     nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc get_next;
     bool first;
     EfDrawParticle* p;
-    VEC3 move;
-    MTX34 rotate_mtx;
-    MTX34 local_mtx;
-    MTX34 frame_mtx;
-    MTX34 world_mtx;
-    VEC3 side;
-    VEC3 up;
-    VEC3 normal;
-    VEC3 ahead;
-    VEC3 pos;
-    VEC3 center;
-    VEC3 edge_a;
-    VEC3 edge_b;
-    VEC3 edge_c;
-    VEC3 edge_d;
-    VEC3 flat_side;
-    VEC3 flat_normal;
 
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_directional_file_str, 512, ef_directional_pm_assert_str, pm);
@@ -522,13 +473,16 @@ void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfD
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_directional_file_str, 518, ef_directional_ed_assert_str, ed);
     }
-    MTX34_ctor(&view);
+    MTX34 view;
     ef_draw_info_view_mtx(info, &view);
     nw4r::ef::DrawStrategyImpl::AheadContext ctx(&view, pm);
     calc_ahead = self->GetCalcAheadFunc(pm);
     use_tex = self->mNumTexmap != 0;
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&pm_mtx);
+    MTX34 mtx;
+    MTX34 pm_mtx;
+    _MTX34 rotate_mtx;
+    _MTX34 local_mtx;
+    _MTX34 frame_mtx;
     ef_pm_get_mtx(pm, &pm_mtx);
     mtx34_concat(&mtx, &view, &pm_mtx);
     GXLoadPosMtxImm((const f32(*)[4])mtx34_const_ptr((u32)&ef_identity_mtx), 0);
@@ -537,7 +491,7 @@ void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfD
     axis_z = ef_mtx34_column_length((const f32*)&mtx, 2);
     for (head = (EfDrawParticle*)ef_pm_list_head((EfParticleState*)pm); head != NULL && head->ahead.x > 1.0f;
          head = (EfDrawParticle*)ef_pm_list_next(pm, head)) {
-        copyVec3(&head->ahead, &ef_zero_vec);
+        head->ahead = ef_zero_vec;
     }
     pivot_x = ed->scale_a / 100.0f;
     pivot_y = ed->scale_b / 100.0f;
@@ -559,53 +513,48 @@ void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfD
         }
         stretch = 1.0f;
         if (ed->type_option2 != 0) {
-            VEC3_ctor(&move);
+            VEC3 move;
             ef_particle_get_move_dir(p, &move);
             stretch += 0.5f * sqrt_f32(vec3_dot((const f32*)&move, (const f32*)&move)) / scale_y;
         }
         self->SetupGP(p, *ed, *info, first, false);
         first = false;
-        ef_directional_rotate_mtx(&rotate_mtx, p, ed->type_axis);
-        ef_directional_local_mtx(&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
-                                 &rotate_mtx);
-        VEC3_ctor(&side);
-        VEC3_ctor(&up);
-        VEC3_ctor(&normal);
-        VEC3_ctor(&ahead);
+        ef_directional_rotate_mtx((MTX34*)&rotate_mtx, p, ed->type_axis);
+        ef_directional_local_mtx((MTX34*)&local_mtx, ed->type_option3, pivot_x, pivot_y, scale_x, scale_y, stretch,
+                                 (MTX34*)&rotate_mtx);
+        VEC3 side;
+        VEC3 up;
+        VEC3 normal;
+        VEC3 ahead;
         calc_ahead(&ahead, &ctx, p);
         mtx34_rotate_vec3(&ahead, &mtx, &ahead);
-        copyVec3(&up, &ahead);
+        up = ahead;
         ef_vec3_normalize(&up);
-        copyVec3(&side, setVec3(&flat_side, ahead.y, -ahead.x, 0.0f));
+        side = VEC3(ahead.y, -ahead.x, 0.0f);
         if (ef_vec3_normalize(&side) != 0) {
-            copyVec3(&normal, setVec3(&flat_normal, -ahead.x * ahead.z, -ahead.y * ahead.z,
-                                      ahead.x * ahead.x + ahead.y * ahead.y));
+            normal = VEC3(-ahead.x * ahead.z, -ahead.y * ahead.z, ahead.x * ahead.x + ahead.y * ahead.y);
         } else {
             vec3_cross((f32*)&side, (const f32*)&ahead, (const f32*)&p->ahead);
             if (ef_vec3_normalize(&side) == 0) {
-                copyVec3(&side, &ef_unit_x_vec);
+                side = ef_unit_x_vec;
             }
             vec3_cross((f32*)&normal, (const f32*)&side, (const f32*)&ahead);
         }
         ef_vec3_normalize(&normal);
-        copyVec3(&p->ahead, &normal);
-        VEC3_ctor(&pos);
+        p->ahead = normal;
+        VEC3 pos;
         mtx34_mult_vec3(&pos, &mtx, (const VEC3*)&p->world_pos);
-        mtx34_set(&frame_mtx, axis_x * side.x, axis_y * up.x, axis_z * normal.x, pos.x, axis_x * side.y,
+        mtx34_set((MTX34*)&frame_mtx, axis_x * side.x, axis_y * up.x, axis_z * normal.x, pos.x, axis_x * side.y,
                   axis_y * up.y, axis_z * normal.y, pos.y, axis_x * side.z, axis_y * up.z, axis_z * normal.z, pos.z);
-        MTX34_ctor(&world_mtx);
-        mtx34_concat(&world_mtx, &frame_mtx, &local_mtx);
-        setVec3(&center, world_mtx.m[0][3], world_mtx.m[1][3], world_mtx.m[2][3]);
-        setVec3(&edge_a, world_mtx.m[0][0] + world_mtx.m[0][1], world_mtx.m[1][0] + world_mtx.m[1][1],
-                world_mtx.m[2][0] + world_mtx.m[2][1]);
-        setVec3(&edge_b, world_mtx.m[0][0] - world_mtx.m[0][1], world_mtx.m[1][0] - world_mtx.m[1][1],
-                world_mtx.m[2][0] - world_mtx.m[2][1]);
+        MTX34 world_mtx;
+        mtx34_concat(&world_mtx, (MTX34*)&frame_mtx, (MTX34*)&local_mtx);
+        VEC3 center(world_mtx.m[0][3], world_mtx.m[1][3], world_mtx.m[2][3]);
+        VEC3 edge_a(world_mtx.m[0][0] + world_mtx.m[0][1], world_mtx.m[1][0] + world_mtx.m[1][1], world_mtx.m[2][0] + world_mtx.m[2][1]);
+        VEC3 edge_b(world_mtx.m[0][0] - world_mtx.m[0][1], world_mtx.m[1][0] - world_mtx.m[1][1], world_mtx.m[2][0] - world_mtx.m[2][1]);
         ef_directional_write_quad_center(&center, (Vec*)&edge_a, (Vec*)&edge_b, use_tex);
         if (ed->type_option == 1) {
-            setVec3(&edge_c, world_mtx.m[0][1] + world_mtx.m[0][2], world_mtx.m[1][1] + world_mtx.m[1][2],
-                    world_mtx.m[2][1] + world_mtx.m[2][2]);
-            setVec3(&edge_d, world_mtx.m[0][1] - world_mtx.m[0][2], world_mtx.m[1][1] - world_mtx.m[1][2],
-                    world_mtx.m[2][1] - world_mtx.m[2][2]);
+            VEC3 edge_c(world_mtx.m[0][1] + world_mtx.m[0][2], world_mtx.m[1][1] + world_mtx.m[1][2], world_mtx.m[2][1] + world_mtx.m[2][2]);
+            VEC3 edge_d(world_mtx.m[0][1] - world_mtx.m[0][2], world_mtx.m[1][1] - world_mtx.m[1][2], world_mtx.m[2][1] - world_mtx.m[2][2]);
             ef_directional_write_quad_center(&center, (Vec*)&edge_c, (Vec*)&edge_d, use_tex);
         }
     }

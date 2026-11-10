@@ -116,7 +116,7 @@
 #include "enemy/fn_8013F764.h"   /* em_kind_release - owned by enemy/fn_8013F764.cpp (rule 2) */
 #include "Pl/pl_act_stage_latch_set.h"  /* pl_act_stage_latch_set, my_player_work_get - owned by Pl/fn_80273B14.cpp (rule 2) */
 #include "Pl/fn_80288CEC.h"   /* pl_warp_start - owned by Pl/fn_80288CEC.cpp (rule 2) */
-#include "mh3_pad.h"          /* setVec3 (rule 2) */
+#include "mh3_pad.h"          /* the owner header (rule 2) */
 #include "stage/stg_w.h"        /* stage_map_area_count_get - owned by stage/stg_w.cpp (rule 2) */
 #include "sound/fn_800D7F54.h"  /* snd_item_fail_play - owned by sound/fn_800D7F54.cpp (rule 2) */
 #include "Pl/Pl_master_ck.h"    /* Pl_master_ck - owned by Pl/pl_master.cpp (rule 2) */
@@ -2402,7 +2402,6 @@ void quest_monster_spawn_area(u8 rank, Q_MoveWork* work) {
     QuestMonsterVariantList* variant;
     s8 index;
 
-    em_ground_rec_clear(&rec);
     slot = quest_work_ptr->slots_0x34C;
     key = quest_work_ptr->key_rows_0x0319;
     quest_work_ptr->spawn_count_0x308 = 0;
@@ -2504,7 +2503,6 @@ void quest_monsters_spawn(Q_ItemWork* item) {
     QuestEntrySlot* quest_list;
     struct _ENEMY_WORK* enemy;
 
-    em_ground_rec_clear(&rec);
     work = (Q_MoveWork*)get_move_work_adrs(0);
     if (work == NULL) {
         return;
@@ -3218,13 +3216,12 @@ u32 quest_work_busy_ck(void) {
 /* Warps the player to the quest's start position: the local one for a network quest, a fixed spot for the
  * two arena phases, else the stage's own start. */
 void quest_start_warp(_PLW* plw) {
-    nw4r::math::VEC3 pos;
     s32 angle;
     Q_MoveWork* work;
     u8 saved;
     u8 phase;
 
-    setVec3(&pos, 0.0f, 0.0f, 0.0f);
+    nw4r::math::VEC3 pos(0.0f, 0.0f, 0.0f);
     work = (Q_MoveWork*)get_move_work_adrs(0);
     if (quest_work_busy_ck() != 0) {
         if (PlayMode_ck() == 2) {
@@ -3756,8 +3753,6 @@ void quest_finish_step(void) {
  * over), asks the enemy side for the intruder, releases the key row's monster, waits for the load and spawns
  * the next intruder; the server-select screen runs the lobby-synchronised form (phases 10-13). */
 void quest_intruder_step(void) {
-    EmGroundRec rec_a;
-    EmGroundRec rec_b;
     Q_MoveWork* work;
     QuestWork* quest;
     u8 kind;
@@ -3887,8 +3882,8 @@ void quest_intruder_step(void) {
             return;
         }
         break;
-    case 4:
-        em_ground_rec_clear(&rec_a);
+    case 4: {
+        EmGroundRec rec_a;
         if (quest_flag_100_ck(NULL) == 1) {
             row = 3;
         } else {
@@ -3923,6 +3918,7 @@ void quest_intruder_step(void) {
         em_intruder_spawn(key->id_0x00, &rec_a, row);
         quest->field_0x6978++;
         return;
+    }
     case 5: {
         struct _ENEMY_WORK* enemy = NULL;
         struct _ENEMY_MINI_WORK* mini = NULL;
@@ -3948,8 +3944,8 @@ void quest_intruder_step(void) {
             return;
         }
         break;
-    case 12:
-        em_ground_rec_clear(&rec_b);
+    case 12: {
+        EmGroundRec rec_b;
         if (quest_flag_100_ck(NULL) == 1) {
             row = 3;
         } else {
@@ -3986,6 +3982,7 @@ void quest_intruder_step(void) {
             quest->field_0x6978++;
             return;
         }
+    }
         /* fall through */
     case 13: {
         struct _ENEMY_WORK* enemy = NULL;
@@ -4005,8 +4002,6 @@ void quest_intruder_step(void) {
  * monster for the current map's kind as the next spawn record; the server-select screen runs the
  * lobby-synchronised form (phases 10-13). */
 void quest_successive_step(Q_MoveWork* work) {
-    EmGroundRec rec_a;
-    EmGroundRec rec_b;
     QuestWork* quest;
     Q_SlotPair* key;
     QuestSpawnRec* spawn;
@@ -4042,9 +4037,9 @@ void quest_successive_step(Q_MoveWork* work) {
             return;
         }
         break;
-    case 3:
+    case 3: {
         key = &quest->key_rows_0x0319[quest->spawn_count_0x308];
-        em_ground_rec_clear(&rec_a);
+        EmGroundRec rec_a;
         variant = quest_monster_variant_tbl[key->id_0x00];
         if (variant == NULL) {
             break;
@@ -4080,6 +4075,7 @@ void quest_successive_step(Q_MoveWork* work) {
         em_intruder_spawn(key->id_0x00, &rec_a, quest->spawn_count_0x308);
         quest->field_0x6978++;
         return;
+    }
     case 4: {
         struct _ENEMY_WORK* enemy = NULL;
         struct _ENEMY_MINI_WORK* mini = NULL;
@@ -4107,9 +4103,9 @@ void quest_successive_step(Q_MoveWork* work) {
             return;
         }
         break;
-    case 12:
+    case 12: {
         key = &quest->key_rows_0x0319[quest->spawn_count_0x308];
-        em_ground_rec_clear(&rec_b);
+        EmGroundRec rec_b;
         variant = quest_monster_variant_tbl[key->id_0x00];
         if (variant == NULL) {
             break;
@@ -4147,6 +4143,7 @@ void quest_successive_step(Q_MoveWork* work) {
             quest->field_0x6978++;
             return;
         }
+    }
         /* fall through */
     case 13: {
         struct _ENEMY_WORK* enemy = NULL;
@@ -4856,11 +4853,10 @@ u32 quest_players_state_get(void) {
 
 /* Warps the local player to entry point 2 of the current map. */
 void quest_entry_point_warp(void) {
-    nw4r::math::VEC3 pos;
     u32 angle;
 
-    setVec3(&pos, 0.0f, 0.0f, 0.0f);
-    copyVec3(&pos, stage_entry_pos_get(get_now_mapno(), 2));
+    nw4r::math::VEC3 pos(0.0f, 0.0f, 0.0f);
+    pos = *stage_entry_pos_get(get_now_mapno(), 2);
     angle = stage_entry_angle_get(get_now_mapno(), 2);
     pl_act_stage_latch_set(my_player_work_get(), 4);
     pl_warp_start(2, &pos, (u16)angle);
@@ -6597,9 +6593,6 @@ s32 quest_arena_count_get(s32 index) {
 /* Takes `points` off the quest score (clamped at 0) and plays the penalty sound at the area's fixed spot,
  * on enemy `unique_id`'s sound work. */
 void quest_score_deduct(u16 points, u16 unique_id) {
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 spot_a;
-    nw4r::math::VEC3 spot_b;
     struct _ENEMY_WORK* enemy;
     struct _ENEMY_MINI_WORK* mini;
     s32 score;
@@ -6612,16 +6605,16 @@ void quest_score_deduct(u16 points, u16 unique_id) {
         score = 0;
     }
     quest_work.field_0x5D8 = score;
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     enemy = NULL;
     mini = NULL;
     if ((u8)em_get_unique_work(unique_id, &enemy, &mini) != 0 && enemy != NULL) {
         switch (get_now_areano()) {
         case 1:
-            copyVec3(&pos, setVec3(&spot_a, 0.0f, 0.0f, 0.0f));
+            pos = VEC3(0.0f, 0.0f, 0.0f);
             break;
         case 2:
-            copyVec3(&pos, setVec3(&spot_b, 9950.0f, 0.0f, 0.0f));
+            pos = VEC3(9950.0f, 0.0f, 0.0f);
             break;
         default:
             return;

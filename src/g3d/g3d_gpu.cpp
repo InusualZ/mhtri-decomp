@@ -13,7 +13,7 @@
 #include "types.h"
 #include "nw4r/math.h"      /* nw4r::math::MTX34 */
 #include "gx/fn_8009AA78.h" /* fn_8009AB1C / fn_8009AC44 - owner gx/fn_8009AA78.c (rule 2) */
-#include "fn_8004CAD8.h"    /* MTX34_ctor / fn_80050508 - owner src/fn_8004CAD8.cpp (rule 2) */
+#include "fn_8004CAD8.h"    /* MTX34::MTX34() / fn_80050508 - owner src/fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_gpu.h"
 
 /* `Panic(const char* pFile, int line, const char* pFmt, ...)`; the map's name is the C++ mangling
@@ -76,7 +76,6 @@ void GDSetCurrentMtx(Array8* self) {
 void GDLoadTexMtxImm3x3(const Mat33* pSrc, u32 id) {
     nw4r::math::MTX34 mtx;
 
-    MTX34_ctor(&mtx);
     mtx.m[0][0] = pSrc->m[0][0];
     mtx.m[0][1] = pSrc->m[0][1];
     mtx.m[0][2] = pSrc->m[0][2];

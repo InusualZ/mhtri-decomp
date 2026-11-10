@@ -20,7 +20,7 @@ namespace nw4r {
 namespace math {
 
 /* The dot product of two vectors in paired singles. */
-inline f32 VEC3Dot(register const VEC3* a, register const VEC3* b) {
+inline f32 VEC3Dot(register const _VEC3* a, register const _VEC3* b) {
     register f32 res;
     register f32 yz;
     register f32 byz;
@@ -40,7 +40,7 @@ inline f32 VEC3Dot(register const VEC3* a, register const VEC3* b) {
 }
 
 /* The signed distance of `p` from the plane. */
-inline f32 PLANE::Test(const VEC3& p) const {
+inline f32 PLANE::Test(const _VEC3& p) const {
     return d + VEC3Dot(&N, &p);
 }
 
@@ -164,8 +164,8 @@ int Frustum::IntersectAABB_Ex(const AABB* box) const {
 
     result = 1;
     for (i = 0; i < 6; i++) {
-        VEC3 nearPt;
-        VEC3 farPt;
+        _VEC3 nearPt;
+        _VEC3 farPt;
 
         if (planes[i].N.x >= 0.0f) {
             nearPt.x = box->min.x;

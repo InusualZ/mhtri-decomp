@@ -13,6 +13,10 @@
 struct G3dIndMtxOp {
     /* +0x00 */ u32 flags;
     /* +0x04 */ nw4r::math::MTX34 mtx[3];
+
+    /* 0x8007663C (0x60): retail's out-of-line constructor: clears the flags and builds the three matrices. */
+    G3dIndMtxOp() __attribute__((never_inline)) : flags(0) {}
+    G3dIndMtxOp(nw4r::g3d::ResMatIndMtxAndScale ind); /* 0x80085160 (0xD8), g3d/g3d_state.cpp */
 };
 
 /* The callback the material's indirect matrices are offered to before they load: `Exec` adds the callback's

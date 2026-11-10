@@ -13,11 +13,21 @@ struct EfParticleState; /* ef/fn_800AEE48.h */
 /* One tube ring: its centre, its X and Z axes and the texture coordinate along the stripe (the stripe and smooth
  * stripe tubes; the copy moves the vectors as words and the scalar as a float). */
 typedef struct EfStripeParam {
+    EfStripeParam(); /* 0x800B6954 (0x40), ef/ef_drawstripestrategy.cpp: constructs the three vectors */
     /* +0x00 */ VEC3 center;
     /* +0x0C */ VEC3 side;
     /* +0x18 */ VEC3 up;
     /* +0x24 */ f32 tex_t;
 } EfStripeParam; /* size: 0x28 */
+
+/* A tube ring's byte image: the ring copies move it as one plain record (its vectors as words, the coordinate as a
+ * float), never through the vectors' assignment. size: 0x28 */
+typedef struct EfStripeParamImage {
+    /* +0x00 */ _VEC3 center;
+    /* +0x0C */ _VEC3 side;
+    /* +0x18 */ _VEC3 up;
+    /* +0x24 */ f32 tex_t;
+} EfStripeParamImage; /* size: 0x28 */
 
 #ifdef __cplusplus
 extern "C" {

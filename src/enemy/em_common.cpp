@@ -81,7 +81,7 @@
  *   em_mat_alpha_apply
  *   GUESS, other units' rows this unit named:
  *   emc_host_ck, mhchar_motion_set, mhchar_motion_layer_set, mhchar_mat_blend_set, mhchar_motion_speed_set,
- *   pl_segment_init, pl_segment_box_init, eft_vec_ctor, pl_segment_sphere_hit, em_gauge_period_step, em_se_stop_all,
+ *   SEGMENT3::SEGMENT3(), pl_segment_box_init, eft_vec_ctor, pl_segment_sphere_hit, em_gauge_period_step, em_se_stop_all,
  *   eft013_em_place, eft013_spark_set, eft_stun_set, mhchar_motion_flag_ck, camera_em_shake_req,
  *   camera_enemy_focus_pos_set, em_part_limit_default, emc_delay_frames_get, em_kill_sub_kind_ck, emc_kill_report,
  *   hit_motion_set, pl_ground_probe, em_hate_bands_default, vec3_polar_offset, vec3_polar_offset2,
@@ -158,12 +158,11 @@
  *   (`fn_8012BDF4`); the +0x468/+0x812/+0x814/+0x94A/+0x94C words are read through `ENEMY_WORK.h`'s `s16` views; an
  *   `if` that returns from a `switch` case ends the case with `break` so the cases share one `return 0`; the shell
  *   job's +0x28 slot takes five arguments (the table pointer is only the base register); `em_target_pos_set` hands
- *   `copyVec3` the address of `get_worldworld_pos`'s returned temporary (MWCC warns 10142; a named copy costs a
+ *   `VEC3::operator=` the address of `get_worldworld_pos`'s returned temporary (MWCC warns 10142; a named copy costs a
  *   struct copy and 0x10 bytes of frame).
  */
 
 /* Names the included headers declare with the callers' older signatures, hidden while they are read. */
-#define em_ground_rec_clear em_ground_rec_clear_hidden_header
 #define em_move_target_set em_move_target_set_hidden_header
 #define em_get_part_limit em_get_part_limit_hidden_header
 #define em_part_rec_reset em_part_rec_reset_hidden_header
@@ -282,7 +281,7 @@
 #undef em_pl_target_ck
 #undef em_area_ck
 #undef em_act_ck__FP11_ENEMY_WORKUcUc
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "vec3_scale.h" /* vec3_scale (the owner's leaf header, rule 2) */
 #include "stage/shell.h" /* niku_entry_at / niku_find / niku_state_set / niku_enemy_attach (rule 2) */
 #include "mh3_pad/system_w.h" /* system_w (rule 2) */
@@ -295,14 +294,10 @@
 #undef vec3_dist_sq
 #include "Pl/pl_coll.h" /* findInterSection (rule 2) */
 #define Pl_area_flag_get Pl_area_flag_get_hidden_land_h
-#define em_land_data_init em_land_data_init_hidden_land_h
-#define em_pl_box_init em_pl_box_init_hidden_land_h
 #include "Pl/fn_8028F66C.h" /* LandData / PlBox (rule 1) */
-#undef em_pl_box_init
-#undef em_land_data_init
 #undef Pl_area_flag_get
 #include "Pl/pl_hit_sphere.h" /* PlSegment / PlSegmentBox / pl_segment_box_set (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() (rule 2) */
 #include "enemy/enemy_control.h" /* emc_work / SenkoRec (rule 2) */
 #include "enemy/ENEMY_MINI_WORK.h" /* _ENEMY_MINI_WORK (rule 1) */
 #include "quest/quest_types.h" /* QuestSpawnRec (rule 1) */
@@ -340,7 +335,7 @@
 #include "ef/fn_800CDB2C.h" /* ran_suu (rule 2) */
 #include "MSL_C/file_io.h" /* abs (rule 2) */
 #include "ef/ef_emitter.h" /* ef_truncate_float (rule 2) */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "g3d/g3d_anmchr.h" /* res_node_ref (rule 2) */
 #include "g3d/g3d_draw.h" /* vec3_negate (rule 2) */
 #include "stage/shell_set_func_ptr.h" /* shell_set_func_ptr (rule 2) */
@@ -379,8 +374,6 @@
 #include "calcMtxAng3.h" /* the owner's symbols this unit calls (rule 2) */
 /* the segment offsets through the floats-first order this unit's calls evaluate in. */
 #include "Pl/pl_segment_sphere_hit.h" /* the owner's symbols this unit calls (rule 2) */
-#include "ef/pl_segment_box_init.h" /* the owner's symbols this unit calls (rule 2) */
-#include "ef/pl_segment_init.h" /* the owner's symbols this unit calls (rule 2) */
 #include "sound/mhchar_motion_set.h" /* the owner's symbols this unit calls (rule 2) */
 /* the motion setters through the owner's own parameter order (the start frame ahead of the loop count). */
 #define mhchar_motion_set_c1 ((void (*)(struct MHchar*, u32, s32, u16, s32, f32, s32, u32, f32))mhchar_motion_set)
@@ -405,7 +398,6 @@
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get (the owner's header, rule 2) */
 #include "enemy/em_pop.h" /* quest_element_state_find (the owner's header, rule 2) */
 #include "ef/pRoot.h"
-#undef em_ground_rec_clear
 #undef em_move_target_set
 #undef em_get_part_limit
 #undef em_part_rec_reset
@@ -418,9 +410,6 @@
 #define em_turn_step_get_s16 ((s32 (*)(_ENEMY_WORK*, EmTurnMotions*, s16, u8))em_turn_step_get)
 /* The vector helpers return their result by value (retail passes the hidden result pointer in r3 and the
  * temporaries take their frame slots in textual order); the owners declare the out-pointer form. */
-#define addVec3_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))addVec3)
-#define subVec3_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, nw4r::math::VEC3*))subVec3)
-#define vec3_scale_byval ((nw4r::math::VEC3 (*)(nw4r::math::VEC3*, f32))vec3_scale)
 #define get_move_work_adrs_view5 ((void* (*)(u8))get_move_work_adrs)
 #define get_move_work_adrs_view3 ((_ENEMY_WORK* (*)(u8))get_move_work_adrs)
 #define get_move_work_adrs_view1 ((_ENEMY_WORK* (*)(u8))get_move_work_adrs)
@@ -790,8 +779,8 @@ extern f32 lbl_80796D34;
 extern f32 lbl_80796D38;
 extern f32 lbl_80796D3C;
 
-/* The four 0x0C-byte colour records `setVec3` rebuilds; the table's bytes belong to the data pass. */
-extern nw4r::math::VEC3 lbl_806A4560[];
+/* The four default patrol points (`.bss`, defined at the end; `__sinit` constructs them). */
+extern nw4r::math::VEC3 em_patrol_default_points[4];
 
 /* `get_move_work_adrs__FUc` / `get_move_work_max__FUc` (owner `ef/system_core.cpp`). */
 u16 get_move_work_max(u8 area);
@@ -805,7 +794,6 @@ void em_act_flag1_set(_ENEMY_WORK* self);
 void fn_801376BC(_ENEMY_WORK* self, u8 flag);
 void fn_801376DC(_ENEMY_WORK* self, u8 flag);
 void em_net_flag_apply_1(_ENEMY_WORK* self);
-LandData* em_land_data_init(LandData* land);
 
 EmActTimers* fn_80126494(_ENEMY_WORK* self);
 
@@ -947,7 +935,6 @@ extern "C" void fn_8012554C(struct _ENEMY_WORK* self)
 
 /* This unit's own entry points `em_act_advance` calls ahead of their definitions. */
 extern "C" {
-EmGroundRec* em_ground_rec_clear(EmGroundRec* rec);
 void em_break_parts_reset(_ENEMY_WORK* self);
 void em_anger_clear(_ENEMY_WORK* self);
 void em_shell_rate_init(_ENEMY_WORK* self);
@@ -987,10 +974,6 @@ void em_ambient_color_update(_ENEMY_WORK* self, u8 snap);
 extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
 {
     EnemyData* data = get_enemy_data(self);
-    EmGroundRec rec;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 stun_pos;
-    nw4r::math::VEC3 stun_offset;
     nw4r::g3d::ResNode node(NULL);
     EmActTimers* timers;
     EmRecoverChoice* choice;
@@ -1008,8 +991,8 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     u8 sub;
     u8 level;
 
-    VEC3_ctor(&offset);
-    em_ground_rec_clear(&rec);
+    nw4r::math::VEC3 offset;
+    EmGroundRec rec;
     self->visible_0x001 = 1;
     if (kind == 1) {
         em_roster_records_release(self);
@@ -1069,7 +1052,7 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     case 4:
         if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
             self->area_no = rec.area_0x01;
-            copyVec3(&self->pos, &rec.pos_0x08);
+            self->pos = rec.pos_0x08;
             eft_rot_vec_copy((_CP_VECTOR*)&self->field_0x1BC, &rec.rot_0x14);
         }
         self->break_parts_0x488[0].area = self->area_no;
@@ -1273,8 +1256,8 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     em_char_pose_sync(self);
     em_fall_height_latch(self);
     self->field_0x1AC = 0.0f;
-    copyVec3(&self->aim, &self->pos);
-    copyVec3(&self->prev_pos, &self->pos);
+    self->aim = self->pos;
+    self->prev_pos = self->pos;
     self->field_0x214 = self->field_0x210 = self->field_0x20C = self->pos.y;
     self->ground_mode_0x208 = -1;
     self->field_0x218 = 0;
@@ -1286,10 +1269,10 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
         em_stun_fx_set(self);
         stun = data->ailment_fx_0x9C->stun_stars;
         if (stun != NULL) {
-            copyVec3(&offset, setVec3(&stun_offset, stun->x, stun->y, stun->z));
+            offset = VEC3(stun->x, stun->y, stun->z);
             eft_stun_set_c1(self, stun->joint, &offset, stun->scale, 3);
         } else {
-            setVec3(&stun_pos, 0.0f, 100.0f, 0.0f);
+            nw4r::math::VEC3 stun_pos(0.0f, 100.0f, 0.0f);
             eft_stun_set_c1(self, 2, &stun_pos, 2.0f, 3);
         }
         if ((self->field_0x1C8 & 1) && data->ailment_fx_0x9C->model_fx != 0) {
@@ -1302,13 +1285,6 @@ extern "C" void em_act_advance(_ENEMY_WORK* self, u8 kind)
     if (!(self->field_0x1C8 & 1)) {
         em_ambient_color_update(self, 1);
     }
-}
-
-/* 0x80125F54 (0x34): prepares a ground record (constructs its position). */
-extern "C" EmGroundRec* em_ground_rec_clear(EmGroundRec* rec)
-{
-    VEC3_ctor(&rec->pos_0x08);
-    return rec;
 }
 
 extern "C" u8 fn_80125F88(u32 idx)
@@ -1411,17 +1387,15 @@ extern "C" EmRoute* em_route_find(EnemyData* data, u8 area)
  * origin when the area has no route. */
 extern "C" void em_route_point_get(EnemyData* data, u16 key, nw4r::math::VEC3* out)
 {
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     u8 point = key;
     EmRoute* route = em_route_find(data, (u8)((key & 0xFF00) >> 8));
 
     if (route != NULL) {
         nw4r::math::VEC3* p = &route->points[point];
-        copyVec3(out, setVec3(&a, p->x, p->y, p->z));
+        *out = VEC3(p->x, p->y, p->z);
         return;
     }
-    copyVec3(out, setVec3(&b, 0.0f, 0.0f, 0.0f));
+    *out = VEC3(0.0f, 0.0f, 0.0f);
 }
 
 /* 0x80126278 (0x44): copies the enemy's route point `key` into `out`. */
@@ -2040,7 +2014,6 @@ extern "C" u8 em_nearest_area_get(EnemyData* data, nw4r::math::VEC3* pos, u8 are
     nw4r::math::VEC3 spot;
     f32 dist;
 
-    VEC3_ctor(&spot);
     set = em_special_part_set_get(data, area);
     if (set != NULL) {
         part = (EmPartSpots*)set->parts;
@@ -2077,16 +2050,14 @@ extern "C" void em_part_spot_nearest_get(_ENEMY_WORK* self, nw4r::math::VEC3* po
     EmPartSpots* part;
     EmPartSpot* s;
     s32 i;
-    nw4r::math::VEC3 spot;
-    nw4r::math::VEC3 best_spot;
     f32 none;
     f32 best;
     f32 dist;
 
     data = get_enemy_data(self);
     set = em_special_part_set_get(data, self->area_no);
-    VEC3_ctor(&spot);
-    VEC3_ctor(&best_spot);
+    nw4r::math::VEC3 spot;
+    nw4r::math::VEC3 best_spot;
     best = -1.0f;
     if (set != NULL) {
         part = (EmPartSpots*)set->parts;
@@ -2153,7 +2124,7 @@ extern "C" EmPatrol* em_patrol_get(_ENEMY_WORK* self, u8 area)
 extern "C" void em_patrol_point_get(_ENEMY_WORK* self, struct _EM_REC4* points, u8 index, nw4r::math::VEC3* out)
 {
     if (points == NULL) {
-        copyVec3(out, &lbl_806A4560[index]);
+        *out = em_patrol_default_points[index];
         return;
     }
     em_data_point_get(self, points[index].field_0x0, out);
@@ -2186,7 +2157,6 @@ extern "C" u8 em_patrol_nearest_get(_ENEMY_WORK* self, u16 mask)
     u8 count;
     f32 dist;
 
-    VEC3_ctor(&point);
     best = 0.0f;
     found = 0;
     count = em_patrol_points_get(self, self->area_no, &points);
@@ -2245,14 +2215,12 @@ extern "C" u32 em_patrol_step(_ENEMY_WORK* self, u8 flags)
     s32 best;
     u32 next_only;
     u8 count;
-    nw4r::math::VEC3 a;
     prev_only = 0;
     next_only = 0;
     struct _EM_REC4* points;
-    nw4r::math::VEC3 b;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
     count = em_patrol_points_get(self, self->area_no, &points);
     if ((flags & 1) == 0 && --self->field_0x1E7 == 0) {
         self->field_0x1E7 = 0;
@@ -2267,7 +2235,7 @@ extern "C" u32 em_patrol_step(_ENEMY_WORK* self, u8 flags)
                     em_patrol_point_get(self, points, i, &b);
                     diff = calcVecAng2(&self->pos, &b) - self->field_0x1C0;
                     if (abs((s16)best) >= abs((s16)diff)) {
-                        copyVec3(&a, &b);
+                        a = b;
                         pick = i;
                         best = diff;
                     }
@@ -2321,9 +2289,6 @@ extern "C" u32 em_patrol_prev_closer_ck(_ENEMY_WORK* self, u8 index)
     s32 dir;
     s32 to_prev;
 
-    VEC3_ctor(&at);
-    VEC3_ctor(&prev);
-    VEC3_ctor(&next);
     count = em_patrol_points_get(self, self->area_no, &points);
     em_patrol_point_get(self, points, index, &at);
     em_patrol_point_get(self, points, em_patrol_prev_get(self, points, count, index), &prev);
@@ -2583,7 +2548,7 @@ extern "C" void em_delay_act_set(_ENEMY_WORK* self, u8 act, u8 sub)
             rec->target_kind = self->field_0x380;
             rec->target_sub = self->state_0x381;
             rec->target_index = self->field_0x382;
-            copyVec3(&rec->target, &self->vec_0x36C);
+            rec->target = self->vec_0x36C;
             break;
         }
     }
@@ -2610,7 +2575,7 @@ extern "C" void em_delay_act_fire(_ENEMY_WORK* self, EmDelayRec* rec)
     self->field_0x380 = rec->target_kind;
     self->state_0x381 = rec->target_sub;
     self->field_0x382 = rec->target_index;
-    copyVec3(&self->vec_0x36C, &rec->target);
+    self->vec_0x36C = rec->target;
     em_act_step_arm(self, rec->act, rec->sub, 3);
 }
 
@@ -2943,22 +2908,17 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
     struct _AINPC_W* npc;
     u8 kind;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&seg_a);
-    VEC3_ctor(&seg_b);
-    VEC3_ctor(&here);
-    VEC3_ctor(&there);
     use_segment = 0;
     wave_offset = 0;
     if (pos != NULL) {
-        copyVec3(&self->vec_0x36C, pos);
+        self->vec_0x36C = *pos;
     } else {
         switch (self->field_0x380) {
         case 1:
             if (self->field_0x382 != 0xFF) {
                 rec = em_move_work_pick(self->state_0x381, self->field_0x382);
                 if (rec[0] != 0 && (u32)em_pl_target_ck(self, (_PLW*)rec) == 1) {
-                    copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
+                    self->vec_0x36C = *(&((_PLW*)rec)->vec_0x03C);
                     break;
                 }
                 return;
@@ -2968,7 +2928,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             if (self->field_0x382 != 0xFF) {
                 npc = &ainpc_w;
                 if (ainpc_w.active != 0 && self->area_no == npc->field_0x1A4) {
-                    copyVec3(&self->vec_0x36C, &npc->vec_0x178);
+                    self->vec_0x36C = npc->vec_0x178;
                     break;
                 }
                 return;
@@ -2978,7 +2938,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             if (self->field_0x382 != 0xFF) {
                 work = &get_move_work_adrs_view3(3)[self->field_0x382];
                 if (work->active != 0 && self->area_no == work->area_no) {
-                    copyVec3(&self->vec_0x36C, &work->pos);
+                    self->vec_0x36C = work->pos;
                     break;
                 }
                 return;
@@ -3006,10 +2966,10 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                     break;
                 }
                 rotVecY(&dir, angle);
-                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
+                self->vec_0x36C = *(&(self->pos + dir));
                 break;
             case 6:
-                copyVec3(&self->vec_0x36C, &self->aim);
+                self->vec_0x36C = self->aim;
                 break;
             case 7:
                 data = (struct _ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A),
@@ -3023,12 +2983,12 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                                 setVector3(&seg_a, blk->a[0], blk->a[1], blk->a[2]);
                                 setVector3(&seg_b, blk->b[0], blk->b[1], blk->b[2]);
                                 self->field_0x384 = blk->reach;
-                                copyVec3(&self->vec_0x36C, &vec3_scale_byval(&addVec3_byval(&seg_a, &seg_b), 0.5f));
+                                self->vec_0x36C = *(&((seg_a + seg_b) * 0.5f));
                             }
                         }
                         if (use_segment == 0) {
                             self->field_0x384 = data->speed_0x30;
-                            copyVec3(&self->vec_0x36C, &data->vec_0x24);
+                            self->vec_0x36C = data->vec_0x24;
                         }
                         break;
                     }
@@ -3055,7 +3015,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                     break;
                 }
                 rotVecY(&dir, angle);
-                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
+                self->vec_0x36C = *(&(self->pos + dir));
                 break;
             case 12:
             case 13:
@@ -3065,7 +3025,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                 }
                 self->field_0x384 = 100.0f * self->field_0x382;
                 wave_offset = 1;
-                copyVec3(&self->vec_0x36C, &self->pos);
+                self->vec_0x36C = self->pos;
                 break;
             }
             break;
@@ -3074,7 +3034,7 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
         case 7:
             niku = niku_find(self->state_0x381, self->field_0x382);
             if (niku != NULL) {
-                copyVec3(&self->vec_0x36C, &niku->shell_0x00->pos_0x18);
+                self->vec_0x36C = niku->shell_0x00->pos_0x18;
                 break;
             }
             return;
@@ -3097,9 +3057,9 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
                 em_data_point_get(self, ((self->state_0x381 & 0xF) << 8) | self->field_0x382, &self->vec_0x36C);
             }
             if (area != self->state_0x381) {
-                copyVec3(&here, &get_worldworld_pos(&self->pos, self->area_no));
-                copyVec3(&there, &get_worldworld_pos(&self->vec_0x36C, self->state_0x381));
-                copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &subVec3_byval(&there, &here)));
+                here = *(&get_worldworld_pos(&self->pos, self->area_no));
+                there = *(&get_worldworld_pos(&self->vec_0x36C, self->state_0x381));
+                self->vec_0x36C = *(&(self->pos + (there - here)));
                 self->vec_0x36C.y = 2000.0f + stg_area_ceiling_get(self->area_no);
                 self->field_0x1FA = 1;
             } else {
@@ -3116,12 +3076,12 @@ extern "C" void em_target_pos_set(_ENEMY_WORK* self, nw4r::math::VEC3* pos)
             dir.y = 0.0f;
             dir.z = 1000.0f;
             rotVecY(&dir, self->field_0x1C0);
-            copyVec3(&self->vec_0x36C, &addVec3_byval(&self->pos, &dir));
+            self->vec_0x36C = *(&(self->pos + dir));
             break;
         default:
             rec = (u8*)get_move_work_adrs(2);
             if (rec[0] != 0) {
-                copyVec3(&self->vec_0x36C, &((_PLW*)rec)->vec_0x03C);
+                self->vec_0x36C = *(&((_PLW*)rec)->vec_0x03C);
                 break;
             }
             return;
@@ -3478,39 +3438,30 @@ extern "C" void em_ground_probe(_ENEMY_WORK* self)
  * one body radius ahead and behind it (probed from above) is the same cell. */
 extern "C" void em_cell_span_update(_ENEMY_WORK* self)
 {
-    LandData land;
     nw4r::math::VEC3 offset;
     nw4r::math::VEC3 from;
     nw4r::math::VEC3 to;
     nw4r::math::VEC3 hit;
-    nw4r::math::VEC3 ahead;
-    nw4r::math::VEC3 behind;
+    LandData land;
     f32 radius;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
-    VEC3_ctor(&hit);
-    em_land_data_init(&land);
     self->field_0x760 = 0;
     if (self->area_no == get_now_areano() && (self->field_0x1C8 & 1) && self->cell_0x22F != 0) {
         radius = get_enemy_data(self)->size_0x54->radius_0x24;
         setVector3(&offset, 0.0f, 0.0f, radius);
         rotVecY(&offset, self->field_0x1C0);
-        addVec3(&ahead, &self->pos, &offset);
-        copyVec3(&from, &ahead);
+        from = self->pos + offset;
         from.y += radius;
-        copyVec3(&to, &from);
+        to = from;
         to.y -= 2.0f * radius;
         if (findInterSection2(&from, &to, &hit, 2, 0x20, self->area_no, 0, NULL, &land) <= 0
             || self->cell_0x22F == land.field_0x07) {
             offset.x = -offset.x;
             offset.y = -offset.y;
             offset.z = -offset.z;
-            addVec3(&behind, &self->pos, &offset);
-            copyVec3(&from, &behind);
+            from = self->pos + offset;
             from.y += radius;
-            copyVec3(&to, &from);
+            to = from;
             to.y -= 2.0f * radius;
             if (findInterSection2(&from, &to, &hit, 2, 0x20, self->area_no, 0, NULL, &land) <= 0
                 || self->cell_0x22F == land.field_0x07) {
@@ -3521,13 +3472,6 @@ extern "C" void em_cell_span_update(_ENEMY_WORK* self)
 }
 #pragma fp_contract on
 
-/* 0x8012A624 (0x34): the `LandData` constructor (constructs the hit position). */
-extern "C" LandData* em_land_data_init(LandData* land)
-{
-    VEC3_ctor(&land->vec_0x08);
-    return land;
-}
-
 extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index);
 
 /* 0x8012A658 (0x1B8): moves the enemy into the next area: keeps the previous area, resets the per-area state,
@@ -3536,7 +3480,7 @@ extern "C" void em_area_change(_ENEMY_WORK* self, u8 quiet)
 {
     void (*hook)(_ENEMY_WORK*);
 
-    copyVec3(&self->prev_pos, &self->pos);
+    self->prev_pos = self->pos;
     self->state_0x999 = 0;
     self->field_0x99A = 0;
     self->field_0x99B = 0;
@@ -3576,15 +3520,6 @@ extern "C" void em_area_change(_ENEMY_WORK* self, u8 quiet)
     }
 }
 
-/* 0x8012A8F8 (0x40): the `PlBox` constructor (constructs its three vectors). */
-extern "C" PlBox* em_pl_box_init(PlBox* box)
-{
-    VEC3_ctor(&box->vec_0x00);
-    VEC3_ctor(&box->vec_0x0C);
-    VEC3_ctor(&box->vec_0x18);
-    return box;
-}
-
 /* 0x8012A938 (0xB0): whether the enemy may use exit `exit` here: on a map of kind 3, exit 1 of area 6 and exit 2
  * of area 8 only from water areas 1 and 2. */
 extern "C" u32 em_area_exit_ck(_ENEMY_WORK* self, u8 exit)
@@ -3610,19 +3545,17 @@ extern "C" u32 em_sight_player_ck2(_ENEMY_WORK* self, u8 player);
 extern "C" u32 em_target_reach_ck(_ENEMY_WORK* self, u8 mode, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                                   nw4r::math::VEC3* target, f32 limit, f32* dist)
 {
-    PlSegment seg;
-    PlBox box;
     f32 t;
 
-    pl_segment_init(&seg);
-    em_pl_box_init(&box);
+    PlSegment seg;
+    PlBox box;
     switch (mode) {
     default:
         *dist = vec3_dist_sq(a, target);
         break;
     case 2:
-        copyVec3(&seg.start, a);
-        copyVec3(&seg.end, b);
+        seg.start = *a;
+        seg.end = *b;
         pl_box_set((PlBox*)&seg, &box);
         *dist = pl_box_point_dist_sq_c1(&box, target, &t);
         break;
@@ -3673,8 +3606,6 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
     _ENEMY_WORK* work;
     struct _AINPC_W* npc;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     pick_player = 0xFF;
     pick_enemy = 0xFF;
     pick_npc = 0xFF;
@@ -3717,46 +3648,46 @@ extern "C" void em_target_select(_ENEMY_WORK* self, u8* kind, u8* sel, u8* index
     case 3:
         nearest = 0;
         shape = 1;
-        copyVec3(&from, &self->pos);
+        from = self->pos;
         break;
     case 4:
         nearest = 0;
         shape = 2;
-        copyVec3(&from, &self->aim);
+        from = self->aim;
         break;
     case 5:
         nearest = 0;
         shape = 3;
         data = (struct _ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
         if (data != NULL) {
-            copyVec3(&from, &data->vec_0x24);
+            from = data->vec_0x24;
         } else {
-            copyVec3(&from, &self->pos);
+            from = self->pos;
         }
         break;
     case 1:
         nearest = 1;
         shape = 0;
-        copyVec3(&from, &self->pos);
+        from = self->pos;
         break;
     case 6:
         nearest = 1;
         shape = 1;
-        copyVec3(&from, &self->pos);
+        from = self->pos;
         break;
     case 7:
         nearest = 1;
         shape = 2;
-        copyVec3(&from, &self->aim);
+        from = self->aim;
         break;
     case 8:
         nearest = 1;
         shape = 3;
         data = (struct _ENEMY_DATA*)enemy_data_find(enemy_data_grp(self->team, self->field_0x00A), self->field_0x46C);
         if (data != NULL) {
-            copyVec3(&from, &data->vec_0x24);
+            from = data->vec_0x24;
         } else {
-            copyVec3(&from, &self->pos);
+            from = self->pos;
         }
         break;
     case 9:
@@ -3979,9 +3910,6 @@ extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
     s32 i;
     EmPartSpot* spot;
 
-    VEC3_ctor(&eye);
-    VEC3_ctor(&spot_pos);
-    VEC3_ctor(&hit);
     self->field_0x380 = kind;
     self->state_0x381 = sub;
     self->field_0x382 = index;
@@ -4007,7 +3935,7 @@ extern "C" void em_reaction_req(_ENEMY_WORK* self, u8 kind, u8 sub, u8 index)
         em_special_part_apply(self, self->state_0x381);
         if (self->field_0x382 == 0xFF && self->recs_0x9A4 != NULL) {
             spot = ((EmPartSpots*)self->recs_0x9A4)->spots;
-            copyVec3(&eye, &self->pos);
+            eye = self->pos;
             if ((u32)(self->field_0x1E2 - 1) <= 1) {
                 lift = 0.0f;
             } else {
@@ -4563,7 +4491,6 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
     const s32* extra;
     f32 dist;
 
-    VEC3_ctor(&vec);
     add = 0;
 
     thresholds = motion->thresholds;
@@ -4591,7 +4518,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
 
     case 2:
         flag = (fn_8012D188_view1(enemy, other) == 1);
-        copyVec3(&vec, &other->pos_0x178);
+        vec = other->pos_0x178;
         extra = motion->extra_frames;
         if (extra != 0) {
             if (ai_npc_flag_ck(other, 1) != 0) {
@@ -4608,7 +4535,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
 
     case 3:
         flag = (enemy->area_no == other->area_no);
-        copyVec3(&vec, &other->pos);
+        vec = other->pos;
         if (other->field_0x1E2 == 2) {
             add = 1;
         }
@@ -5949,11 +5876,10 @@ extern "C" u32 em_spawn_rec_live_ck2(_ENEMY_WORK* self)
  * mini work and steps it, 2 stores it with spawn kind 3; then releases the work. */
 extern "C" void em_act_end(_ENEMY_WORK* self, u8 mode)
 {
-    EmGroundRec rec;
     QuestSpawnRec* spawn;
     _ENEMY_MINI_WORK* mini;
+    EmGroundRec rec;
 
-    em_ground_rec_clear(&rec);
     switch (mode) {
     case 0:
         if ((u32)em_spawn_rec_live_ck(self) == 1 && self->field_0x00C == 3) {
@@ -6861,10 +6787,7 @@ extern "C" f32 em_height_base_get(_ENEMY_WORK* self)
 /* 0x80130350 (0x50): sets the move vector to `vec` scaled by the change scale. */
 extern "C" void em_move_vec_set(_ENEMY_WORK* self, nw4r::math::VEC3* vec)
 {
-    nw4r::math::VEC3 scaled;
-
-    vec3_scale(&scaled, vec, get_em_chg_scale(self));
-    copyVec3(&self->move_0x1A0, &scaled);
+    self->move_0x1A0 = *vec * (get_em_chg_scale(self));
 }
 
 /* 0x801303A0 (0x4C): sets the move vector's y to `y` scaled by the change scale. */
@@ -6906,7 +6829,6 @@ extern "C" void em_move_mode_set(_ENEMY_WORK* self, u8 mode)
 {
     u8 sub = 0;
     f32* param;
-    nw4r::math::VEC3 vec;
 
     if ((u8)mode == 0xFE) {
         mode = 1;
@@ -6930,7 +6852,7 @@ extern "C" void em_move_mode_set(_ENEMY_WORK* self, u8 mode)
         param = get_enemy_data(self)->move_params_0x50;
         break;
     }
-    copyVec3(&self->move_param_0x21C, setVec3(&vec, param[0], param[1], param[2]));
+    self->move_param_0x21C = VEC3(param[0], param[1], param[2]);
     em_move_sub_mode_set(self, sub);
     if (self->field_0x1E2 != (u8)mode) {
         switch ((u8)mode) {
@@ -6965,7 +6887,6 @@ extern "C" void em_joint_drop_start(_ENEMY_WORK* self, u32 joint)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if ((u32)(self->field_0x1E2 - 3) <= 1 || self->field_0x1E2 == 0) {
         get_joint_wpos_em(self, joint, &pos);
         self->pos.y = pos.y;
@@ -6978,12 +6899,11 @@ extern "C" void em_joint_drop_start(_ENEMY_WORK* self, u32 joint)
 /* 0x801306C0 (0x6C): sets the move sub mode; sub mode 1 copies the dive parameter vector. */
 extern "C" void em_move_sub_mode_set(_ENEMY_WORK* self, u8 sub)
 {
-    nw4r::math::VEC3 vec;
     f32* param;
 
     if (sub == 1) {
         param = get_enemy_data(self)->move_params_0x50;
-        copyVec3(&self->move_param_0x21C, setVec3(&vec, param[6], param[7], param[8]));
+        self->move_param_0x21C = VEC3(param[6], param[7], param[8]);
     }
     self->field_0x1E3 = sub;
 }
@@ -7239,21 +7159,18 @@ extern "C" ShellNikuEntry* em_niku_search(_ENEMY_WORK* self)
     ShellNikuEntry* niku;
     u32 i;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
-    VEC3_ctor(&hit);
     if ((u32)(self->field_0x1E2 - 1) <= 1) {
         lift = 0.0f;
     } else {
         lift = 50.0f;
     }
-    copyVec3(&from, &self->pos);
+    from = self->pos;
     from.y += lift;
     for (i = 0; i < 12; i++) {
         niku = niku_entry_at(i);
         if (niku->state_0x07 == 1 && niku->shell_0x00->area_0x08 == self->area_no &&
             vec3_dist_sq(&self->pos, &niku->shell_0x00->pos_0x18) <= 9000000.0f) {
-            copyVec3(&to, &niku->shell_0x00->pos_0x18);
+            to = niku->shell_0x00->pos_0x18;
             to.y += lift;
             if (findInterSection(&from, &to, &hit, 1, 0xFFFF, self->area_no, em_hit_mask_get(self), NULL) == 0) {
                 niku_enemy_attach(niku, self);
@@ -7318,10 +7235,6 @@ extern "C" _ENEMY_WORK* em_ally_find(_ENEMY_WORK* self, u32 team, u32 near)
 
 /* A sphere for the segment test: the centre and the radius.
  * size: 0x10 */
-struct EmSightSphere {
-    /* +0x00 */ nw4r::math::VEC3 center;
-    /* +0x0C */ f32 radius;
-};
 
 extern "C" EmSight* em_sight_get(_ENEMY_WORK* self);
 void get_joint_wmat_em(_ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* out);
@@ -7338,8 +7251,6 @@ extern "C" void em_level_raise(_ENEMY_WORK* self, u32 kind);
 extern "C" void em_sight_update(_ENEMY_WORK* self)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 target;
-    nw4r::math::VEC3 eye;
     u16 max;
     _PLW* work;
     EmSight* sight;
@@ -7349,9 +7260,8 @@ extern "C" void em_sight_update(_ENEMY_WORK* self)
     s32 n;
     EmSight local;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&target);
-    VEC3_ctor(&eye);
+    nw4r::math::VEC3 target;
+    nw4r::math::VEC3 eye;
     max = get_move_work_max(2);
     work = get_move_work_adrs(2);
     self->field_0x38E = 0;
@@ -7366,7 +7276,7 @@ extern "C" void em_sight_update(_ENEMY_WORK* self)
     }
     sight = em_sight_get(self);
     if (sight->joint == 0xFFFFFFFF) {
-        copyVec3(&eye, &self->pos);
+        eye = self->pos;
         eye.y += 50.0f;
         angle = self->field_0x1C0;
     } else {
@@ -7383,7 +7293,7 @@ extern "C" void em_sight_update(_ENEMY_WORK* self)
         for (i = 0; i < max; i++, work++) {
             if (work->slot_active != 0 && em_pl_slot_leaving_ck(work->chunk_ofs) == 0 && em_pl_target_ck(self, work) != 0 &&
                 self->frames_0x454[i] >= 0.0f) {
-                copyVec3(&target, &work->vec_0x03C);
+                target = work->vec_0x03C;
                 target.y += 100.0f;
                 if ((self->field_0x1C8 & 0x8000) ||
                     em_sight_player_ck(self, sight, &eye, &target, angle, self->frames_0x454[i]) == 1) {
@@ -7426,26 +7336,22 @@ extern "C" u32 em_sight_player_ck(_ENEMY_WORK* self, EmSight* sight, nw4r::math:
 {
     KemuriRec* smoke = emc_work.marker_0x130;
     s32 i;
+
     PlSegment seg;
     PlSegmentBox box;
-    EmSightSphere sphere;
+    PlSphere sphere;
     nw4r::math::VEC3 hit;
-
-    pl_segment_init(&seg);
-    pl_segment_box_init(&box);
-    eft_vec_ctor(&sphere.center);
-    VEC3_ctor(&hit);
     if (dist < sight->near_reach) {
         return 1;
     }
-    copyVec3(&seg.start, eye);
-    copyVec3(&seg.end, target);
+    seg.start = *eye;
+    seg.end = *target;
     pl_segment_box_set(&seg, &box);
     for (i = 0; i < 10; i++, smoke++) {
         if (smoke->countdown > 0) {
-            copyVec3(&sphere.center, &smoke->pos_0x00);
+            sphere.pos = smoke->pos_0x00;
             sphere.radius = smoke->value_0x0C;
-            if ((u8)pl_segment_sphere_hit(&box, &sphere, 0, 0) != 0) {
+            if ((u8)pl_segment_sphere_hit(&box, (struct EmSightSphere*)&sphere, 0, 0) != 0) {
                 return 0;
             }
         }
@@ -7499,7 +7405,6 @@ extern "C" void em_level_raise(_ENEMY_WORK* self, u32 kind)
     nw4r::math::VEC3 unused;
     EmLevelBlock* block;
 
-    VEC3_ctor(&unused);
     self->level_kind_0x918 = kind;
     block = get_enemy_data(self)->extra->levels;
     if (block != NULL && block->frames != NULL) {
@@ -8117,19 +8022,16 @@ extern "C" void em_status_advance(_ENEMY_WORK* self)
 extern "C" void em_poison_fx_set(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     EmAilmentFx* fx;
 
-    VEC3_ctor(&offset);
     if ((u32)em_die_ck(self) != 1) {
         fx = get_enemy_data(self)->ailment_fx_0x9C->poison;
         if (fx != NULL) {
-            copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
+            offset = VEC3(fx->x, fx->y, fx->z);
             eft013_em_place_c1(self, &offset, fx->joint, fx->scale, 2);
             return;
         }
-        copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
+        offset = VEC3(0.0f, 100.0f, 0.0f);
         eft013_em_place_c1(self, &offset, 2, 2.0f, 2);
     }
 }
@@ -8213,20 +8115,17 @@ extern "C" void em_sleep_start(_ENEMY_WORK* self)
 extern "C" void em_sleep_fx_update(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     EmAilmentFx* fx;
 
-    VEC3_ctor(&offset);
     if ((em_sleep_ck(self, 1) == 1 || (u32)em_act_kind6_ck(self->action, self->state_sub) == 1) &&
         (system_w.field_0x0c & 0x1F) == 0x10) {
         fx = get_enemy_data(self)->ailment_fx_0x9C->sleep;
         if (fx != NULL) {
-            copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
+            offset = VEC3(fx->x, fx->y, fx->z);
             eft013_em_place_c1(self, &offset, fx->joint, fx->scale, 0xA);
             return;
         }
-        copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
+        offset = VEC3(0.0f, 100.0f, 0.0f);
         eft013_em_place_c1(self, &offset, 2, 2.0f, 0xA);
     }
 }
@@ -8367,18 +8266,15 @@ extern "C" void em_stun_end(_ENEMY_WORK* self)
 extern "C" void em_stun_fx_set(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     EmAilmentFx* fx;
 
-    VEC3_ctor(&offset);
     fx = get_enemy_data(self)->ailment_fx_0x9C->stun;
     if (fx != NULL) {
-        copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
+        offset = VEC3(fx->x, fx->y, fx->z);
         eft_stun_set_c1(self, fx->joint, &offset, fx->scale, 2);
         return;
     }
-    copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
+    offset = VEC3(0.0f, 100.0f, 0.0f);
     eft_stun_set_c1(self, 2, &offset, 2.0f, 2);
 }
 
@@ -8685,7 +8581,6 @@ extern "C" void em_hit_fx_set(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
 
-    VEC3_ctor(&offset);
     if (self->team != 0x28 && (u32)em_die_ck(self) != 1) {
         setVector3(&offset, 0.0f, 0.0f, 0.0f);
         if (self->joint_0x204 != 0xFFFFFFFF) {
@@ -8742,31 +8637,27 @@ extern "C" u32 em_break_state_ck(_ENEMY_WORK* self)
 extern "C" void em_break_fx_set(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
-    nw4r::math::VEC3 c;
     EmAilmentFx* fx;
     u32 kind;
     f32 scale;
     u32 joint;
 
-    VEC3_ctor(&offset);
     if (self->team != 0x28 && (u32)em_die_ck(self) != 1) {
         if ((u8)(self->team + 226) <= 1) {
             kind = 0x1F;
             fx = get_enemy_data(self)->ailment_fx_0x9C->poison;
             if (fx != NULL) {
-                copyVec3(&offset, setVec3(&a, fx->x, fx->y, fx->z));
+                offset = VEC3(fx->x, fx->y, fx->z);
                 joint = fx->joint;
                 scale = fx->scale;
             } else {
-                copyVec3(&offset, setVec3(&b, 0.0f, 100.0f, 0.0f));
+                offset = VEC3(0.0f, 100.0f, 0.0f);
                 joint = self->joint_0x204;
                 scale = 2.0f;
             }
         } else {
             kind = 0xE;
-            copyVec3(&offset, setVec3(&c, 0.0f, 0.0f, 0.0f));
+            offset = VEC3(0.0f, 0.0f, 0.0f);
             joint = self->joint_0x204;
             scale = em_hit_fx_scale_get(self);
         }
@@ -8862,14 +8753,11 @@ extern "C" u32 em_turn_to_target(_ENEMY_WORK* self, u32 step)
 extern "C" u32 em_turn_to_target_3d(_ENEMY_WORK* self, u32 pitch_step, u32 yaw_step)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&dir);
     em_target_refresh(self);
-    subVec3(&diff, &self->vec_0x36C, &self->pos);
-    copyVec3(&dir, &diff);
+    dir = self->vec_0x36C - self->pos;
     calcVecAngXY(&dir, &pitch, &yaw);
     self->field_0x1BC = em_angle_approach(pitch, self->field_0x1BC, pitch_step);
     self->field_0x1C0 = em_angle_approach(yaw, self->field_0x1C0, yaw_step);
@@ -8932,7 +8820,6 @@ extern "C" void em_approach_start(_ENEMY_WORK* self, f32 speed, u32 flags)
     nw4r::math::VEC3 unused;
     f32 extra;
 
-    VEC3_ctor(&unused);
     em_target_refresh(self);
     extra = speed * get_em_chg_scale(self);
     if (((u16)flags & 2) == 2) {
@@ -8961,14 +8848,9 @@ extern "C" u32 em_approach_step(_ENEMY_WORK* self, s32 yaw_offset, s32 step)
 {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 move;
-    nw4r::math::VEC3 d0;
-    nw4r::math::VEC3 d1;
-    nw4r::math::VEC3 d2;
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&move);
     if (self->approach_flags_0x480 & 0x20) {
         setVector3(&dir, 0.0f, 1.0f, 0.0f);
         rotVecZ(&dir, self->field_0x1C4);
@@ -8984,10 +8866,9 @@ extern "C" u32 em_approach_step(_ENEMY_WORK* self, s32 yaw_offset, s32 step)
     } else {
         rotVecY(&dir, (u16)yaw_offset + self->field_0x1C0);
     }
-    copyVec3(&move, &self->pos_offset_0x470);
+    move = self->pos_offset_0x470;
     self->value_0x378 -= vec3_dot((f32*)&dir, (f32*)&move);
-    subVec3(&d0, &self->pos, &self->prev_pos);
-    copyVec3(&move, &d0);
+    move = self->pos - self->prev_pos;
     if (self->value_0x378 - vec3_dot((f32*)&dir, (f32*)&move) <= 0.0f) {
         self->value_0x378 = 0.0f;
         return 1;
@@ -8995,15 +8876,13 @@ extern "C" u32 em_approach_step(_ENEMY_WORK* self, s32 yaw_offset, s32 step)
     if ((self->approach_flags_0x480 & 1) == 0) {
         if (self->approach_flags_0x480 & 0x20) {
             if ((u16)step != 0) {
-                subVec3(&d1, &self->vec_0x36C, &self->pos);
-                copyVec3(&dir, &d1);
+                dir = self->vec_0x36C - self->pos;
                 rotVecY(&dir, -self->field_0x1C0);
                 self->field_0x1C4 = em_angle_approach(vec3_angle_xy((f32*)&dir), self->field_0x1C4, step);
             }
         } else {
             if ((self->approach_flags_0x480 & 2) == 2) {
-                subVec3(&d2, &self->vec_0x36C, &self->pos);
-                copyVec3(&dir, &d2);
+                dir = self->vec_0x36C - self->pos;
                 calcVecAngXY(&dir, &pitch, &yaw);
                 self->field_0x1BC = em_angle_approach(pitch, self->field_0x1BC, step);
             } else {
@@ -9154,11 +9033,8 @@ extern "C" void em_turn_apply(_ENEMY_WORK* self, u32* yaw, s16 diff, u16 step)
 extern "C" s32 em_roll_to_get(_ENEMY_WORK* self, nw4r::math::VEC3* target)
 {
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 diff;
 
-    VEC3_ctor(&dir);
-    subVec3(&diff, target, &self->pos);
-    copyVec3(&dir, &diff);
+    dir = *target - self->pos;
     rotVecY(&dir, (u16)-self->field_0x1C0);
     return vec3_angle_xy((f32*)&dir);
 }
@@ -9333,7 +9209,7 @@ extern "C" void em_fly_start(_ENEMY_WORK* self, EmFlyMotions* table)
 {
     em_mot_set_blend(self, table->flap.motion, table->flap.start, table->flap.frame, table->flap.loop);
     self->fly_state_0x786 = 0;
-    copyVec3(&self->fly_start_0x788, &self->pos);
+    self->fly_start_0x788 = self->pos;
     self->vec_0x31C.z = 0.0f;
     self->vec_0x31C.y = 0.0f;
     self->vec_0x31C.x = 0.0f;
@@ -9351,8 +9227,6 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
 {
     nw4r::math::VEC3 to_target;
     nw4r::math::VEC3 to_start;
-    nw4r::math::VEC3 d0;
-    nw4r::math::VEC3 d1;
     u16 turn;
     u16 bank;
     u16 roll;
@@ -9360,16 +9234,12 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
     s32 rate;
     f32 lean;
 
-    VEC3_ctor(&to_target);
-    VEC3_ctor(&to_start);
     em_target_refresh(self);
     self->field_0x784 = 1;
-    subVec3(&d0, &self->vec_0x36C, &self->pos);
-    copyVec3(&to_target, &d0);
+    to_target = self->vec_0x36C - self->pos;
     switch (self->fly_state_0x786) {
     case 0:
-        subVec3(&d1, &self->vec_0x36C, &self->fly_start_0x788);
-        copyVec3(&to_start, &d1);
+        to_start = self->vec_0x36C - self->fly_start_0x788;
         if (vec3_dot((f32*)&to_target, (f32*)&to_start) < 0.0f) {
             self->fly_state_0x786++;
             turn = 0;
@@ -9479,14 +9349,14 @@ extern "C" void em_move_vec2_clr(_ENEMY_WORK* self)
 /* 0x80135418 (0x10): adds the move vector to the position. */
 extern "C" void em_move_offset_apply(_ENEMY_WORK* self)
 {
-    addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+    self->pos += self->offset_0x30C.vec_0x310;
 }
 
 /* 0x80135428 (0x40): adds the move vector to the position and the acceleration to the move vector. */
 extern "C" void CancelFade(_ENEMY_WORK* self)
 {
-    addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
-    addVec3To(&self->offset_0x30C.vec_0x310, &self->vec_0x31C);
+    self->pos += self->offset_0x30C.vec_0x310;
+    self->offset_0x30C.vec_0x310 += self->vec_0x31C;
 }
 
 /* 0x80135468 (0x44): moves and accelerates, then holds the floor lifted by `lift`. */
@@ -9515,14 +9385,13 @@ extern "C" void em_move_offset_rot_apply(_ENEMY_WORK* self, u32* rot)
 {
     nw4r::math::VEC3 move;
 
-    VEC3_ctor(&move);
-    copyVec3(&move, &self->offset_0x30C.vec_0x310);
+    move = self->offset_0x30C.vec_0x310;
     if ((u32)(self->field_0x1E2 - 1) <= 1 || (s32)self->field_0x1E2 == 4) {
         rotVecZ(&move, rot[2]);
         rotVecX(&move, rot[0]);
     }
     rotVecY(&move, rot[1]);
-    addVec3To(&self->pos, &move);
+    self->pos += move;
 }
 
 /* 0x80135584 (0x44): moves by the rotated move vector, then holds the floor lifted by `lift`. */
@@ -9536,7 +9405,7 @@ extern "C" void em_move_rot_ground_step(_ENEMY_WORK* self, u32* rot, f32 lift)
 extern "C" void em_move_offset_step(_ENEMY_WORK* self, u32* rot)
 {
     em_move_offset_rot_apply(self, rot);
-    addVec3To(&self->offset_0x30C.vec_0x310, &self->vec_0x31C);
+    self->offset_0x30C.vec_0x310 += self->vec_0x31C;
 }
 
 /* 0x80135600 (0x44): moves by the rotated move vector, accelerates it and holds the floor lifted by `lift`. */
@@ -9742,8 +9611,8 @@ extern "C" void em_break_part_motion_clear(EmBreakPart* part)
 /* 0x80135B84 (0x40): moves the part by its velocity, then accelerates the velocity. */
 extern "C" void em_break_part_motion_step(EmBreakPart* part)
 {
-    addVec3To(&part->pos, &part->vel);
-    addVec3To(&part->vel, &part->accel);
+    part->pos += part->vel;
+    part->vel += part->accel;
 }
 
 /* 0x80135BC4 (0x98): 1 when a breakable part is active (with `any` 0: only one in the current area). */
@@ -9776,7 +9645,6 @@ extern "C" void em_part_hit_set(_ENEMY_WORK* self, u32 index, u32 flags)
     f32 lift;
     s32 i;
 
-    em_land_data_init(&land);
     part = &self->break_parts_0x488[(u8)index];
     switch (part->hit_kind) {
     default:
@@ -9821,7 +9689,7 @@ extern "C" void em_part_hit_set(_ENEMY_WORK* self, u32 index, u32 flags)
         if ((u8)flags & 2) {
             lift += 150.0;
         }
-        copyVec3(&part->origin, &self->pos);
+        part->origin = self->pos;
         if (part->kind == 1 && part->origin.y > self->field_0x210) {
             part->origin.y = self->field_0x210;
         }
@@ -9841,24 +9709,20 @@ extern "C" void em_break_part_launch(_ENEMY_WORK* self, EmBreakPart* part, u8 in
 {
     nw4r::math::MTX34 pose;
     nw4r::math::MTX34 inverse;
-    nw4r::math::VEC3 v;
-    nw4r::math::VEC3 diff;
     EmBreakPartData* data;
     s16 frames;
     f32 gravity;
 
-    MTX34_ctor(&pose);
-    MTX34_ctor(&inverse);
-    VEC3_ctor(&v);
+    nw4r::math::VEC3 v;
     mtx34_identity(&pose);
     nw4r::g3d::ResNode scale_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
-    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_scale_get((const ResHandle*)&scale_node));
+    v = *((nw4r::math::VEC3*)em_res_node_scale_get((const ResHandle*)&scale_node));
     mtx34_scale_in_place(&pose, &v);
     nw4r::g3d::ResNode rot_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
-    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_rot_get((const ResHandle*)&rot_node));
+    v = *((nw4r::math::VEC3*)em_res_node_rot_get((const ResHandle*)&rot_node));
     mtx34_rot_xyz_deg(&pose, v.x, v.y, v.z);
     nw4r::g3d::ResNode trans_node = ((nw4r::g3d::ResMdl*)&self->res_mdl_0x138)->GetResNode(item->field_0x00);
-    copyVec3(&v, (nw4r::math::VEC3*)em_res_node_trans_get((const ResHandle*)&trans_node));
+    v = *((nw4r::math::VEC3*)em_res_node_trans_get((const ResHandle*)&trans_node));
     mtx34_set_trans(&pose, &v);
     mtx34_inverse(&inverse, &pose);
     get_joint_wmat_em(self, item->field_0x0C, &pose);
@@ -9877,8 +9741,7 @@ extern "C" void em_break_part_launch(_ENEMY_WORK* self, EmBreakPart* part, u8 in
     if ((u32)em_area_ck(self) == 1) {
         se_req_pos_ps(self->se_0xB14, 0x24, 2, &v);
     }
-    subVec3(&diff, &part->origin, &v);
-    copyVec3(&v, &diff);
+    v = part->origin - v;
     em_break_part_motion_clear(part);
     if (part->kind == 1) {
         part->duration = 2.0f * frames;
@@ -9922,18 +9785,11 @@ extern "C" void em_break_part_return_step(EmBreakPart* part)
     nw4r::math::VEC3 offset;
     nw4r::math::VEC3 spare;
     nw4r::math::VEC3 step;
-    nw4r::math::VEC3 scaled;
-    nw4r::math::VEC3 back;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&spare);
-    VEC3_ctor(&step);
     offset.x = part->pos.x - part->origin.x;
     offset.y = part->pos.y - part->origin.y;
     offset.z = part->pos.z - part->origin.z;
-    vec3_negate(&back, &offset);
-    vec3_div(&scaled, &back, 0.25f * part->duration);
-    copyVec3(&step, &scaled);
+    step = -offset / (0.25f * part->duration);
     part->pos.x += step.x;
     part->pos.y += step.y;
     part->pos.z += step.z;
@@ -9955,7 +9811,6 @@ extern "C" void em_break_part_spin(EmBreakPart* part, EmBreakPartData* data, _CP
     f32* y;
     f32* z;
 
-    VEC3_ctor(&spin);
     if (part->kind == 1) {
         x = data->curves->lifted_spin[0];
         y = data->curves->lifted_spin[1];
@@ -9999,7 +9854,6 @@ extern "C" void em_break_parts_update(_ENEMY_WORK* self)
     f32 bob;
     f32 s;
 
-    VEC3_ctor(&scale);
     for (i = 0; i < 2; i++) {
         part = &self->break_parts_0x488[(u8)i];
         if (part->kind == 2) {
@@ -10142,23 +9996,17 @@ extern "C" void em_ground_impact_set(_ENEMY_WORK* self, u8 kind, u8 fx, f32 scal
 {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 rot;
-    nw4r::math::VEC3 b;
-    nw4r::math::VEC3 a;
     f32 size;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&rot);
     if (self->pos.y <= 900.0f + self->field_0x20C) {
         pos.x = self->pos.x;
         pos.y = self->field_0x20C;
         pos.z = self->pos.z;
         size = scale * get_em_chg_scale(self);
         if (offset != NULL) {
-            vec3_scale(&a, offset, get_em_chg_scale(self));
-            vec3_scale(&b, &a, scale);
-            copyVec3(&rot, &b);
+            rot = (*offset * (get_em_chg_scale(self))) * scale;
             rotVecY(&rot, self->field_0x1C0);
-            addVec3To(&pos, &rot);
+            pos += rot;
         }
         switch (kind) {
         case 1:
@@ -10180,7 +10028,6 @@ extern "C" void em_camera_req(_ENEMY_WORK* self, u32 joint, u8 mode)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (joint != 0xFFFFFFFF) {
         get_joint_wpos_em(self, joint, &pos);
         camera_enemy_focus_pos_set_c1(self, mode, &pos);
@@ -10204,11 +10051,9 @@ extern "C" u32 em_data_word_get(_ENEMY_WORK* self)
 extern "C" u8 em_joint_points_get(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* out)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 v;
     nw4r::math::VEC3* points;
     u8 i;
 
-    MTX34_ctor(&mtx);
     if (set == NULL) {
         return 0;
     }
@@ -10221,7 +10066,7 @@ extern "C" u8 em_joint_points_get(_ENEMY_WORK* self, EmJointPoints* set, nw4r::m
     }
     get_joint_wmat_em(self, set->joint, &mtx);
     for (i = 0; i < set->count; i++, out++) {
-        copyVec3(out, setVec3(&v, points[i].x, points[i].y, points[i].z));
+        *out = VEC3(points[i].x, points[i].y, points[i].z);
         mulVecMatAddTrans(out, &mtx);
     }
     return i;
@@ -10563,11 +10408,10 @@ extern "C" u8* em_move_work_pick(u8 mode, u8 mask)
     return work;
 }
 
-/* Rebuilds the record's four light records. */
-extern "C" void fn_801378A0(void)
-{
-    setVec3(&lbl_806A4560[0], lbl_80796D34, lbl_80796D38, lbl_80796C58);
-    setVec3(&lbl_806A4560[1], lbl_80796C58, lbl_80796D38, lbl_80796D3C);
-    setVec3(&lbl_806A4560[2], lbl_80796D3C, lbl_80796D38, lbl_80796C58);
-    setVec3(&lbl_806A4560[3], lbl_80796C58, lbl_80796D38, lbl_80796D34);
-}
+/* The default patrol points, constructed by MWCC's `__sinit` (0x801378A0). */
+nw4r::math::VEC3 em_patrol_default_points[4] = {
+    nw4r::math::VEC3(lbl_80796D34, lbl_80796D38, lbl_80796C58),
+    nw4r::math::VEC3(lbl_80796C58, lbl_80796D38, lbl_80796D3C),
+    nw4r::math::VEC3(lbl_80796D3C, lbl_80796D38, lbl_80796C58),
+    nw4r::math::VEC3(lbl_80796C58, lbl_80796D38, lbl_80796D34),
+};

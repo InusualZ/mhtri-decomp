@@ -31,7 +31,7 @@
 #include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/pRoot.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_801260BC_c1 ((u32 (*)(_ENEMY_WORK*))fn_801260BC)

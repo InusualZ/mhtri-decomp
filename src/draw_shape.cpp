@@ -68,7 +68,7 @@
 #include "lobby/lb_quest_screen.h" /* quest_id_get (rule 2) */
 #include "quest/quest_entry.h"    /* quest_phase_get (rule 2) */
 #include "quest/quest_item_slot.h" /* quest_select_ready_ck (rule 2) */
-#include "fn_8004CAD8.h"          /* mtx34_get_ptr / MTX34_ctor / sin_idx_get / anim_tick_cos (rule 2) */
+#include "fn_8004CAD8.h"          /* mtx34_get_ptr / MTX34::MTX34() / sin_idx_get / anim_tick_cos (rule 2) */
 #include "main.h"                 /* _MH_VEC2 (rule 1) */
 #include "draw_shape.h"
 
@@ -82,8 +82,6 @@ typedef f32 (*DrawShapeMtxPtr)[4];
 typedef struct DrawShapeWork {
     /* 0x80055E64 (0x60): constructs the two matrices and the three handles (run by `__sinit_\draw_shape_cpp`). */
     DrawShapeWork() {
-        MTX34_ctor(&pos_mtx);
-        MTX34_ctor(&tex_mtx);
         res_tex_ctor(&tex, 0);
         res_pltt_ctor(&pltt, 0);
         res_tex_ctor(&tex_0x360, 0);
@@ -438,7 +436,6 @@ extern "C" void drawshape_vtx_fmt_set(u32 flags) {
 /* 0x80053160 (0x17C): the GX state of an immediate 2D (or, with mode bit 0, camera-space) draw. */
 extern "C" void drawshape_gx_setup(u8 mode, u32* tex, u32* pltt) {
     MTX34 mtx;
-    MTX34_ctor(&mtx);
 
     if ((mode & 1) == 0) {
         drawshape_ortho_proj_set();
@@ -906,7 +903,6 @@ extern "C" void drawshape_set_tex_offset_f32(const f32* scale, u16 angle, const 
 /* 0x80054580 (0x228): the GX state of the shape `drawshape_exec` draws. */
 extern "C" void drawshape_gx_begin_setup(void) {
     MTX34 mtx;
-    MTX34_ctor(&mtx);
 
     if ((drawshape_work.flags & 1) == 0) {
         if (drawshape_work.flags & 4) {

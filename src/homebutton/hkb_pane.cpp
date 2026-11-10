@@ -90,7 +90,7 @@ namespace detail {
  * height. */
 const ut::Rect CalcPaneRect(const Pane* pPane) {
     ut::Rect ret;
-    math::VEC2 basePt = static_cast<const math::VEC2&>(pPane->GetVtxPos());
+    math::_VEC2 basePt = static_cast<const math::VEC2&>(pPane->GetVtxPos());
 
     ret.left = basePt.x;
     ret.top = basePt.y;
@@ -186,12 +186,12 @@ void Pane::CalculateMtx(const DrawInfo& drawInfo) {
     }
 
     {
-        math::MTX34 mtx1;
-        math::MTX34 mtx2;
-        math::MTX34 rotateMtx;
+        math::_MTX34 mtx1;
+        math::_MTX34 mtx2;
+        math::_MTX34 rotateMtx;
 
         {
-            math::VEC2 scale = mScale;
+            math::_VEC2 scale = mScale;
             if (drawInfo.mFlag.locationAdjust && (flag & 4)) {
                 scale.x *= drawInfo.mLocationAdjustScale.x;
                 scale.y *= drawInfo.mLocationAdjustScale.y;
@@ -372,7 +372,7 @@ void Pane::SetAnimationEnable(const AnimResource& animRes, bool bEnable, bool bR
 /* 0x8052AE78 (0x58): Loads the global matrix (times the view matrix when the view is applied per draw) as the
  * position matrix. */
 void Pane::LoadMtx(const DrawInfo& drawInfo) {
-    math::MTX34 mtx;
+    math::_MTX34 mtx;
     const f32(*mtxPtr)[4];
 
     if (drawInfo.mFlag.mulViewDraw) {
@@ -387,8 +387,8 @@ void Pane::LoadMtx(const DrawInfo& drawInfo) {
 }
 
 /* 0x8052AED0 (0xE4): Returns the pane's top-left corner relative to its origin, from the base position. */
-const math::VEC2 Pane::GetVtxPos() const {
-    math::VEC2 basePt;
+const math::_VEC2 Pane::GetVtxPos() const {
+    math::_VEC2 basePt;
     basePt.x = 0.0f;
     basePt.y = 0.0f;
 

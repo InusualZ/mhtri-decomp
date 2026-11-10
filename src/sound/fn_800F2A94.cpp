@@ -86,7 +86,7 @@
 #include "lobby/lb_special_bgm_ck.h"
 #include "lobby/lobby_w.h"
 #include "mh3_pad/system_w.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "fn_8004CAD8.h"
 #include "camera/camera_angle_x_get.h"
 #include "Network/network_pat_control.h"
@@ -1338,7 +1338,6 @@ void snd_quest_frame_begin(s32 mode, u8 phase, u8 sub) {
     BgmCtrl* work = bgm_ctrl;
     VEC3 pos;
     u8 tracks[2];
-    VEC3_ctor(&pos);
     if (work == NULL) {
         return;
     }
@@ -1446,8 +1445,7 @@ void snd_quest_frame_begin(s32 mode, u8 phase, u8 sub) {
             _PLW* players = (_PLW*)get_move_work_adrs(2);
             _PLW* player = players + (s8)my_player_no();
             if (player != NULL && sub == 2) {
-                VEC3 spot;
-                copyVec3(&pos, setVec3(&spot, 1542.0f, 406.5f, 554.0f));
+                pos = VEC3(1542.0f, 406.5f, 554.0f);
                 pos.y = player->motion_pos_0x40;
                 if (calcVecDistXZ(&pos, &player->vec_0x03C) <= 420.0f) {
                     work->env_area = 1;
@@ -1533,8 +1531,7 @@ void snd_quest_frame_begin(s32 mode, u8 phase, u8 sub) {
             _PLW* players = (_PLW*)get_move_work_adrs(2);
             _PLW* player = players + (s8)my_player_no();
             if (player != NULL && (map == 1 || map == 12) && sub == 11) {
-                VEC3 spot;
-                copyVec3(&pos, setVec3(&spot, 5000.0f, 0.0f, 6000.0f));
+                pos = VEC3(5000.0f, 0.0f, 6000.0f);
                 pos.y = player->motion_pos_0x40;
                 if (calcVecDistXZ(&pos, &player->vec_0x03C) <= 1000.0f) {
                     work->env_area = 1;
@@ -1665,8 +1662,7 @@ void bgm_ctrl_frame(void) {
                     }
                     if (work->ch_state[2] == 2) {
                         StreamCmd cmd = bgm_lobby_cmd;
-                        VEC3 spot;
-                        setVec3(&spot, 0.0f, 154.0f, -620.0f);
+                        VEC3 spot(0.0f, 154.0f, -620.0f);
                         f32 range = 2000.0f;
                         _PLW* player = (_PLW*)get_move_work_adrs(2);
                         if (player != NULL) {

@@ -89,11 +89,9 @@ void nw4r::ef::EmitterFormTorus::Emission(EfWork* em, ParticleManager* pm, int c
     total = swept ? count * count : count;
     tube = 0.0f;
     for (i = 0; i < total; i++) {
-        VEC3 v_pt, v_out, v_norm, v_flat, v_dir;
+        VEC3 v_pt, v_out;
         f32 c1, s1, c2, s2;
 
-        VEC3_ctor(&v_pt);
-        VEC3_ctor(&v_out);
         ratio = (100.0f - params->rate) / (100.0f + params->rate);
         if (!swept) {
             angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
@@ -106,11 +104,11 @@ void nw4r::ef::EmitterFormTorus::Emission(EfWork* em, ParticleManager* pm, int c
         v_pt.y = scale_b * c2;
         v_pt.z = scale_c * (s1 * (-ratio * s2) - s1) / (1.0f + ratio);
 
-        assignVec3((Vec*)&v_norm, (Vec*)&v_pt);
+        VEC3 v_norm = v_pt;
         ef_vec3_normalize_to(&v_norm, &v_norm);
-        setVec3(&v_flat, v_pt.x, 0.0f, v_pt.z);
+        VEC3 v_flat(v_pt.x, 0.0f, v_pt.z);
         ef_vec3_normalize_to(&v_flat, &v_flat);
-        VEC3_ctor(&v_dir);
+        VEC3 v_dir;
         if (ratio == 0.0f) {
             v_dir.x = c1 * (scale_a * s2);
             v_dir.y = scale_b * c2;
@@ -123,7 +121,7 @@ void nw4r::ef::EmitterFormTorus::Emission(EfWork* em, ParticleManager* pm, int c
         ef_vec3_normalize_to(&v_dir, &v_dir);
 
         CalcVelocity((Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
-        pm->CreateParticle(CalcLife(id, scale, em), v_pt, v_out, spawn_arg,
+        pm->CreateParticle(CalcLife(id, scale, em), (const _VEC3&)v_pt, (const _VEC3&)v_out, spawn_arg,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                            em->spawn_extra, em->spawn_flag);
 

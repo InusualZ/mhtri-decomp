@@ -2087,7 +2087,6 @@ extern "C" void eft_res_models_spawn(_EFT* self, void** models, s32 mode, s32 co
     u16 flags;
     s32 i;
 
-    VEC3_ctor(&pos);
     flags = 0;
     if (self->area_0x44 != get_now_areano() || self->flag_0x01 == 0) {
         if ((mode & 2) == 0) {

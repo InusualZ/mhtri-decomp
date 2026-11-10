@@ -27,7 +27,6 @@
 #include "enemy/em_motion_kind_set.h" /* em_motion_kind_set (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play.h" /* em_se_tbl_play (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play_alt.h" /* em_se_tbl_play_alt (rule 2: the owner's header) */
-#include "enemy/em_ground_rec_clear.h" /* fn_80125F54 (rule 2: the owner's header) */
 #include "enemy/em_move_target_set.h" /* fn_80126324 (rule 2: the owner's header) */
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
 #include "enemy/em_pl_target_ck.h" /* em_pl_target_ck (rule 2: the owner's header) */
@@ -49,6 +48,8 @@
 #include "enemy/em_hit_by_set.h" /* fn_8012CEB4 (rule 2: the owner's header) */
 #include "enemy/em_flag_0x8AC_ck.h" /* em_flag_0x8AC_ck (rule 2: the owner's header) */
 #include "types.h"
+#include "Pl/pl_hit_sphere.h" /* PlCapsuleBox (rule 1) */
+#include "enemy/em_se_record.h" /* EmSeShiftPair (rule 1) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_801B0010.h"
@@ -95,7 +96,7 @@
 #include "quest/quest_item_slot.h" /* quest_item_work_merge (rule 2: its owner) */
 #include "enemy/fn_801B4458.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_rot_vec_copy_c1 ((void (*)(void*, void*))eft_rot_vec_copy)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -115,7 +116,6 @@
 #define em_se_tbl_play_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play)
 #define em_hit_window_set_default_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32))em_hit_window_set_default)
 #define calcVecDistXZ_view1 ((f32 (*)(const void*, const void*))calcVecDistXZ)
-#define assignVec3_view1 ((void (*)(Vec*, Vec*))assignVec3)
 
 /* The 8-byte `lbl_805B1B08` lookup entry: a key byte, a value byte and the list pointer (more records of this shape,
  * keyed by the kind); `enemy/em004_act.cpp`'s `EmLookupEntry` is the different 0x805B3CD8 table.
@@ -138,15 +138,10 @@ u8 stage_map_kind_get(u8 map);
 /* enemy/em_common.cpp (the 0x8013xxxx motion setters). */
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
-void assignVec3(void* out, void* in);
-void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
-void eft_shape_init(void* out);
 u32 move_work_state_ck(void);
 void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
-s32 pl_capsule_box_set(void* a, void* b);
 s32 pl_capsule_point_ck(void* a, void* b);
 void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
@@ -211,7 +206,7 @@ extern f32 lbl_80798CF0; /* -2.38f */
 extern f32 lbl_80798CF4; /* 0.11f */
 
 extern u8 lbl_80570260[];
-extern VEC3 vec_pair_801B4458_0[2];
+extern EmSeShiftPair em034_se_shift;
 
 /* the 0x805B1Bxx enemy-control program tables `em_se_tbl_play`/`em_se_tbl_play_alt` walk. */
 extern u8 lbl_805B1BB0[];
@@ -236,9 +231,8 @@ extern u8 lbl_805B20E8[];
 extern "C" void fn_801B4348(_ENEMY_WORK* work) {
     EmGroundRec rec;
 
-    em_ground_rec_clear(&rec);
     if (em_ground_rec_find(work->field_0x01A, &rec) == 1) {
-        copyVec3(&work->aim, &rec.pos_0x08);
+        work->aim = rec.pos_0x08;
     }
 }
 
@@ -277,11 +271,6 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
 /* 0x801B4458 (0x158).  Picks the seat record of the `kind` set `fn_801B4398` hands back whose point
  * (or two-point segment midpoint) is nearest the work record's `pos`; 0xFF when the set is empty. */
 extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
-    nw4r::math::VEC3 mid;
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
-    nw4r::math::VEC3 delta;
-    nw4r::math::VEC3 point;
     EmSeatRec* list;
     u8 best;
     u8 count;
@@ -292,20 +281,18 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
     list = NULL;
     best = 0xFF;
     bestDist = lbl_80798C68;
-    VEC3_ctor(&mid);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    nw4r::math::VEC3 mid;
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
     count = (u8)fn_801B4398(self, kind, (u32*)&list);
     for (i = 0; i < count; i++) {
         if (list->code == 1) {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
             vec_to_mh_vec3(&b, (Vec*)list->vec_0x10);
-            addVec3(&delta, &a, &b);
-            vec3_div(&point, &delta, lbl_80798C6C);
-            copyVec3(&mid, &point);
+            mid = (a + b) / lbl_80798C6C;
         } else {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
-            copyVec3(&mid, &a);
+            mid = a;
         }
         dist = vec3_distance(&self->pos, &mid);
         if (i == 0 || bestDist > dist) {
@@ -322,20 +309,17 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
  * box between its points, a single-point seat the straight distance. */
 extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
     EmSeatRec* rec;
-    u8 box[0x34];
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
 
     rec = (EmSeatRec*)seat;
-    eft_shape_init(box);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    PlCapsuleBox box;
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
     if (rec->code == 1) {
         vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
-        capsule_box_from_points(&a, &b, radius, (nw4r::math::CAPSULE*)box);
-        pl_capsule_box_set(box, box);
-        if ((u32)pl_capsule_point_ck(point, box) == 1) {
+        capsule_box_from_points(&a, &b, radius, (nw4r::math::CAPSULE*)&box);
+        pl_capsule_box_set((PlCapsule*)&box, &box);
+        if ((u32)pl_capsule_point_ck(point, &box) == 1) {
             return 1;
         }
     } else {
@@ -351,16 +335,14 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
 /* 0x801B4694 (0x110): moves the aim to seat `index` - a segment (`em_wave_segment`) for a two-point seat, the point
  * itself (`em_wave_amp`) otherwise, each with the seat's own float and a random u16 phase. */
 extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     EmSeatRec* list;
     u8 count;
     u8 i;
     u16 phase;
 
     list = NULL;
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
     count = (u8)fn_801B4398(self, self->area_no, (u32*)&list);
     if ((u8)index < count) {
         phase = ran_suu(0);
@@ -512,7 +494,6 @@ extern "C" s32 fn_801B4C54(u16 id) {
     EmGroundRec rec;
     s32 pct;
 
-    em_ground_rec_clear(&rec);
     if (move_work_state_ck() == 0) {
         return 0;
     }
@@ -1441,7 +1422,6 @@ extern "C" void fn_801B64FC(_ENEMY_WORK* self) {
 extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 arg4, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         switch (id) {
@@ -1484,7 +1464,6 @@ extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 ar
 extern "C" void fn_801B670C(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (em_get_mot_no(self)) {
     case 0x9:
         if ((self->field_0x228 & 6) != 0 &&
@@ -1594,7 +1573,6 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     EmGroundRec rec;
     u32 unmatched;
 
-    em_ground_rec_clear(&rec);
     unmatched = 0;
     switch (stage_map_kind_get(self->field_0x1E0)) {
     case 1:
@@ -1664,7 +1642,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         *out_state = 0;
         *out_flag = 0;
         if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
-            copyVec3(&self->pos, &rec.pos_0x08);
+            self->pos = rec.pos_0x08;
             eft_rot_vec_copy_c1(&self->field_0x1BC, &rec.field_0x14);
         }
     } else {
@@ -1698,20 +1676,11 @@ extern "C" void fn_801B6EF4(_ENEMY_WORK* self, u8 kind) {
 }
 
 #pragma peephole on
-/* 0x801B6FB0 (0x6C).  The `.ctors` static initializer: seed the two global control vectors. */
-extern "C" void fn_801B6FB0(void) {
-    nw4r::math::VEC3 first;
-    nw4r::math::VEC3 second;
-
-    assignVec3(vec_pair_801B4458_0, setVec3(&first, lbl_80798C74, lbl_80798CE8, lbl_80798CEC));
-    assignVec3(&vec_pair_801B4458_0[1], setVec3(&second, lbl_80798C74, lbl_80798CF0, lbl_80798CF4));
-}
-
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */
 extern "C" u32 em034_eft_ck(_ENEMY_WORK* self) {
     return em_flag_0x8AC_ck();
 }
 
-/* The unit's `.bss` (0x806A7AA0-0x806A7AB8): the two-vector record its static constructor `fn_801B6FB0` builds
+/* The unit's `.bss` (0x806A7AA0-0x806A7AB8): the point/step record MWCC's `__sinit` (0x801B6FB0) builds
  * and the `.data` tables point at. */
-VEC3 vec_pair_801B4458_0[2];  /* +0x806A7AA0 */
+EmSeShiftPair em034_se_shift = {nw4r::math::VEC3(lbl_80798C74, lbl_80798CE8, lbl_80798CEC), nw4r::math::VEC3(lbl_80798C74, lbl_80798CF0, lbl_80798CF4)};

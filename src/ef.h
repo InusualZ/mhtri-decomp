@@ -51,18 +51,28 @@ typedef struct EfParticle EfParticle;
  * the four floats are the scale factors their product reads; `manager` is the record's owner. */
 typedef struct EfParticleParams EfParticleParams;
 
-/* One 8-byte sub-object the constructor builds with VEC2_ctor; three of them form each array. */
-typedef struct EfParticleNode {
-    /* +0x00 */ u8 data[8];
-} EfParticleNode; /* size: 0x08 */
+#ifdef __cplusplus
+/* The texture scale/translate pair the constructor builds with `VEC2()`; three of them form each array. */
+typedef nw4r::math::VEC2 EfParticleNode; /* size: 0x08 */
 
 /* A pair of scale factors the constructor builds and the scale helpers multiply. */
+typedef nw4r::math::VEC2 EfParticleScale; /* size: 0x08 */
+#else
+typedef struct EfParticleNode {
+    /* +0x00 */ f32 x;
+    /* +0x04 */ f32 y;
+} EfParticleNode; /* size: 0x08 */
+
 typedef struct EfParticleScale {
     /* +0x00 */ f32 x;
     /* +0x04 */ f32 y;
 } EfParticleScale; /* size: 0x08 */
+#endif
 
 struct EfParticleParams {
+#ifdef __cplusplus
+    EfParticleParams(); /* 0x800AA1D8, ef/ef_particle.cpp */
+#endif
     /* +0x00 */ u8 colors[2][2][4];
     /* +0x10 */ EfParticleScale scale_0x10; /* the phases select which pair multiplies */
     /* +0x18 */ EfParticleScale scale_0x18;
@@ -250,14 +260,11 @@ typedef struct _se_w _se_w;
 #endif
 
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map.
- * The two `src/mh3_pad.cpp` helpers declared here (`VEC3_ctor`, `setVec3`) are spelled EXACTLY as
+ * The two `src/mh3_pad.cpp` helpers declared here (`VEC3::VEC3()`, `VEC3(x, y, z)`) are spelled EXACTLY as
  * `mh3_pad/vec3.h` spells them (the owner's header), with the record's real type `nw4r::math::VEC3`; two
  * spellings in one TU are MWCC `(10197) illegal function overloading`.  They stay here rather than in an
  * `#include "mh3_pad.h"`: that header carries other declarations its consumers spell differently, and this
  * header's declaration set is a codegen input (adding one declaration moved `ef/ef_disc.cpp`'s `fn_800CC5B0`). */
-extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA8 - owner mh3_pad.cpp */
-extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
-extern void assignVec3(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
 extern void ef_vec_sin_cos(Vec* out, f32 angle);                    /* the same, under the owner's name */
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */

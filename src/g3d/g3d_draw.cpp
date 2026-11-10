@@ -35,8 +35,8 @@
  */
 
 #include "types.h"
-#include "mh3_pad.h"               /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h"       /* MTX34_ctor (rule 2) */
+#include "mh3_pad.h"               /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
+#include "fn_8004CAD8/mtx.h"       /* MTX34::MTX34() (rule 2) */
 #include "g3d/g3d_obj.h"
 #include "g3d/g3d_anmchr.h"        /* res_node_ref / res_node_ref_nonconst / res_node_copy_ctor / res_node_assign (rule 2) */
 #include "g3d/fn_8005AA28.h"       /* res_node_is_valid (rule 2) */
@@ -126,7 +126,6 @@ extern "C" {
 s32 light_obj_is_specular_light(const nw4r::g3d::LightObj* pLObj);
 s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pLObj);
 s32 light_obj_is_directional(const nw4r::g3d::LightObj* pLObj);
-void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 void fn_80077E64(s32* pDst, s32* pSrc);
 void SetupDraw1Mat1ShpSwap(nw4r::g3d::Draw1Mat1ShpSwap* pSwap, nw4r::g3d::DrawResMdlReplacement* pRep, u32 idx);
 u32 fn_80078608(s32* pDst, s32* pSrc);
@@ -154,7 +153,6 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
 
     bool nrmMtxReady = false;
     math::MTX34 nrmMtx;
-    MTX34_ctor(&nrmMtx);
     u32 i;
     G3dIndMtxCallback* pOp = g3d_state_get_ind_mtx_hook();
     pOp->Reset();
@@ -189,27 +187,24 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
                     mtx34_concat(&nrmMtx, (const math::MTX34*)res_node_ref_nonconst((ResHandle*)&shpNode)->mInvModelMtx,
                                  (const math::MTX34*)pNodeData->mModelMtx);
                     const Mat33* pNrm = g3d_state_get_nrm_mtx(shp.ptr()->curMtxIdx);
-                    math::MTX34 shpNrmMtx;
-                    mtx34_set(&shpNrmMtx, pNrm->m[0][0], pNrm->m[0][1], pNrm->m[0][2], 0.0f, pNrm->m[1][0], pNrm->m[1][1], pNrm->m[1][2],
+                    math::_MTX34 shpNrmMtx;
+                    mtx34_set((math::MTX34*)&shpNrmMtx, pNrm->m[0][0], pNrm->m[0][1], pNrm->m[0][2], 0.0f, pNrm->m[1][0], pNrm->m[1][1], pNrm->m[1][2],
                               0.0f, pNrm->m[2][0], pNrm->m[2][1], pNrm->m[2][2], 0.0f);
-                    mtx34_concat(&nrmMtx, &shpNrmMtx, &nrmMtx);
+                    mtx34_concat(&nrmMtx, (math::MTX34*)&shpNrmMtx, &nrmMtx);
                 }
                 nrmMtx.m[0][3] = nrmMtx.m[1][3] = nrmMtx.m[2][3] = 0.0f;
 
-                math::VEC3 axisX;
-                setVec3(&axisX, nrmMtx.m[0][0], nrmMtx.m[1][0], nrmMtx.m[2][0]);
+                math::VEC3 axisX(nrmMtx.m[0][0], nrmMtx.m[1][0], nrmMtx.m[2][0]);
                 vec3_normalize_into(&axisX, &axisX);
                 nrmMtx.m[0][0] = axisX.x;
                 nrmMtx.m[1][0] = axisX.y;
                 nrmMtx.m[2][0] = axisX.z;
-                math::VEC3 axisY;
-                setVec3(&axisY, nrmMtx.m[0][1], nrmMtx.m[1][1], nrmMtx.m[2][1]);
+                math::VEC3 axisY(nrmMtx.m[0][1], nrmMtx.m[1][1], nrmMtx.m[2][1]);
                 vec3_normalize_into(&axisY, &axisY);
                 nrmMtx.m[0][1] = axisY.x;
                 nrmMtx.m[1][1] = axisY.y;
                 nrmMtx.m[2][1] = axisY.z;
-                math::VEC3 axisZ;
-                setVec3(&axisZ, nrmMtx.m[0][2], nrmMtx.m[1][2], nrmMtx.m[2][2]);
+                math::VEC3 axisZ(nrmMtx.m[0][2], nrmMtx.m[1][2], nrmMtx.m[2][2]);
                 vec3_normalize_into(&axisZ, &axisZ);
                 nrmMtx.m[0][2] = axisZ.x;
                 nrmMtx.m[1][2] = axisZ.y;
@@ -222,25 +217,19 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
         LightObj* pLObj = g3d_state_get_light_obj(g3d_state_get_light_set_entry(lightRef[i]));
         if (pLObj != NULL && light_obj_is_enable(pLObj)) {
             math::VEC3 lightDir;
-            math::VEC3 specDir;
-            math::VEC3 negDir;
-            math::VEC3 negPos;
-            VEC3_ctor(&lightDir);
             if (light_obj_is_directional(pLObj)) {
                 light_obj_get_light_dir(pLObj, &lightDir);
                 if (0.0f == lightDir.x && 0.0f == lightDir.y && 0.0f == lightDir.z) {
                     light_obj_get_light_pos(pLObj, &lightDir);
-                    vec3_negate(&negDir, &lightDir);
-                    copyVec3(&lightDir, &negDir);
+                    lightDir = -lightDir;
                     vec3_normalize_into(&lightDir, &lightDir);
                 }
             } else if (light_obj_is_point_light(pLObj)) {
                 light_obj_get_light_pos(pLObj, &lightDir);
-                vec3_negate(&negPos, &lightDir);
-                copyVec3(&lightDir, &negPos);
+                lightDir = -lightDir;
                 vec3_normalize_into(&lightDir, &lightDir);
             } else {
-                VEC3_ctor(&specDir);
+                math::VEC3 specDir;
                 if (!light_obj_is_specular_light(pLObj)) {
                     nw4r::db::Panic("g3d_draw.cpp", 0xAB, "NW4R:Failed assertion pLObj->IsSpecularLight()");
                 }
@@ -278,9 +267,9 @@ s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pLObj) {
     return isPoint;
 }
 
-/* 0x80077DBC (0x1C): stores the negated vector. */
-void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
-    setVec3(pOut, -pIn->x, -pIn->y, -pIn->z);
+/* 0x80077DBC (0x1C): returns the negated record. */
+nw4r::math::VEC3 nw4r::math::VEC3::operator-() const {
+    return VEC3(-x, -y, -z);
 }
 
 /* 0x80077DD8 (0x18): whether the light object is directional (flag bit 0). */

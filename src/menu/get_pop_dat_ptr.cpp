@@ -51,8 +51,8 @@
  */
 
 #include "types.h"
-#include "nw4r/math.h"       /* nw4r::math::VEC3, the 3-float record VEC3_ctor takes */
-#include "mh3_pad/vec3.h"    /* VEC3_ctor / copyVec3 (owner src/mh3_pad.cpp) */
+#include "nw4r/math.h"       /* nw4r::math::VEC3 */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "fn_8004CAD8.h"     /* get_vsUser_work / _vs_user_data (owner src/fn_8004CAD8.cpp) */
 #include "hud/layout.h"     /* _mh_ivec2_, which the band header's prototypes name */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (owner: the Runtime.PPCEABI.H lib) */
@@ -147,7 +147,7 @@
 #include "enemy/fn_8012EC74.h" /* get_joint_wmat_em */
 #include "enemy/em025_prog.h" /* em025_shore_target_ck */
 #include "ef/math_sin_rad.h"
-#include "fn_8004CAD8/mtx.h"  /* MTX34_ctor */
+#include "fn_8004CAD8/mtx.h"  /* MTX34::MTX34() */
 #include "font/flfnt.h"     /* font_set_size / font_print_ex / font_flush */
 #include "Network/network_pat_control.h" /* NetCtrlWk::getBigDataText */
 
@@ -355,7 +355,6 @@ const struct EmWeightEntry**** get_pop_dat_ptr(void)
 
 extern "C" {
 
-nw4r::math::VEC3* vec3_construct(nw4r::math::VEC3* out);
 void pop_dat_spare_load(Q_MoveWork* work, char* path);
 void lb_pop_peer_count_set(LbPopWork* work);
 void lb_pop_screen_close(void);
@@ -377,7 +376,6 @@ void pop_dat_place_load(Q_MoveWork* work, char* path)
     s32 i;
     u8 kind;
 
-    vec3_construct(&entry.pos_0x00);
     file = (PopFile*)work->result_buffer_0x150;
     if (file == NULL) {
         return;
@@ -392,7 +390,7 @@ void pop_dat_place_load(Q_MoveWork* work, char* path)
             continue;
         }
         memset(&entry, 0, sizeof(entry));
-        copyVec3(&entry.pos_0x00, &point->pos_0x04);
+        entry.pos_0x00 = point->pos_0x04;
         eft_rot_vec_copy(&entry.rot_0x0C, &point->rot_0x10);
         entry.point_0x20 = kind = point->point_0x31;
         entry.point_kind_0x22 = point->point_0x31;
@@ -430,11 +428,9 @@ void pop_dat_place_load(Q_MoveWork* work, char* path)
     }
 }
 
-/* Constructs the 3-float record at `out` and hands the same pointer back. */
-nw4r::math::VEC3* vec3_construct(nw4r::math::VEC3* out)
+/* Constructs the pop point: its position record. */
+EmPopEntry::EmPopEntry()
 {
-    VEC3_ctor(out);
-    return out;
 }
 
 /* Loads the spare pop file and files each used spare head with the roster or the spare pool. */
@@ -3047,7 +3043,6 @@ void eft_em_model_pair_create(_EFT* self)
 void eft_em_model_pair_move(_EFT* self)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
     _GXColor color;
     u8 first;
     u8 count;
@@ -3059,8 +3054,7 @@ void eft_em_model_pair_move(_EFT* self)
     f32 wave;
     struct _ENEMY_WORK* enemy;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     models = (PopEftModels*)self->work_0x38;
     _GXColor hot = {0xFF, 0x40, 0x00, 0xFF};
     _GXColor dim = {0x40, 0x40, 0x40, 0xFF};
@@ -3081,7 +3075,7 @@ void eft_em_model_pair_move(_EFT* self)
             if (scratch->flags_0x156[i] != 0 && (scratch->flags_0x156[i] & 1)) {
                 scale = 10.0f;
                 color_rgba_copy((u8*)&color, models->color_0x26);
-                copyVec3(&pos, &scratch->slots_0x160[i]);
+                pos = scratch->slots_0x160[i];
                 pos.y += lb_interior_scale_get(lobby_w.place_ids_0x134[first + i]);
                 if (scratch->flags_0x156[i] & 4) {
                     scale = 15.0f;
@@ -3093,7 +3087,7 @@ void eft_em_model_pair_move(_EFT* self)
                 }
                 setVector3(&models->models_0x04[i]->scale_0x1C, scale, scale, scale);
                 models->models_0x04[i]->setMatColor(0, GX_COLOR0A0, color, false);
-                copyVec3(&models->models_0x04[i]->pos_0x04, &pos);
+                models->models_0x04[i]->pos_0x04 = pos;
                 eft_rot_vec_copy(&models->models_0x04[i]->rot_0x28, &self->rot_0x24);
                 models->models_0x04[i]->move(0);
                 eft_res_models_spawn(self, (void**)&models->models_0x04[i], 2, 1, NULL);
@@ -3118,19 +3112,19 @@ void eft_em_model_pair_move(_EFT* self)
             get_joint_wmat_em(enemy, 37, &mtx);
             setVector3(&pos, 780.0f, -140.0f + wave, -400.0f);
             mulVecMatAddTrans(&pos, &mtx);
-            copyVec3(&models->models_0x04[0]->pos_0x04, &pos);
+            models->models_0x04[0]->pos_0x04 = pos;
             models->models_0x04[0]->field_0x34 = 1;
             break;
         case 2:
             get_joint_wmat_em(enemy, 20, &mtx);
             setVector3(&pos, 380.0f, 220.0f + wave, 1950.0f);
             mulVecMatAddTrans(&pos, &mtx);
-            copyVec3(&models->models_0x04[0]->pos_0x04, &pos);
+            models->models_0x04[0]->pos_0x04 = pos;
             models->models_0x04[0]->field_0x34 = 1;
             get_joint_wmat_em(enemy, 20, &mtx);
             setVector3(&pos, -380.0f, 220.0f + wave, 1950.0f);
             mulVecMatAddTrans(&pos, &mtx);
-            copyVec3(&models->models_0x04[1]->pos_0x04, &pos);
+            models->models_0x04[1]->pos_0x04 = pos;
             models->models_0x04[1]->field_0x34 = 1;
             break;
         }

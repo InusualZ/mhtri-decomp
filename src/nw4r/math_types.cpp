@@ -319,7 +319,7 @@ MTX34* MTX33ToMTX34(register MTX34* pOut, register const MTX33* pM) {
 
 /* 0x805015C8 (0x90): applies the rotation part of a 3x4 matrix to a vector (nw4r's VEC3TransformNormal). */
 extern "C" void mtx34_rotate_vec3(nw4r::math::VEC3* out, const nw4r::math::MTX34* mtx, const nw4r::math::VEC3* v) {
-    nw4r::math::VEC3 tmp;
+    nw4r::math::_VEC3 tmp;
 
     tmp.x = mtx->m[0][0] * v->x + mtx->m[0][1] * v->y + mtx->m[0][2] * v->z;
     tmp.y = mtx->m[1][0] * v->x + mtx->m[1][1] * v->y + mtx->m[1][2] * v->z;

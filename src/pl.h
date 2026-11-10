@@ -121,6 +121,10 @@ typedef struct MHchar {
     /* +0x13C */ u8* field_0x13C;
 
 #ifdef __cplusplus
+    /* 0x801FF984 (0x5C): constructs the three vectors, the resource file and the model resource
+     * (`lobby/lb_npc.cpp`). */
+    MHchar();
+
     /* The engine model/joint entry points the effect units drive; their map names are `MHchar` members
      * (`setVisibility__6MHcharFUlb`, ...), so they are declared here once and called as members
      * (docs/plan.md 6.5 rule 9).  A member adds no storage, so the C view is unchanged. */

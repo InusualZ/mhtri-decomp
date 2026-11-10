@@ -57,7 +57,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "ef/eft001.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/eft004_model_set_start.h"
 #include "ef/eft007.h"
@@ -150,7 +150,7 @@ extern f32 lbl_807966A4;
 /* externs                                                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* MTX34 identity (`MTX34_ctor`), VEC3 clear (`VEC3_ctor`) - both stubs the map still spells. */
+/* MTX34 identity (`MTX34::MTX34()`), VEC3 clear (`VEC3::VEC3()`) - both stubs the map still spells. */
 
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
@@ -201,6 +201,7 @@ struct EftFileLoad {
 /* One 0x2C-byte slot of the spawn set: a type byte, a flag byte, two 16-bit weights, the slot's
  * vector and its rotation triple. */
 struct EftSpawnSlot {
+    EftSpawnSlot(); /* 0x800FF8A0 (0x34) */
     /* +0x00 */ u8 field_0x00;
     /* +0x01 */ u8 pad_0x01[0x02];
     /* +0x03 */ u8 flags_0x03;
@@ -214,6 +215,7 @@ struct EftSpawnSlot {
 /* The spawn set the resource loader fills and `fn_800FF840` releases: a small header, a rotation
  * vector at +0x84 and 30 slots at +0x90. */
 struct EftSpawnSet {
+    EftSpawnSet(); /* 0x800FF840 (0x60) */
     /* +0x00 */ u8 field_0x00;
     /* +0x01 */ u8 field_0x01;
     /* +0x02 */ u8 field_0x02;
@@ -254,8 +256,6 @@ struct EftSpawnWork {
 /* ------------------------------------------------------------------------------------------------ */
 
 /* The two spawn-set helpers, defined below (same TU). */
-extern "C" EftSpawnSet* fn_800FF840(EftSpawnSet* self);
-extern "C" EftSpawnSlot* fn_800FF8A0(EftSpawnSlot* self);
 
 namespace nw4r {
 
@@ -1446,9 +1446,6 @@ extern "C" void fn_800FE978(_EFT* self)
     void* mem;
     EftSpawnWork* work;
 
-    MTX34_ctor(&mtx);
-    fn_800FF840(&set);
-
     work = (EftSpawnWork*)self->work_0x38;
     self->state_0x05++;
     mapno = get_now_mapno();
@@ -1741,27 +1738,12 @@ extern "C" void fn_800FE978(_EFT* self)
     fn_800FF8D4(self);
 }
 
-/* Releases the spawn set: the header vector, then every slot, and returns the set. */
-extern "C" EftSpawnSet* fn_800FF840(EftSpawnSet* self)
-{
-    EftSpawnSlot* end;
-    EftSpawnSlot* slot;
-
-    VEC3_ctor(&self->vec_0x84);
-    slot = self->slots_0x90;
-    end = self->slots_0x90 + 30;
-    do {
-        fn_800FF8A0(slot);
-        slot++;
-    } while (slot < end);
-    return self;
+/* 0x800FF840 (0x60): constructs the header vector, then every slot. */
+EftSpawnSet::EftSpawnSet() {
 }
 
-/* Releases one spawn-set slot's embedded vector state and returns the slot. */
-extern "C" EftSpawnSlot* fn_800FF8A0(EftSpawnSlot* self)
-{
-    VEC3_ctor(&self->vec_0x14);
-    return self;
+/* 0x800FF8A0 (0x34): constructs the slot's vector. */
+EftSpawnSlot::EftSpawnSlot() {
 }
 
 
@@ -1779,8 +1761,6 @@ extern "C" void fn_800FF8D4(_EFT* self)
     s32 count;
     s32 idx;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     work = (EftSpawnWork*)self->work_0x38;
     if (eft_control.effect_system_0x04 == NULL) {
         return;
@@ -1996,7 +1976,7 @@ extern "C" void fn_80100024(EftEmitter* self, nw4r::math::VEC3* out)
     if (out == NULL) {
         nw4r::db::Panic(lbl_8059C4D0, 391, lbl_8059C4AC);
     }
-    copyVec3(out, &self->pos_0x90);
+    *out = self->pos_0x90;
 }
 
 /* Retires a pooled effect after shifting every particle manager's emitter 5 units along x and doubling its scale;
@@ -2020,7 +2000,6 @@ extern "C" void fn_80100088(void* effect, s32 flag)
     f32 scale;
     const char* name;
 
-    VEC3_ctor(&pos);
     ef_store_word(&res, 0);
     ef_res_slot_set_emitter_desc(&param, NULL);
     ef_res_slot_set_params(&draw, NULL);
@@ -2046,7 +2025,7 @@ extern "C" void fn_80100088(void* effect, s32 flag)
                         ef_res_drawparam_set_flag_0400(&draw, 1);
                     }
                 }
-                copyVec3(&pos, ef_res_emitterparam_vec(&param));
+                pos = *ef_res_emitterparam_vec(&param);
                 pos.x += 5.0f;
                 scale *= 2.0f;
                 ef_res_emitterparam_set_vec(&param, &pos);

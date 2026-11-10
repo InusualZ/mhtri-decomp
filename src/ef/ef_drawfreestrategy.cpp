@@ -74,9 +74,9 @@ char ef_free_resource_assert_str[] = "NW4R:Pointer Error\npm->mResource(=%p) is 
 char ef_free_ed_assert_str[] = "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.";
 char ef_free_pp_assert_str[] = "NW4R:Pointer Error\npp(=%p) is not valid pointer.";
 /* The unit quad in the XY plane and its crossing quad in the YZ plane (`.rodata`). */
-static const Vec3 ef_free_quad_vtx[4] = {
+static const _VEC3 ef_free_quad_vtx[4] = {
     {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}};
-static const Vec3 ef_free_cross_vtx[4] = {
+static const _VEC3 ef_free_cross_vtx[4] = {
     {0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f}};
 /* The quads' texture coordinates, (s, t) byte pairs the GX_VA_TEX0 array reads (`.sdata`). */
 static u8 ef_free_texcoords[8] __attribute__((aligned(32))) = {0, 1, 0, 0, 1, 0, 1, 1};
@@ -171,15 +171,13 @@ extern "C" {
 /* Transforms four input vectors through `mtx` and writes them as a GX_QUADS primitive; when `flag` is
  * set each corner is preceded by its 1-byte index.  The guard is the file's `__FILE__` assert. */
 void ef_free_write_quad(const MTX34* mtx, const Vec3* verts, u32 flag) {
-    Vec3 v0, v1, v2, v3;
-
     if (!IsValidPointer((u32)verts))
         nw4r::db::Panic(ef_free_file_str, 88, ef_free_p_assert_str, verts);
 
-    VEC3_ctor(&v0);
-    VEC3_ctor(&v1);
-    VEC3_ctor(&v2);
-    VEC3_ctor(&v3);
+    Vec3 v0;
+    Vec3 v1;
+    Vec3 v2;
+    Vec3 v3;
     mtx34_mult_vec3(&v0, mtx, &verts[0]);
     mtx34_mult_vec3(&v1, mtx, &verts[1]);
     mtx34_mult_vec3(&v2, mtx, &verts[2]);
@@ -255,7 +253,6 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
     GetFirstDrawParticleFunc first;
     EfDrawParticle* p;
     EfDrawState* ed;
-    MTX34 mtx_view, mtx_mgr;
     f32 scale_a, scale_b, scale_x, scale_z;
 
     if (!IsValidPointer((u32)pm))
@@ -272,9 +269,9 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
 
     flag = (mNumTexmap != 0);
 
-    MTX34_ctor(&mtx_view);
+    MTX34 mtx_view;
     ef_pm_get_mtx(pm, &mtx_view);
-    MTX34_ctor(&mtx_mgr);
+    MTX34 mtx_mgr;
     ef_draw_info_view_mtx(&info, &mtx_mgr);
     mtx34_concat(&mtx_mgr, &mtx_mgr, &mtx_view);
     GXLoadPosMtxImm(mtx34_get_ptr(&mtx_mgr), 0);
@@ -287,8 +284,8 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
 
     first_pass = true;
     for (p = first(pm); p != NULL; p = next(pm, p)) {
-        MTX34 mtx_rot;
-        MTX34 mtx_final;
+        _MTX34 mtx_rot;
+        _MTX34 mtx_final;
 
         scale_x = ef_particle_get_scale((EfParticle*)p);
         if (scale_x < 1.1920929e-7f) {
@@ -301,16 +298,16 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         SetupGP(p, *(EfEmitterDrawSetting*)ed, info, first_pass, false);
         first_pass = false;
 
-        ef_free_rotate_mtx(&mtx_rot, p, ed->drawer_mode);
-        ef_free_scale_mtx(&mtx_final, scale_a, scale_b, scale_x, scale_z, &mtx_rot);
+        ef_free_rotate_mtx((MTX34*)&mtx_rot, p, ed->drawer_mode);
+        ef_free_scale_mtx((MTX34*)&mtx_final, scale_a, scale_b, scale_x, scale_z, (MTX34*)&mtx_rot);
 
         mtx_final.m[0][3] += ((EfDrawFreeParticle*)p)->offset_x;
         mtx_final.m[1][3] += ((EfDrawFreeParticle*)p)->offset_y;
         mtx_final.m[2][3] += ((EfDrawFreeParticle*)p)->offset_z;
 
-        ef_free_write_quad(&mtx_final, (Vec3*)ef_free_quad_vtx, flag);
+        ef_free_write_quad((MTX34*)&mtx_final, (Vec3*)ef_free_quad_vtx, flag);
         if (ed->draw_yz_quad == 1) {
-            ef_free_write_quad(&mtx_final, (Vec3*)ef_free_cross_vtx, flag);
+            ef_free_write_quad((MTX34*)&mtx_final, (Vec3*)ef_free_cross_vtx, flag);
         }
     }
 }
@@ -354,13 +351,12 @@ void ef_free_scale_mtx(MTX34* dst, f32 s, f32 t, f32 u, f32 v, const MTX34* m) {
 /* Builds an `MTX34` rotation from the particle's angle vector `pp`: mode 0 rotates about X, 1 about Y,
  * 2 about Z and any other value composes the full Euler rotation.  `ef_sin_cos` is the sin/cos pair. */
 void ef_free_rotate_mtx(MTX34* dst, const EfDrawParticle* pp, u8 mode) {
-    Vec3 v;
     f32 sx, cx, sy, cy, sz, cz;
 
     if (!IsValidPointer((u32)pp))
         nw4r::db::Panic(ef_free_file_str, 136, ef_free_pp_assert_str, pp);
 
-    VEC3_ctor(&v);
+    Vec3 v;
     ef_particle_get_rotate((const void*)pp, &v);
 
     switch (mode) {

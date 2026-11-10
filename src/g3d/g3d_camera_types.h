@@ -14,22 +14,13 @@
 struct CameraData {
     CameraData();
 
-    /* +0x00 */ f32 mViewMtx[3][4];
-    /* +0x30 */ f32 mProjMtx[3][4];
-    /* +0x60 */ u32 mUnk60[4];
+    /* +0x00 */ nw4r::math::MTX34 mViewMtx;
+    /* +0x30 */ nw4r::math::MTX44 mProjMtx;
     /* +0x70 */ u32 mFlags;
-    /* +0x74 */ f32 mPosX;
-    /* +0x78 */ f32 mPosY;
-    /* +0x7C */ f32 mPosZ;
-    /* +0x80 */ f32 mTargetX;
-    /* +0x84 */ f32 mTargetY;
-    /* +0x88 */ f32 mTargetZ;
-    /* +0x8C */ f32 mUpX;
-    /* +0x90 */ f32 mUpY;
-    /* +0x94 */ f32 mUpZ;
-    /* +0x98 */ f32 mUnk98;
-    /* +0x9C */ f32 mUnk9C;
-    /* +0xA0 */ f32 mUnkA0;
+    /* +0x74 */ nw4r::math::VEC3 mPos;
+    /* +0x80 */ nw4r::math::VEC3 mTarget;
+    /* +0x8C */ nw4r::math::VEC3 mUp;
+    /* +0x98 */ nw4r::math::VEC3 mUnk98;
     /* +0xA4 */ f32 mUnkA4;
     /* +0xA8 */ s32 mProjType;
     /* +0xAC */ f32 mProjA;
@@ -44,10 +35,8 @@ struct CameraData {
     /* +0xD0 */ f32 mUnkD0;
     /* +0xD4 */ f32 mUnkD4;
     /* +0xD8 */ f32 mUnkD8;
-    /* +0xDC */ f32 mViewportX;
-    /* +0xE0 */ f32 mViewportY;
-    /* +0xE4 */ f32 mViewportW;
-    /* +0xE8 */ f32 mViewportH;
+    /* +0xDC */ nw4r::math::VEC2 mViewportPos;  /* x, y */
+    /* +0xE4 */ nw4r::math::VEC2 mViewportSize; /* width, height */
     /* +0xEC */ f32 mViewportNear;
     /* +0xF0 */ f32 mViewportFar;
     /* +0xF4 */ s32 mScissorX;
@@ -65,16 +54,13 @@ class Camera {
 public:
     struct PostureInfo {
         /* +0x00 */ s32 mType;
-        /* +0x04 */ f32 mPosX;
-        /* +0x08 */ f32 mPosY;
-        /* +0x0C */ f32 mPosZ;
-        /* +0x10 */ f32 mTargetX;
-        /* +0x14 */ f32 mTargetY;
-        /* +0x18 */ f32 mTargetZ;
-        /* +0x1C */ f32 mUpX;
-        /* +0x20 */ f32 mUpY;
-        /* +0x24 */ f32 mUpZ;
+        /* +0x04 */ nw4r::math::VEC3 mPos;
+        /* +0x10 */ nw4r::math::VEC3 mTarget;
+        /* +0x1C */ nw4r::math::VEC3 mUp;
         /* +0x28 */ f32 mUnk28;
+
+        /* 0x80067E70 (0x44): retail's out-of-line constructor (its three vectors). */
+        PostureInfo() __attribute__((never_inline)) {}
     }; /* size: 0x2C */
 
     void SetPosition(const math::VEC3& rPos);

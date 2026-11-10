@@ -21,7 +21,7 @@ extern "C" {
 /* 0x800B1C80 (0x724): applies a post field to one particle; 0 when the particle was moved or killed here. */
 s32 ef_pf_calc_particle(struct EfDrawParticle* p, const struct EfPostFieldTransform* xform,
                         struct EfPostFieldInfo* info, struct EffectHandle* eh, const MTX34* emitter_mtx,
-                        const MTX34* pm_mtx, const VEC3* pos, VEC3 offset, VEC3* velocity, u8* killed);
+                        const MTX34* pm_mtx, const VEC3* pos, _VEC3 offset, VEC3* velocity, u8* killed);
 
 #ifdef __cplusplus
 }

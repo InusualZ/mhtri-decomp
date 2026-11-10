@@ -39,14 +39,13 @@
 #include "enemy/ENEMY_DATA.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_80138074.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* MTX34_ctor (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* MTX34::MTX34() (rule 2) */
 #include "fn_8004CAD8.h"
 #include "enemy/em_common.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"
-#include "enemy/em_ground_rec_clear.h"
 #include "enemy/em_act_arm_unless_down.h"
 #include "enemy/em_anger_clear.h"
 #include "enemy/em_fx_flag_set.h"
@@ -552,7 +551,7 @@ SenkoRec* senko_free_get(void) {
 void senko_set(nw4r::math::VEC3* pos, f32 value, u8 arg2, s16 arg3) {
     SenkoRec* rec = senko_free_get();
     if (rec != 0) {
-        copyVec3(&rec->pos_0x00, pos);
+        rec->pos_0x00 = *pos;
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = arg3;
@@ -641,7 +640,7 @@ KemuriRec* kemuri_free_get(void) {
 void kemuri_set(nw4r::math::VEC3* pos, f32 value, u8 arg2) {
     KemuriRec* rec = kemuri_free_get();
     if (rec != 0) {
-        copyVec3(&rec->pos_0x00, pos);
+        rec->pos_0x00 = *pos;
         rec->value_0x0C = value;
         rec->value_0x12 = arg2;
         rec->countdown = 570;
@@ -722,7 +721,7 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
             req->field_0x08 = req_flags;
             req->field_0x0A = request;
             if (req_flags & 2) {
-                copyVec3(&req->pos_0x0C, pos);
+                req->pos_0x0C = *pos;
             }
             if (req_flags & 4) {
                 eft_rot_vec_copy((_CP_VECTOR*)&req->field_0x18, rot);
@@ -809,7 +808,7 @@ void emc_marker_replay(_ENEMY_MINI_WORK* mini, u8 team, u8 entry, u16 order, u8 
             work->link_order_0x01C = order;
             work->field_0x00E = 2;
             if (flags & 2) {
-                copyVec3(&work->pos, pos);
+                work->pos = *pos;
             }
             if (flags & 4) {
                 eft_rot_vec_copy((_CP_VECTOR*)&work->field_0x1BC, (_CP_VECTOR*)rot);
@@ -984,7 +983,7 @@ void enemy_work_ground_set(_ENEMY_WORK* self, EmGroundRec* rec) {
     self->field_0x010 = rec->field_0x04_b;
     self->frames_index_0x015 = rec->field_0x05;
     self->field_0x00A = rec->field_0x03;
-    copyVec3(&self->pos, &rec->pos_0x08);
+    self->pos = rec->pos_0x08;
     eft_rot_vec_copy((_CP_VECTOR*)&self->field_0x1BC, &rec->rot_0x14);
 }
 
@@ -1201,7 +1200,6 @@ s32 em_set_entry_ground_get(EmSetEntry* entry, EmGroundRec* rec) {
 _ENEMY_WORK* em_set_entry_spawn(EmSetEntry* entry, u16 order) {
     EmGroundRec rec;
     _ENEMY_WORK* work;
-    em_ground_rec_clear(&rec);
     if (em_set_entry_ground_get(entry, &rec) == 0) {
         return NULL;
     }
@@ -1219,7 +1217,6 @@ _ENEMY_WORK* em_set_entry_spawn(EmSetEntry* entry, u16 order) {
 _ENEMY_WORK* em_set_boss_spawn(EmSetEntry* entry, u16 order) {
     EmGroundRec rec;
     u8 level;
-    em_ground_rec_clear(&rec);
     if (em_set_entry_ground_get(entry, &rec) == 0) {
         return NULL;
     }
@@ -1235,7 +1232,6 @@ _ENEMY_WORK* em_area_entry_restore(_ENEMY_MINI_WORK* mini) {
     QuestSpawnRec* spawn;
     _ENEMY_WORK* work;
 
-    em_ground_rec_clear(&rec);
     if (mini->step_0x04 == 0) {
         mini->step_0x04++;
         em_area_entry_reenter(mini);
@@ -1257,12 +1253,10 @@ _ENEMY_WORK* em_area_entry_restore(_ENEMY_MINI_WORK* mini) {
     rec.field_0x05 = mini->field_0x13;
     rec.area_0x01 = mini->area_0x0A;
     if (spawn != NULL) {
-        nw4r::math::VEC3 pos;
-        copyVec3(&rec.pos_0x08, (nw4r::math::VEC3*)em_vec3_copy(&pos, &spawn->slot_0x8->element_0x08.word_0x10, 0));
+        rec.pos_0x08 = nw4r::math::VEC3(*(const Vec*)&spawn->slot_0x8->element_0x08.word_0x10);
         eft_rot_vec_copy(&rec.rot_0x14, (_CP_VECTOR*)&spawn->slot_0x8->element_0x08.word_0x1C);
     } else {
-        nw4r::math::VEC3 zero;
-        copyVec3(&rec.pos_0x08, setVec3(&zero, 0.0f, 0.0f, 0.0f));
+        rec.pos_0x08 = VEC3(0.0f, 0.0f, 0.0f);
         rec.field_0x14 = 0;
         rec.field_0x18 = 0;
         rec.field_0x1C = 0;
@@ -1289,15 +1283,12 @@ _ENEMY_WORK* em_area_entry_restore(_ENEMY_MINI_WORK* mini) {
 
 }
 
-/* Copies a `VEC3` (`src` -> `dst`); returns `dst`. */
-extern "C" void* em_vec3_copy(void* dst, void* src, s32 unused) {
-    nw4r::math::VEC3* d = (nw4r::math::VEC3*)dst;
-    nw4r::math::VEC3* s = (nw4r::math::VEC3*)src;
-    (void)unused;
-    d->x = s->x;
-    d->y = s->y;
-    d->z = s->z;
-    return dst;
+/* 0x80143174 (0x1C): builds a vector from an SDK `Vec` (emitted after its first user, `em_area_entry_restore`). */
+inline nw4r::math::VEC3::VEC3(const Vec& v)
+{
+    x = v.x;
+    y = v.y;
+    z = v.z;
 }
 
 extern "C" {
@@ -1497,7 +1488,6 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
     EmGroundRec rec;
     _ENEMY_MINI_WORK* mini;
 
-    em_ground_rec_clear(&rec);
     if (self->field_0x004 == 0) {
         self->field_0x004++;
         em_act_advance(self, self->field_0x00E);
@@ -1509,7 +1499,7 @@ _ENEMY_MINI_WORK* em_area_entry_store(_ENEMY_WORK* self) {
     rec.mode_0x02 = self->field_0x00C;
     rec.field_0x03 = self->field_0x00A;
     rec.area_0x01 = self->area_no;
-    copyVec3(&rec.pos_0x08, &self->pos);
+    rec.pos_0x08 = self->pos;
     eft_rot_vec_copy(&rec.rot_0x14, (_CP_VECTOR*)&self->field_0x1BC);
     mini = em_area_entry_new(self->team, self->area_no);
     if (mini != NULL) {
@@ -1846,7 +1836,6 @@ void emc_mini_event_b(_ENEMY_MINI_WORK* mini, u8 remote) {
     u8 report;
     u8 state;
 
-    em_ground_rec_clear(&rec);
     spawn = quest_spawn_rec_find(mini->order_0x16);
     if (spawn == NULL) {
         em_area_entry_release(mini);
@@ -2069,35 +2058,38 @@ u32 emc_joint_cache_mtx_get(u8 index, u32 joint, nw4r::math::MTX34* out) {
 void pl_ride_local_pos_get(_PLW* pl, nw4r::math::MTX34* mtx, nw4r::math::VEC3* out) {
     nw4r::math::MTX34 inv;
     nw4r::math::VEC3 trans;
-    nw4r::math::VEC3 diff;
-    MTX34_ctor(&inv);
-    VEC3_ctor(&trans);
     mtx34_trans_get(mtx, &trans);
-    subVec3(&diff, &pl->vec_0x03C, &trans);
-    copyVec3(out, &diff);
+    *out = pl->vec_0x03C - trans;
     mtx34_inverse(&inv, mtx);
     mulVecMat(out, &inv);
 }
+
+/* The six joint points one set yields, constructed one by one (six separate vectors, not an array: an array's
+ * construction is a loop).  size: 0x48 */
+struct EmJointTriPoints {
+    /* +0x00 */ nw4r::math::VEC3 p0;
+    /* +0x0C */ nw4r::math::VEC3 p1;
+    /* +0x18 */ nw4r::math::VEC3 p2;
+    /* +0x24 */ nw4r::math::VEC3 p3;
+    /* +0x30 */ nw4r::math::VEC3 p4;
+    /* +0x3C */ nw4r::math::VEC3 p5;
+
+    nw4r::math::VEC3* at(s32 i) { return &p0 + i; }
+};
 
 /* Tests `pos` with radius `radius` against every triangle of live enemy `self`'s joint point sets `set`; the highest
  * hit's height goes to `*height` and its joint to `*joint`.  Returns the number of hits. */
 s32 em_joint_points_hit_ck(_ENEMY_WORK* self, EmJointPoints* set, nw4r::math::VEC3* pos, f32 radius, u32* joint,
                            f32* height) {
-    nw4r::math::VEC3 pts[6];
+    EmJointTriPoints pts;
     f32 h;
     s32 hits;
-    VEC3_ctor(&pts[0]);
-    VEC3_ctor(&pts[1]);
-    VEC3_ctor(&pts[2]);
-    VEC3_ctor(&pts[3]);
-    VEC3_ctor(&pts[4]);
-    VEC3_ctor(&pts[5]);
     hits = 0;
     while (set->joint != 0xFFFFFFFF) {
         u8 i;
-        s32 tris = em_joint_points_get(self, set, pts) - 2;
+        s32 tris = em_joint_points_get(self, set, pts.at(0)) - 2;
         for (i = 0; i < tris; i++) {
-            if (pl_coll_tri_hit_ck(pos, radius, &pts[i], &pts[i + 1], &pts[i + 2], &h) == 1) {
+            if (pl_coll_tri_hit_ck(pos, radius, pts.at(i), pts.at(i + 1), pts.at(i + 2), &h) == 1) {
                 if (hits != 0) {
                     if (h > *height) {
                         *height = h;
@@ -2122,16 +2114,12 @@ void pl_ride_move(_PLW* pl) {
     nw4r::math::VEC3 probe;
     nw4r::math::VEC3 local;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 push;
     f32 height;
     u32 joint;
     s32 hit;
     u32 i;
     f32 lift;
     f32 radius;
-    VEC3_ctor(&probe);
-    VEC3_ctor(&local);
-    MTX34_ctor(&mtx);
     setVector3(&pl->ride_ofs_0x588, 0.0f, 0.0f, 0.0f);
     hit = 0;
     i = 0;
@@ -2149,11 +2137,10 @@ void pl_ride_move(_PLW* pl) {
                     pl_ride_local_pos_get(pl, &mtx, &local);
                     get_joint_wmat_em(work, pl->ride_joint_0x594, &mtx);
                     mulVecMatAddTrans(&local, &mtx);
-                    subVec3(&push, &pl->vec_0x03C, &local);
-                    copyVec3(&pl->ride_ofs_0x588, &push);
-                    copyVec3(&pl->vec_0x03C, &local);
+                    pl->ride_ofs_0x588 = pl->vec_0x03C - local;
+                    pl->vec_0x03C = local;
                 }
-                copyVec3(&probe, &pl->vec_0x03C);
+                probe = pl->vec_0x03C;
                 probe.y += lift;
                 if (em_joint_points_hit_ck(work, set, &probe, radius, &joint, &height) != 0) {
                     hit = 1;
@@ -2193,7 +2180,6 @@ u32 em_ride_hit_check(nw4r::math::VEC3* pos, u8 area, _ENEMY_WORK** out, u32* jo
     u32 i;
     f32 lift;
     f32 radius;
-    VEC3_ctor(&probe);
     i = 0;
     lift = 200.0f;
     radius = -400.0f;
@@ -2206,7 +2192,7 @@ u32 em_ride_hit_check(nw4r::math::VEC3* pos, u8 area, _ENEMY_WORK** out, u32* jo
                 work = &work[index];
                 set = (EmJointPoints*)em_data_word_get(work);
                 if (set != NULL) {
-                    copyVec3(&probe, pos);
+                    probe = *pos;
                     probe.y += lift;
                     if (em_joint_points_hit_ck(work, set, &probe, radius, &hit_joint, &hit_height) != 0) {
                         *height = hit_height;
@@ -2513,7 +2499,7 @@ void emc_event_hold_set(u8 event) {
                                 em_area_change(work, 1);
                             }
                             setVector3(&work->pos, target->pos->pos.x, target->pos->pos.y, target->pos->pos.z);
-                            copyVec3(&work->vec_0x194, &work->pos);
+                            work->vec_0x194 = work->pos;
                             work->field_0x1C0 = target->pos->yaw;
                         } else if (work->area_no != emc_event_area_get()) {
                             continue;
@@ -2778,7 +2764,7 @@ u32 em_demo_time_ck(u32 frames) {
 /* Places live enemy `self` at (`x`, `y`, `z`) and makes it its previous position too. */
 void em_demo_pos_set(_ENEMY_WORK* self, f32 x, f32 y, f32 z) {
     setVector3(&self->pos, x, y, z);
-    copyVec3(&self->vec_0x194, &self->pos);
+    self->vec_0x194 = self->pos;
 }
 
 /* The 16-bit angle of `deg` degrees (rounded away from zero). */
@@ -2823,8 +2809,6 @@ void em_demo_key3_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* 
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 rot;
     f32 t;
-    VEC3_ctor(&pos);
-    VEC3_ctor(&rot);
     t = frame * 2;
     if (pos_keys != NULL) {
         getKeyData3(pos_keys, t, &pos.x, &pos.y, &pos.z);
@@ -2879,7 +2863,7 @@ void em_demo_key_apply(_ENEMY_WORK* self, s16 frame, void* pos_keys_arg, void* r
                 break;
             }
         }
-        copyVec3(&self->vec_0x194, &self->pos);
+        self->vec_0x194 = self->pos;
     }
     if (rot_keys_arg != NULL && rot_axes != 0) {
         if (rot_axes == 1 || rot_axes == 2 || rot_axes == 4) {
@@ -3475,21 +3459,13 @@ u32 em_area_entry_make(u8* area_arg, u8 kind, u8 index) {
 #pragma dont_inline on
 
 /* Constructs a sparkle record's position. */
-inline SenkoRec::SenkoRec() {
-    VEC3_ctor(&pos_0x00);
-}
+inline SenkoRec::SenkoRec() {}
 
 /* Constructs a smoke record's position. */
-inline KemuriRec::KemuriRec() {
-    VEC3_ctor(&pos_0x00);
-}
+inline KemuriRec::KemuriRec() {}
 
 /* Constructs a spawn request's position. */
-inline Marker2Rec::Marker2Rec() {
-    VEC3_ctor(&pos_0x0C);
-}
+inline Marker2Rec::Marker2Rec() {}
 
 /* Constructs a cached joint matrix. */
-inline EmcJointMtx::EmcJointMtx() {
-    MTX34_ctor(&mtx);
-}
+inline EmcJointMtx::EmcJointMtx() {}

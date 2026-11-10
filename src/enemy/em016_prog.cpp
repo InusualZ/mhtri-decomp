@@ -84,7 +84,7 @@
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 #include "enemy/em_eft_fx.h"
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
-#include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
+#include "mh3_pad.h"           /* VEC3::VEC3()/VEC3::operator=/VEC3(x, y, z) */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
 #define stage_map_kind_get stage_map_kind_get_hidden_stg_w_h
 #include "stage/stg_w.h"
@@ -100,7 +100,7 @@
 #include "sys_mem.h"
 #include "enemy/fn_8012EC74.h" /* fn_8013026C/fn_8012FE3C/fn_801337FC/em_height_follow */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 #include "enemy/em016_prog_types.h"
@@ -216,7 +216,6 @@ typedef void (*EmShellShotFn)(_ENEMY_WORK* self, EmSpawnRec* req, u32 mode);
 #define em_fall_start_view1 ((void (*)(_ENEMY_WORK*, f32))em_fall_start)
 #define em_alt_mode_ck_view1 ((u32 (*)(EmActWork*))em_alt_mode_ck)
 #define eft_spawn_type11_view1 ((void (*)(_ENEMY_WORK*, nw4r::math::VEC3*, u32, f32))eft_spawn_type11)
-#define assignVec3_view1 ((void (*)(void*, const void*))assignVec3)
 
 extern "C" {
 void em016_strafe_point_get(_ENEMY_WORK* self, u8 kind, VEC3* out);
@@ -330,43 +329,25 @@ void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d, nw4r::ma
 void eft_spawn_type10(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 d);
 void eft_spawn_pos_in_area(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
 void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
-void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 sin_idx_get(u16 a);
 
 }
 
-/* `_CP_VECTOR` is `ef.h`'s three-word type; `ef.h` is not included because its `setVec3` returns `void`
+/* `_CP_VECTOR` is `ef.h`'s three-word type; `ef.h` is not included because its `VEC3(x, y, z)` returns `void`
  * where these call sites read r3. */
 struct _CP_VECTOR;
 
-/* The 3x3 matrix `fn_805012E8` fills (nine floats; `Em016UserData::CalcAnmItemEx`'s frame is sized for it).
- * size: 0x24 */
-struct EmMtx33 {
-    /* +0x00 */ f32 m[3][3];
-};
-
-/* The static vector pair `em016_static_init` builds (`VEC3[2]` per 0x18-byte object).
- * size: 0x18 */
-struct EmVecPair {
-    /* +0x00 */ VEC3 vec_0x00;
-    /* +0x0C */ VEC3 vec_0x0C;
-};
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the unit's pool, declared, not defined                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
 
-/* The five static vectors `em016_static_init` builds (the last one is the default `em016_shot_req_init` copies
- * from). */
-extern EmVecPair em016_aim_vec_pair_0;
-extern EmVecPair em016_aim_vec_pair_1;
-extern EmVecPair em016_aim_vec_pair_2;
-extern EmVecPair em016_aim_vec_pair_3;
-extern VEC3 em016_shot_default_pos;
-
-/* The one-shot latch `em016_shot_req_init` sets. */
-s8 em016_shot_default_ready;
+/* The four point/step pairs MWCC's `__sinit` (0x80192204) builds (`.bss`, defined at the end). */
+extern EmSeShiftPair em016_aim_vec_pair_0;
+extern EmSeShiftPair em016_aim_vec_pair_1;
+extern EmSeShiftPair em016_aim_vec_pair_2;
+extern EmSeShiftPair em016_aim_vec_pair_3;
 
 /* The `.data` word `em016_action_allow_ck` hands to `em_pack_area_pick`, in the unit's class-table block. */
 
@@ -384,9 +365,8 @@ void anm_chr_result_scale_set(void* holder, void* vec);
 void anm_chr_result_rot_mul(void* holder, void* mtx);
 void mtx34_set_trans(MTX34* mtx, VEC3* vec);
 void eft_rot_vec_copy(void* dst, void* src);
-void fn_805012E8(EmMtx33* dst, const MTX34* src);
+void fn_805012E8(nw4r::math::MTX33* dst, const MTX34* src);
 
-void MTX33_ctor(void* mtx);
 
 /* This block's own entry points. */
 void em016_action_select(EmActWork* self, u8* out_class, u8* out_state);
@@ -398,7 +378,6 @@ s32 em016_action_allow_ck(EmActWork* self, u32 arg);
 void em016_aim_step(EmActWork* self);
 void em016_aim_fade(EmActWork* self);
 void em016_shot_req_init(EmSpawnRec* out, u8 a, u16 b, u16 c);
-void em016_static_init(void);
 }
 
 /* ---- the per-team step dispatch (`team` 0x10/0x11/0x15) and its steps ---- */
@@ -414,13 +393,11 @@ extern "C" {
 
 }
 
-/* The unit's `.bss`: the four vector pairs and the default vector `em016_static_init` builds (`em016_shot_req_init` copies
- * the default).  Names are GUESSes. */
-EmVecPair em016_aim_vec_pair_0;  /* +0x806A7A00 */
-EmVecPair em016_aim_vec_pair_1;  /* +0x806A7A18 */
-EmVecPair em016_aim_vec_pair_2;  /* +0x806A7A30 */
-EmVecPair em016_aim_vec_pair_3;  /* +0x806A7A48 */
-VEC3 em016_shot_default_pos;      /* +0x806A7A60 */
+/* The unit's `.bss`: the four point/step pairs MWCC's `__sinit` builds.  Names are GUESSes. */
+EmSeShiftPair em016_aim_vec_pair_0 = {nw4r::math::VEC3(0.0f, 6.0f, 0.0f), nw4r::math::VEC3(0.0f, 0.0f, 0.0f)};     /* +0x806A7A00 */
+EmSeShiftPair em016_aim_vec_pair_1 = {nw4r::math::VEC3(0.0f, -3.0f, 0.0f), nw4r::math::VEC3(0.0f, 0.0f, 0.0f)};    /* +0x806A7A18 */
+EmSeShiftPair em016_aim_vec_pair_2 = {nw4r::math::VEC3(0.0f, 48.0f, 0.0f), nw4r::math::VEC3(0.0f, -1.92f, 0.0f)};  /* +0x806A7A30 */
+EmSeShiftPair em016_aim_vec_pair_3 = {nw4r::math::VEC3(0.0f, 0.0f, 30.0f), nw4r::math::VEC3(0.0f, -5.5f, 0.0f)};   /* +0x806A7A48 */
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the unit's data, in retail order                                                                  */
@@ -575,8 +552,6 @@ extern Em016SeSelect em017_se_alt_seq_05_select;
  * steers by. */
 void em016_strafe_point_get(_ENEMY_WORK* self, u8 kind, VEC3* out) {
     VEC3 v;
-    VEC3 rel;
-    VEC3_ctor(&v);
     v.x = 0.0f;
     v.y = 0.0f;
     v.z = 2500.0f;
@@ -604,8 +579,7 @@ void em016_strafe_point_get(_ENEMY_WORK* self, u8 kind, VEC3* out) {
         break;
     }
     rotVecY(&v, (u16)(self->field_0x1C0 + offset));
-    addVec3(&rel, &self->pos, &v);
-    copyVec3(out, &rel);
+    *out = self->pos + v;
 }
 
 /* Forwards the value to the motion setter only for team 0x10. */
@@ -703,7 +677,6 @@ extern "C" void em016_opening_act_arm(_ENEMY_WORK* self) {
  * aim block, enemy 017 clears its alert pair, and each picks the opening action for the map/area it starts in. */
 extern "C" void em016_init(_ENEMY_WORK* self, u8 mode) {
     VEC3 offset;
-    VEC3_ctor(&offset);
     if (self->team == 0x10) {
         if (em_res_user_data_ck(self) == 0) {
             Em016UserData* helper = (Em016UserData*)operator new(sizeof(Em016UserData));
@@ -984,7 +957,7 @@ extern "C" void em016_frame_em017(_ENEMY_WORK* self) {
                                 break;
                             }
                             em_motion_kind_set(self, 4, stance);
-                            copyVec3(&self->aim, &rec->pos);
+                            self->aim = rec->pos;
                             found = 1;
                             break;
                         }
@@ -994,7 +967,7 @@ extern "C" void em016_frame_em017(_ENEMY_WORK* self) {
                                 if (self->field_0x43B == 0) {
                                     em_motion_kind_set(self, 3, 0);
                                 }
-                                copyVec3(&self->aim, &rec->pos);
+                                self->aim = rec->pos;
                                 self->em017_0x328.ally_near_0x329 = 1;
                                 break;
                             }
@@ -1891,7 +1864,6 @@ extern "C" void em016_swim_rise(_ENEMY_WORK* self) {
  * and falls, then lands into the next state (or swims again when it drops back under). */
 extern "C" void em016_swim_leap(_ENEMY_WORK* self, u8 reenter) {
     VEC3 offset;
-    VEC3_ctor(&offset);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -2218,7 +2190,6 @@ extern "C" void em016_swim_team_mot(_ENEMY_WORK* self) {
  * plays the two surfacing motions. */
 extern "C" void em016_swim_surface(_ENEMY_WORK* self) {
     VEC3 offset;
-    VEC3_ctor(&offset);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -2739,7 +2710,6 @@ extern "C" void em016_atk_turn_bite(_ENEMY_WORK* self) {
  * the wind-up and the projectile request at frame 82. */
 extern "C" void em016_atk_spit(_ENEMY_WORK* self, u8 kind) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0: {
         self->state++;
@@ -2782,7 +2752,6 @@ extern "C" void em016_atk_spit(_ENEMY_WORK* self, u8 kind) {
  * strike, then plays the recovery (a second strike for kind 2). */
 extern "C" void em016_atk_lunge(_ENEMY_WORK* self, u8 kind) {
     VEC3 dir;
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0: {
         u32 motion;
@@ -2816,14 +2785,10 @@ extern "C" void em016_atk_lunge(_ENEMY_WORK* self, u8 kind) {
             self->state++;
             motion = kind == 6 ? 0x29 : 0x2C;
             blend = 0x18;
-            VEC3 diff;
-            subVec3(&diff, &self->vec_0x36C, &self->pos);
-            copyVec3(&dir, &diff);
+            dir = self->vec_0x36C - self->pos;
             if (vec3_length_sq(&dir.x) > 0.001f) {
-                VEC3 back;
                 vec3_normalize_into(&dir, &dir);
-                vec3_scale(&back, &dir, 500.0f);
-                vec3_sub_assign((Vec*)&self->vec_0x36C, (Vec*)&back);
+                vec3_sub_assign((Vec*)&self->vec_0x36C, (Vec*)&static_cast<const VEC3&>(dir * 500.0f));
             }
         }
         em_mot_set_blend(self, (u16)motion, blend, 0, 1);
@@ -3055,7 +3020,6 @@ extern "C" void em016_atk_spin_tail(_ENEMY_WORK* self) {
  * one while no effect is active). */
 extern "C" void em016_atk_spray(_ENEMY_WORK* self) {
     VEC3 offset;
-    VEC3_ctor(&offset);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3123,7 +3087,6 @@ extern "C" void em016_atk_side_slam(_ENEMY_WORK* self) {
  * request (its side and spread from `kind`) and hands it to the shell spawner. */
 extern "C" void em016_atk_water_shot(_ENEMY_WORK* self, u8 kind) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0: {
         self->state++;
@@ -3335,7 +3298,6 @@ extern "C" void em016_atk_head_butt(_ENEMY_WORK* self) {
  * plays the recovery (motion 0xCA for `kind` 1). */
 extern "C" void em016_atk_volley_charge(_ENEMY_WORK* self, u8 kind) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3415,7 +3377,6 @@ extern "C" void em016_atk_body_slam(_ENEMY_WORK* self, u8 kind) {
  * material blend that crossfades the body as the timer runs. */
 extern "C" void em016_atk_double_spit(_ENEMY_WORK* self, u8 kind) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0: {
         self->state++;
@@ -3556,8 +3517,6 @@ extern "C" void em016_atk_double_spit(_ENEMY_WORK* self, u8 kind) {
 extern "C" void em016_atk_volley_run(_ENEMY_WORK* self, u8 point, u8 kind) {
     VEC3 target;
     EmSpawnRec req;
-    VEC3_ctor(&target);
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3774,7 +3733,6 @@ extern "C" void em016_atk_swim_sweep(_ENEMY_WORK* self) {
  * for `kind` 0, the low one otherwise). */
 extern "C" void em016_atk_bubble_shot(_ENEMY_WORK* self, u8 kind) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3785,9 +3743,8 @@ extern "C" void em016_atk_bubble_shot(_ENEMY_WORK* self, u8 kind) {
         switch (kind) {
         case 0:
             if (em_frame_check(self, 0, 66.0f, 0.0f) == 1) {
-                VEC3 offset;
                 req.id = 0x14;
-                copyVec3(&req.pos, setVec3(&offset, 0.0f, 30.0f, 0.0f));
+                req.pos = VEC3(0.0f, 30.0f, 0.0f);
                 req.field_0x10 = 0;
                 req.field_0x12 = 0;
                 req.field_0x14 = 0;
@@ -3797,9 +3754,8 @@ extern "C" void em016_atk_bubble_shot(_ENEMY_WORK* self, u8 kind) {
             break;
         default:
             if (em_frame_check(self, 0, 64.0f, 0.0f) == 1) {
-                VEC3 offset;
                 req.id = 0x14;
-                copyVec3(&req.pos, setVec3(&offset, 0.0f, 30.0f, -10.0f));
+                req.pos = VEC3(0.0f, 30.0f, -10.0f);
                 req.field_0x10 = 0;
                 req.field_0x12 = 0;
                 req.field_0x14 = 0;
@@ -3819,7 +3775,6 @@ extern "C" void em016_atk_bubble_shot(_ENEMY_WORK* self, u8 kind) {
  * stands. */
 extern "C" void em016_atk_bubble_shot_stand(_ENEMY_WORK* self) {
     EmSpawnRec req;
-    em_spawn_rec_init(&req);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3832,9 +3787,8 @@ extern "C" void em016_atk_bubble_shot_stand(_ENEMY_WORK* self) {
             em_turn_to_target(self, 0x100);
         }
         if (em_frame_check(self, 0, 84.0f, 0.0f) == 1) {
-            VEC3 offset;
             req.id = 0x14;
-            copyVec3(&req.pos, setVec3(&offset, 0.0f, 0.0f, 0.0f));
+            req.pos = VEC3(0.0f, 0.0f, 0.0f);
             req.field_0x10 = 0;
             req.field_0x12 = 0;
             req.field_0x14 = 0;
@@ -5308,7 +5262,6 @@ f32 em016_demo_opening_keys_c[90] = {
 void em016_demo_opening(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     em_frame_flag_set(self);
     switch (self->state) {
     case 0:
@@ -5662,7 +5615,6 @@ void em016_demo_pose_3(_ENEMY_WORK* self) {
 void em016_demo_run_4(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -5775,7 +5727,6 @@ f32 em016_demo_run5_keys[180] = {
 void em016_demo_run_5(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -5967,7 +5918,6 @@ f32 em016_demo_run6_keys_b[141] = {
 void em016_demo_run_6(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -6134,7 +6084,6 @@ f32 em016_demo_run7_keys_b[123] = {
 void em016_demo_run_7(_ENEMY_WORK* self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (self->state) {
     case 0:
         self->state++;
@@ -6319,8 +6268,6 @@ void em016_frame_effect(_ENEMY_WORK* self) {
     MTX34 sp18;
     u16 ang;
 
-    VEC3_ctor(&sp8);
-    MTX34_ctor(&sp18);
     if (em_alt_mode_ck_c1(self) != 0) {
         ang = calcVecAngX(&self->vec_0x76C);
         if ((u16)(ang + 0x8000) > 0x671B) {
@@ -6362,11 +6309,10 @@ void em016_frame_effect(_ENEMY_WORK* self) {
 /* 0x8018D558 - the effect-spawn router: `arg1` picks the position (+0x210 height, a joint, +0x20C height),
  * `arg3` the joint (0xFF: the work), then `eft009_set_pos` or `eft009_spawn_at_joint`. */
 void em016_effect_spawn(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 arg5) {
-    VEC3 vec;
     u8 var;
 
     var = arg2;
-    VEC3_ctor(&vec);
+    VEC3 vec;
     switch (arg1) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -6450,7 +6396,7 @@ void em016_effect_spawn(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4,
             }
         } else {
             if (arg3 == 0xFF) {
-                copyVec3(&vec, &self->pos);
+                vec = self->pos;
             } else {
                 get_joint_wpos_em(self, arg3, &vec);
             }
@@ -6461,7 +6407,7 @@ void em016_effect_spawn(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4,
         return;
     case 2:
         if (arg3 == 0xFF) {
-            copyVec3(&vec, &self->pos);
+            vec = self->pos;
         } else {
             get_joint_wpos_em(self, arg3, &vec);
         }
@@ -6482,16 +6428,12 @@ void em016_motion_events(_ENEMY_WORK* self) {
     VEC3 sp2C;
     VEC3 sp20;
     VEC3 sp14;
-    VEC3 sp8;
     f32 temp_f1;
     u16 temp_r3;
     u16 temp_r3_2;
     u16 temp_r3_3;
     u8 temp_r0;
 
-    VEC3_ctor(&sp2C);
-    VEC3_ctor(&sp20);
-    VEC3_ctor(&sp14);
     temp_r0 = self->team;
     switch ((s32) temp_r0) {
     case 16:
@@ -6684,8 +6626,7 @@ void em016_motion_events(_ENEMY_WORK* self) {
                     fn_80117E58_c1(self, 1, &sp14, 3, 0.7f * get_em_chg_scale(self));
                     setVector3(&sp14, 0.0f, 0.0f, 500.0f * get_em_chg_scale(self));
                     rotVecY(&sp14, self->field_0x1C0);
-                    addVec3(&sp8, &self->pos, &sp14);
-                    copyVec3(&sp2C, copyVec3(&sp20, &sp8));
+                    sp2C = sp20 = self->pos + sp14;
                     temp_f1 = 370.0f * get_em_chg_scale(self);
                     sp2C.y -= temp_f1;
                     sp20.y += 370.0f * get_em_chg_scale(self);
@@ -7851,14 +7792,12 @@ void Em016UserData::Attach() {
 /* 0x80191CE4 (0x14C): Applies the aim block's scale or rotation to the animation result of nodes 16..26. */
 void Em016UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::ResMdl mdl,
                                   nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
-    MTX34 mtx;
-    EmMtx33 dst;
     EmRotVec rot;
     EmActWork* work;
 
     work = (EmActWork*)this->work;
-    MTX34_ctor(&mtx);
-    MTX33_ctor(&dst);
+    MTX34 mtx;
+    nw4r::math::MTX33 dst;
     switch (item->field_0x04) {
     case 0xFF:
         switch (kind) {
@@ -7895,12 +7834,11 @@ void Em016UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::Re
 /* 0x80191E30 (0xC8): Moves the matrix of node 16/18/20 onto its live cluster's position. */
 void Em016UserData::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::ResMdl mdl,
                                   nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 kind, UserDataItem* item) {
-    MTX34 mtx;
     u32 index;
     EmActWork* work;
 
     work = (EmActWork*)this->work;
-    MTX34_ctor(&mtx);
+    MTX34 mtx;
     switch (item->field_0x04) {
     case 0xFF:
         switch (kind) {
@@ -8014,12 +7952,10 @@ void em016_aim_fade(EmActWork* self) {
 
 /* Fills in one effect request (id 0x17) from the default vector. */
 void em016_shot_req_init(EmSpawnRec* out, u8 a, u16 b, u16 c) {
-    if (em016_shot_default_ready == 0) {
-        setVec3(&em016_shot_default_pos, 0.0f, 0.0f, 30.0f);
-        em016_shot_default_ready = 1;
-    }
+    static VEC3 em016_shot_default_pos(0.0f, 0.0f, 30.0f);
+
     out->id = 0x17;
-    copyVec3(&out->pos, &em016_shot_default_pos);
+    out->pos = em016_shot_default_pos;
     out->field_0x10 = a;
     out->field_0x12 = b;
     out->field_0x14 = c;
@@ -8029,31 +7965,3 @@ void em016_shot_req_init(EmSpawnRec* out, u8 a, u16 b, u16 c) {
 Em016UserData::~Em016UserData() {
 }
 
-/* Builds the five static vectors the effect requests start from. */
-void em016_static_init(void) {
-    VEC3 v1;
-    VEC3 v2;
-    VEC3 v3;
-    VEC3 v4;
-    VEC3 v5;
-    VEC3 v6;
-    VEC3 v7;
-    VEC3 v8;
-
-    assignVec3_view1(&em016_aim_vec_pair_0.vec_0x00,
-                setVec3(&v1, 0.0f, 6.0f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_0.vec_0x0C,
-                setVec3(&v2, 0.0f, 0.0f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_1.vec_0x00,
-                setVec3(&v3, 0.0f, -3.0f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_1.vec_0x0C,
-                setVec3(&v4, 0.0f, 0.0f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_2.vec_0x00,
-                setVec3(&v5, 0.0f, 48.0f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_2.vec_0x0C,
-                setVec3(&v6, 0.0f, -1.92f, 0.0f));
-    assignVec3_view1(&em016_aim_vec_pair_3.vec_0x00,
-                setVec3(&v7, 0.0f, 0.0f, 30.0f));
-    assignVec3_view1(&em016_aim_vec_pair_3.vec_0x0C,
-                setVec3(&v8, 0.0f, -5.5f, 0.0f));
-}

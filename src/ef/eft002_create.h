@@ -1,5 +1,5 @@
-#ifndef MHTRI_EF_FN_800FD520_H
-#define MHTRI_EF_FN_800FD520_H
+#ifndef MHTRI_EF_EFT002_CREATE_H
+#define MHTRI_EF_EFT002_CREATE_H
 
 #include "types.h"
 
@@ -12,10 +12,10 @@ extern "C" {
 
 struct _EFT;
 
-void fn_800FD520(struct _EFT* self);
+void eft002_effect_create(struct _EFT* self);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MHTRI_EF_FN_800FD520_H */
+#endif /* MHTRI_EF_EFT002_CREATE_H */

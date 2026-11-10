@@ -81,10 +81,9 @@
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012EC74.h"
 #include "g3d/g3d_calcworld.h"
-#include "lobby/mhchar_construct.h"
 #include "lobby/lb_sub0d_send.h"
 #include "menu/hit_flags_clear.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "pl.h"
 #include "sound/mhchar.h" /* mhchar_reset (rule 2) */
 #include "sound/sound_job_request.h"
@@ -195,8 +194,8 @@ extern "C" MHchar* pull_shell_chara_heap(void) {
         if (slot->used_0x00 == 0) {
             slot->used_0x00 = 1;
             pool->heap_used_0x18++;
-            mhchar_reset((MHchar*)slot->chara_0x04);
-            return (MHchar*)slot->chara_0x04;
+            mhchar_reset(&slot->chara_0x04);
+            return &slot->chara_0x04;
         }
     }
     return NULL;
@@ -227,7 +226,7 @@ extern "C" void push_shell_chara_heap(MHchar* chara) {
     }
     slot = pool->heap_0x14;
     for (i = 0; i < pool->heap_max_0x10; i++, slot++) {
-        if ((MHchar*)slot->chara_0x04 == chara) {
+        if (&slot->chara_0x04 == chara) {
             slot->used_0x00 = 0;
             if (pool->heap_used_0x18 > 0) {
                 pool->heap_used_0x18--;
@@ -468,7 +467,7 @@ extern "C" void shell_place_model(_SHELL_W* shell, MHchar* model) {
     model->field_0x28 = shell->rot_x_0x24;
     model->field_0x2C = shell->rot_y_0x28;
     model->field_0x30 = shell->rot_z_0x2C;
-    copyVec3(&model->pos_0x04, &shell->pos_0x18);
+    model->pos_0x04 = shell->pos_0x18;
 }
 
 void shell_draw_set(_SHELL_W* shell, MHchar* model) {
@@ -489,12 +488,12 @@ void shell_draw_set_eff(_SHELL_W* shell, nw4r::ef::Effect* effect) {
 }
 
 void shell_rate_add(_SHELL_W* shell) {
-    addVec3To(&shell->pos_0x18, &shell->vel_0x3C);
+    shell->pos_0x18 += shell->vel_0x3C;
 }
 
 void shell_rate_add_g(_SHELL_W* shell) {
-    addVec3To(&shell->pos_0x18, &shell->vel_0x3C);
-    addVec3To(&shell->vel_0x3C, &shell->vel_0x48);
+    shell->pos_0x18 += shell->vel_0x3C;
+    shell->vel_0x3C += shell->vel_0x48;
 }
 
 void set_shell_scr_id(_SHELL_W* shell, u8 area_bits, u8 water_bits) {
@@ -810,12 +809,7 @@ ShellBlockPool shell_block_pool;
 /* The element constructors, defined out of line after the objects so MWCC emits them after `__sinit` in
  * retail's order (the deferred list is last-in first-out: the heap slot's, then the work record's). */
 __declspec(noinline) inline ShellCharaHeap::ShellCharaHeap() {
-    mhchar_construct((MHchar*)chara_0x04);
 }
 
 __declspec(noinline) inline _SHELL_W::_SHELL_W() {
-    VEC3_ctor(&pos_0x18);
-    VEC3_ctor(&vec_0x30);
-    VEC3_ctor(&vel_0x3C);
-    VEC3_ctor(&vel_0x48);
 }

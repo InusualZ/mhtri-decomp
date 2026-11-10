@@ -100,21 +100,14 @@ EmItemRow* GetItemData(u16 id);
 
 /* `calcVecDistXZ` (the distance between two positions) and `subVec3` come from `fn_8004CAD8.h`. */
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x801B42DC): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x801B42DC): each vector is constructed into
+ * a temporary and copied (`EmSeShift`).  size: 0x18 */
 struct Em030VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, z) and (0, dy, dz). */
-    Em030VecPair(f32 y, f32 z, f32 dy, f32 dz)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3((Vec*)&pos, (Vec*)setVec3(&a, 0.0f, y, z));
-        assignVec3((Vec*)&step, (Vec*)setVec3(&b, 0.0f, dy, dz));
-    }
+    Em030VecPair(f32 y, f32 z, f32 dy, f32 dz) : pos(0.0f, y, z), step(0.0f, dy, dz) {}
 };
 
 /* The vector pair (`.bss`, defined at the end); three sound records point at it. */
@@ -475,7 +468,7 @@ extern "C" u32 em030_large_monster_find(_ENEMY_WORK* work) {
         if (other->area_no != work->area_no) {
             continue;
         }
-        copyVec3(&work->aim, &other->pos);
+        work->aim = other->pos;
         return 1;
     }
     return 0;
@@ -1186,11 +1179,9 @@ extern "C" void em030_act2_7(_ENEMY_WORK* work) {
  * step (clamped at 0) through `em_angle_approach`, and the 0x78-frame countdown picks the 0x19 tail. */
 extern "C" void em030_act2_circle(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
-    VEC3 diff;
     u32 angA;
     u32 angB;
 
-    VEC3_ctor(&vec);
 
     switch (work->state) {
     case 0:
@@ -1211,8 +1202,7 @@ extern "C" void em030_act2_circle(_ENEMY_WORK* work, u32 kind) {
             if (step < 0) {
                 step = 0;
             }
-            subVec3(&diff, &work->vec_0x36C, &work->pos);
-            copyVec3(&vec, &diff);
+            vec = work->vec_0x36C - work->pos;
             calcVecAngXY(&vec, &angA, &angB);
             if ((u8)kind == 1) {
                 step = -step;
@@ -1391,11 +1381,9 @@ extern "C" void em030_act7_0(_ENEMY_WORK* work, u32 kind) {
  * or steps the second angle through `em_angle_approach`, and the team/kind gates pick the follow-up. */
 extern "C" void em030_act7_1(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
-    VEC3 diff;
     u32 angA;
     u32 angB;
 
-    VEC3_ctor(&vec);
 
     switch (work->state) {
     case 0:
@@ -1410,8 +1398,7 @@ extern "C" void em030_act7_1(_ENEMY_WORK* work, u32 kind) {
         } else {
             work->timer_0x020 = 0x3C;
         }
-        subVec3(&diff, &work->vec_0x36C, &work->pos);
-        copyVec3(&vec, &diff);
+        vec = work->vec_0x36C - work->pos;
         calcVecAngXY(&vec, &angA, &angB);
         work->field_0x37C = angB;
         break;
@@ -1935,8 +1922,6 @@ extern "C" void em030_effect_spawn(_ENEMY_WORK* work, u8 where, u8 id, u32 joint
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 unused;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused);
     switch (where) {
     case 0:
         if (joint == 0xFF) {
@@ -1948,7 +1933,7 @@ extern "C" void em030_effect_spawn(_ENEMY_WORK* work, u8 where, u8 id, u32 joint
     case 1:
         if ((work->field_0x228 & 6) == 0) {
             if (joint == 0xFF) {
-                copyVec3(&pos, &work->pos);
+                pos = work->pos;
             } else {
                 get_joint_wpos_em(work, joint, &pos);
             }
@@ -1959,7 +1944,7 @@ extern "C" void em030_effect_spawn(_ENEMY_WORK* work, u8 where, u8 id, u32 joint
         break;
     case 2:
         if (joint == 0xFF) {
-            copyVec3(&pos, &work->pos);
+            pos = work->pos;
         } else {
             get_joint_wpos_em(work, joint, &pos);
         }
@@ -1978,8 +1963,6 @@ extern "C" void em030_motion_events(_ENEMY_WORK* work) {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
     switch (em_get_mot_no(work)) {
     case 0x6:
         if ((em_after_frame_check(work, 0, 10.0f, 0.0f) == 1) || (em_after_frame_check(work, 0, 34.0f, 0.0f) == 1)) {
@@ -2143,7 +2126,7 @@ extern "C" void em030_motion_events(_ENEMY_WORK* work) {
             get_joint_wpos_em(work, 0x10, &pos);
             setVector3(&ofs, 0.0f, 15.0f, -40.0f);
             rotVecY(&ofs, work->field_0x1C0);
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             if (work->field_0x228 & 6) {
                 eft009_set_pos(0x16, &pos, (_CP_VECTOR*)&work->field_0x1BC, 0.3f, work->area_no);
                 break;

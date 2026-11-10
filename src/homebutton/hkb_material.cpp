@@ -160,7 +160,7 @@ static inline u32 CalcOffsetTevStageAry(const BitGXNums& bitGXNums) {
 
 /* 0x8053072C (0x108): builds the 3x4 texture matrix of a scale/rotate/translate about the texture centre. */
 static void CalcTextureMtx(math::MTX34* pMtx, const TexSRT& texSRT) {
-    math::VEC2 center;
+    math::_VEC2 center;
     center.x = 0.5f;
     center.y = 0.5f;
     f32 cosR = CosDeg(texSRT.rotate);
@@ -744,8 +744,8 @@ bool Material::SetupGX(bool bModVtxCol, u8 alpha) {
         const TexSRT* texSRTs = GetTexSRTAry();
         for (u8 i = 0; i < mGXMemNum.texSRT; i++) {
             if (bUseTexMtx[i]) {
-                math::MTX34 texMtx;
-                CalcTextureMtx(&texMtx, texSRTs[i]);
+                math::_MTX34 texMtx;
+                CalcTextureMtx((math::MTX34*)&texMtx, texSRTs[i]);
                 GXLoadTexMtxImm(texMtx.m, 30 + i * 3, 1);
             }
         }

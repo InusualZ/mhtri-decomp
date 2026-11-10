@@ -52,7 +52,7 @@
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #define eft_res_spawn_gate_ck fn_800F92F4_hidden_eft_res_h
 #include "ef/fn_801173AC_types.h"
 #undef eft_res_spawn_gate_ck
@@ -185,7 +185,7 @@ void fn_80119814(_EFT* self);
 void fn_80119818(MHchar* chr, u8 mode);
 void fn_801198F8(MHchar* chr, u8 index);
 /* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`ef.h`
- * spells `VEC3_ctor`/`setVec3` differently from `mh3_pad.h`, MWCC (10197)), so this
+ * spells `VEC3::VEC3()`/`VEC3(x, y, z)` differently from `mh3_pad.h`, MWCC (10197)), so this
  * copy stays - normalised to the owner's body (`void*` return).  `vec3_normalize_into`/`addVec3` now
  * come from their owner's header, `fn_8004CAD8.h` (included above, rule 2). */
 void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
@@ -342,7 +342,7 @@ extern "C" void eft026_pl_spawn(_EFT26_EM* em, u8 kind, nw4r::math::VEC3* vec, u
     rec->rot_0x24.z = 0;
     {
         _EFT26_WORK* work = (_EFT26_WORK*)rec->work_0x38;
-        copyVec3(&work->offset, vec);
+        work->offset = *vec;
         work->joint = joint;
         setVector3(&work->scale, scale, scale, scale);
     }
@@ -360,7 +360,7 @@ extern "C" void eft026_ramp_place_set(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR
     }
     rec->source_0x30 = 0;
     rec->field_0x10 = 0;
-    copyVec3(&rec->pos_0x18, pos);
+    rec->pos_0x18 = *pos;
     rec->rot_0x24.x = rot->x;
     rec->rot_0x24.y = rot->y + 0x8000;
     work = (_EFT26_WORK*)rec->work_0x38;
@@ -467,10 +467,6 @@ extern "C" void fn_80118214(_EFT* self)
     nw4r::math::MTX34 mtx;
     s32 i;
 
-    VEC3_ctor(&vA);
-    VEC3_ctor(&vB);
-    VEC3_ctor(&vC);
-    MTX34_ctor(&mtx);
     self->state_0x05++;
     for (i = 0; i < work->count; i++) {
         work->models[i] = res_eft_UV_model_create(work->chara[i], eft026_effect_ids[self->type_0x02], 0x118, 0,
@@ -525,8 +521,8 @@ extern "C" void fn_80118214(_EFT* self)
             return;
         }
         get_joint_wpos_em((struct _ENEMY_WORK*)em, work->joint, &vA);
-        copyVec3(&self->pos_0x18, &vA);
-        copyVec3(&vB, &work->offset);
+        self->pos_0x18 = vA;
+        vB = work->offset;
         mtx34_identity(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
@@ -534,17 +530,15 @@ extern "C" void fn_80118214(_EFT* self)
         work->chara[0]->getTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
         work->phase[0].color.a = 0;
         mulVecMat(&vB, &mtx);
-        addVec3To(&self->pos_0x18, &vB);
+        self->pos_0x18 += vB;
         work->field_0x74 = em->height_0x18C;
         switch (self->type_0x02) {
         case 1:
         case 8: {
             fn_80119818(work->chara[0], 1);
             const nw4r::math::VEC3& camPos = get_camera_pos();
-            nw4r::math::VEC3 cam;
-            copyVec3(&vC, &camPos);
-            subVec3(&cam, &self->pos_0x18, &vC);
-            copyVec3(&vA, &cam);
+            vC = camPos;
+            vA = self->pos_0x18 - vC;
             {
                 f32 dist = vec3_len((const f32*)&vA);
                 if (dist < 600.0f) {
@@ -583,9 +577,9 @@ extern "C" void fn_80118214(_EFT* self)
         mtx34_trans_get(&mtx, &self->pos_0x18);
         work->chara[0]->getTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
         work->phase[0].color.a = 0;
-        copyVec3(&vB, &work->offset);
+        vB = work->offset;
         mulVecMat(&vB, &mtx);
-        addVec3To(&self->pos_0x18, &vB);
+        self->pos_0x18 += vB;
         self->field_0x10 = 10;
         break;
     case 7:
@@ -628,14 +622,11 @@ extern "C" void fn_8011870C(_EFT* self)
     s32 i;
     _EFT26_WORK* work;
     _EFT26_EM* em;
+    u8 done = 0;
+
     nw4r::math::VEC3 vA;
     nw4r::math::VEC3 vB;
     nw4r::math::MTX34 mtx;
-    u8 done = 0;
-
-    VEC3_ctor(&vA);
-    VEC3_ctor(&vB);
-    MTX34_ctor(&mtx);
     work = (_EFT26_WORK*)self->work_0x38;
     em = (_EFT26_EM*)self->source_0x30;
 
@@ -709,23 +700,23 @@ extern "C" void fn_8011870C(_EFT* self)
 
     self->area_0x44 = em->area_0x16;
     em->model_0x13C->chr_0x04.get_joint_wpos(3, &vA);
-    copyVec3(&self->pos_0x18, &vA);
+    self->pos_0x18 = vA;
     mtx34_identity(&mtx);
     rotLocalMatY(self->rot_0x24.y, &mtx);
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatY(work->rot_c, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);
-    copyVec3(&vA, &work->offset);
+    vA = work->offset;
     mulVecMat(&vA, &mtx);
-    addVec3To(&self->pos_0x18, &vA);
+    self->pos_0x18 += vA;
     mtx.m[0][3] = self->pos_0x18.x;
     mtx.m[1][3] = self->pos_0x18.y;
     mtx.m[2][3] = self->pos_0x18.z;
     self->rot_0x24.z = (work->chara[0]->field_0x30 += 0x100);
 
     for (i = 0; i < work->count; i++) {
-        copyVec3(&work->chara[i]->pos_0x04, &self->pos_0x18);
-        copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
+        work->chara[i]->pos_0x04 = self->pos_0x18;
+        work->chara[i]->scale_0x1C = work->scale;
         work->chara[i]->move2(&mtx, 0);
         ((EftUvModelHooks*)work->models[i])->update();
         eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, 0);
@@ -747,12 +738,6 @@ extern "C" void fn_80118B2C(_EFT* self)
     nw4r::math::MTX34 mtx;
     s32 i;
 
-    VEC3_ctor(&v0);
-    VEC3_ctor(&v1);
-    VEC3_ctor(&v2);
-    VEC3_ctor(&v3);
-    VEC3_ctor(&v4);
-    MTX34_ctor(&mtx);
     work = (_EFT26_WORK*)self->work_0x38;
     em = (_EFT26_EM*)self->source_0x30;
 
@@ -780,8 +765,8 @@ extern "C" void fn_80118B2C(_EFT* self)
     case 1:
     case 8:
         mtx34_set_trans(&mtx, &self->pos_0x18);
-        copyVec3(&v2, &self->pos_0x18);
-        copyVec3(&v4, &work->scale);
+        v2 = self->pos_0x18;
+        v4 = work->scale;
         break;
     case 2:
     case 9:
@@ -790,7 +775,7 @@ extern "C" void fn_80118B2C(_EFT* self)
         self->rot_0x24.z -= 0x444;
         self->pos_0x18.x = v0.x;
         self->pos_0x18.z = v0.z;
-        copyVec3(&v1, &work->offset);
+        v1 = work->offset;
         mulVecMat(&v1, &mtx);
         self->pos_0x18.x += v1.x;
         self->pos_0x18.y += em->height_0x18C - work->field_0x74;
@@ -799,12 +784,10 @@ extern "C" void fn_80118B2C(_EFT* self)
         work->field_0x74 = em->height_0x18C;
         {
             const nw4r::math::VEC3& camDir = get_camera_direction();
-            nw4r::math::VEC3 sum;
-            copyVec3(&v3, &camDir);
+            v3 = camDir;
             vec3_normalize_into(&v3, &v3);
             vec3_scale_in_place(&v3, -200.0f);
-            addVec3(&sum, &self->pos_0x18, &v3);
-            copyVec3(&v2, &sum);
+            v2 = self->pos_0x18 + v3;
         }
         self->field_0x10++;
         if (self->field_0x10 > 5) {
@@ -848,7 +831,7 @@ extern "C" void fn_80118B2C(_EFT* self)
     }
 
     for (i = 0; i < work->count; i++) {
-        copyVec3(&work->chara[i]->scale_0x1C, &v4);
+        work->chara[i]->scale_0x1C = v4;
         work->chara[i]->move2(&mtx, 0);
         ((EftUvModelHooks*)work->models[i])->update();
         if (get_camera_pos().y < 0.0f) {
@@ -871,12 +854,6 @@ extern "C" void fn_80118FF0(_EFT* self)
     nw4r::math::MTX34 mtxB;
     s32 i;
 
-    VEC3_ctor(&v0);
-    VEC3_ctor(&v1);
-    VEC3_ctor(&v2);
-    VEC3_ctor(&v3);
-    MTX34_ctor(&mtxA);
-    MTX34_ctor(&mtxB);
     work = (_EFT26_WORK*)self->work_0x38;
     em = (_EFT26_EM*)self->source_0x30;
 
@@ -921,7 +898,7 @@ extern "C" void fn_80118FF0(_EFT* self)
     }
     self->area_0x44 = em->area_no_0x1E1;
     get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtxA);
-    copyVec3(&v1, &work->offset);
+    v1 = work->offset;
     mulVecMat(&v1, &mtxA);
     mtx34_trans_add(&mtxA, &v1);
     mtx34_trans_get(&mtxA, &self->pos_0x18);
@@ -950,7 +927,7 @@ extern "C" void fn_80118FF0(_EFT* self)
         mtx34_copy(&mtxB, &mtxA);
         rotLocalMatZ(work->rot_a[i], &mtxB);
         work->chara[i]->move2(&mtxB, 0);
-        copyVec3(&work->chara[i]->scale_0x1C, &v3);
+        work->chara[i]->scale_0x1C = v3;
         ((EftUvModelHooks*)work->models[i])->update();
         work->chara[i]->setTevKColor(0, GX_KCOLOR3, &work->phase[0].color);
         if (get_camera_pos().y < 0.0f) {
@@ -966,13 +943,9 @@ extern "C" void fn_80119450(_EFT* self)
     u8 done = 0;
     nw4r::math::VEC3 v0;
     nw4r::math::VEC3 v1;
-    nw4r::math::VEC3 v2;
     nw4r::math::MTX34 mtx;
     _EFT26_WORK* work;
 
-    VEC3_ctor(&v0);
-    VEC3_ctor(&v1);
-    MTX34_ctor(&mtx);
     work = (_EFT26_WORK*)self->work_0x38;
 
     for (i = 0; i < 5; i++) {
@@ -1039,16 +1012,15 @@ extern "C" void fn_80119450(_EFT* self)
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);
     mulVecMat(&v0, &mtx);
-    addVec3(&v2, &self->pos_0x18, &v0);
-    copyVec3(&v1, &v2);
+    v1 = self->pos_0x18 + v0;
     mtx.m[0][3] = v1.x;
     mtx.m[1][3] = v1.y;
     mtx.m[2][3] = v1.z;
     self->rot_0x24.z = (work->chara[0]->field_0x30 += 0x100);
 
     for (i = 0; i < work->count; i++) {
-        copyVec3(&work->chara[i]->pos_0x04, &v1);
-        copyVec3(&work->chara[i]->scale_0x1C, &work->scale);
+        work->chara[i]->pos_0x04 = v1;
+        work->chara[i]->scale_0x1C = work->scale;
         work->chara[i]->move2(&mtx, 0);
         ((EftUvModelHooks*)work->models[i])->update();
         eft_res_models_spawn(self, (void**)&work->chara[i], 2, 1, 0);

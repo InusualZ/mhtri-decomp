@@ -79,7 +79,7 @@
 #undef fn_80140778
 #undef fn_801406E0
 #include "ef/eft_slot.h"     /* eft_slot_effect_key, enemy_data_find, enemy_data_grp */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 #include "unsplit/em_snd_proc_tbl.h" /* em_snd_proc_tbl (rule 2: the band) */
 #include "enemy/em_pop.h" /* quest_flag_100000_ck, quest_flag_10_ck (rule 2: their owner) */
@@ -109,7 +109,6 @@
 #define em_motion_mode_set_c1 ((void (*)(_ENEMY_WORK*, u32))em_motion_mode_set)
 /* Callees the folded sources declared with different parameters: each call keeps its own view through a cast
  * (the same direct call). */
-#define get_worldworld_pos_out ((void (*)(nw4r::math::VEC3*, nw4r::math::VEC3*, u8))get_worldworld_pos)
 #define fn_80140C00_view1 ((struct EnemyData* (*)(u8, u8))enemy_data_by_team_get)
 #define fn_80140B10_view1 ((void (*)(struct _ENEMY_WORK *, u32, u32))fn_80140B10)
 #define fn_80140AF8_view1 ((void (*)(struct _ENEMY_WORK *, u32, u32))fn_80140AF8)
@@ -226,7 +225,7 @@ extern f32 sqrt_f32(f32 x);
 extern f32 atan2f(f32 y, f32 x);
 /* `eft_slot_effect_key` (0x8034539C): its owner's header, `ef/eft_slot.h` (rule 2). */
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u8 flag);
-extern void get_worldlocal_pos(Vec3 *out, Vec3 *in, u32 idx);
+extern "C" Vec3 get_worldlocal_pos(Vec3* pos, u8 area);
 extern f32 stg_area_ceiling_get(u32 idx);
 }
 
@@ -394,7 +393,6 @@ s16 fn_8013BE60(_ENEMY_WORK* self, u8* in, u8 id, u8 sub, s16 value) {
     s16 count;
     f32* sight;
     s32 found;
-    Vec3 point;
     u8 len;
 
     dist = -1.0f;
@@ -404,7 +402,7 @@ s16 fn_8013BE60(_ENEMY_WORK* self, u8* in, u8 id, u8 sub, s16 value) {
     count = 0;
     sight = 0;
     found = 0;
-    VEC3_ctor(&point);
+    Vec3 point;
     len = fn_801406E0(id, in[0]);
     switch (in[0]) {
     case 0:
@@ -827,11 +825,7 @@ void fn_8013C97C(_ENEMY_WORK *self, u8 *in) {
 void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
     Vec3 a;
     Vec3 b;
-    Vec3 c;
-    Vec3 d;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     switch (in[0]) {
     case 0:
         if (self->field_0x9F7 != 255) {
@@ -843,10 +837,8 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
         break;
     case 255:
         if (self->area_no != self->field_0x9F7 && self->field_0x9F7 != 255) {
-            get_worldworld_pos_out(&c, &self->pos, self->area_no);
-            copyVec3(&a, &c);
-            get_worldlocal_pos(&d, &a, self->field_0x9F7);
-            copyVec3(&self->pos, &d);
+            a = get_worldworld_pos(&self->pos, self->area_no);
+            self->pos = get_worldlocal_pos(&a, self->field_0x9F7);
             self->pos.y = stg_area_ceiling_get(self->field_0x9F7);
             em_area_change(self, 0);
             em_target_pos_set(self, 0);
@@ -1166,10 +1158,10 @@ void fn_8013D34C(_ENEMY_WORK *self) {
 void fn_8013D41C(_ENEMY_WORK *self, u8 *in) {
     switch (in[0]) {
     case 0:
-        copyVec3(&self->aim, &self->pos);
+        self->aim = self->pos;
         break;
     case 1:
-        copyVec3(&self->aim, &self->vec_0x36C);
+        self->aim = self->vec_0x36C;
         break;
     default:
         fn_80140AF8_view1(self, 9, 0);
@@ -1480,7 +1472,7 @@ void fn_8013DE58(_ENEMY_WORK *self, u8 *in) {
 /* Moves the converted target position into the record's position and remembers the old one. */
 void fn_8013DE80(_ENEMY_WORK *self, u8 *in) {
     em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &self->pos);
-    copyVec3(&self->prev_pos, &self->pos);
+    self->prev_pos = self->pos;
 }
 
 void fn_8013DED4(_ENEMY_WORK *self, u8 *in) {
@@ -1493,7 +1485,6 @@ void fn_8013DED4(_ENEMY_WORK *self, u8 *in) {
 void fn_8013DEFC(_ENEMY_WORK *self, u8 *in) {
     Vec3 v;
 
-    VEC3_ctor(&v);
     em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[0]), &v);
     self->field_0x1BC = 0;
     self->field_0x1C0 = calcVecAng2(&self->pos, &v);
@@ -1673,7 +1664,6 @@ void em_prog_route_start(_ENEMY_WORK* self, u8* in) {
     u8 i;
     u8 flags;
 
-    VEC3_ctor(&point);
     self->state_0x9FB = in[0];
     flags = in[1];
     self->field_0x9FD = flags;
@@ -2212,24 +2202,22 @@ s16 em_prog_sight_line_ck(_ENEMY_WORK* self, u8* in) {
     Vec3 from;
     Vec3 to;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     switch (in[0]) {
     case 0: {
         f32 height;
         s32 mode;
         switch (in[1]) {
         default:
-            copyVec3(&to, &self->vec_0x36C);
+            to = self->vec_0x36C;
             break;
         case 1:
-            copyVec3(&to, &self->aim);
+            to = self->aim;
             break;
         case 2:
             em_data_point_get(self, (u16)(((self->area_no & 0xF) << 8) | in[2]), &to);
             break;
         }
-        copyVec3(&from, &self->pos);
+        from = self->pos;
         mode = self->field_0x1E2;
         if (mode >= 1 && mode <= 2) {
             height = 0.0f;

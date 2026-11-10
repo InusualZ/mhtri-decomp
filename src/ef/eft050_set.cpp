@@ -26,7 +26,7 @@
 #include "stage/stg_w.h"     /* get_now_areano (the owner header, rule 2) */
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "nw4r/math_types.h" /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h" /* the vector helpers (rule 2) */
@@ -74,8 +74,6 @@ f32 eft050_set_scales[4] = { 14.0f, 12.0f, 9.0f, 5.0f };
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 /* Pools the `eft050` record: the effect, its work block, four pooled model handles, the extra record
  * the fourth pool call hands back, and the position/source/area seeds. */
@@ -109,7 +107,7 @@ void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
     memset(work->works_0x1C, 0, 8);
     eft->field_0x03 = 0x32;
     eft_state_flags_set(eft, 1, 0);
-    copyVec3(&eft->pos_0x18, pos);
+    eft->pos_0x18 = *pos;
     eft->area_0x44 = flag;
     eft->source_0x30 = plw;
     eft->flag_0x01 = 1;
@@ -185,11 +183,6 @@ extern "C" void eft050_set_create(_EFT* self)
  * models along the view axis. */
 extern "C" void eft050_set_move(_EFT* self)
 {
-    VEC3 ofs;
-    VEC3 cam;
-    MTX34 view;
-    MTX34 mtx;
-    VEC3 dir;
     u32 i;
     Eft050SetWork* work;
     EftControl* control;
@@ -198,11 +191,11 @@ extern "C" void eft050_set_move(_EFT* self)
     u8 alpha;
 
     work = (Eft050SetWork*)self->work_0x38;
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&cam);
-    MTX34_ctor(&view);
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&dir);
+    VEC3 ofs;
+    VEC3 cam;
+    MTX34 view;
+    MTX34 mtx;
+    VEC3 dir;
     control = &eft_control;
     switch (self->field_0x06) {
     case 0:
@@ -235,11 +228,11 @@ extern "C" void eft050_set_move(_EFT* self)
     if (camera_underwater_ck() == 1) {
         return;
     }
-    copyVec3(&dir, &get_camera_direction());
+    dir = *(&get_camera_direction());
     vec3_normalize_into(&dir, &dir);
     dist = 20.0f;
-    copyVec3(&cam, &get_camera_pos());
-    copyVec3(&((MHchar*)work->extra_0x14)->pos_0x04, &VEC3_ADD(&cam, &VEC3_SCALE(&dir, dist)));
+    cam = *(&get_camera_pos());
+    *(&((MHchar*)work->extra_0x14)->pos_0x04) = *(&(cam + (dir * dist)));
     ((MHchar*)work->extra_0x14)->field_0x28 = camera_angle_x_get();
     ((MHchar*)work->extra_0x14)->field_0x2C = camera_angle_y_get();
     ((MHchar*)work->extra_0x14)->field_0x30 = 0;
@@ -271,7 +264,7 @@ extern "C" void eft050_set_move(_EFT* self)
                 work->scale_0x28 = 0.625f;
             }
             mhchar_mat_alpha_set(work->models_0x04[i], 4, (u8)(255.0f * work->scale_0x28), 0);
-            copyVec3(&work->models_0x04[i]->pos_0x04, &VEC3_ADD(&self->pos_0x18, &ofs));
+            work->models_0x04[i]->pos_0x04 = *(&(self->pos_0x18 + ofs));
             mtx34_identity(&mtx);
             mtx34_set_trans(&mtx, &work->models_0x04[i]->pos_0x04);
             mtx34_concat_assign(&mtx, &view);

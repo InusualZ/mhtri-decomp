@@ -87,7 +87,7 @@
 #include "stage/get_now_mapno.h"
 #include "lobby/lb_quest_screen.h"
 #include "lobby/quest_element_failed_ck.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "mh3_pad/lb_param_w.h"
 #include "mh3_pad/Screen_w.h"
 #include "quest/quest_record_find.h"
@@ -104,7 +104,6 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/ENEMY_MINI_WORK.h"
 #include "enemy/em_pop.h"
-#include "enemy/em_ground_rec_clear.h"
 #include "enemy/enemy_control.h"
 #include "enemy/em_common.h"
 #include "enemy/em_quest_element_set.h"
@@ -255,10 +254,9 @@ extern "C" void note_pane_state_dispatch(NoteWork* self) {
 }
 
 /* 0x803A4E58 - reads the quest NPC's motion number through `qn_get_motion_no` (the record is the pane's 0x1F8-byte
- * `NoteWork`; the vector local is retail's `VEC3 v; VEC3_ctor(&v);` idiom). */
+ * `NoteWork`; the vector local is retail's `VEC3 v; VEC3::VEC3()(&v);` idiom). */
 extern "C" void note_pane_get_motion(NoteWork* self) {
     nw4r::math::VEC3 v;
-    VEC3_ctor(&v);
     qn_get_motion_no((_QNPC_W*)self);
 }
 
@@ -622,7 +620,6 @@ extern "C" void quest_area_spawn_setup(Q_MoveWork* work, u32* area, s32 count, u
     u32 order;
     s32 element;
 
-    em_ground_rec_clear(&ground);
     if (work->main_0x2258 == NULL) {
         work->main_0x2258 = (QuestSpawnRec*)work_mem_alloc(16);
         memset(work->main_0x2258, 0, 16);
@@ -687,7 +684,6 @@ extern "C" s32 quest_area_entry_collect(Q_MoveWork* work, QuestBossSpawn** out) 
     s32 n;
     QuestBossSpawn* boss;
 
-    em_ground_rec_clear(&ground);
     count = work->area_counts_0x2154[0];
     rec = work->area_recs_0x154[0];
     n = 0;
@@ -1780,16 +1776,15 @@ extern "C" u16 note_pane_angle_step(u16 target, u16 cur, u16 step) {
 /* 0x803A4214 (0xC4): puts the pane at its map's home spot, facing its current heading, idle, and starts its voice
  * entry. */
 extern "C" void note_pane_init(NoteWork* self) {
-    nw4r::math::VEC3 home;
     NoteRestBlock* rest = &self->rest_0x1B4;
 
-    VEC3_ctor(&home);
+    nw4r::math::VEC3 home;
     self->field_0x001 = 1;
     self->flag_0x1AC = 1;
     vec_to_mh_vec3(&home, &note_pane_home_table[stage_map_kind_get(self->map_0x194)]);
-    copyVec3(&self->vec_0x170, copyVec3(&self->vec_0x17C, &home));
+    self->vec_0x170 = self->vec_0x17C = home;
     self->field_0x1A8 = self->field_0x18C;
-    copyVec3(&rest->pos_0x00, &self->vec_0x170);
+    static_cast<nw4r::math::VEC3&>(rest->pos_0x00) = self->vec_0x170;
     rest->talk_step_0x0C = 0;
     rest->field_0x0D = 0;
     note_pane_anim_pair_0_1(self);
@@ -1852,7 +1847,7 @@ extern "C" void note_pane_state_1(NoteWork* self) {
         if (--self->field_0x16C <= 0) {
             note_pane_set_anim_pair(self, 0, 3);
         } else {
-            angle = note_pane_angle_step(calcVecAng2(&self->vec_0x170, &rest->pos_0x00), self->field_0x18C, 0x100);
+            angle = note_pane_angle_step(calcVecAng2(&self->vec_0x170, &static_cast<nw4r::math::VEC3&>(rest->pos_0x00)), self->field_0x18C, 0x100);
             self->field_0x18C = angle;
             self->field_0x1A8 = angle;
         }
@@ -2041,7 +2036,7 @@ extern "C" void note_pane_state_6(NoteWork* self, u32 variant) {
 static inline void note_pane_hand_fx(NoteWork* self, nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos,
                                      nw4r::math::VEC3* ofs) {
     note_pane_joint_mtx_get(self, 6, mtx);
-    copyVec3(pos, ofs);
+    *pos = *ofs;
     mulVecMatAddTrans(pos, mtx);
     eft004_scaled_spawn(pos, self->field_0x195, 1.0f);
 }
@@ -2049,12 +2044,9 @@ static inline void note_pane_hand_fx(NoteWork* self, nw4r::math::MTX34* mtx, nw4
 /* 0x803A4BA4 (0x230): pane state 9, handing over: motion 9 with the hand effect at frame 140, then back to motion 1. */
 extern "C" void note_pane_state_9(NoteWork* self) {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 ofs;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    setVec3(&ofs, 10.0f, -10.0f, 0.0f);
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 ofs(10.0f, -10.0f, 0.0f);
     switch (self->field_0x169) {
     case 0:
         self->field_0x169++;

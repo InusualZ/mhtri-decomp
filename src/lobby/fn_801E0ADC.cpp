@@ -385,7 +385,7 @@ extern u8 eft033_alpha_keys_high[8];
 extern u8 eft033_alpha_keys_low[8];
 extern u8 eft033_gun_colors_a[12];
 extern u8 eft033_gun_colors_b[12];
-extern nw4r::math::VEC3 eft033_gun_angles;
+extern nw4r::math::_VEC3 eft033_gun_angles;
 
 /* This unit's view of the 0x60-byte work of the Cha-Cha mask effect (`Em007EftWork` in `enemy/em007_act.cpp`, which
  * allocates it): the models and effects, the mask state, its spring position, the dance timers and the area. */
@@ -492,13 +492,10 @@ void em007_model_eft_sparks(_EFT* eft)
     _AINPC_W* npc = (_AINPC_W*)eft->source_0x30;
     _PLW* plw = npc->plw_0x16C;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 ofs;
     s32 i;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 ofs;
     if (work->area_0x5D != eft->area_0x44) {
         for (i = 0; i < 5; i++) {
             if (work->effects_0x10[i] != NULL) {
@@ -513,18 +510,18 @@ void em007_model_eft_sparks(_EFT* eft)
             switch (eft->field_0x07) {
             case 3:
                 cpSetRotMatrix(&npc->vec_0x190, &mtx);
-                copyVec3(&pos, &npc->pos_0x178);
+                pos = npc->pos_0x178;
                 setVector3(&ofs, 0.0f, -30.0f, 40.0f);
                 rotVecY(&ofs, npc->vec_0x190.y);
                 break;
             default:
                 cpSetRotMatrix((_CP_VECTOR*)&plw->rot_0x54, &mtx);
-                copyVec3(&pos, &eft->pos_0x18);
+                pos = eft->pos_0x18;
                 setVector3(&ofs, 0.0f, 30.0f, 145.0f);
                 rotVecY(&ofs, plw->rot_0x54.y);
                 break;
             }
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             mtx34_set_trans(&mtx, &pos);
             for (i = 0; i < 5; i++) {
                 if (work->effects_0x10[i] == NULL) {
@@ -564,21 +561,6 @@ void em007_model_eft_update(_EFT* eft)
     MaskEftView* work = (MaskEftView*)eft->work_0x38;
     nw4r::math::MTX34 joint_mtx;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 joint;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 fwd;
-    nw4r::math::VEC3 rest;
-    nw4r::math::VEC3 pull;
-    nw4r::math::VEC3 head;
-    nw4r::math::VEC3 target;
-    nw4r::math::VEC3 lean;
-    nw4r::math::VEC3 seat;
-    nw4r::math::VEC3 reach;
-    nw4r::math::VEC3 spring;
-    nw4r::math::VEC3 gap;
-    nw4r::math::VEC3 back;
     f32 scale;
     f32 scale_b;
     u32 i;
@@ -587,13 +569,11 @@ void em007_model_eft_update(_EFT* eft)
     s32 se_arg;
     _GXColor col;
 
-    MTX34_ctor(&joint_mtx);
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&joint);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&fwd);
+    nw4r::math::VEC3 joint;
+    nw4r::math::VEC3 dir;
+    nw4r::math::VEC3 ofs;
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 fwd;
     scale = 1.0f;
     scale_b = 0.0f;
     for (i = 0; i < work->model_count_0x00; i++) {
@@ -616,7 +596,7 @@ void em007_model_eft_update(_EFT* eft)
                 return;
             }
             eft->area_0x44 = npc->area;
-            copyVec3(&eft->pos_0x18, &npc->pos_0x178);
+            eft->pos_0x18 = npc->pos_0x178;
             eft->flag_0x01 = npc->in_area;
             switch (npc->field_0x420) {
             case 0:
@@ -628,7 +608,7 @@ void em007_model_eft_update(_EFT* eft)
                     setVector3(&fwd, 0.0f, 0.0f, 80.0f);
                     mulVecMat(&fwd, &mtx);
                     mtx34_trans_get(&mtx, &pos);
-                    addVec3To(&pos, &fwd);
+                    pos += fwd;
                     SetRootMtxTrans(work->effect_0x0C, &pos);
                     effect_move(work->effect_0x0C);
                     col.r = 0xFF;
@@ -775,7 +755,7 @@ void em007_model_eft_update(_EFT* eft)
         case 1:
             lb_npc = (_LB_NPC*)eft->source_0x30;
             if (lb_npc != NULL) {
-                copyVec3(&eft->pos_0x18, &lb_npc->pos_0x10);
+                eft->pos_0x18 = lb_npc->pos_0x10;
                 if ((lb_param_w.entry_0x08 & 0x7F) != work->kind_0x2A) {
                     if (lb_entry_unlock_flags[work->kind_0x2A] != 0xFFFF &&
                         userdata_progress_flag_ck(lb_entry_unlock_flags[work->kind_0x2A]) == 0) {
@@ -811,7 +791,7 @@ void em007_model_eft_update(_EFT* eft)
             }
             break;
         }
-        copyVec3(&work->models_0x08[i]->pos_0x04, &eft->pos_0x18);
+        work->models_0x08[i]->pos_0x04 = eft->pos_0x18;
         work->models_0x08[i]->move(0);
         if (work->mode_0x28 == 0 && npc->field_0x420 == 4) {
             em007_model_eft_draw(eft, work->models_0x08[i]);
@@ -844,8 +824,7 @@ void em007_model_eft_update(_EFT* eft)
             }
             setVector3(&ofs, 0.0f, 60.0f, 0.0f);
             setVector3(&work->vel_0x44, 0.0f, 0.0f, 0.0f);
-            addVec3(&rest, &work->joint_0x38, &ofs);
-            copyVec3(&work->pos_0x2C, &rest);
+            work->pos_0x2C = work->joint_0x38 + ofs;
             work->angle_0x50 = 0;
             eft->demo_flag_0x08++;
             break;
@@ -860,32 +839,23 @@ void em007_model_eft_update(_EFT* eft)
                 work->models_0x08[0]->get_joint_wpos(2, &joint);
                 break;
             }
-            addVec3To(&work->pos_0x2C, &work->vel_0x44);
-            subVec3(&pull, &work->joint_0x38, &joint);
-            copyVec3(&dir, &pull);
+            work->pos_0x2C += work->vel_0x44;
+            dir = work->joint_0x38 - joint;
             vec3_scale_in_place(&dir, 0.5f);
-            addVec3To(&work->pos_0x2C, &dir);
+            work->pos_0x2C += dir;
             setVector3(&ofs, 0.0f, 1.0f, 0.0f);
             mulVecMat(&ofs, &joint_mtx);
-            vec3_scale(&head, &ofs, 60.0f);
-            copyVec3(&pos, &head);
-            addVec3(&target, &joint, &pos);
-            copyVec3(&pos, &target);
+            pos = ofs * 60.0f;
+            pos = joint + pos;
             vec3_clamp_distance(&pos, &work->pos_0x2C, 42.0f);
-            subVec3(&lean, &work->pos_0x2C, &joint);
-            copyVec3(&dir, &lean);
+            dir = work->pos_0x2C - joint;
             if (vec3_length_sq((f32*)&dir) > 0.0005f) {
                 vec3_normalize_into(&dir, &dir);
             }
-            vec3_scale(&reach, &dir, 60.0f);
-            addVec3(&seat, &joint, &reach);
-            copyVec3(&work->pos_0x2C, &seat);
-            subVec3(&gap, &pos, &work->pos_0x2C);
-            vec3_scale(&spring, &gap, 0.25f);
-            copyVec3(&work->vel_0x44, &spring);
-            copyVec3(&work->joint_0x38, &joint);
-            subVec3(&back, &joint, &work->pos_0x2C);
-            copyVec3(&dir, &back);
+            work->pos_0x2C = joint + (dir * 60.0f);
+            work->vel_0x44 = (pos - work->pos_0x2C) * 0.25f;
+            work->joint_0x38 = joint;
+            dir = joint - work->pos_0x2C;
             mtx34_inverse(&mtx, &joint_mtx);
             mtx34_rotate_vec3(&dir, &mtx, &dir);
             work->angle_0x50 = (u16)(0.5f + 65536.0f * atan2f(dir.z, dir.y) / 6.2831855f);
@@ -952,9 +922,6 @@ void em007_model_eft_dance(_EFT* eft)
     _AINPC_W* npc;
     MaskEftView* work;
     _PLW* plw;
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 ofs;
     _GXColor col_a;
     _GXColor col_b;
     _GXColor col_c;
@@ -963,9 +930,9 @@ void em007_model_eft_dance(_EFT* eft)
     work = (MaskEftView*)eft->work_0x38;
     npc = (_AINPC_W*)eft->source_0x30;
     plw = npc->plw_0x16C;
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 ofs;
     eft->timer_0x0C++;
     switch (Get_motion_no(plw)) {
     case 0x14D:
@@ -1093,16 +1060,13 @@ void em007_model_eft_hold(_EFT* eft)
     MaskEftView* work = (MaskEftView*)eft->work_0x38;
     _AINPC_W* npc = (_AINPC_W*)eft->source_0x30;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 ofs;
     _GXColor col_a;
     _GXColor col_b;
     _GXColor col_c;
     _GXColor col_d;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 ofs;
     work->hold_timer_0x54++;
     eft->field_0x07 = 3;
     if (work->se_timer_b_0x5B % 30 == 0 && eft->area_0x44 == get_now_areano()) {
@@ -1128,12 +1092,6 @@ void em007_model_eft_job_draw(PrimRec* job)
     MaskEftView* work;
     _AINPC_W* npc;
     _PLW* plw;
-    MTX34 mask_mtx;
-    MTX34 back_mtx;
-    VEC3 dir;
-    VEC3 unused;
-    VEC3 base;
-    VEC3 pivot;
     u32 angle;
     f32 y;
     f32 x;
@@ -1142,12 +1100,12 @@ void em007_model_eft_job_draw(PrimRec* job)
 
     eft = ((MaskJobRec*)job)->eft_0x2C;
     work = (MaskEftView*)eft->work_0x38;
-    MTX34_ctor(&mask_mtx);
-    MTX34_ctor(&back_mtx);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&base);
-    VEC3_ctor(&pivot);
+    MTX34 mask_mtx;
+    MTX34 back_mtx;
+    VEC3 dir;
+    VEC3 unused;
+    VEC3 base;
+    VEC3 pivot;
     npc = (_AINPC_W*)eft->source_0x30;
     plw = npc->plw_0x16C;
     dir.x = 0.0f;
@@ -1314,8 +1272,6 @@ void Em007ModelCopy::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::
     _AINPC_W* npc;
     u32 joint;
 
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&turn);
     work = (MaskEftView*)eft_0x04->work_0x38;
     npc = (_AINPC_W*)eft_0x04->source_0x30;
     if (work->mode_0x28 == 0 && npc->field_0x420 == 4) {
@@ -1416,7 +1372,7 @@ void eft033_set_ofs(_PLW* plw, u8 kind, u32 joint, nw4r::math::VEC3* ofs, f32 sc
         work = (Eft033Work*)eft->work_0x38;
         work->scale_0x18 = scale;
         work->joint_0x1C = joint;
-        copyVec3(&work->ofs_0x0C, ofs);
+        work->ofs_0x0C = *ofs;
     }
 }
 
@@ -1450,7 +1406,6 @@ void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 joint, u32 id, nw4r::math:
     _EFT* eft;
     Eft033Work* work;
 
-    VEC3_ctor(&wpos);
     get_joint_wpos_em(self, joint, (Vec3*)&wpos);
     if ((u32)((u8)id - 0x19) <= 6 || (u8)id == 0x21 || !(wpos.y > self->field_0x210)) {
         eft = eft033_alloc(self->area_no, id);
@@ -1461,7 +1416,7 @@ void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 joint, u32 id, nw4r::math:
             eft_state_flags_set(eft, 0, 0);
             eft->timer_0x0C = life;
             work = (Eft033Work*)eft->work_0x38;
-            copyVec3(&work->ofs_0x0C, pos);
+            work->ofs_0x0C = *pos;
             work->joint_0x1C = joint;
             work->state_sub_0x21 = self->state_sub;
             work->action_0x20 = self->action;
@@ -1541,8 +1496,6 @@ void eft033_create(_EFT* eft)
     u16 id;
     _PLW* plw;
 
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     eft->state_0x05++;
     group = eft033_groups[eft->type_0x02];
     id = eft033_ids[eft->type_0x02];
@@ -1596,10 +1549,10 @@ void eft033_create(_EFT* eft)
             eft->state_0x05 = 3;
             return;
         }
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         eft_rot_vec_copy(&eft->rot_0x24, (_CP_VECTOR*)&plw->rot_0x54);
         mhchar_joint_mtx_get(&((Eft033Physics*)plw->physics_0x13C)->chr_0x04, work->joint_0x1C, (Mtx34*)&mtx);
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &eft->pos_0x18);
@@ -1613,13 +1566,13 @@ void eft033_create(_EFT* eft)
             eft->state_0x05 = 3;
             return;
         }
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         eft_rot_vec_copy(&eft->rot_0x24, (_CP_VECTOR*)&plw->rot_0x54);
         cpSetRotMatrix(&eft->rot_0x24, &mtx);
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         mulVecMat(&pos, &mtx);
         ((Eft033Physics*)plw->physics_0x13C)->chr_0x04.get_joint_wpos(work->joint_0x1C, &eft->pos_0x18);
-        addVec3To(&eft->pos_0x18, &pos);
+        eft->pos_0x18 += pos;
         mtx34_set_trans(&mtx, &eft->pos_0x18);
         work->effects_0x04[0]->SetRootMtx(mtx);
         break;
@@ -1670,12 +1623,6 @@ void eft033_move_joint(_EFT* eft)
     s32 i;
     u32 col;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&spawn);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&rot);
-    VEC2_ctor(&scale);
     if (--eft->timer_0x0C < 0) {
         eft->field_0x10 = 30;
         eft->flag_0x01 = 0;
@@ -1758,7 +1705,7 @@ void eft033_move_joint(_EFT* eft)
     case 29:
     case 30:
     case 33:
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &eft->pos_0x18);
@@ -1774,10 +1721,10 @@ void eft033_move_joint(_EFT* eft)
     case 21:
     case 31:
     case 32:
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         mulVecMat(&pos, &mtx);
         mtx34_trans_get(&mtx, &eft->pos_0x18);
-        addVec3To(&eft->pos_0x18, &pos);
+        eft->pos_0x18 += pos;
         SetRootMtxTrans(work->effects_0x04[0], &eft->pos_0x18);
         break;
     case 25:
@@ -1821,7 +1768,7 @@ void eft033_move_joint(_EFT* eft)
             work->scale_0x18 = 1.3f;
             break;
         }
-        copyVec3(&pos, &work->ofs_0x0C);
+        pos = work->ofs_0x0C;
         mulVecMat(&pos, &mtx);
         eft->field_0x10++;
         eft_rot_vec_copy(&eft->rot_0x24, (_CP_VECTOR*)&plw->rot_0x54);
@@ -1878,7 +1825,7 @@ void eft033_move_joint(_EFT* eft)
             color.b = (col & 0xFF00) >> 8;
             color.a = 0xFF;
             change_color_eff(work->effects_0x04[0], &eft->pos_0x18, color);
-            copyVec3(&spawn, &eft->pos_0x18);
+            spawn = eft->pos_0x18;
             if (spawn.y > -10.0f) {
                 spawn.y = -10.0f;
             }
@@ -1927,11 +1874,6 @@ void eft033_move_gun(_EFT* eft)
     s32 c2;
     s32 c3;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&scale);
-    VEC3_ctor(&ang);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&joint);
     if (eft_res_spawn_gate_ck(eft, 0) == 0) {
         eft->flag_0x01 = 0;
         eft->state_0x05++;
@@ -1952,7 +1894,7 @@ void eft033_move_gun(_EFT* eft)
     switch (slot) {
     case 0:
         mhchar_joint_mtx_get(&((Eft033Physics*)plw->physics_0x13C)->chr_0x04, 11, (Mtx34*)&joint);
-        ang = eft033_gun_angles;
+        static_cast<nw4r::math::_VEC3&>(ang) = eft033_gun_angles;
         mtx34_identity(&mtx);
         mtx34_rot_xyz_deg(&mtx, ang.x, ang.y, ang.z);
         mtx34_trans_get(&joint, &eft->pos_0x18);
@@ -1983,7 +1925,7 @@ void eft033_move_gun(_EFT* eft)
         mtx34_trans_get(&mtx, &eft->pos_0x18);
         setVector3(&scale, 0.4f, 1.0f, 1.8f);
     } else {
-        copyVec3(&ofs, &work->ofs_0x0C);
+        ofs = work->ofs_0x0C;
         mulVecMat(&ofs, &mtx);
         mtx34_trans_add(&mtx, &ofs);
         mtx34_trans_get(&mtx, &eft->pos_0x18);

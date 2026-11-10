@@ -69,9 +69,9 @@ struct Pane {
     /* +0x0B */ u8 pad_0xB;
     /* +0x0C */ char name[16];
     /* +0x1C */ char userData[8];
-    /* +0x24 */ math::VEC3 translate;
-    /* +0x30 */ math::VEC3 rotate;
-    /* +0x3C */ math::VEC2 scale;
+    /* +0x24 */ math::_VEC3 translate;
+    /* +0x30 */ math::_VEC3 rotate;
+    /* +0x3C */ math::_VEC2 scale;
     /* +0x44 */ Size size;
 };
 
@@ -152,7 +152,7 @@ public:
 
     void AppendChild(Pane* pChild);
     void AddAnimationLink(AnimationLink* pAnimationLink);
-    const math::VEC2 GetVtxPos() const;
+    const math::_VEC2 GetVtxPos() const;
     const ut::Rect GetPaneRect(const DrawInfo& drawInfo) const;
 
     const char* GetName() const { return mName; }
@@ -174,12 +174,12 @@ public:
     /* +0x10 */ ut::LinkList<Pane, 4> mChildList;
     /* +0x1C */ AnimationLinkList mAnimList;
     /* +0x28 */ Material* mpMaterial;
-    /* +0x2C */ math::VEC3 mTranslate;
-    /* +0x38 */ math::VEC3 mRotate;
-    /* +0x44 */ math::VEC2 mScale;
+    /* +0x2C */ math::_VEC3 mTranslate;
+    /* +0x38 */ math::_VEC3 mRotate;
+    /* +0x44 */ math::_VEC2 mScale;
     /* +0x4C */ Size mSize;
-    /* +0x54 */ math::MTX34 mMtx;
-    /* +0x84 */ math::MTX34 mGlbMtx;
+    /* +0x54 */ math::_MTX34 mMtx;
+    /* +0x84 */ math::_MTX34 mGlbMtx;
     /* +0xB4 */ const void* mpUserData; /* untyped: the `usd1` block, read by the game */
     /* +0xB8 */ u8 mAlpha;
     /* +0xB9 */ u8 mGlbAlpha;

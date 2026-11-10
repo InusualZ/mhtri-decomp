@@ -46,7 +46,7 @@
 #pragma optimization_level 4
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_draworder.h" /* nw4r::ef::DrawOrder (rule 1) */
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterFormBuilder (rule 1) */
@@ -193,41 +193,35 @@ namespace ef {
 
 /* The default draw info the system draws with: `nw4r::ef::DrawInfo`'s constructor sets both matrices to the
  * identity, lighting and fog off, a zero depth offset and origin and a white material over a black ambient colour. */
-class DrawInfo : public EfDrawInfo {
-public:
-    DrawInfo() {
-        MTX34_ctor(&view_mtx);
-        MTX34_ctor(&mtx_0x30);
-        VEC3_ctor(&depth_origin);
-        mtx34_identity(&view_mtx);
-        mtx34_identity(&mtx_0x30);
-        light_enable = false;
-        light_mask = 0;
-        light_mask1 = 0;
-        is_spot_light = true;
-        fog_type = 0;
-        f32 one;
-        f32 zero = 0.0f;
+inline DrawInfo::DrawInfo() {
+    mtx34_identity(&view_mtx);
+    mtx34_identity(&mtx_0x30);
+    light_enable = false;
+    light_mask = 0;
+    light_mask1 = 0;
+    is_spot_light = true;
+    fog_type = 0;
+    f32 one;
+    f32 zero = 0.0f;
 
-        fog_start_z = zero;
-        one = 1.0f;
-        fog_end_z = one;
-        fog_near_z = zero;
-        fog_far_z = one;
-        depth_offset = zero;
-        depth_origin.x = zero;
-        depth_origin.y = zero;
-        depth_origin.z = zero;
-        mat_color.b = 0xFF;
-        mat_color.g = 0xFF;
-        mat_color.r = 0xFF;
-        mat_color.a = 0xFF;
-        amb_color.b = 0;
-        amb_color.g = 0;
-        amb_color.r = 0;
-        amb_color.a = 0xFF;
-    }
-}; /* size: 0xA0 */
+    fog_start_z = zero;
+    one = 1.0f;
+    fog_end_z = one;
+    fog_near_z = zero;
+    fog_far_z = one;
+    depth_offset = zero;
+    depth_origin.x = zero;
+    depth_origin.y = zero;
+    depth_origin.z = zero;
+    mat_color.b = 0xFF;
+    mat_color.g = 0xFF;
+    mat_color.r = 0xFF;
+    mat_color.a = 0xFF;
+    amb_color.b = 0;
+    amb_color.g = 0;
+    amb_color.r = 0;
+    amb_color.a = 0xFF;
+}
 
 /* The objects the system hands out, in construction order (the static initializer builds them). */
 static DrawOrder sDrawOrder;
@@ -265,9 +259,6 @@ inline EfSysActivityList::EfSysActivityList() {
 /* 0x800A559C (0x7C): builds the effect system: its creation queue, the reference position and matrix, and the
  * library version, registered once. */
 EfSys::EfSys() {
-    ef_creation_queue_reset((CreationQueue*)mCreationQueue);
-    VEC3_ctor(&mRefPos);
-    MTX34_ctor(&mRefMtx);
     if (ef_system_version_registered == 0) {
         ef_system_version_registered = 1;
         OSRegisterVersion(NW4R_EF_Version_);
@@ -429,7 +420,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
 /* 0x800A602C - sets the system's reference transform and its two range floats. */
 extern "C" void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src,
                             f32 a, f32 b) {
-    copyVec3(&self->mRefPos, pos);
+    self->mRefPos = *pos;
     nw4r::math::MTX34* dst = (nw4r::math::MTX34*)mtx34_get_ptr(&self->mRefMtx);
     PSMTXCopy(mtx34_const_ptr(src), dst);
     self->mRangeA = a;

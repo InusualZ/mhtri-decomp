@@ -29,7 +29,7 @@
 #include "g3d/g3d_rescommon.h"   /* nw4r::g3d::ResDic (rule 2) */
 #include "g3d/g3d_anmobj.h"      /* f32_select_nonneg (rule 2) */
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
-#include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
+#include "mh3_pad.h"             /* VEC3::operator=, VEC3(x, y, z), VEC3::VEC3() (rule 2) */
 #include "MSL_C/alloc.h"         /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 #include "nw4r/math_types.h"      /* MTX34RotXYZFIdx, MTX34Scale, MTX33Identity, ... (rule 2) */
 #include "nw4r/math_triangular.h" /* Atan2FIdx (rule 2) */
@@ -1296,10 +1296,9 @@ void fn_8008D1AC(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
 void fn_8008D1C4(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeData, f32 frame)
 {
     f32* anmData = nodeData->anms;
-    nw4r::math::VEC3 rec;
 
     (void)info;
-    VEC3_ctor(&rec);
+    nw4r::math::VEC3 rec;
     self->scale[0] = 1.0f;
     self->scale[1] = 1.0f;
     self->scale[2] = 1.0f;
@@ -1338,7 +1337,6 @@ void fn_8008D30C(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
     f32* anmData = nodeData->anms;
     nw4r::math::VEC3 rec;
 
-    VEC3_ctor(&rec);
     self->scale[0] = 1.0f;
     self->scale[1] = 1.0f;
     self->scale[2] = 1.0f;
@@ -1365,10 +1363,9 @@ void fn_8008D3DC(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
 void fn_8008D47C(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeData, f32 frame)
 {
     f32* anmData = nodeData->anms;
-    nw4r::math::VEC3 rec;
 
     (void)info;
-    VEC3_ctor(&rec);
+    nw4r::math::VEC3 rec;
     anmData = (f32*)fn_8008A664(self->scale, nodeData, anmData, frame);
     mtx34_identity(self->mat);
     fn_8008CF2C(&rec.x, nodeData, anmData, frame);
@@ -1382,7 +1379,6 @@ void fn_8008D528(ResAnmChrObj* self, const u16* info, ResAnmChrNodeData* nodeDat
     f32* anmData = nodeData->anms;
     nw4r::math::VEC3 rec;
 
-    VEC3_ctor(&rec);
     anmData = (f32*)fn_8008A664(self->scale, nodeData, anmData, frame);
     anmData = (f32*)fn_8008C038(self->mat, self->pos, info, nodeData, anmData, frame);
     fn_8008CF2C(&rec.x, nodeData, anmData, frame);
@@ -1451,7 +1447,7 @@ void anm_chr_result_scale_get(ResAnmChrObj* self, f32* out)
         out[1] = 1.0f;
         out[2] = 1.0f;
     } else {
-        copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->scale);
+        *(nw4r::math::VEC3*)out = *((const nw4r::math::VEC3*)self->scale);
     }
 }
 
@@ -1475,7 +1471,7 @@ s32 anm_chr_result_rot_get(ResAnmChrObj* self, f32* out)
         return 1;
     }
     if (self->flags & 0x80000000) {
-        copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->pos);
+        *(nw4r::math::VEC3*)out = *((const nw4r::math::VEC3*)self->pos);
         return 1;
     }
     r = sqrt_f32(1.0f - self->mat[8] * self->mat[8]);
@@ -1616,7 +1612,7 @@ void anm_chr_result_scale_set(ResAnmChrObj* self, const f32* out)
             self->flags = t | 0x10;
         }
     }
-    copyVec3((nw4r::math::VEC3*)self->scale, (const nw4r::math::VEC3*)out);
+    *(nw4r::math::VEC3*)self->scale = *((const nw4r::math::VEC3*)out);
 }
 
 void anm_chr_result_rot_set(ResAnmChrObj* self, const f32* out)
@@ -1653,14 +1649,12 @@ void anm_chr_result_rot_set(ResAnmChrObj* self, const f32* out)
         self->mat[9] = 0.0f;
         self->mat[10] = 1.0f;
     } else {
-        nw4r::math::VEC3 rec;
-
-        setVec3(&rec, self->mat[3], self->mat[7], self->mat[11]);
+        nw4r::math::VEC3 rec(self->mat[3], self->mat[7], self->mat[11]);
         mtx34_rot_xyz_deg(self->mat, out[0], out[1], out[2]);
         self->mat[3] = rec.x;
         self->mat[7] = rec.y;
         self->mat[11] = rec.z;
-        copyVec3((nw4r::math::VEC3*)self->pos, (const nw4r::math::VEC3*)out);
+        *(nw4r::math::VEC3*)self->pos = *((const nw4r::math::VEC3*)out);
         self->flags &= ~0x26;
     }
     self->flags |= 0x80000000;
@@ -1732,8 +1726,6 @@ void anm_chr_result_trans_set(ResAnmChrObj* self, const f32* out)
 void anm_chr_result_mtx_set(ResAnmChrObj* self, const void* src)
 {
     u32 valid;
-    nw4r::math::VEC3 rec;
-    f32 norm[3];
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
@@ -1743,13 +1735,13 @@ void anm_chr_result_mtx_set(ResAnmChrObj* self, const void* src)
     if (!valid) {
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x672, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.", src);
     }
-    setVec3(&rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
+    nw4r::math::VEC3 rec(fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
     anm_chr_result_scale_set(self, (const f32*)&rec);
     if (self->flags & 8) {
         mtx34_copy_ps((Mtx34*)self->mat, (const Mtx34*)src);
     } else {
-        setVec3((nw4r::math::VEC3*)norm, math_reciprocal(rec.x), math_reciprocal(rec.y), math_reciprocal(rec.z));
-        nw4r::math::MTX34Scale(reinterpret_cast<nw4r::math::MTX34*>(self->mat), static_cast<const nw4r::math::MTX34*>(src), reinterpret_cast<const nw4r::math::VEC3*>(norm));
+        nw4r::math::VEC3 norm(math_reciprocal(rec.x), math_reciprocal(rec.y), math_reciprocal(rec.z));
+        nw4r::math::MTX34Scale(reinterpret_cast<nw4r::math::MTX34*>(self->mat), static_cast<const nw4r::math::MTX34*>(src), &norm);
     }
     self->flags &= 0x7FFFFFFF;
 }

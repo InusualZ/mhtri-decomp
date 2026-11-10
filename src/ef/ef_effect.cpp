@@ -58,7 +58,7 @@
 #include "nw4r/math.h"
 #define MHTRI_EF_EFFECT_OWNER /* the full nw4r::ef::Effect of ef/ef_effect.h */
 #include "ef/ef_effect.h" /* nw4r::ef::Effect and ReferencedObject, the unit's own header */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_effectsystem.h" /* EfSys and its memory manager (rule 1) */
 #include "nw4r/ut_list.h" /* nw4r::ut::List_* (rule 2) */
@@ -144,7 +144,6 @@ void mtx34_copy_ps(MTX34* dst, const MTX34* src);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 
 /* This unit's own symbols (address order). */
-inline EfEffActivityList* fn_800A3FFC(EfEffActivityList* list, u16 offset);
 inline void fn_800A4030(EfEffActivityList* list, u16 offset);
 u32 fn_800A4474(EfEff* self, EfEffEmitter* em);
 void fn_800A45DC(EfEffActivityList* list, void* node);
@@ -202,9 +201,8 @@ void* fn_800A5484(nw4r::ef::ResEmitter* res);
 #pragma dont_inline on
 
 /* 0x800A3FFC (0x34): builds an activity list whose elements carry their link at `offset`. */
-extern "C" inline EfEffActivityList* fn_800A3FFC(EfEffActivityList* list, u16 offset) {
-    fn_800A4030(list, offset);
-    return list;
+inline EfEffActivityList::EfEffActivityList(u16 offset) {
+    fn_800A4030(this, offset);
 }
 
 /* 0x800A4030 (0x50): sets both lists' link offset and clears the live count. */
@@ -215,10 +213,7 @@ extern "C" inline void fn_800A4030(EfEffActivityList* list, u16 offset) {
 }
 
 /* 0x800A3F98 (0x64): builds the effect: the base, its emitter group, the root matrix and velocity, the draw list. */
-nw4r::ef::Effect::Effect() {
-    fn_800A3FFC(&mEmitters, 0x14);
-    MTX34_ctor(&mRootMtx);
-    VEC3_ctor(&mVelocity);
+nw4r::ef::Effect::Effect() : mEmitters(0x14) {
     nw4r::ut::List_Init((nw4r::ut::List*)&mDrawList, 0x30);
 }
 
@@ -492,7 +487,7 @@ void nw4r::ef::Effect::Calc(u32 flag) {
             if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 1) {
                 node->mField_0xB4 = 0;
             }
-            copyVec3(&node->mField_0x114, &node->mField_0x108);
+            node->mField_0x114 = node->mField_0x108;
             EfEffEmitter* child = NULL;
             while ((child = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&node->mChildren, child)) != NULL) {
                 fn_800AE500(child, 0);
@@ -597,7 +592,6 @@ void nw4r::ef::Effect::Calc(u32 flag) {
             fn_800AE5B0(child);
         }
         MTX34 mtx;
-        MTX34_ctor(&mtx);
         ef_emitter_get_mtx(node, &mtx);
         node->mField_0x108.x = mtx.m[0][3];
         node->mField_0x108.y = mtx.m[1][3];

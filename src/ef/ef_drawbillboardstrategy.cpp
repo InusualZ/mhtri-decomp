@@ -57,7 +57,7 @@
 #include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "gx.h"
 #include "sys_mem.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/fn_800AEE48.h" /* ef_vec3_normalize / ef_pm_next_alive / ef_pm_prev_alive, owned by ef_drawstripestrategy.cpp's range (rule 2) */
 #include "ef/ef_drawstripestrategy.h" /* the walker family ef_ahead_manager_axis_y..ef_ahead_move_dir (rule 2) */
@@ -204,9 +204,6 @@ extern "C" {
 /* 0x800B9DF8 (0x3E8): draws every particle as a camera-facing quad, rolled with the view unless the type option is
  * the no-roll billboard. */
 void ef_billboard_draw_normal(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
-    MTX34 view;
-    MTX34 mtx;
-    EfVec2 pivot;
     EfEmitterDrawSetting* ed;
     u32 use_tex;
     f32 axis_x;
@@ -223,15 +220,15 @@ void ef_billboard_draw_normal(nw4r::ef::DrawBillboardStrategy* self, const EfDra
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_billboard_file_str, 528, ef_billboard_pm_assert_str, pm);
     }
-    MTX34_ctor(&view);
+    MTX34 view;
     ef_draw_info_view_mtx(info, &view);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     ef_billboard_setup_gx(self, info, pm);
     use_tex = self->mNumTexmap != 0;
-    VEC2_ctor(&pivot);
+    nw4r::math::VEC2 pivot;
     pivot.x = ed->scale_a / ef_billboard_percent;
     pivot.y = ed->scale_b / ef_billboard_percent;
-    MTX34_ctor(&mtx);
+    MTX34 mtx;
     ef_pm_get_mtx(pm, &mtx);
     mtx34_concat(&mtx, &view, &mtx);
     axis_x = ef_mtx34_column_length((const f32*)&mtx, 0);
@@ -328,13 +325,11 @@ inline void ef_billboard_quad_corners(register VEC3* out, register const EfDrawP
 void ef_billboard_normal_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParticle* p, const MTX34* mtx,
                               f32 axis_x, f32 axis_y, f32 unused, f32 cos_roll, f32 sin_roll, f32 scale_x,
                               f32 scale_y, const EfVec2* pivot, u32 flags) {
-    VEC3 corner[4];
-    VEC3 rotate;
 
     if (!IsValidPointer((u32)p)) {
         nw4r::db::Panic(ef_billboard_quad_file_str, 136, ef_billboard_quad_particle_str, p);
     }
-    VEC3_ctor(&rotate);
+    VEC3 rotate;
     ef_particle_get_rotate(p, (Vec3*)&rotate);
     if (0.0f != rotate.z) {
         VEC3 center;
@@ -364,10 +359,6 @@ void ef_billboard_normal_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParti
         f32 g;
         f32 h;
 
-        VEC3_ctor(&center);
-        VEC3_ctor(&pos);
-        VEC3_ctor(&edge_a);
-        VEC3_ctor(&edge_b);
         mtx34_mult_vec3(&center, mtx, (const VEC3*)&p->world_pos);
         px = pivot->x;
         py = pivot->y;
@@ -403,10 +394,7 @@ void ef_billboard_normal_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParti
     } else {
         VEC3* out;
 
-        VEC3_ctor(&corner[0]);
-        VEC3_ctor(&corner[1]);
-        VEC3_ctor(&corner[2]);
-        VEC3_ctor(&corner[3]);
+        VEC3 corner[4];
         out = corner;
         ef_billboard_quad_corners(out, p, mtx, pivot, axis_x, axis_y, cos_roll, sin_roll, scale_x, scale_y);
         GXBegin(0x80, 0, 4);
@@ -432,9 +420,7 @@ void ef_billboard_normal_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParti
 
 /* 0x800BA854 (0x3DC): draws every live particle as a quad that turns about its Y axis toward the view. */
 void ef_billboard_draw_y(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
-    MTX34 view;
-    MTX34 mtx;
-    EfVec2 pivot;
+    nw4r::math::_VEC2 pivot;
     EfEmitterDrawSetting* ed;
     u32 use_tex;
     f32 axis_x;
@@ -451,13 +437,13 @@ void ef_billboard_draw_y(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_billboard_file_str, 593, ef_billboard_pm_assert_str, pm);
     }
-    MTX34_ctor(&view);
+    MTX34 view;
     ef_draw_info_view_mtx(info, &view);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     ef_billboard_setup_gx(self, info, pm);
     use_tex = self->mNumTexmap != 0;
     ef_billboard_vec2_set((f32*)&pivot, ed->scale_a / ef_billboard_percent, ed->scale_b / ef_billboard_percent);
-    MTX34_ctor(&mtx);
+    MTX34 mtx;
     ef_pm_get_mtx(pm, &mtx);
     mtx34_concat(&mtx, &view, &mtx);
     axis_x = ef_mtx34_column_length((const f32*)&mtx, 0);
@@ -492,7 +478,7 @@ void ef_billboard_draw_y(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo
         }
         self->SetupGP(p, *ed, *info, first, false);
         first = false;
-        ef_billboard_y_quad(self, p, &mtx, axis_x, axis_y, unused, view_y, view_z, scale_x, scale_y, &pivot, use_tex);
+        ef_billboard_y_quad(self, p, &mtx, axis_x, axis_y, unused, view_y, view_z, scale_x, scale_y, (EfVec2*)&pivot, use_tex);
     }
 }
 
@@ -501,11 +487,6 @@ void ef_billboard_draw_y(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo
 void ef_billboard_y_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParticle* p, const MTX34* mtx, f32 axis_x,
                          f32 axis_y, f32 unused, f32 view_y, f32 view_z, f32 scale_x, f32 scale_y,
                          const EfVec2* pivot, u32 flags) {
-    VEC3 rotate;
-    VEC3 center;
-    VEC3 pos;
-    VEC3 edge_a;
-    VEC3 edge_b;
     f32 yy;
     f32 yz;
     f32 px;
@@ -514,17 +495,17 @@ void ef_billboard_y_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParticle* 
     if (!IsValidPointer((u32)p)) {
         nw4r::db::Panic(ef_billboard_y_quad_file_str, 380, ef_billboard_y_quad_particle_str, p);
     }
-    VEC3_ctor(&rotate);
+    VEC3 rotate;
     ef_particle_get_rotate(p, (Vec3*)&rotate);
-    VEC3_ctor(&center);
+    VEC3 center;
     mtx34_mult_vec3(&center, mtx, (const VEC3*)&p->world_pos);
     yy = axis_y * view_y;
     yz = axis_y * view_z;
     px = pivot->x;
     py = pivot->y;
-    VEC3_ctor(&pos);
-    VEC3_ctor(&edge_a);
-    VEC3_ctor(&edge_b);
+    VEC3 pos;
+    VEC3 edge_a;
+    VEC3 edge_b;
     if (ef_billboard_zero != rotate.z) {
         f32 sin_z;
         f32 cos_z;
@@ -574,9 +555,6 @@ void ef_billboard_y_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParticle* 
  * the draw setting asks for it. */
 void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const EfDrawInfo* info,
                                    EfDrawParticleManager* pm) {
-    MTX34 view;
-    MTX34 mtx;
-    EfVec2 pivot;
     EfEmitterDrawSetting* ed;
     u32 use_tex;
     f32 axis_x;
@@ -591,15 +569,15 @@ void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const 
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_billboard_file_str, 662, ef_billboard_pm_assert_str, pm);
     }
-    MTX34_ctor(&view);
+    MTX34 view;
     ef_draw_info_view_mtx(info, &view);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     ef_billboard_setup_gx(self, info, pm);
     use_tex = self->mNumTexmap != 0;
-    VEC2_ctor(&pivot);
+    nw4r::math::VEC2 pivot;
     pivot.x = ed->scale_a / ef_billboard_percent;
     pivot.y = ed->scale_b / ef_billboard_percent;
-    MTX34_ctor(&mtx);
+    MTX34 mtx;
     ef_pm_get_mtx(pm, &mtx);
     mtx34_concat(&mtx, &view, &mtx);
     axis_x = ef_mtx34_column_length((const f32*)&mtx, 0);
@@ -617,7 +595,6 @@ void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const 
         f32 cos_dir;
         f32 sin_dir;
         f32 stretch;
-        VEC3 ahead;
 
         if (ef_get_life_status(p) != 1) {
             continue;
@@ -632,7 +609,7 @@ void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const 
         }
         self->SetupGP(p, *ed, *info, first, false);
         first = false;
-        VEC3_ctor(&ahead);
+        VEC3 ahead;
         calc_ahead(&ahead, &ctx, p);
         mtx34_rotate_vec3(&ahead, &mtx, &ahead);
         length = sqrt_f32(ahead.x * ahead.x + ahead.y * ahead.y);
@@ -648,7 +625,6 @@ void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const 
         if (ed->type_option2 != 0) {
             VEC3 move;
 
-            VEC3_ctor(&move);
             ef_particle_get_move_dir(p, &move);
             stretch += 0.5f * sqrt_f32(vec3_dot((const f32*)&move, (const f32*)&move)) / scale_y;
         }
@@ -662,10 +638,6 @@ void ef_billboard_draw_directional(nw4r::ef::DrawBillboardStrategy* self, const 
 void ef_billboard_directional_quad(nw4r::ef::DrawBillboardStrategy* self, EfDrawParticle* p, const MTX34* mtx,
                                    f32 axis_x, f32 axis_y, f32 unused, f32 cos_dir, f32 sin_dir, f32 scale_x,
                                    f32 scale_y, f32 stretch, const EfVec2* pivot, u32 flags) {
-    VEC3 center;
-    VEC3 pos;
-    VEC3 edge_a;
-    VEC3 edge_b;
     f32 px;
     f32 py;
     f32 xc;
@@ -682,7 +654,7 @@ void ef_billboard_directional_quad(nw4r::ef::DrawBillboardStrategy* self, EfDraw
     if (!IsValidPointer((u32)p)) {
         nw4r::db::Panic(ef_billboard_dir_quad_file_str, 458, ef_billboard_dir_quad_particle_str, p);
     }
-    VEC3_ctor(&center);
+    VEC3 center;
     mtx34_mult_vec3(&center, mtx, (const VEC3*)&p->world_pos);
     px = pivot->x;
     py = pivot->y;
@@ -692,13 +664,13 @@ void ef_billboard_directional_quad(nw4r::ef::DrawBillboardStrategy* self, EfDraw
     ys = axis_y * sin_dir;
     ox = px - scale_x * px;
     oy = scale_y * ((stretch + py) - ef_billboard_one) - py;
-    setVec3(&pos, center.x + (xc * ox + ys * oy), center.y + (xs * ox - yc * oy), center.z);
+    VEC3 pos(center.x + (xc * ox + ys * oy), center.y + (xs * ox - yc * oy), center.z);
     a = xc * scale_x;
     b = xs * scale_x;
     c = stretch * (ys * scale_y);
     d = stretch * (yc * scale_y);
-    setVec3(&edge_a, a - c, b + d, ef_billboard_zero);
-    setVec3(&edge_b, a + c, b - d, ef_billboard_zero);
+    VEC3 edge_a(a - c, b + d, ef_billboard_zero);
+    VEC3 edge_b(a + c, b - d, ef_billboard_zero);
     ef_billboard_write_quad(self, &pos, (Vec*)&edge_a, (Vec*)&edge_b, flags);
 }
 
@@ -763,29 +735,24 @@ void ef_billboard_vec2_set(f32* dst, f32 x, f32 y) {
 
 /* The stripe writer (first copy): four vertices from the matrix and two positions. */
 void ef_billboard_write_quad(void* unused, void* mtx, Vec* a, Vec* b, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
     GXBegin(0x80, 0, 4);
-    subVec3(&v0, mtx, a);
-    ef_billboard_gx_position(&v0);
+    VEC3 v0 = *(const VEC3*)mtx - *(const VEC3*)a;
+    ef_billboard_gx_position((Vec*)&v0);
     if (ef_billboard_tex_flag(flags) != 0) {
         ef_billboard_gx_u8(0);
     }
-    subVec3(&v1, mtx, b);
-    ef_billboard_gx_position(&v1);
+    VEC3 v1 = *(const VEC3*)mtx - *(const VEC3*)b;
+    ef_billboard_gx_position((Vec*)&v1);
     if (ef_billboard_tex_flag(flags) != 0) {
         ef_billboard_gx_u8(1);
     }
-    addVec3((VEC3*)&v2, (VEC3*)mtx, (VEC3*)a);
-    ef_billboard_gx_position(&v2);
+    VEC3 v2 = *(const VEC3*)mtx + *(const VEC3*)a;
+    ef_billboard_gx_position((Vec*)&v2);
     if (ef_billboard_tex_flag(flags) != 0) {
         ef_billboard_gx_u8(2);
     }
-    addVec3((VEC3*)&v3, (VEC3*)mtx, (VEC3*)b);
-    ef_billboard_gx_position(&v3);
+    VEC3 v3 = *(const VEC3*)mtx + *(const VEC3*)b;
+    ef_billboard_gx_position((Vec*)&v3);
     if (ef_billboard_tex_flag(flags) != 0) {
         ef_billboard_gx_u8(3);
     }
@@ -842,45 +809,37 @@ void ef_billboard_ahead_younger(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
         PSVECSubtract((f32*)out, (const f32*)&em->world_pos, (const f32*)&args->pos);
     }
     if (ef_vec3_normalize(out) == 0) {
-        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
+        *(nw4r::math::VEC3*)out = args->prev_pos;
     }
 }
 
 /* Resolves the ahead-context position of one particle from its two neighbour particles. */
 void ef_billboard_ahead_neighbours(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
-    Vec a;
-    Vec b;
-    Vec c;
-    Vec d;
     EfWalkerObj* first = (EfWalkerObj*)ef_pm_next_alive(args->particle, em);
     EfWalkerObj* second = (EfWalkerObj*)ef_pm_prev_alive(args->particle, em);
 
-    setVec3((nw4r::math::VEC3*)&a, ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
+    VEC3 a(ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
     if (first != 0) {
         PSVECSubtract((f32*)&a, (const f32*)&first->world_pos, (const f32*)&em->world_pos);
-        if (ef_vec3_normalize(&a) == 0) {
-            copyVec3((nw4r::math::VEC3*)&a, setVec3((nw4r::math::VEC3*)&c, ef_billboard_zero, ef_billboard_zero,
-                                                      ef_billboard_zero));
+        if (ef_vec3_normalize((Vec*)&a) == 0) {
+            a = VEC3(ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
         }
     }
-    setVec3((nw4r::math::VEC3*)&b, ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
+    VEC3 b(ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
     if (second != 0) {
         PSVECSubtract((f32*)&b, (const f32*)&second->world_pos, (const f32*)&em->world_pos);
-        if (ef_vec3_normalize(&b) == 0) {
-            copyVec3((nw4r::math::VEC3*)&b, setVec3((nw4r::math::VEC3*)&d, ef_billboard_zero, ef_billboard_zero,
-                                                      ef_billboard_zero));
+        if (ef_vec3_normalize((Vec*)&b) == 0) {
+            b = VEC3(ef_billboard_zero, ef_billboard_zero, ef_billboard_zero);
         }
     }
     PSVECSubtract((f32*)out, (const f32*)&a, (const f32*)&b);
     if (ef_vec3_normalize(out) == 0) {
-        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
+        *(nw4r::math::VEC3*)out = args->prev_pos;
     }
 }
 
 /* Sets the stripe GX state (texcoord array, vertex format and position matrix). */
 void ef_billboard_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* em, EfDrawParticleManager* args) {
-    Mtx34 mtx;
-
     (void)(IsValidPointer((u32)args) ||
            (nw4r::db::Panic(ef_billboard_file_str, 746, ef_billboard_pm_assert_str, args), 0));
     self->InitGraphics(args, *(EfEmitterDrawSetting*)ef_resource_draw_setting(args->resource), *em);
@@ -893,7 +852,7 @@ void ef_billboard_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* e
     }
     GXSetVtxAttrFmt(0, 9, 1, 4, 0);
     GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
-    MTX34_ctor(&mtx);
+    Mtx34 mtx;
     mtx34_identity(&mtx);
     GXLoadPosMtxImm(mtx34_get_ptr(&mtx), 0);
     GXSetCurrentMtx(0);

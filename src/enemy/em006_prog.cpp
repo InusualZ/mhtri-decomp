@@ -32,7 +32,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/enemy_control.h"
@@ -79,7 +79,6 @@
 #define em_fall_height_get_c1 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 #define em_roll_cooldown_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u16, u16, s16*))em_roll_cooldown_ck)
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 #define draw_shape_arm_c1 ((void (*)(struct _ENEMY_WORK*, u32, u32))draw_shape_arm)
 #define UpdateValue_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))UpdateValue)
 #define em_act_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
@@ -186,21 +185,14 @@ extern "C" const u32 em006_turn_seq_1[16] = {
 /* data                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* A point and its per-frame step, built by MWCC's `__sinit` (0x801C28FC): each vector is set through `setVec3` into
- * a temporary and copied with `assignVec3`.  size: 0x18 */
+/* A point and its per-frame step, built by MWCC's `__sinit` (0x801C28FC): each vector is constructed into
+ * a temporary and copied (`EmSeShift`).  size: 0x18 */
 struct Em006VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, 0) and (0, dy, 0). */
-    Em006VecPair(f32 y, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&pos, setVec3(&a, 0.0f, y, 0.0f));
-        assignVec3_c1(&step, setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em006VecPair(f32 y, f32 dy) : pos(0.0f, y, 0.0f), step(0.0f, dy, 0.0f) {}
 };
 
 /* The three vector pairs (`.bss`, defined at the end); three sound records point at them. */
@@ -273,10 +265,7 @@ s32 em006_front_blocked_ck(struct _ENEMY_WORK* self)
 {
     VEC3 ofs;
     VEC3 to;
-    VEC3 sum;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&to);
     if (em_parts_damage_level_get(self, 0) >= 2) {
         return 0;
     }
@@ -284,8 +273,7 @@ s32 em006_front_blocked_ck(struct _ENEMY_WORK* self)
     ofs.y = 0.0f;
     ofs.z = 400.0f + 130.0f * get_em_chg_scale(self);
     rotVecY(&ofs, self->field_0x1C0);
-    addVec3(&sum, &self->pos, &ofs);
-    copyVec3(&to, &sum);
+    to = self->pos + ofs;
     return pl_coll_sweep_ck(&self->pos, &to, 155.0f, 1, 0x100, self->area_no, em_hit_mask_get(self)) != 0;
 }
 
@@ -320,7 +308,6 @@ void em006_init(struct _ENEMY_WORK* self, u8 mode)
 {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (mode) {
     case 2:
         switch (stage_map_kind_get(self->field_0x1E0)) {
@@ -666,7 +653,6 @@ void em006_act1_6(struct _ENEMY_WORK* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1287,7 +1273,6 @@ void em006_act6_3(struct _ENEMY_WORK* self, u8 kind)
     VEC3 pos;
     f32 dist;
 
-    VEC3_ctor(&pos);
     em_fx_flag2_set(self);
     if (kind == 2) {
         em_busy_set(self);
@@ -1371,7 +1356,6 @@ void em006_act6_E(struct _ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
@@ -1415,7 +1399,6 @@ void em006_act6_F(struct _ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_fx_flag2_set(self);
     switch (self->state) {
     case 0:
@@ -1674,7 +1657,6 @@ void em006_act7_7(struct _ENEMY_WORK* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1827,7 +1809,6 @@ void em006_act7_10(struct _ENEMY_WORK* self, u8 turn)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2545,7 +2526,6 @@ void em006_act13_0(struct _ENEMY_WORK* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     em_frame_flag_set(self);
     switch (self->state) {
     case 0:
@@ -2776,7 +2756,6 @@ void em006_alt_mode_effect(struct _ENEMY_WORK* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (em_alt_mode_ck(self) == 1 && system_w.field_0x0c % 20 == 0) {
         setVector3(&pos, 0.0f, -20.0f, 100.0f);
         eft_spawn_type10(self, 0xE, 0x18, &pos, 1.0f);
@@ -2791,12 +2770,10 @@ void em006_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
     VEC3 pos;
     _CP_VECTOR rot;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
     switch (kind) {
     case 0:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
             if ((self->field_0x228 & 6) != 0) {
                 pos.y = 5.0f + self->field_0x210;
             } else {
@@ -2830,7 +2807,6 @@ void em006_motion_events(struct _ENEMY_WORK* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     em006_alt_mode_effect(self);
     switch (em_get_mot_no(self)) {
     case 0x2:

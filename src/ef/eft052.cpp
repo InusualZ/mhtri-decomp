@@ -70,8 +70,8 @@
 #include "sound/fn_800D7F54.h"           /* sysSE_req / shell_se_req */
 #include "stage/stg_w.h"                 /* get_now_areano */
 #include "ef/fn_800CDB2C.h"               /* ran_suu */
-#include "mh3_pad.h"                     /* copyVec3 */
-#include "g3d/g3d_calcworld.h"           /* addVec3To */
+#include "mh3_pad.h"                     /* VEC3::operator= */
+#include "g3d/g3d_calcworld.h"           /* VEC3::operator+= */
 #include "ef/get_move_work_adrs.h"       /* get_move_work_adrs */
 #include "MSL_C/strcat.h"                /* strcat */
 #include "lobby/spr_data_copy.h"         /* spr_data_copy */
@@ -79,8 +79,6 @@
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 /* One 0x1C-byte part slot of the work block below: the pooled model handle `eft_res_model_get` hands back
  * and the byte that says whether the slot has been placed. */
@@ -245,9 +243,6 @@ extern "C" void fn_80358B40(_EFT* self)
     f32 dist;
     u8 speed;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     for (i = 0, slot = work->slots_0x04; i < work->count_0x00; i++, slot++) {
         switch (slot->phase_0x04) {
         case 0:
@@ -272,14 +267,14 @@ extern "C" void fn_80358B40(_EFT* self)
                 vec_to_mh_vec3(&from, &work->paths_0x40[work->path_0x3D * 2]);
                 vec_to_mh_vec3(&to, &work->paths_0x40[work->path_0x3D * 2 + 1]);
             }
-            copyVec3(&dir, &VEC3_SUB(&to, &from));
+            dir = *(&(to - from));
             dist = vec3_distance(&to, &from);
             speed = ((u16)ran_suu(1) % 5 + 18) * 2;
             vec3_normalize_into(&dir, &dir);
-            copyVec3(&slot->vel_0x08, &VEC3_SCALE(&dir, (f32)speed));
+            slot->vel_0x08 = *(&(dir * ((f32)speed)));
             slot->timer_0x14 = dist / (f32)speed;
             slot->model_0x00->field_0x2C = calcVecAng2(&from, &to);
-            copyVec3(&slot->model_0x00->pos_0x04, &from);
+            slot->model_0x00->pos_0x04 = from;
             slot->variant_0x16 = (u16)ran_suu(1) % 2;
             slot->frame_0x17 = slot->variant_0x16 * 5;
             slot->phase_0x04++;
@@ -287,7 +282,7 @@ extern "C" void fn_80358B40(_EFT* self)
         case 1:
             if (slot->timer_0x14 < 0)
                 slot->phase_0x04++;
-            addVec3To(&slot->model_0x00->pos_0x04, &slot->vel_0x08);
+            slot->model_0x00->pos_0x04 += slot->vel_0x08;
             slot->anim_0x18--;
             if (slot->anim_0x18 <= 0) {
                 slot->frame_0x17++;
@@ -326,7 +321,6 @@ extern "C" u8 eft052_part_damage_ck(_ENEMY_WORK* self, u32 part)
     f32 near_dist;
     f32 far_dist;
 
-    VEC3_ctor(&v);
 
     switch ((u8)part) {
     case 0:

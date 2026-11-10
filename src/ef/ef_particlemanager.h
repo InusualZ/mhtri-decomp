@@ -40,6 +40,7 @@ s32 fn_800AB9F4(struct EfPmManager* self);
 namespace nw4r {
 namespace ef {
 class Emitter;
+struct DrawInfo;
 } // namespace ef
 } // namespace nw4r
 
@@ -57,10 +58,10 @@ struct ParticleManager : ParticleManagerHead {
     virtual void slot_0x0C();
     /* untyped: opaque handle - the emitter resource, passed through */
     virtual s32 Initialize(nw4r::ef::Emitter* emitter, void* resource);
-    virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, const MTX34* space, f32 momentum, u8* inherit, u32 reference,
+    virtual void CreateParticle(u16 life, _VEC3 pos, _VEC3 vel, const MTX34* space, f32 momentum, u8* inherit, u32 reference,
                                 u16 remain);
     virtual void Calc();                              /* +0x18: `ParticleManager::Calc` */
-    virtual void Draw(const struct EfDrawInfo* info); /* +0x1C: `ParticleManager::Draw` */
+    virtual void Draw(const nw4r::ef::DrawInfo* info); /* +0x1C: `ParticleManager::Draw` */
 }; /* size: 0x20 */
 #endif
 

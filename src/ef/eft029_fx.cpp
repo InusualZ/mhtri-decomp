@@ -32,7 +32,7 @@
 #include "unsplit/unknown.h"
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "fn_8004CAD8.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "ef/effect.h" /* effect_move / change_paramscale_eff (rule 2) */
 #include "ef/eft_res.h" /* eft_res_slot_get / eft_res_models_spawn / eft_res_model_get (rule 2) */
 #include "ef/eft001.h" /* mtx34_set_trans (rule 2) */
@@ -45,7 +45,7 @@
 #include "Pl/pl_act.h" /* the player act queries (rule 2) */
 #include "Pl/fn_802840DC.h"
 #include "sound/se_req.h" /* the player SE requests (rule 2) */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 #include "rotLocalMatX.h" /* rotLocalMatX (rule 2) */
 #include "stage/get_now_mapno.h" /* get_now_mapno (rule 2) */
@@ -168,9 +168,6 @@ u8 eft029_effect_counts[24] = {
 
 /* The by-value spellings of the out-pointer vector helpers (the result pointer is the hidden first argument either
  * way): retail builds each result in a compiler temporary, in call order. */
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 /* `change_color_scale_eff` with its parameters in the owner's order: the scale is the fifth (its own prologue saves f1
  * between r6 and r7, and the payload stores it before the position). */
@@ -380,7 +377,6 @@ extern "C" void eft029_start_effects(_EFT* self)
     u8* col;
     s32 i;
 
-    VEC3_ctor(&unused);
     self->state_0x05++;
     {
         u16 param;
@@ -480,12 +476,11 @@ extern "C" void eft029_start_effects(_EFT* self)
 extern "C" void eft029_start_model(_EFT* self)
 {
     _EFT029FX_WORK* work = (_EFT029FX_WORK*)self->work_0x38;
-    nw4r::math::VEC3 unused;
     s32 i;
     _PLW* plw = (_PLW*)self->source_0x30;
     f32* keys;
 
-    VEC3_ctor(&unused);
+    nw4r::math::VEC3 unused;
     self->state_0x05++;
     ((_EFT029_PL_PHYS*)plw->physics_0x13C)->chr.get_joint_wpos(2, &self->pos_0x18);
     switch (self->type_0x02) {
@@ -542,7 +537,7 @@ extern "C" void eft029_start_model(_EFT* self)
         eft029_free(self);
         return;
     }
-    copyVec3(&work->model->pos_0x04, &self->pos_0x18);
+    work->model->pos_0x04 = self->pos_0x18;
     work->model->getTevKColor(0, (_GXTevKColorID)3, &work->kcolor);
     work->kcolor.a = 0;
     work->model->setTevKColor(0, (_GXTevKColorID)3, &work->kcolor);
@@ -581,7 +576,6 @@ extern "C" void eft029_move_charge(_EFT* self)
 {
     u8 done = 0;
     nw4r::math::VEC2 uv;
-    nw4r::math::VEC3 ofs;
     _PLW* plw;
     _EFT029FX_WORK* work;
     _GXColor col;
@@ -589,8 +583,7 @@ extern "C" void eft029_move_charge(_EFT* self)
     s32 i;
     u16 act;
 
-    VEC2_ctor(&uv);
-    VEC3_ctor(&ofs);
+    nw4r::math::VEC3 ofs;
     plw = (_PLW*)self->source_0x30;
     work = (_EFT029FX_WORK*)self->work_0x38;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
@@ -675,7 +668,7 @@ extern "C" void eft029_move_charge(_EFT* self)
         ((_EFT029_PL_PHYS*)plw->physics_0x13C)->chr.get_joint_wpos(2, &self->pos_0x18);
         setVector3(&ofs, 0.0f, -20.0f, 0.0f);
         rotVecX(&ofs, plw->param_0x54);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
     } else {
         ((_EFT029_PL_PHYS*)plw->physics_0x13C)->chr.get_joint_wpos(2, &self->pos_0x18);
     }
@@ -730,7 +723,6 @@ extern "C" void eft029_move_model_keys(_EFT* self)
     f32 ang;
     s32 frame;
 
-    VEC3_ctor(&ofs);
     if (--self->timer_0x0C < 0 || eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -757,19 +749,19 @@ extern "C" void eft029_move_model_keys(_EFT* self)
         work->alpha = eftGetKeyAlpha(eft029_alpha_keys_18, self->field_0x10);
         ang = 65536.0f * getKeyData(eft029_spin_keys_18, self->field_0x10) / 360.0f;
         self->rot_0x24.y = (u16)(0.5f + ang);
-        copyVec3(&self->pos_0x18, &plw->vec_0x03C);
+        self->pos_0x18 = plw->vec_0x03C;
         setVector3(&ofs, 0.0f, 0.0f, 5.0f);
         rotVecY(&ofs, plw->field_0x058);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         self->pos_0x18.y += getKeyData(eft029_rise_keys_18, self->field_0x10);
         break;
     }
     if (self->field_0x06 < 1) {
         work->kcolor.a = work->alpha;
         work->model->setTevKColor(0, (_GXTevKColorID)3, &work->kcolor);
-        copyVec3(&work->model->pos_0x04, &self->pos_0x18);
+        work->model->pos_0x04 = self->pos_0x18;
         work->model->field_0x2C = self->rot_0x24.y;
-        copyVec3(&work->model->scale_0x1C, &work->model_scale);
+        work->model->scale_0x1C = work->model_scale;
         work->model->move(0);
         eft_res_models_spawn(self, (void**)&work->model, 2, 1, 0);
     }
@@ -802,8 +794,6 @@ extern "C" void eft029_move_model_swing(_EFT* self)
     _PLW* plw;
     _EFT029FX_WORK* work;
 
-    VEC3_ctor(&ofs);
-    MTX34_ctor(&mtx);
     plw = (_PLW*)self->source_0x30;
     work = (_EFT029FX_WORK*)self->work_0x38;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
@@ -854,11 +844,11 @@ extern "C" void eft029_move_model_swing(_EFT* self)
     rotLocalMatX(self->rot_0x24.x, &mtx);
     ((_EFT029_PL_PHYS*)plw->physics_0x13C)->chr.get_joint_wpos(7, &self->pos_0x18);
     self->pos_0x18.y = plw->ground_y_0x060;
-    addVec3To(&self->pos_0x18, &ofs);
+    self->pos_0x18 += ofs;
     mtx34_set_trans(&mtx, &self->pos_0x18);
     work->kcolor.a = work->alpha;
     work->model->setTevKColor(0, (_GXTevKColorID)3, &work->kcolor);
-    copyVec3(&work->model->scale_0x1C, &work->model_scale);
+    work->model->scale_0x1C = work->model_scale;
     work->model->move2(&mtx, 0);
     eft_res_models_spawn(self, (void**)&work->model, 2, 1, 0);
 }
@@ -876,12 +866,11 @@ extern "C" void eft029_move_effects(_EFT* self)
     nw4r::math::MTX34 mtx;
     u8* src;
 
-    MTX34_ctor(&mtx);
     plw = (_PLW*)self->source_0x30;
     work = (_EFT029FX_WORK*)self->work_0x38;
     switch (self->type_0x02) {
     case 16:
-        copyVec3(&self->pos_0x18, &plw->vec_0x03C);
+        self->pos_0x18 = plw->vec_0x03C;
         self->pos_0x18.y += 50.0f;
         cpSetRotMatrix(&self->rot_0x24, &mtx);
         mtx34_set_trans(&mtx, &self->pos_0x18);
@@ -962,15 +951,13 @@ extern "C" void eft029_move_effects(_EFT* self)
 extern "C" void eft029_move_charge2(_EFT* self)
 {
     nw4r::math::VEC2 uv;
-    nw4r::math::VEC3 tip;
     _PLW* plw;
     _EFT029FX_WORK* work;
     u32 joint;
     f32 s;
     s32 frame;
 
-    VEC2_ctor(&uv);
-    VEC3_ctor(&tip);
+    nw4r::math::VEC3 tip;
     plw = (_PLW*)self->source_0x30;
     work = (_EFT029FX_WORK*)self->work_0x38;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
@@ -1081,7 +1068,6 @@ extern "C" void eft029_move_hold(_EFT* self)
     s32 i;
     f32 s;
 
-    VEC2_ctor(&uv);
     plw = (_PLW*)self->source_0x30;
     work = (_EFT029FX_WORK*)self->work_0x38;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
@@ -1290,8 +1276,6 @@ extern "C" void eft030_start(_EFT* self)
  * height, spin and scale, and fades it in while it rises. */
 extern "C" void eft030_move(_EFT* self)
 {
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
     s32 j;
     s32 seg;
     f32 t;
@@ -1300,8 +1284,8 @@ extern "C" void eft030_move(_EFT* self)
     s32 i;
     _EFT030_WORK* work = (_EFT030_WORK*)self->work_0x38;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
     _GXColor col = { 0xFF, 0xFF, 0xFF, 0xFF };
     for (i = 0; i < work->count; i++) {
         switch (self->field_0x06) {
@@ -1337,7 +1321,7 @@ extern "C" void eft030_move(_EFT* self)
                 seg = (u8)(ran_suu(1) % work->seg_count) * 2;
                 vec_to_mh_vec3(&a, &work->path[seg]);
                 vec_to_mh_vec3(&b, &work->path[seg] + 1);
-                copyVec3(&self->pos_0x18, &VEC3_ADD(&VEC3_SCALE(&VEC3_SUB(&b, &a), t), &a));
+                self->pos_0x18 = *(&(((b - a) * t) + a));
                 self->pos_0x18.y += rise;
                 setVector3(&work->models[0]->scale_0x1C, work->scale, work->scale, work->scale);
                 work->models[0]->field_0x30 = self->field_0x10;
@@ -1366,7 +1350,7 @@ extern "C" void eft030_move(_EFT* self)
                 work->models[0]->setVisibility(self->field_0x07 * 2 + 1, 1);
                 self->demo_flag_0x08++;
             }
-            copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+            work->models[0]->pos_0x04 = self->pos_0x18;
             work->models[0]->move(0);
             eft_res_models_spawn(self, (void**)work->models, 2, 1, 0);
             break;

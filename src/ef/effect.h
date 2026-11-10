@@ -35,7 +35,6 @@ s32 effect_emitter_alive_ck(nw4r::ef::Effect* effect);
  * compares it against 1). */
 s32 eft_water_state_ck(_EFT* self);
 /* 0x800FA420 - zeroes one vector and returns it. */
-nw4r::math::VEC3* eft_vec_ctor(nw4r::math::VEC3* self);
 
 #ifdef __cplusplus
 }
@@ -67,7 +66,6 @@ extern "C" {
 f32 eft_rand_signed_half(void);
 f32 eft_rand_unit(void);
 /* 0x800FA378 - constructs a hit-shape record (a capsule box and two more vectors) and returns it. */
-struct EftShape* eft_shape_init(struct EftShape* self);
 #ifdef __cplusplus
 }
 #endif

@@ -20,7 +20,7 @@ namespace detail {
 
 /* The texture coordinates of one quad: four corners. size: 0x20 */
 struct TexCoordQuad {
-    /* +0x00 */ math::VEC2 coord[4];
+    /* +0x00 */ math::_VEC2 coord[4];
 };
 
 /* A pane's texture-coordinate quads, allocated from the layout allocator. size: 0x8 */

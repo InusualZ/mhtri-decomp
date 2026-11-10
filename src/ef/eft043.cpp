@@ -22,10 +22,10 @@
 #include "ef/effect.h"
 #include "pl.h" /* _PLW */
 #include "gx.h" /* _GXColor */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 */
-#include "fn_8004CAD8.h" /* calcVecAngXY / rotVecX / rotVecY / cpSetRotMatrix / getKeyData3 / MTX34_ctor */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) */
+#include "fn_8004CAD8.h" /* calcVecAngXY / rotVecX / rotVecY / cpSetRotMatrix / getKeyData3 / MTX34::MTX34() */
 #include "sound/fn_800DD1F0.h" /* mhchar_joint_mtx_get */
-#include "g3d/g3d_calcworld.h" /* addVec3To */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= */
 #include "ef/eft001.h" /* mtx34_set_trans */
 #include "ef/mtx34_trans_get.h"
 #include "ef/eft_stage_spawn_flag.h"
@@ -53,12 +53,6 @@ struct Eft043PlwJoints {
     /* +0x004 */ MHchar joint_0x004;
 };
 
-/* A vector built through `setVec3`, so a file-scope one is constructed by `__sinit`.  size: 0xC */
-struct Eft043Offset : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    Eft043Offset(f32 x, f32 y, f32 z) { setVec3(this, x, y, z); }
-};
-
 extern "C" {
 /* The effect ids type 0 creates, and the pool size of each type. */
 u16 eft043_effect_ids[2] = { 0x019F, 0x01A0 };
@@ -75,9 +69,9 @@ f32 eft043_scale_keys[20] = {
 }
 
 /* The joint-7 offset of each type; MWCC's `__sinit` builds them. */
-Eft043Offset eft043_offsets[2] = {
-    Eft043Offset(-10.0f, -17.0f, 87.0f),
-    Eft043Offset(-10.0f, -17.0f, 45.0f),
+nw4r::math::VEC3 eft043_offsets[2] = {
+    nw4r::math::VEC3(-10.0f, -17.0f, 87.0f),
+    nw4r::math::VEC3(-10.0f, -17.0f, 45.0f),
 };
 
 extern "C" void eft043_release(_EFT* self);
@@ -136,12 +130,9 @@ extern "C" void eft043_start(_EFT* self) {
     Eft043Work* work = (Eft043Work*)self->work_0x38;
     _PLW* plw = (_PLW*)self->source_0x30;
     nw4r::math::MTX34 mtx;
+
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 dir;
-
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&dir);
     switch (self->type_0x02) {
     case 0:
         for (i = 0; i < work->count; i++) {
@@ -163,10 +154,10 @@ extern "C" void eft043_start(_EFT* self) {
         dir.z = -mtx.m[2][2];
         calcVecAngXY(&dir, &self->rot_0x24.x, &self->rot_0x24.y);
         self->rot_0x24.z = 0;
-        copyVec3(&ofs, &eft043_offsets[self->type_0x02]);
+        ofs = eft043_offsets[self->type_0x02];
         rotVecX(&ofs, self->rot_0x24.x);
         rotVecY(&ofs, self->rot_0x24.y);
-        addVec3To(&self->pos_0x18, &ofs);
+        self->pos_0x18 += ofs;
         cpSetRotMatrix(&self->rot_0x24, &mtx);
         mtx34_set_trans(&mtx, &self->pos_0x18);
         if (self->area_0x44 == (u8)get_now_areano()) {
@@ -202,18 +193,14 @@ extern "C" void eft043_start(_EFT* self) {
  * player leaves the glowing act. */
 extern "C" void eft043_move(_EFT* self) {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 scale;
     _PLW* plw;
     Eft043Work* work;
     s32 i;
     nw4r::ef::EffectSystem* system;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&scale);
+    nw4r::math::VEC3 ofs;
+    nw4r::math::VEC3 dir;
+    nw4r::math::VEC3 scale;
     plw = (_PLW*)self->source_0x30;
     work = (Eft043Work*)self->work_0x38;
     system = eft_control.effect_system_0x04;
@@ -252,10 +239,10 @@ extern "C" void eft043_move(_EFT* self) {
     dir.z = -mtx.m[2][2];
     calcVecAngXY(&dir, &self->rot_0x24.x, &self->rot_0x24.y);
     self->rot_0x24.z = 0;
-    copyVec3(&ofs, &eft043_offsets[self->type_0x02]);
+    ofs = eft043_offsets[self->type_0x02];
     rotVecX(&ofs, self->rot_0x24.x);
     rotVecY(&ofs, self->rot_0x24.y);
-    addVec3To(&self->pos_0x18, &ofs);
+    self->pos_0x18 += ofs;
     cpSetRotMatrix(&self->rot_0x24, &mtx);
     mtx34_set_trans(&mtx, &self->pos_0x18);
     switch (self->type_0x02) {

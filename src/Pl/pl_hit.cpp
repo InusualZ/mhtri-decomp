@@ -83,14 +83,13 @@
 #include "ai/ai_npc_time_scale_get.h"
 #include "stage/shell.h"       /* `_SHELL_W`, a hit owner of kind 2 */
 #include "fn_8004CAD8.h"       /* `calcVecAng2`, `calcVecAngX2` (rule 2) */
-#include "mh3_pad.h"            /* `copyVec3` (rule 2) */
-#include "g3d/g3d_calcworld.h"  /* `addVec3To` (rule 2) */
+#include "mh3_pad.h"            /* the owner header (rule 2) */
+#include "g3d/g3d_calcworld.h"  /* `VEC3::operator+=` (rule 2) */
 #include "ef/fn_800AEE48.h"     /* `vec3_sub_assign` (rule 2) */
 #include "sound/mhchar_node_id_get.h"
 #include "Pl/pl_hit_sphere.h"   /* `PlCapsule` */
 #include "Pl/pl_joint_body.h"
-#include "ef/effect.h"            /* `eft_vec_ctor`, `eft_shape_init` (rule 2) */
-#include "ef/eft_capsule_ctor.h"
+#include "ef/effect.h"            /* `CAPSULE::CAPSULE()` (rule 2) */
 #include "sound/se_hit_bank_req.h"
 #include "sound/se_req_pos_id113_level.h"
 #include "sound/se_req_pos_id110_level.h"
@@ -123,7 +122,7 @@
 #include "ef/eft013_shell_spawn.h"
 #include "ef/eft013_set_from_sel.h"
 #include "Pl/pl_coll.h"           /* `HitSphere` (rule 2) */
-#include "fn_8004CAD8/mtx.h"        /* `MTX34_ctor` (rule 2) */
+#include "fn_8004CAD8/mtx.h"        /* `MTX34::MTX34()` (rule 2) */
 #include "sound/mhchar_joint_mtx_get.h"
 #include "enemy/em_flags836_ck.h"
 #include "enemy/em_timer_0x94A_ck.h"
@@ -1431,26 +1430,18 @@ extern "C" void hit_damage_npc(_AINPC_W* npc, _HIT_W* hit, nw4r::math::VEC3* con
  * first contact to the player. */
 extern "C" void hit_apply_pl(_HIT_W* hit, _PLW* plw)
 {
+    _HIT_SIZE_DATA* shape;
+    s32 hit_kind;
+    s32 struck;
+
     PlCapsule hit_capsule;
     PlCapsule pl_capsule;
-    HitSphere hit_sphere;
+    PlSphere hit_sphere;
     PlCapsuleBox hit_box;
     PlCapsuleBox pl_box;
     nw4r::math::VEC3 contact;
     nw4r::math::VEC3 hit_pos;
     nw4r::math::VEC3 pl_pos;
-    _HIT_SIZE_DATA* shape;
-    s32 hit_kind;
-    s32 struck;
-
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&hit_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&pl_capsule);
-    eft_vec_ctor(&hit_sphere.pos);
-    eft_shape_init((struct EftShape*)&hit_box);
-    eft_shape_init((struct EftShape*)&pl_box);
-    VEC3_ctor(&contact);
-    VEC3_ctor(&hit_pos);
-    VEC3_ctor(&pl_pos);
     pl_hit_capsule_get(plw, &pl_capsule);
     pl_capsule_box_set(&pl_capsule, &pl_box);
     shape = hit->size_data_0x08;
@@ -1466,7 +1457,7 @@ extern "C" void hit_apply_pl(_HIT_W* hit, _PLW* plw)
         if (hit_kind == 0) {
             if ((u32)pl_sphere_capsule_contact(&hit_sphere, &pl_box, &contact) == 1) {
                 struck = 1;
-                copyVec3(&hit_pos, &hit_sphere.pos);
+                hit_pos = hit_sphere.pos;
                 pl_pos.x = (pl_capsule.start.x + pl_capsule.end.x) / 2.0f;
                 pl_pos.y = (pl_capsule.start.y + pl_capsule.end.y) / 2.0f;
                 pl_pos.z = (pl_capsule.start.z + pl_capsule.end.z) / 2.0f;
@@ -1491,30 +1482,21 @@ extern "C" void hit_apply_pl(_HIT_W* hit, _PLW* plw)
  * can strike, and applies the first contact to the enemy. */
 extern "C" void hit_apply_em(_HIT_W* hit, _ENEMY_WORK* em)
 {
-    PlCapsule hit_capsule;
-    PlCapsule em_capsule;
-    HitSphere hit_sphere;
-    HitSphere em_sphere;
-    nw4r::math::VEC3 contact;
-    nw4r::math::VEC3 hit_pos;
-    nw4r::math::VEC3 em_pos;
-    PlCapsuleBox hit_box;
-    PlCapsuleBox em_box;
     _HIT_SIZE_DATA* shape;
     EmWeakPoint* part;
     s32 hit_kind;
     s32 em_kind;
     s32 struck;
 
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&hit_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&em_capsule);
-    eft_vec_ctor(&hit_sphere.pos);
-    eft_vec_ctor(&em_sphere.pos);
-    VEC3_ctor(&contact);
-    VEC3_ctor(&hit_pos);
-    VEC3_ctor(&em_pos);
-    eft_shape_init((struct EftShape*)&hit_box);
-    eft_shape_init((struct EftShape*)&em_box);
+    PlCapsule hit_capsule;
+    PlCapsule em_capsule;
+    PlSphere hit_sphere;
+    PlSphere em_sphere;
+    nw4r::math::VEC3 contact;
+    nw4r::math::VEC3 hit_pos;
+    nw4r::math::VEC3 em_pos;
+    PlCapsuleBox hit_box;
+    PlCapsuleBox em_box;
     shape = hit->size_data_0x08;
     struck = 0;
     for (; shape->joint != -1; shape++) {
@@ -1559,14 +1541,14 @@ extern "C" void hit_apply_em(_HIT_W* hit, _ENEMY_WORK* em)
                 if (em_kind == 0) {
                     if ((u32)pl_sphere_contact(&hit_sphere, &em_sphere, &contact) == 1) {
                         struck = 1;
-                        copyVec3(&hit_pos, &hit_sphere.pos);
-                        copyVec3(&em_pos, &em_sphere.pos);
+                        hit_pos = hit_sphere.pos;
+                        em_pos = em_sphere.pos;
                     }
                 } else {
                     pl_capsule_box_set(&em_capsule, &em_box);
                     if ((u32)pl_sphere_capsule_contact(&hit_sphere, &em_box, &contact) == 1) {
                         struck = 1;
-                        copyVec3(&hit_pos, &hit_sphere.pos);
+                        hit_pos = hit_sphere.pos;
                         em_pos.x = (em_capsule.start.x + em_capsule.end.x) / 2.0f;
                         em_pos.y = (em_capsule.start.y + em_capsule.end.y) / 2.0f;
                         em_pos.z = (em_capsule.start.z + em_capsule.end.z) / 2.0f;
@@ -1578,7 +1560,7 @@ extern "C" void hit_apply_em(_HIT_W* hit, _ENEMY_WORK* em)
                     hit_pos.x = (hit_capsule.start.x + hit_capsule.end.x) / 2.0f;
                     hit_pos.y = (hit_capsule.start.y + hit_capsule.end.y) / 2.0f;
                     hit_pos.z = (hit_capsule.start.z + hit_capsule.end.z) / 2.0f;
-                    copyVec3(&em_pos, &em_sphere.pos);
+                    em_pos = em_sphere.pos;
                 }
             } else {
                 pl_capsule_box_set(&em_capsule, &em_box);
@@ -1605,30 +1587,21 @@ extern "C" void hit_apply_em(_HIT_W* hit, _ENEMY_WORK* em)
  * hit's damage to it. */
 extern "C" void hit_apply_body(_HIT_W* hit, _BODY_W* body)
 {
-    PlCapsule hit_capsule;
-    PlCapsule body_capsule;
-    HitSphere hit_sphere;
-    HitSphere body_sphere;
-    nw4r::math::VEC3 contact;
-    nw4r::math::VEC3 hit_pos;
-    nw4r::math::VEC3 body_pos;
-    PlCapsuleBox hit_box;
-    PlCapsuleBox body_box;
     _HIT_SIZE_DATA* shape;
     EmWeakPoint* part;
     s32 hit_kind;
     s32 body_kind;
     s32 struck;
 
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&hit_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&body_capsule);
-    eft_vec_ctor(&hit_sphere.pos);
-    eft_vec_ctor(&body_sphere.pos);
-    VEC3_ctor(&contact);
-    VEC3_ctor(&hit_pos);
-    VEC3_ctor(&body_pos);
-    eft_shape_init((struct EftShape*)&hit_box);
-    eft_shape_init((struct EftShape*)&body_box);
+    PlCapsule hit_capsule;
+    PlCapsule body_capsule;
+    PlSphere hit_sphere;
+    PlSphere body_sphere;
+    nw4r::math::VEC3 contact;
+    nw4r::math::VEC3 hit_pos;
+    nw4r::math::VEC3 body_pos;
+    PlCapsuleBox hit_box;
+    PlCapsuleBox body_box;
     shape = hit->size_data_0x08;
     struck = 0;
     for (; shape->joint != -1; shape++) {
@@ -1646,14 +1619,14 @@ extern "C" void hit_apply_body(_HIT_W* hit, _BODY_W* body)
                 if (body_kind == 0) {
                     if ((u32)pl_sphere_contact(&hit_sphere, &body_sphere, &contact) == 1) {
                         struck = 1;
-                        copyVec3(&hit_pos, &hit_sphere.pos);
-                        copyVec3(&body_pos, &body_sphere.pos);
+                        hit_pos = hit_sphere.pos;
+                        body_pos = body_sphere.pos;
                     }
                 } else {
                     pl_capsule_box_set(&body_capsule, &body_box);
                     if ((u32)pl_sphere_capsule_contact(&hit_sphere, &body_box, &contact) == 1) {
                         struck = 1;
-                        copyVec3(&hit_pos, &hit_sphere.pos);
+                        hit_pos = hit_sphere.pos;
                         body_pos.x = (body_capsule.start.x + body_capsule.end.x) / 2.0f;
                         body_pos.y = (body_capsule.start.y + body_capsule.end.y) / 2.0f;
                         body_pos.z = (body_capsule.start.z + body_capsule.end.z) / 2.0f;
@@ -1665,7 +1638,7 @@ extern "C" void hit_apply_body(_HIT_W* hit, _BODY_W* body)
                     hit_pos.x = (hit_capsule.start.x + hit_capsule.end.x) / 2.0f;
                     hit_pos.y = (hit_capsule.start.y + hit_capsule.end.y) / 2.0f;
                     hit_pos.z = (hit_capsule.start.z + hit_capsule.end.z) / 2.0f;
-                    copyVec3(&body_pos, &body_sphere.pos);
+                    body_pos = body_sphere.pos;
                 }
             } else {
                 pl_capsule_box_set(&body_capsule, &body_box);
@@ -1701,8 +1674,6 @@ extern "C" void ai_npc_hit_capsule_get(_AINPC_W* npc, PlCapsule* out)
     nw4r::math::VEC3 unused_b;
     MHchar* chr;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
     chr = &npc->model;
     chr->get_joint_wpos(mhchar_node_id_get(chr, "NULL"), &out->start);
     chr->get_joint_wpos(mhchar_node_id_get(chr, "HD-00"), &out->end);
@@ -1713,26 +1684,18 @@ extern "C" void ai_npc_hit_capsule_get(_AINPC_W* npc, PlCapsule* out)
  * contact to the NPC. */
 extern "C" void hit_apply_npc(_HIT_W* hit, _AINPC_W* npc)
 {
+    _HIT_SIZE_DATA* shape;
+    s32 hit_kind;
+    s32 struck;
+
     PlCapsule hit_capsule;
     PlCapsule npc_capsule;
-    HitSphere hit_sphere;
+    PlSphere hit_sphere;
     PlCapsuleBox hit_box;
     PlCapsuleBox npc_box;
     nw4r::math::VEC3 contact;
     nw4r::math::VEC3 hit_pos;
     nw4r::math::VEC3 npc_pos;
-    _HIT_SIZE_DATA* shape;
-    s32 hit_kind;
-    s32 struck;
-
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&hit_capsule);
-    eft_capsule_ctor((nw4r::math::CAPSULE*)&npc_capsule);
-    eft_vec_ctor(&hit_sphere.pos);
-    eft_shape_init((struct EftShape*)&hit_box);
-    eft_shape_init((struct EftShape*)&npc_box);
-    VEC3_ctor(&contact);
-    VEC3_ctor(&hit_pos);
-    VEC3_ctor(&npc_pos);
     ai_npc_hit_capsule_get(npc, &npc_capsule);
     pl_capsule_box_set(&npc_capsule, &npc_box);
     shape = hit->size_data_0x08;
@@ -1748,7 +1711,7 @@ extern "C" void hit_apply_npc(_HIT_W* hit, _AINPC_W* npc)
         if (hit_kind == 0) {
             if ((u32)pl_sphere_capsule_contact(&hit_sphere, &npc_box, &contact) == 1) {
                 struck = 1;
-                copyVec3(&hit_pos, &hit_sphere.pos);
+                hit_pos = hit_sphere.pos;
                 npc_pos.x = (npc_capsule.start.x + npc_capsule.end.x) / 2.0f;
                 npc_pos.y = (npc_capsule.start.y + npc_capsule.end.y) / 2.0f;
                 npc_pos.z = (npc_capsule.start.z + npc_capsule.end.z) / 2.0f;
@@ -1786,30 +1749,22 @@ extern "C" void pl_hit_capsule_get(_PLW* plw, PlCapsule* out)
     nw4r::math::VEC3 leg_r;
     nw4r::math::VEC3 axis;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 tmp0;
-    nw4r::math::VEC3 tmp1;
     MHchar* chr;
 
-    VEC3_ctor(&leg_l);
-    VEC3_ctor(&leg_r);
-    VEC3_ctor(&axis);
-    VEC3_ctor(&dir);
     chr = &((PlJointBody*)plw->physics_0x13C)->chr_0x04;
     chr->get_joint_wpos(mhchar_node_id_get(chr, "LL-02"), &leg_l);
     chr->get_joint_wpos(mhchar_node_id_get(chr, "LR-02"), &leg_r);
-    addVec3(&tmp0, &leg_l, &leg_r);
-    copyVec3(&out->start, &tmp0);
+    out->start = leg_l + leg_r;
     vec3_scale_in_place(&out->start, 0.5f);
     chr->get_joint_wpos(mhchar_node_id_get(chr, "HD-00"), &out->end);
-    subVec3(&tmp1, &out->end, &out->start);
-    copyVec3(&axis, &tmp1);
+    axis = out->end - out->start;
     if (vec3_length_sq(&axis.x) > 0.001f) {
         vec3_normalize_into(&dir, &axis);
     } else {
-        copyVec3(&dir, &axis);
+        dir = axis;
     }
     vec3_scale_in_place(&dir, 40.0f);
-    addVec3To(&out->start, &dir);
+    out->start += dir;
     vec3_sub_assign((Vec*)&out->end, (Vec*)&dir);
     out->radius = 40.0f;
 }
@@ -1823,16 +1778,13 @@ extern "C" s32 em_part_sphere_get(_ENEMY_WORK* em, EmWeakPoint* part, PlCapsule*
     nw4r::math::MTX34 mtx;
     s32 result;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&ofs_b);
-    MTX34_ctor(&mtx);
     result = 0;
     ofs.x = part->offset.x;
     ofs.y = part->offset.y;
     ofs.z = part->offset.z;
     if (part->joint == 1000) {
         sphere->radius = part->radius * get_em_scale(em);
-        copyVec3(&sphere->pos, &em->pos);
+        sphere->pos = em->pos;
         cpSetRotMatrix((_CP_VECTOR*)&em->field_0x1BC, &mtx);
         mulVecMat(&ofs, &mtx);
         sphere->pos.x += ofs.x;
@@ -1883,10 +1835,6 @@ extern "C" s32 body_part_shape_get(_BODY_W* body, EmWeakPoint* part, PlCapsule* 
     void* owner;
     s32 result;
 
-    VEC3_ctor(&base);
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&ofs_b);
-    MTX34_ctor(&mtx);
     result = 0;
     if (part->joint != 1000) {
         sphere->radius = 0.0f;
@@ -1899,22 +1847,22 @@ extern "C" s32 body_part_shape_get(_BODY_W* body, EmWeakPoint* part, PlCapsule* 
         switch (body->kind) {
         case 0:
             owner = (void*)body->field_0x010;
-            copyVec3(&base, &((_PLW*)owner)->vec_0x03C);
+            base = *(&((_PLW*)owner)->vec_0x03C);
             cpSetRotMatrix(&((_PLW*)owner)->rot_0x54, &mtx);
             break;
         case 1:
             owner = (void*)body->field_0x010;
-            copyVec3(&base, &((_ENEMY_WORK*)owner)->pos);
+            base = *(&((_ENEMY_WORK*)owner)->pos);
             cpSetRotMatrix((_CP_VECTOR*)&((_ENEMY_WORK*)owner)->field_0x1BC, &mtx);
             break;
         case 2:
             owner = (void*)body->field_0x010;
-            copyVec3(&base, &((_SHELL_W*)owner)->pos_0x18);
+            base = *(&((_SHELL_W*)owner)->pos_0x18);
             cpSetRotMatrix((_CP_VECTOR*)&((_SHELL_W*)owner)->rot_x_0x24, &mtx);
             break;
         case 3:
             owner = (void*)body->field_0x010;
-            copyVec3(&base, &((_AINPC_W*)owner)->pos_0x178);
+            base = *(&((_AINPC_W*)owner)->pos_0x178);
             cpSetRotMatrix(&((_AINPC_W*)owner)->vec_0x190, &mtx);
             break;
         }
@@ -1926,22 +1874,22 @@ extern "C" s32 body_part_shape_get(_BODY_W* body, EmWeakPoint* part, PlCapsule* 
     ofs.y = part->offset.y;
     ofs.z = part->offset.z;
     mulVecMat(&ofs, &mtx);
-    addVec3To(&ofs, &base);
+    ofs += base;
     switch (part->shape) {
     case 0:
         sphere->radius = part->radius;
-        copyVec3(&sphere->pos, &ofs);
+        sphere->pos = ofs;
         result = 0;
         break;
     case 1:
         capsule->radius = part->radius;
-        copyVec3(&capsule->start, &ofs);
+        capsule->start = ofs;
         ofs_b.x = part->offset_b.x;
         ofs_b.y = part->offset_b.y;
         ofs_b.z = part->offset_b.z;
         mulVecMat(&ofs_b, &mtx);
-        addVec3To(&ofs_b, &base);
-        copyVec3(&capsule->end, &ofs_b);
+        ofs_b += base;
+        capsule->end = ofs_b;
         result = 1;
         break;
     }
@@ -1963,11 +1911,6 @@ extern "C" s32 hit_shape_get(_HIT_W* hit, _HIT_SIZE_DATA* shape, PlCapsule* caps
     s32 result;
     f32 scale;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&ofs_b);
-    VEC3_ctor(&base);
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&rot);
     result = 0;
     scale = hit->scale_0x24;
     switch (hit->owner_kind_0x06) {
@@ -1996,20 +1939,20 @@ extern "C" s32 hit_shape_get(_HIT_W* hit, _HIT_SIZE_DATA* shape, PlCapsule* caps
         sphere->radius = shape->radius * scale;
         switch (hit->owner_kind_0x06) {
         case 0:
-            copyVec3(&sphere->pos, &((_PLW*)owner)->vec_0x03C);
+            sphere->pos = *(&((_PLW*)owner)->vec_0x03C);
             cpSetRotMatrix(&((_PLW*)owner)->rot_0x54, &mtx);
             break;
         case 1:
-            copyVec3(&sphere->pos, &((_ENEMY_WORK*)owner)->pos);
+            sphere->pos = *(&((_ENEMY_WORK*)owner)->pos);
             cpSetRotMatrix((_CP_VECTOR*)&((_ENEMY_WORK*)owner)->field_0x1BC, &mtx);
             sphere->radius *= get_em_scale((_ENEMY_WORK*)owner);
             break;
         case 2:
-            copyVec3(&sphere->pos, &((_SHELL_W*)owner)->pos_0x18);
+            sphere->pos = *(&((_SHELL_W*)owner)->pos_0x18);
             cpSetRotMatrix((_CP_VECTOR*)&((_SHELL_W*)owner)->rot_x_0x24, &mtx);
             break;
         case 3:
-            copyVec3(&sphere->pos, &((_AINPC_W*)owner)->pos_0x178);
+            sphere->pos = *(&((_AINPC_W*)owner)->pos_0x178);
             cpSetRotMatrix(&((_AINPC_W*)owner)->vec_0x190, &mtx);
             break;
         }
@@ -2169,7 +2112,6 @@ extern "C" void hit_effect_spawn(_HIT_W* hit, nw4r::math::VEC3* contact, nw4r::m
     u32 deep;
     u8 fx;
 
-    VEC3_ctor(&unused);
     if ((hit->field_0x04C & 0x3F) == 0) {
         return;
     }

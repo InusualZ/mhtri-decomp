@@ -603,7 +603,7 @@ extern "C" void lobby_area_change_step(TaskSlot* task) {
              NetCtrlWk::isConnectionSettled() != 0) &&
             NetCtrlWk::pollBigDataFetch() != 0) {
             stage_area_enter(lobby_wp->field_0x001, lobby_wp->area_0x002);
-            lb_player_spawn_set(lobby_wp->spawn_0x018, lobby_wp->spawn_id_0x024, lobby_wp->field_0x001,
+            lb_player_spawn_set(&lobby_wp->spawn_pos_0x018, lobby_wp->spawn_id_0x024, lobby_wp->field_0x001,
                                 lobby_wp->area_0x002);
             lb_npc_model_release_all();
             lb_npc_map_setup();

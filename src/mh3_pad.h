@@ -11,16 +11,16 @@
  *
  * The parameter types are the record's real one, `nw4r::math::VEC3*` (see `mh3_pad/vec3.h` for the
  * evidence); they were `void*` until the type-fix pass - the erased form docs/plan.md 6.5 rule 11
- * bans.  `copyVec3`/`setVec3` return that pointer: the callers keep the first argument as the result
+ * bans.  `VEC3::operator=`/`VEC3(x, y, z)` return that pointer: the callers keep the first argument as the result
  * (`mr r4,r3` after the `bl`, e.g. `fn_80166330` in `enemy/fn_80165FC8.cpp`) and the bodies leave r3
  * untouched.
  *
  * GUESS (naming - confirm or rename when a body pass reaches the record type):
- *   * `VEC3_ctor` (0x80043EA8) - a 4-byte `blr` no-op called 1,873 times in the DOL, always with the
- *     address of a 3-float record local right after its declaration (`VEC3 v; VEC3_ctor(&v);`).  Read
+ *   * `VEC3::VEC3()` (0x80043EA8) - a 4-byte `blr` no-op called 1,873 times in the DOL, always with the
+ *     address of a 3-float record local right after its declaration (`VEC3 v; VEC3::VEC3()(&v);`).  Read
  *     as the out-of-line default constructor of that record type; being empty it is a no-op either way.
- *   * `copyVec3` (0x80041E40) / `setVec3` (0x80041E8C) - named in the sibling scheme of this band
- *     (`setVector3`, `copyMat33`, `mulVecMat`, `vec_to_mh_vec3`).  `setVec3`'s body is byte-identical
+ *   * `VEC3::operator=` (0x80041E40) / `VEC3(x, y, z)` (0x80041E8C) - named in the sibling scheme of this band
+ *     (`setVector3`, `copyMat33`, `mulVecMat`, `vec_to_mh_vec3`).  `VEC3(x, y, z)`'s body is byte-identical
  *     to the map's `setVector3__FPQ34nw4r4math4VEC3fff` (0x8004FFA8) - a second out-of-line copy of the
  *     same helper in another TU - so the name cannot be reused: the map cannot hold it twice.
  */
@@ -29,14 +29,14 @@
 
 #include "types.h"
 #include "mh3_pad/control.h"   /* get_ControlType / fn_80044B14 (rule 2) */
-#include "mh3_pad/vec3.h"      /* the three 3-float-record helpers below (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "mh3_pad/task.h"      /* `TaskSlot`, the task table entry (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* `VEC3_ctor` (0x80043EA8), `copyVec3` (0x80041E40) and `setVec3` (0x80041E8C) are declared in
+/* `VEC3::VEC3()` (0x80043EA8), `VEC3::operator=` (0x80041E40) and `VEC3(x, y, z)` (0x80041E8C) are declared in
  * `mh3_pad/vec3.h`, included above - `ef/ef_cube.cpp` needs them without `types.h`. */
 
 /* Added when `camera/fn_802B5C58.cpp` registered (rule 2): the camera accessors all start by copying a

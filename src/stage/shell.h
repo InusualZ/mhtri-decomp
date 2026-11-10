@@ -9,6 +9,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "pl.h" /* MHchar, the slot's model object (rule 1) */
 
 #ifdef __cplusplus
 
@@ -100,7 +101,8 @@ struct _SHELL_W {
 struct ShellCharaHeap {
     /* +0x000 */ u8 used_0x00;
     /* +0x001 */ u8 pad_0x01[0x3];
-    /* +0x004 */ u8 chara_0x04[0x164];     /* the `MHchar` the slot hands out */
+    /* +0x004 */ MHchar chara_0x04;          /* the model object the slot hands out */
+    /* +0x144 */ u8 pad_0x144[0x24];
 
     /* Constructs the model object; MWCC's `__sinit` runs it over `shell_chara_heap_tbl` (defined in `stage/shell.cpp`). */
     ShellCharaHeap();

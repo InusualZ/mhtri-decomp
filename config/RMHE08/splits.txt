@@ -925,14 +925,14 @@ ef/eft002.cpp:
 	.sdata      start:0x807916C8 end:0x807916E0
 	.sdata2     start:0x80796640 end:0x80796658
 
-ef/fn_800FD520.c:
+ef/eft002_create.cpp:
 	extab       start:0x8000BDFC end:0x8000BE04
 	extabindex  start:0x80025BE4 end:0x80025BF0
 	.text       start:0x800FD520 end:0x800FD718 align:16
 	.sdata      start:0x807916E0 end:0x807916E8
 	.sdata2     start:0x80796658 end:0x80796688
 
-ef/fn_800FD718.c:
+ef/eft002_follow.cpp:
 	extab       start:0x8000BE04 end:0x8000BE0C
 	extabindex  start:0x80025BF0 end:0x80025BFC
 	.text       start:0x800FD718 end:0x800FD864
@@ -976,7 +976,7 @@ ef/eft009.cpp:
 	.data       start:0x8059DBF0 end:0x8059E430
 	.sdata2     start:0x80796750 end:0x80796778
 
-ef/fn_80104BD0.c:
+ef/em_hit_eft.cpp:
 	extab       start:0x8000BFB4 end:0x8000BFBC
 	extabindex  start:0x80025E78 end:0x80025E84
 	.text       start:0x80104BD0 end:0x80105314 align:16

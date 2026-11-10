@@ -29,7 +29,7 @@
  *   (0x8012EC74, `enemy/em_common.cpp`) is declared here under STOPGAP `enemy-em012#1` until its owner's header carries it.
  * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` (`em012_motion_events`,
  *   `em012_act2_27`).  A case-level `return` at the end of a state switch costs a `b`: the steps `break`.
- *   `em_mot_finished_ck`, `em_ground_ck`, `em_fall_start`, `assignVec3` and `em_act_arm_unless_down` are called
+ *   `em_mot_finished_ck`, `em_ground_ck`, `em_fall_start`, `VEC3::operator=` and `em_act_arm_unless_down` are called
  *   through `_c1` views whose widths give retail's compares and float arguments.  The +0x3C shell-table slot is
  *   called without its table argument (`ShellRecJobFn`).  The data is defined between the functions in retail
  *   order (the jump tables fall between the definitions).
@@ -37,7 +37,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/enemy_control.h"
 #include "enemy/em_act_arm_unless_down.h"
@@ -91,7 +91,6 @@
 /* The +0x3C shell-table slot spelled without its trailing table argument: the call site passes none. */
 typedef void (*ShellRecJobFn)(struct _ENEMY_WORK* self, EmSpawnRec* rec, u32 mode);
 
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
 #define em_mot_finished_ck_c1 ((u32 (*)(struct _ENEMY_WORK*))em_mot_finished_ck)
 #define em_act_arm_unless_down_c1 ((void (*)(_ENEMY_WORK *, u8, u8))em_act_arm_unless_down)
@@ -160,21 +159,14 @@ extern "C" const u32 em012_turn_seq_2[16] = {
 /* The pick record `em012_action_select` hands `em_pack_area_pick` (`.sdata`). */
 u8 em012_pick_tbl[8] = {0x00, 0x00, 0x00, 0x1E, 0xFF, 0xFF, 0x00, 0x00};
 
-/* A model-space point and its per-frame step, built by MWCC's `__sinit` (0x80176B7C): each vector is set through
- * `setVec3` into a temporary and copied with `assignVec3`; two sound records point at the first vector.  size: 0x18 */
+/* A model-space point and its per-frame step, built by MWCC's `__sinit` (0x80176B7C): each vector is constructed
+ * into a temporary and copied (`EmSeShift`); two sound records point at the first vector.  size: 0x18 */
 struct Em012VecPair {
-    /* +0x00 */ VEC3 pos;
-    /* +0x0C */ VEC3 step;
+    /* +0x00 */ EmSeShift pos;
+    /* +0x0C */ EmSeShift step;
 
     /* Builds (0, y, z) and (0, dy, 0). */
-    Em012VecPair(f32 y, f32 z, f32 dy)
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&pos, setVec3(&a, 0.0f, y, z));
-        assignVec3_c1(&step, setVec3(&b, 0.0f, dy, 0.0f));
-    }
+    Em012VecPair(f32 y, f32 z, f32 dy) : pos(0.0f, y, z), step(0.0f, dy, 0.0f) {}
 };
 
 /* The two vector pairs `__sinit` seeds (`.bss`, defined at the end). */
@@ -281,7 +273,6 @@ void em012_init(_ENEMY_WORK *self, u8 a) {
     Vec3 v;
     u8 b, c;
 
-    VEC3_ctor(&v);
     if ((a & 0xFF) == 2) {
         em012_area_start_set(self, &b, &c);
         em_act_arm_unless_down_c1(self, b, c);
@@ -1487,7 +1478,6 @@ void em012_act7_6(_ENEMY_WORK *self) {
 void em012_act7_9(_ENEMY_WORK *self, u8 arg1) {
     EmSpawnRec rec;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2036,7 +2026,6 @@ void em012_act13_0(_ENEMY_WORK *self) {
     f32 temp_f31;
     f32 temp_f31_2;
 
-    VEC3_ctor(&sp8);
     temp_f31 = (f32) (em_demo_frame_get() * 2);
     switch (self->state) {
     case 0x0:
@@ -2175,7 +2164,7 @@ void em012_act13_1(_ENEMY_WORK *self) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xB, 0, 0);
         setVector3(&self->pos, -314.772f, 0.0f, -54.9744f);
-        copyVec3(&self->prev_pos, &self->pos);
+        self->prev_pos = self->pos;
         self->field_0x1BC = 0;
         self->field_0x1C0 = -0x2C44;
         self->field_0x1C4 = 0;
@@ -2269,7 +2258,6 @@ void em012_act13_3(_ENEMY_WORK *self) {
 void em012_act13_4(_ENEMY_WORK *self) {
     EmSpawnRec rec;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0x0:
         self->state++;
@@ -2412,7 +2400,6 @@ void em012_action_dispatch(_ENEMY_WORK* self) {
 void em012_alt_mode_effect(_ENEMY_WORK *self) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     if ((em_alt_mode_ck(self) == 1) && ((system_w.field_0x0c % 20) == 0)) {
         setVector3(&sp8, 0.0f, 10.0f, 70.0f);
         eft_spawn_type10(self, 1, 0x13, &sp8, 1.0f);
@@ -2422,7 +2409,6 @@ void em012_alt_mode_effect(_ENEMY_WORK *self) {
 void em012_effect_spawn(_ENEMY_WORK *self, u8 arg1, u8 arg2, s32 arg3, s32 arg4, f32 farg0) {
     VEC3 sp8;
 
-    VEC3_ctor(&sp8);
     switch (arg1) {
     case 0x0:
         eft009_spawn_at_joint(self, (u32) arg3, (u32) arg2, arg4, farg0);
@@ -3321,11 +3307,9 @@ s32 em012_area_move_armed_ck(_ENEMY_WORK *self) {
 }
 
 void em012_spawn_rec_set(EmSpawnRec *rec, u8 arg1, u16 arg2, u16 arg3) {
-    VEC3 sp8;
-
-    setVec3(&sp8, 0.0f, 0.0f, 0.0f);
+    VEC3 sp8(0.0f, 0.0f, 0.0f);
     rec->id = 0x13;
-    copyVec3(&rec->pos, &sp8);
+    rec->pos = sp8;
     rec->field_0x10 = arg1;
     rec->field_0x12 = arg2;
     rec->field_0x14 = arg3;

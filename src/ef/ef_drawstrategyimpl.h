@@ -9,6 +9,7 @@
 #include "gx.h"
 #include "nw4r/math.h"
 #include "ef/ef_drawstrategy.h"
+#include "g3d/g3d_draw.h" /* mtx34_set (rule 2) */
 
 #ifdef __cplusplus
 namespace nw4r {
@@ -42,9 +43,9 @@ public:
         /* +0x28 */ EfVec2 translate;      /* the particle's texture translation */
     }; /* size: 0x30 */
 
-    /* The per-draw transform state the stripe and billboard walkers advance along. */
-    struct AheadContext {
-        AheadContext(const MTX34* view_mtx, EfDrawParticleManager* pm);
+    /* The ahead context's constructed part: the two handles and the transforms its constructor fills.  size: 0xB0 */
+    struct AheadContextBase {
+        AheadContextBase(); /* 0x800C9434 (0x54): constructs the three matrices and two vectors */
 
         /* +0x00 */ EfDrawParticleManager* particle_manager;
         /* +0x04 */ const MTX34* view_mtx;
@@ -53,7 +54,13 @@ public:
         /* +0x68 */ MTX34 manager_mtx_inv;
         /* +0x98 */ VEC3 emitter_axis_y;   /* the emitter's Y axis in manager space, normalised */
         /* +0xA4 */ VEC3 emitter_center;   /* the emitter's origin in manager space */
-        /* +0xB0 */ VEC3 manager_axis_y;   /* the manager's Y axis (draw types 5 and 7 only) */
+    }; /* size: 0xB0 */
+
+    /* The per-draw transform state the stripe and billboard walkers advance along. */
+    struct AheadContext : AheadContextBase {
+        AheadContext(const MTX34* view_mtx, EfDrawParticleManager* pm);
+
+        /* +0xB0 */ _VEC3 manager_axis_y;  /* the manager's Y axis (draw types 5 and 7 only), never constructed */
     }; /* size: 0xBC */
 
     DrawStrategyImpl();
@@ -127,7 +134,14 @@ extern VEC3 ef_unit_x_vec;
 extern VEC3 ef_unit_y_vec;
 extern VEC3 ef_unit_z_vec;
 extern VEC3 ef_zero_vec;
-extern MTX34 ef_identity_mtx;
+/* The identity matrix: the static initializer sets it with `mtx34_set`, and no `MTX34` constructor runs.
+ * size: 0x30 */
+struct EfIdentityMtx : nw4r::math::_MTX34 {
+    EfIdentityMtx() {
+        mtx34_set((MTX34*)this, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    }
+};
+extern EfIdentityMtx ef_identity_mtx;
 
 #ifdef __cplusplus
 }

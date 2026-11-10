@@ -221,19 +221,16 @@ void eft036_move(struct _ENEMY_WORK* work) {
     f32 dist;
     f32 alpha_max;
     u8 hide;
-    VEC3 dir;
-    VEC3 center;
     Eft036Sphere* sphere;
     EmAreaWork* players;
     EmAreaWork* player;
     u32 i;
 
-    VEC3_ctor(&cam_pos);
     dist = 0.0f;
     alpha_max = 1.0f;
     hide = 0;
-    VEC3_ctor(&dir);
-    VEC3_ctor(&center);
+    VEC3 dir;
+    VEC3 center;
     sphere = NULL;
     players = (EmAreaWork*)get_move_work_adrs(2);
     player = players + (s8)my_player_no();
@@ -241,7 +238,7 @@ void eft036_move(struct _ENEMY_WORK* work) {
         switch ((u32)w->kind_0x14) {
         case 0:
         case 1:
-            copyVec3(&cam_pos, &get_camera_pos());
+            cam_pos = *(&get_camera_pos());
             switch (get_now_mapno()) {
             case 3:
                 switch (self->area_0x44) {
@@ -297,17 +294,12 @@ void eft036_move(struct _ENEMY_WORK* work) {
             }
         }
         for (i = 0; i < w->count_0x00; i++) {
-            VEC3 pos;
-            VEC3 offset;
-
-            copyVec3(&dir, &get_camera_direction());
+            dir = *(&get_camera_direction());
             vec3_normalize_into(&dir, &dir);
             if (w->kind_0x14 != 0) {
                 dist = 20.0f;
             }
-            vec3_scale(&offset, &dir, dist);
-            addVec3(&pos, &get_camera_pos(), &offset);
-            copyVec3(&w->models_0x04[i]->pos_0x04, &pos);
+            w->models_0x04[i]->pos_0x04 = *(&get_camera_pos()) + (dir * dist);
             w->models_0x04[i]->field_0x28 = camera_angle_x_get();
             w->models_0x04[i]->field_0x2C = camera_angle_y_get();
             w->models_0x04[i]->field_0x30 = 0;
@@ -882,7 +874,6 @@ void eft038_set(u8 index) {
     VEC3* pos;
     Eft038Work* work;
 
-    VEC3_ctor(&unused);
     self = (_EFT*)eft_res_slot_get(12);
     if (self != NULL) {
         pos = &eft038_torch_pos[index];
@@ -947,7 +938,6 @@ void eft038_create(_EFT* self) {
     VEC3 unused;
     Eft038Work* work;
 
-    VEC3_ctor(&unused);
     work = (Eft038Work*)self->work_0x38;
     self->state_0x05++;
     work->effect_0x04 = res_eft_create_ex(0x732, 60, 0, 200);
@@ -966,7 +956,6 @@ void eft038_move(_EFT* self) {
     VEC3 unused;
     Eft038Work* work;
 
-    VEC3_ctor(&unused);
     work = (Eft038Work*)self->work_0x38;
     if (stage_torch_unlit_ck(work->index_0x0A) == 1) {
         self->state_0x05++;
@@ -1047,26 +1036,20 @@ extern f32 em023_route_ang_m3_a08[1];
 
 } /* extern "C" */
 
-/* A vector copied in from the one `setVec3` builds, so a file-scope one is constructed by MWCC's `__sinit`.
- * size: 0xC */
-struct Em023SeVec : public nw4r::math::VEC3 {
-    /* Builds (x, y, z). */
-    Em023SeVec(f32 x, f32 y, f32 z)
-    {
-        nw4r::math::VEC3 v;
-
-        assignVec3((Vec*)this, (Vec*)setVec3(&v, x, y, z));
-    }
+/* A sound-position offset record two of the action-10 sound records point at: the offset and a direction.  An
+ * aggregate, so `__sinit` copy-constructs each member from a `VEC3(x, y, z)` temporary.  size: 0x18 */
+struct Em023SeOfs {
+    /* +0x00 */ nw4r::math::VEC3 ofs;
+    /* +0x0C */ nw4r::math::VEC3 dir;
 };
 
-/* The two sound-position offsets two of the action-10 sound records point at (an offset and a direction each). */
-extern "C" Em023SeVec em023_se_ofs_a[2] = {
-    Em023SeVec(0.0f, 6.0f, 0.0f),
-    Em023SeVec(0.0f, 0.0f, 0.0f),
+extern "C" Em023SeOfs em023_se_ofs_a = {
+    nw4r::math::VEC3(0.0f, 6.0f, 0.0f),
+    nw4r::math::VEC3(0.0f, 0.0f, 0.0f),
 };
-extern "C" Em023SeVec em023_se_ofs_b[2] = {
-    Em023SeVec(0.0f, -3.0f, 0.0f),
-    Em023SeVec(0.0f, 0.0f, 0.0f),
+extern "C" Em023SeOfs em023_se_ofs_b = {
+    nw4r::math::VEC3(0.0f, -3.0f, 0.0f),
+    nw4r::math::VEC3(0.0f, 0.0f, 0.0f),
 };
 
 extern "C" {
@@ -1223,7 +1206,7 @@ void em023_slot_state_step(_ENEMY_DATA* data, _ENEMY_WORK* self) {
 /* Follows the bound enemy-data slot: copies its aim vector and switches the motion kind as the slot's mode changes. */
 void em023_slot_update(_ENEMY_DATA* data, _ENEMY_WORK* self) {
     if (em_die_ck(self) == 0) {
-        copyVec3(&self->aim, &data->vec_0x24);
+        self->aim = data->vec_0x24;
     }
     switch (data->field_0x08) {
     case 2:
@@ -2324,7 +2307,6 @@ void em023_demo4_start(_ENEMY_WORK* self) {
 void em023_demo5(_ENEMY_WORK* self) {
     VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     em_hit_arm_set(self);
     switch (self->state) {
     case 0:

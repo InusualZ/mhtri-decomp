@@ -45,7 +45,7 @@
 #include "nw4r/fn_805012C4.h" /* nw4r::math::MTX34Scale (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ICalcWorldCallback, FuncObjCalcWorld (rule 1) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 #pragma pool_data off
 
@@ -77,7 +77,6 @@ extern "C" s32 res_node_is_valid(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
 extern "C" ResNodeData* res_node_ptr(const void* p);
-extern "C" void chr_anm_result_init(void* pOut);
 extern "C" void* anm_chr_result_trans_get(void* pOut, const void* pIn);
 extern "C" void anm_chr_result_trans_set(void* pOut, const void* pIn);
 extern "C" void fn_80098D5C(void* pA, const void* pB);
@@ -147,7 +146,6 @@ inline nw4r::g3d::WorldMtxManip* fn_80073DC4(nw4r::g3d::WorldMtxManip* pSelf, vo
 inline u32 fn_80073E80(u32 value, u32 low);
 inline u32 fn_80073E8C(void* pSelf);
 inline void fn_80073F00(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, s32* pMtx, s32* pMtxID);
-inline nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 inline s32 fn_8007403C(u32 flags);
 inline s32 fn_80074050(const void* p);
 inline s32 res_mdl_get_info(ResHandle* pMdl);
@@ -259,9 +257,10 @@ inline void fn_80073F00(nw4r::g3d::FuncObjCalcWorld* pSelf, u32 id, s32* pMtx, s
     }
 }
 
-inline nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
-    vec3_add_ps(pOut, pOut, pIn);
-    return pOut;
+/* 0x80073F68 (0x38): adds `rhs` to this record (one out-of-line copy, emitted here; the other units call it). */
+inline nw4r::math::VEC3& nw4r::math::VEC3::operator+=(const VEC3& rhs) {
+    vec3_add_ps(this, this, &rhs);
+    return *this;
 }
 
 /* `peephole off` keeps retail's generic `!= 0` conversion (`rlwinm r3,r3,0,4,4; neg; or; srwi`), which `-O3`
@@ -314,9 +313,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                  nw4r::g3d::AnmObjChr* pNodeCallback, nw4r::g3d::FuncObjCalcWorld* pNodeCallback2, u32 flags) {
     s32 mayaDisable;
     bool singleMtx;
-    NodeMtxRec rec;
-    nw4r::math::VEC3 vA;
-    nw4r::math::VEC3 vB;
+    nw4r::g3d::ChrAnmResult rec;
     s32 s1C;
     s32 s18;
     s32 s14;
@@ -324,7 +321,6 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
     s32 sC;
     s32 s8;
     u8* pCode = pByteCode;
-    chr_anm_result_init(&rec);
     NodeMtxRec* pRec = NULL;
     if (pCode == NULL) {
         pCode = (u8*)(void*)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResByteCode("NodeTree");
@@ -359,35 +355,35 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
             f32* pSrcScale = pScale + targetID * 3;
             s32 prev = pMtxIDs[targetID];
             if (pNodeCallback != NULL) {
-                pRec = (NodeMtxRec*)pNodeCallback->GetResult((nw4r::g3d::ChrAnmResult*)&rec,
+                pRec = (NodeMtxRec*)pNodeCallback->GetResult(&rec,
                                                              res_node_get_id((const ResHandle*)&s1C));
             }
             s32 reset;
             if (pNodeCallback == NULL || pRec->mUnk00 == 0) {
-                fn_80098F6C(&s1C, &rec);
-                pRec = &rec;
+                fn_80098F6C(&s1C, (NodeMtxRec*)&rec);
+                pRec = (NodeMtxRec*)&rec;
                 reset = 1;
             } else {
                 reset = 0;
             }
             if (nodeID != 0 && mayaDisable != 0 && reset == 0) {
-                VEC3_ctor(&vA);
-                VEC3_ctor(&vB);
-                if (pRec != &rec) {
-                    rec = *pRec;
-                    pRec = &rec;
+                nw4r::math::VEC3 vA;
+                nw4r::math::VEC3 vB;
+                if (pRec != (NodeMtxRec*)&rec) {
+                    *(NodeMtxRec*)&rec = *pRec;
+                    pRec = (NodeMtxRec*)&rec;
                 }
-                anm_chr_result_trans_get(&rec, &vA);
-                rec.mUnk00 |= 0x200;
-                fn_80098D5C(&s1C, &rec);
-                anm_chr_result_trans_get(&rec, &vB);
-                addVec3To(&vB, &vA);
-                anm_chr_result_trans_set(&rec, &vB);
+                anm_chr_result_trans_get((NodeMtxRec*)&rec, &vA);
+                rec.flags |= 0x200;
+                fn_80098D5C(&s1C, (NodeMtxRec*)&rec);
+                anm_chr_result_trans_get((NodeMtxRec*)&rec, &vB);
+                vB += vA;
+                anm_chr_result_trans_set((NodeMtxRec*)&rec, &vB);
             }
             if (pNodeCallback2 != NULL) {
-                if (pRec != &rec) {
-                    rec = *pRec;
-                    pRec = &rec;
+                if (pRec != (NodeMtxRec*)&rec) {
+                    *(NodeMtxRec*)&rec = *pRec;
+                    pRec = (NodeMtxRec*)&rec;
                 }
                 s10 = *(s32*)pMdl;
                 fn_80073F00(pNodeCallback2, nodeID, (s32*)&rec, &s10);
@@ -421,8 +417,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
             mtx34_copy_ps((Mtx34*)(pMtxArray + nodeID * 0x30), (const Mtx34*)(pMtxArray + targetID * 0x30));
             /* `pScale` is the frame's flat float array (`fn_8005CED0`), so the record is
              * reached by index; the helper's own type is the real one (rule 11). */
-            copyVec3((nw4r::math::VEC3*)(pScale + nodeID * 3),
-                     (const nw4r::math::VEC3*)(pScale + targetID * 3));
+            *((nw4r::math::VEC3*)(pScale + nodeID * 3)) = *((const nw4r::math::VEC3*)(pScale + targetID * 3));
             pCode += 5;
         }
     }

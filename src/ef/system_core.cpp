@@ -275,12 +275,6 @@ SysStack sys_work_stack;    /* .bss:0x80694CB8 */
 typedef struct SysLoading {
     /* 0x800D2F94 (0x58): builds the sprite quad's four corners (run by `__sinit_\system_core_cpp`). */
     SysLoading() {
-        nw4r::math::VEC3* corner = quad_0x34;
-
-        do {
-            VEC3_ctor(corner);
-            corner++;
-        } while (corner < quad_0x34 + 4);
     }
 
 
@@ -1949,10 +1943,6 @@ extern "C" void loading_disp_draw(void) {
     s32 j;
     u8 count;
 
-    VEC3_ctor(&corner[0]);
-    VEC3_ctor(&corner[1]);
-    VEC3_ctor(&corner[2]);
-    VEC3_ctor(&corner[3]);
     if (disp->shown_0x00 == 0) {
         return;
     }
@@ -2158,7 +2148,7 @@ extern "C" void loading_disp_draw(void) {
         u1 = (64.0f + cell_u) / spr_w;
         v1 = (64.0f + cell_v) / spr_h;
         for (j = 0; j < 4; j++) {
-            copyVec3(&corner[j], &disp->quad_0x34[j]);
+            corner[j] = disp->quad_0x34[j];
             if (disp->angle_0x08[i] != 0) {
                 rotVecZ(&corner[j], disp->angle_0x08[i]);
             }

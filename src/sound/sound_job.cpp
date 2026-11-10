@@ -23,7 +23,7 @@
 #include "nw4r/math.h"
 #include "pl.h" /* _PLW (split_screen_size_class reads its +0x08 byte) */
 #include "pad_connect.h" /* screen_split_mode_ck (rule 2) */
-#include "mh3_pad/vec3.h" /* copyVec3 (rule 2) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "sound/fn_800E3CBC.h" /* PrimRec, prim_rec_pool, prim_rec_count (rule 1) */
 #define sound_job_request sound_job_request_band_spelling
 #include "unsplit/sound.h" /* prim_rec_capacity (rule 2: the band) */
@@ -54,7 +54,7 @@ extern "C" PrimRec* sound_job_request(u8 list, u8 layer, s32 handle, u8 kind, u1
         rec->kind = kind;
         rec->flags = flags;
         if (pos != 0) {
-            copyVec3(&rec->pos, pos);
+            rec->pos = *pos;
             rec->flags |= 1;
         }
         rec->callback = callback;

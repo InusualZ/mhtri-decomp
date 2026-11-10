@@ -58,7 +58,7 @@ extern ArenaWork arena_work;
 extern u32 arena_draw_func[4];
 
 /* The arena camera pair and light quad the scene setup writes and the camera/light units read
- * (`.bss` 0x806E4078 / 0x806E4090).  Names are GUESSES from `arena_camera_light_vec_init`'s bodies. */
+ * (`.bss` 0x806E4078 / 0x806E4090).  Names are GUESSES from the values `__sinit` builds them from. */
 extern nw4r::math::VEC3 arena_camera_vec[2];   /* eye + look-at */
 extern nw4r::math::VEC3 arena_light_vec[4];    /* four direct-light positions */
 
@@ -89,7 +89,7 @@ extern u8 arena_user_data_buf[];
 
 /* Pooled float constants the band's setup functions address as globals (playbook 29: declare, never
  * define - a definition would make MWCC emit a second copy in `.sdata2`).  Each is named for the
- * place `arena_camera_light_vec_init` writes it into. */
+ * vector `__sinit` builds it into. */
 extern const f32 arena_zero_f;            /* .sdata2 0x8079C960, 0.0f */
 extern const f32 arena_50f;               /* .sdata2 0x8079C964, 50.0f */
 extern const f32 arena_camera_near_z;    /* .sdata2 0x8079C968, 1.0f */

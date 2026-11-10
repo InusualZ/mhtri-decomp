@@ -21,7 +21,7 @@
  *   switch (do/while(0), idea 183) and duplicates the read tail in step 4 (+108 B, the bodies after it shift).
  *   read_wpad_memory: step 1's error results branch back to step 0's read loop (a backward jump into another case);
  *   the goto-free source omits those six instructions.
- *   getDirVec, assignVec3: retail copies VEC3 as words and returns it by NRVO - its VEC3 derives from a base struct
+ *   getDirVec, VEC3::operator=: retail copies VEC3 as words and returns it by NRVO - its VEC3 derives from a base struct
  *   with a constructor; the shared nw4r::math::VEC3 here is a plain struct of floats (a 399-includer header).
  *   gun_set_box_used_ck keeps the last test as a branch where ours folds it to cntlzw; hunter_rank_points_get hoists
  *   the 10000000 return above the loop; set_mydata2vs ORs the tick first (`or r0,r4,r0`); lobby_friend_list_sort,
@@ -54,7 +54,7 @@
 #include "unsplit/userdata_tables.h"  /* the unowned save-block tables this unit reads */
 #include "Pl/fn_8027D684.h"           /* PlSlotRec (the armour row equip_slot_rec_get hands back) */
 #include "ef/cp_vector.h"             /* _CP_VECTOR */
-#include "mh3_pad/vec3.h"             /* VEC3_ctor, copyVec3 (mh3_pad.cpp) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "nw4r/math_types.h"          /* nw4r::math::MTX34Scale / MTX34RotXYZFIdx */
 #include "nw4r/math_triangular.h"     /* nw4r::math::SinFIdx / CosFIdx */
 #include "MTX/vec.h"                  /* PSVECNormalize, Vec */
@@ -2013,8 +2013,8 @@ void vec_to_mh_vec3(VEC3* dst, Vec* src)
 /* 0x8004FFC8 (0x60): builds the capsule from its two end points and its radius. */
 extern "C" void capsule_box_from_points(VEC3* start, VEC3* end, f32 radius, nw4r::math::CAPSULE* out)
 {
-    copyVec3(&out->start, start);
-    copyVec3(&out->end, end);
+    out->start = *start;
+    out->end = *end;
     out->radius = radius;
 }
 
@@ -2114,8 +2114,6 @@ void rotMatrixZ(u32 angle, MTX34* mtx)
 }
 
 extern "C" MTX34* mtx34_identity(MTX34* mtx);
-/* free: retail C linkage evidenced (unmangled map name) */
-extern "C" void MTX34_ctor(MTX34* mtx);
 extern "C" void mtx34_concat_assign(MTX34* dst, const MTX34* src);
 
 /* 0x8005044C (0x88): rotates `mtx` about its local X axis by the 16-bit angle `angle`. */
@@ -2123,8 +2121,6 @@ void rotLocalMatX(u32 angle, MTX34* mtx)
 {
     MTX34 rot;
     MTX34 unused;
-    MTX34_ctor(&rot);
-    MTX34_ctor(&unused);
     mtx34_identity(&rot);
     f32 s = sin_idx_get(angle);
     f32 c = anim_tick_cos(angle);
@@ -2150,19 +2146,11 @@ extern "C" f32 (*mtx34_get_ptr(MTX34* mtx))[4]
     return mtx->m;
 }
 
-/* 0x8005050C (0x4): the matrix record's (empty) constructor. */
-/* free: retail C linkage evidenced (unmangled map name; ef/g3d/Pl units call it as a C function) */
-extern "C" void MTX34_ctor(MTX34* mtx)
-{
-}
-
 /* 0x80050510 (0x88): rotates `mtx` about its local Y axis by the 16-bit angle `angle`. */
 void rotLocalMatY(u32 angle, MTX34* mtx)
 {
     MTX34 rot;
     MTX34 unused;
-    MTX34_ctor(&rot);
-    MTX34_ctor(&unused);
     mtx34_identity(&rot);
     f32 s = sin_idx_get(angle);
     f32 c = anim_tick_cos(angle);
@@ -2178,8 +2166,6 @@ void rotLocalMatZ(u32 angle, MTX34* mtx)
 {
     MTX34 rot;
     MTX34 unused;
-    MTX34_ctor(&rot);
-    MTX34_ctor(&unused);
     mtx34_identity(&rot);
     f32 s = sin_idx_get(angle);
     f32 c = anim_tick_cos(angle);
@@ -2230,7 +2216,6 @@ extern "C" VEC3* vec3_normalize_into(VEC3* dst, const VEC3* src);
 void setScaleMat34W(MTX34* mtx, VEC3* scale)
 {
     VEC3 axis;
-    VEC3_ctor(&axis);
     axis.x = mtx->m[0][0];
     axis.y = mtx->m[1][0];
     axis.z = mtx->m[2][0];
@@ -2282,7 +2267,6 @@ extern "C" MTX34* mtx34_rot_xyz_rad(MTX34* mtx, f32 x, f32 y, f32 z);
 void cpSetRotMatrix(_CP_VECTOR* ang, MTX34* mtx)
 {
     VEC3 rad;
-    VEC3_ctor(&rad);
     cp_vector_to_rad(ang, &rad);
     mtx34_identity(mtx);
     mtx34_rot_xyz_rad(mtx, rad.x, rad.y, rad.z);
@@ -2299,7 +2283,6 @@ extern "C" MTX34* mtx34_rot_xyz_rad(MTX34* mtx, f32 x, f32 y, f32 z)
 extern "C" void cpSetRotMatrixYXZ(_CP_VECTOR* ang, MTX34* mtx)
 {
     VEC3 unused;
-    VEC3_ctor(&unused);
     mtx34_identity(mtx);
     rotMatrixY(ang->y, mtx);
     rotMatrixX(ang->x, mtx);
@@ -2310,7 +2293,6 @@ extern "C" void cpSetRotMatrixYXZ(_CP_VECTOR* ang, MTX34* mtx)
 void cpSetRotMatrixZXY(_CP_VECTOR* ang, MTX34* mtx)
 {
     VEC3 unused;
-    VEC3_ctor(&unused);
     mtx34_identity(mtx);
     rotMatrixZ(ang->z, mtx);
     rotMatrixX(ang->x, mtx);
@@ -2366,26 +2348,22 @@ extern "C" f32 sqrt_f32(f32 x)
     return (x <= 0.0f) ? 0.0f : x * nw4r::math::FrSqrt(x);
 }
 
-extern "C" void subVec3(VEC3* out, const VEC3* a, const VEC3* b);
-
 /* 0x80050C40 (0x60): the 16-bit pitch of the direction from `from` toward `to`. */
 extern "C" u16 calcVecAngX2(VEC3* from, VEC3* to)
 {
     VEC3 dir;
-    VEC3 diff;
-    VEC3_ctor(&dir);
-    subVec3(&diff, to, from);
-    copyVec3(&dir, &diff);
+    dir = *to - *from;
     return calcVecAngX(&dir);
 }
 
 extern "C" void PSVECSubtract(VEC3* out, const VEC3* a, const VEC3* b);
 
-/* 0x80050CA0 (0x54): `out = a - b`. */
-extern "C" void subVec3(VEC3* out, const VEC3* a, const VEC3* b)
+/* 0x80050CA0 (0x54): returns this record minus `rhs`. */
+VEC3 VEC3::operator-(const VEC3& rhs) const
 {
-    VEC3_ctor(out);
-    PSVECSubtract(out, a, b);
+    VEC3 tmp;
+    PSVECSubtract(&tmp, this, &rhs);
+    return tmp;
 }
 
 /* 0x80050CF4 (0x24): `out = a - b` with paired-single arithmetic. */
@@ -2414,7 +2392,6 @@ void calcVecAngXY(VEC3* v, u32* ang_x, u32* ang_y)
 extern "C" u16 calcMtxAngX(MTX34* mtx)
 {
     VEC3 axis;
-    VEC3_ctor(&axis);
     setVector3(&axis, mtx->m[0][2], mtx->m[1][2], mtx->m[2][2]);
     return (s32)(0.5f + atan2f(axis.z, -axis.y) * 65536.0f / 6.2831855f);
 }
@@ -2423,7 +2400,6 @@ extern "C" u16 calcMtxAngX(MTX34* mtx)
 extern "C" u16 calcMtxAng3(MTX34* mtx)
 {
     VEC3 axis;
-    VEC3_ctor(&axis);
     setVector3(&axis, mtx->m[0][2], mtx->m[1][2], mtx->m[2][2]);
     return calcVecAng3(&axis);
 }
@@ -2433,8 +2409,7 @@ extern "C" f32 vec3_length_sq(const VEC3* v);
 /* 0x80050EAC (0x30): the squared distance between `a` and `b`. */
 extern "C" f32 vec3_dist_sq(const VEC3* a, const VEC3* b)
 {
-    VEC3 diff;
-    subVec3(&diff, b, a);
+    VEC3 diff = *b - *a;
     return vec3_length_sq(&diff);
 }
 
@@ -2455,8 +2430,7 @@ extern "C" f32 vec3_len(const VEC3* v);
 /* 0x80050EF4 (0x30): the distance between `a` and `b`. */
 extern "C" f32 vec3_distance(const VEC3* a, const VEC3* b)
 {
-    VEC3 diff;
-    subVec3(&diff, b, a);
+    VEC3 diff = *b - *a;
     return vec3_len(&diff);
 }
 
@@ -2469,8 +2443,7 @@ extern "C" f32 vec3_len(const VEC3* v)
 /* 0x80050F48 (0x38): the squared distance between `a` and `b` in the XZ plane. */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b)
 {
-    VEC3 diff;
-    subVec3(&diff, b, a);
+    VEC3 diff = *b - *a;
     diff.y = 0.0f;
     return vec3_length_sq(&diff);
 }
@@ -2478,8 +2451,7 @@ f32 calcDistanceSqXZ(VEC3* a, VEC3* b)
 /* 0x80050F80 (0x38): the distance between `a` and `b` in the XZ plane. */
 extern "C" f32 calcVecDistXZ(const VEC3* a, const VEC3* b)
 {
-    VEC3 diff;
-    subVec3(&diff, b, a);
+    VEC3 diff = *b - *a;
     diff.y = 0.0f;
     return vec3_len(&diff);
 }
@@ -2536,8 +2508,7 @@ void rotVecZXY(VEC3* v, _CP_VECTOR* ang)
 /* 0x80051268 (0x58): the unit Z vector rotated by the three angles of `ang` (unrotated without `ang`). */
 VEC3 getDirVec(_CP_VECTOR* ang)
 {
-    VEC3 dir;
-    setVec3(&dir, 0.0f, 0.0f, 1.0f);
+    VEC3 dir(0.0f, 0.0f, 1.0f);
     if (ang != NULL) {
         rotVecXYZ(&dir, ang);
     }
@@ -2545,33 +2516,30 @@ VEC3 getDirVec(_CP_VECTOR* ang)
 }
 
 extern "C" VEC3* vec3_scale_in_place(VEC3* v, f32 scale);
-extern "C" void addVec3(VEC3* out, const VEC3* a, const VEC3* b);
 
 /* 0x800512C0 (0xB8): pulls `pos` to within `limit` of `center`; returns how far it was beyond the limit. */
 extern "C" f32 vec3_clamp_distance(VEC3* center, VEC3* pos, f32 limit)
 {
-    VEC3 diff;
-    VEC3 sum;
     f32 len;
 
-    subVec3(&diff, pos, center);
+    VEC3 diff = *pos - *center;
     len = vec3_len(&diff);
     if (len > limit) {
         vec3_normalize_into(&diff, &diff);
         vec3_scale_in_place(&diff, limit);
-        addVec3(&sum, center, &diff);
-        copyVec3(pos, &sum);
+        *pos = *center + diff;
     }
     return len - limit;
 }
 
 extern "C" void vec3_add_ps(VEC3* out, const VEC3* a, const VEC3* b);
 
-/* 0x80051378 (0x54): `out = a + b`. */
-extern "C" void addVec3(VEC3* out, const VEC3* a, const VEC3* b)
+/* 0x80051378 (0x54): returns this record plus `rhs`. */
+VEC3 VEC3::operator+(const VEC3& rhs) const
 {
-    VEC3_ctor(out);
-    vec3_add_ps(out, a, b);
+    VEC3 tmp;
+    vec3_add_ps(&tmp, this, &rhs);
+    return tmp;
 }
 
 /* 0x800513CC (0x24): `out = a + b` with paired-single arithmetic. */
@@ -2611,20 +2579,12 @@ extern "C" asm void vec3_scale_by(register VEC3* out, register const VEC3* in, r
     blr
 }
 
-extern "C" void assignVec3(VEC3* dst, const VEC3* src);
 
 /* 0x80051440 (0x50): rotates the vector by `mtx`'s 3x3 part. */
 void mulVecMat(VEC3* v, MTX34* mtx)
 {
-    VEC3 src;
-    assignVec3(&src, v);
+    VEC3 src = *v;
     mtx34_rotate_vec3(v, mtx, &src);
-}
-
-/* 0x80051490 (0x1C): copies `src` into `dst`. */
-extern "C" void assignVec3(VEC3* dst, const VEC3* src)
-{
-    *dst = *src;
 }
 
 extern "C" VEC3* mtx34_mult_vec3(VEC3* out, const MTX34* mtx, const VEC3* v);
@@ -2632,8 +2592,7 @@ extern "C" VEC3* mtx34_mult_vec3(VEC3* out, const MTX34* mtx, const VEC3* v);
 /* 0x800514AC (0x50): transforms the vector by `mtx` (rotation and translation). */
 void mulVecMatAddTrans(VEC3* v, MTX34* mtx)
 {
-    VEC3 src;
-    assignVec3(&src, v);
+    VEC3 src = *v;
     mtx34_mult_vec3(v, mtx, &src);
 }
 
@@ -2656,7 +2615,6 @@ extern "C" const f32 (*mtx34_const_ptr(const MTX34* mtx))[4]
 extern "C" void mtx34_concat_assign(MTX34* dst, const MTX34* src)
 {
     MTX34 tmp;
-    MTX34_ctor(&tmp);
     tmp.m[0][0] = dst->m[0][2] * src->m[2][0] + (dst->m[0][0] * src->m[0][0] + dst->m[0][1] * src->m[1][0]);
     tmp.m[0][1] = dst->m[0][2] * src->m[2][1] + (dst->m[0][0] * src->m[0][1] + dst->m[0][1] * src->m[1][1]);
     tmp.m[0][2] = dst->m[0][2] * src->m[2][2] + (dst->m[0][0] * src->m[0][2] + dst->m[0][1] * src->m[1][2]);
@@ -2669,8 +2627,8 @@ extern "C" void mtx34_concat_assign(MTX34* dst, const MTX34* src)
     copyMat33(dst, &tmp);
 }
 
-/* 0x800516F0 (0x4): the 3x3 matrix record's (empty) constructor. */
-extern "C" void MTX33_ctor(nw4r::math::MTX33* mtx)
+/* 0x800516F0 (0x4): the 3x3 matrix's empty default constructor. */
+nw4r::math::MTX33::MTX33()
 {
 }
 
@@ -2694,10 +2652,6 @@ extern "C" void mtx34_basis_set(MTX34* mtx, const VEC3* x_dir, const VEC3* y_dir
     VEC3 y_axis;
     VEC3 z_axis;
     VEC3 y_hint;
-    VEC3_ctor(&x_axis);
-    VEC3_ctor(&y_axis);
-    VEC3_ctor(&z_axis);
-    VEC3_ctor(&y_hint);
     vec3_normalize_into(&x_axis, x_dir);
     vec3_normalize_into(&y_hint, y_dir);
     vec3_cross(&z_axis, &x_axis, &y_hint);
@@ -2732,10 +2686,6 @@ extern "C" void mtx34_blend(MTX34* out, const MTX34* a, const MTX34* b, f32 wa, 
     f32 len;
     f32 scale;
 
-    VEC3_ctor(&y_dir);
-    VEC3_ctor(&x_dir);
-    VEC3_ctor(&unused);
-    VEC3_ctor(&column);
     x_dir.x = a->m[0][0] * wa + b->m[0][0] * wb;
     x_dir.y = a->m[1][0] * wa + b->m[1][0] * wb;
     x_dir.z = a->m[2][0] * wa + b->m[2][0] * wb;
@@ -2796,7 +2746,6 @@ extern "C" void vec3_random_offset(VEC3* out, const VEC3* center, f32 radius, u8
 extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, f32 dist, u16 yaw)
 {
     VEC3 offset;
-    VEC3_ctor(&offset);
     offset.x = 0.0f;
     offset.y = 0.0f;
     offset.z = dist;
@@ -2810,7 +2759,6 @@ extern "C" void vec3_polar_offset(VEC3* out, const VEC3* center, f32 dist, u16 y
 extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, f32 dist, u16 pitch, u16 yaw)
 {
     VEC3 offset;
-    VEC3_ctor(&offset);
     offset.x = 0.0f;
     offset.y = 0.0f;
     offset.z = dist;
@@ -2821,39 +2769,30 @@ extern "C" void vec3_polar_offset2(VEC3* out, const VEC3* center, f32 dist, u16 
     out->z = center->z + offset.z;
 }
 
-extern "C" void vec3_scale(VEC3* out, const VEC3* in, f32 scale);
-
 /* 0x80051DD8 (0x108): the point `dist` away, in the ground-plane direction `yaw`, from the point at `t` (clamped
  * to 0..1) along the segment from `b` to `a`. */
 extern "C" void vec3_segment_offset(VEC3* out, const VEC3* a, const VEC3* b, f32 dist, f32 t, u16 yaw)
 {
     VEC3 dir;
     VEC3 pos;
-    VEC3 tmp;
-    VEC3 sum;
-    VEC3 step;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&pos);
-    subVec3(&tmp, a, b);
-    copyVec3(&dir, &tmp);
+    dir = *a - *b;
     if (t > 1.0f) {
         t = 1.0f;
     }
     if (t < 0.0f) {
         t = 0.0f;
     }
-    vec3_scale(&step, &dir, t);
-    addVec3(&sum, b, &step);
-    copyVec3(&pos, &sum);
+    pos = *b + (dir * t);
     vec3_polar_offset(out, &pos, dist, yaw);
 }
 
-/* 0x80051EE0 (0x54): `out = in * scale`. */
-extern "C" void vec3_scale(VEC3* out, const VEC3* in, f32 scale)
+/* 0x80051EE0 (0x54): returns this record scaled by `f`. */
+VEC3 VEC3::operator*(f32 f) const
 {
-    VEC3_ctor(out);
-    vec3_scale_by(out, in, scale);
+    VEC3 tmp;
+    vec3_scale_by(&tmp, this, f);
+    return tmp;
 }
 
 /* 0x80051F34 (0x100): `vec3_segment_offset` in the direction `pitch`/`yaw`. */
@@ -2861,23 +2800,15 @@ extern "C" void vec3_segment_offset2(VEC3* out, const VEC3* a, const VEC3* b, f3
 {
     VEC3 dir;
     VEC3 pos;
-    VEC3 tmp;
-    VEC3 sum;
-    VEC3 step;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&pos);
-    subVec3(&tmp, a, b);
-    copyVec3(&dir, &tmp);
+    dir = *a - *b;
     if (t > 1.0f) {
         t = 1.0f;
     }
     if (t < 0.0f) {
         t = 0.0f;
     }
-    vec3_scale(&step, &dir, t);
-    addVec3(&sum, b, &step);
-    copyVec3(&pos, &sum);
+    pos = *b + (dir * t);
     vec3_polar_offset2(out, &pos, dist, pitch, yaw);
 }
 
@@ -2892,9 +2823,6 @@ extern "C" u32 vec3_segment_box_ck(const VEC3* p, const VEC3* a, const VEC3* b, 
     VEC3 seg;
     VEC3 rel;
 
-    VEC3_ctor(&side);
-    VEC3_ctor(&seg);
-    VEC3_ctor(&rel);
     if (p->y < a->y || p->y > a->y + size) {
         return 0;
     }
@@ -3031,28 +2959,20 @@ extern "C" void vec3_move_damp(const VEC3* from, const VEC3* to, const VEC3* dir
 {
     VEC3 move;
     VEC3 unit;
-    VEC3 tmp;
-    VEC3 sum;
-    VEC3 step;
     f32 d;
 
-    VEC3_ctor(&move);
-    VEC3_ctor(&unit);
-    subVec3(&tmp, to, from);
-    copyVec3(&move, &tmp);
+    move = *to - *from;
     if (vec3_length_sq(&move) <= 1e-5f) {
-        copyVec3(out, to);
+        *out = *to;
         return;
     }
     vec3_normalize_into(&unit, &move);
     d = vec3_dot(dir, &unit);
     if (d >= 0.0f) {
-        copyVec3(out, to);
+        *out = *to;
         return;
     }
-    vec3_scale(&step, &move, 1.0f + d * k);
-    addVec3(&sum, from, &step);
-    copyVec3(out, &sum);
+    *out = *from + (move * (1.0f + d * k));
 }
 
 /* --- 2D rectangles ---------------------------------------------------------------------------------- */

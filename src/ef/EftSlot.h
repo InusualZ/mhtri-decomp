@@ -5,7 +5,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad/vec3.h" /* VEC3_ctor (rule 2: the owner's header) */
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 
 /* The 0x3C-byte slot pool `eft_slot_pool` (10 entries) the family's spawn/reset pair walks: `key_0x00`
  * is the definition-table index (`eft_def_get`..`eft_def_handler`), `field_0x14` is stamped 255 by the
@@ -39,14 +39,7 @@ struct EftSlot {
     /* +0x1E */ s16 field_0x1E;  /* the net resend timer (negative: due) */
     /* +0x20 */ s16 field_0x20;  /* the state-3 countdown */
     /* +0x22 */ s16 field_0x22;  /* the state timer the tracking step counts */
-    union {   /* the position triple the net sync copies as one VEC3 */
-        /* +0x24 */ nw4r::math::VEC3 pos_0x24;
-        struct {
-            /* +0x24 */ f32 field_0x24;
-            /* +0x28 */ f32 field_0x28;
-            /* +0x2C */ f32 field_0x2C;
-        };
-    };
+    /* +0x24 */ nw4r::math::VEC3 pos_0x24; /* the position triple the net sync copies as one VEC3 */
     /* +0x30 */ f32 field_0x30;
     /* +0x34 */ s16 field_0x34;
     /* +0x36 */ u8 field_0x36;
@@ -58,7 +51,7 @@ struct EftSlot {
 
 #ifdef __cplusplus
     /* Constructs the position vector; `ef/eft_slot.cpp`'s `__sinit` runs it over the pool (`__construct_array`). */
-    EftSlot() { VEC3_ctor(&pos_0x24); }
+    EftSlot() {}
 #endif
 };
 

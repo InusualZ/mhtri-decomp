@@ -219,18 +219,14 @@ extern "C" u32 em024_front_ray_hit_ck(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 offset;
     nw4r::math::VEC3 to;
-    nw4r::math::VEC3 from;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&to);
     if (em_parts_damage_level_get(self, 0) >= 4)
         return 0;
     offset.x = 115.0f;
     offset.y = 0.0f;
     offset.z = 500.0f + 550.0f * get_em_chg_scale(self);
     rotVecY(&offset, self->field_0x1C0);
-    addVec3(&from, &self->pos, &offset);
-    copyVec3(&to, &from);
+    to = self->pos + offset;
     return pl_coll_sweep_ck(&self->pos, &to, 170.0f, 1, 0x100, self->area_no, em_hit_mask_get(self)) != 0;
 }
 
@@ -266,7 +262,7 @@ extern "C" void em024_init(_ENEMY_WORK* self, u8 arg)
     self->em024_0x328.tev_color_0x334.x = 255.0f;
     self->em024_0x328.tev_color_0x334.y = 65.0f;
     self->em024_0x328.tev_color_0x334.z = 30.0f;
-    self->em024_0x328.tev_color2_0x340 = self->em024_0x328.tev_color_0x334;
+    static_cast<nw4r::math::_VEC3&>(self->em024_0x328.tev_color2_0x340) = self->em024_0x328.tev_color_0x334;
     self->field_0x1E4 = 0;
     if (em_res_user_data_ck(self) == 0) {
         ResUserDataAc* rec = (ResUserDataAc*)operator new(sizeof(ResUserDataAc));
@@ -488,7 +484,6 @@ extern "C" void em024_act1_sub4(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -787,11 +782,8 @@ extern "C" void em024_act3_dispatch(_ENEMY_WORK* self)
 extern "C" void em024_act4_sub0(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 origin;
-    nw4r::math::VEC3 tmp;
     EmSpawnRec rec;
 
-    VEC3_ctor(&origin);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -826,7 +818,7 @@ extern "C" void em024_act4_sub0(_ENEMY_WORK* self, u8 kind)
                     eft007_part_spawn(self, 64, 0x2000, 0);
                 if (em_frame_check(self, 0, 6.0f, 0.0f) == 1) {
                     rec.id = 21;
-                    copyVec3(&rec.pos, setVec3(&tmp, 0.0f, 0.0f, 100.0f));
+                    rec.pos = VEC3(0.0f, 0.0f, 100.0f);
                     rec.field_0x10 = 0;
                     rec.field_0x12 = 0x2000;
                     rec.field_0x14 = 0;
@@ -904,21 +896,18 @@ extern "C" void em024_act4_sub2(_ENEMY_WORK* self)
 /* Action 4 sub-state 3: aims at the target, plays motion 14 and turns by the clamped angle. */
 extern "C" void em024_act4_sub3(_ENEMY_WORK* self)
 {
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 delta;
     u32 angle_x;
     u32 angle_y;
     u32 full = 0x10000;
     u32 value;
 
-    VEC3_ctor(&dir);
+    nw4r::math::VEC3 dir;
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 3);
         em_mot_set(self, 14, 2, 0);
-        subVec3(&delta, &self->vec_0x36C, &self->pos);
-        copyVec3(&dir, &delta);
+        dir = self->vec_0x36C - self->pos;
         calcVecAngXY(&dir, &angle_x, &angle_y);
         value = (u16)(full - (angle_y - self->field_0x1C0));
         if (value < 0x6000)
@@ -1121,13 +1110,10 @@ extern "C" void em024_act4_dispatch(_ENEMY_WORK* self)
 /* Action 7 sub-states 0, 10, 34, 35 and 39..46: the long attack step, its effects and turns selected by (attack, turn). */
 extern "C" void em024_act7_sub0(_ENEMY_WORK* self, u8 attack, u8 turn)
 {
-    nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint_pos;
+    nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint_pos);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1360,8 +1346,6 @@ extern "C" void em024_act7_sub1(_ENEMY_WORK* self, u8 attack)
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&dir);
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1397,7 +1381,7 @@ extern "C" void em024_act7_sub1(_ENEMY_WORK* self, u8 attack)
             dir.y = 0.0f;
             dir.z = -200.0f - 5.0f * hi;
             rotVecY(&dir, self->field_0x1C0);
-            addVec3To(&dir, &self->pos);
+            dir += self->pos;
             shell_set_func_ptr->method_0x8C(self, 0, &dir, 1.0f, 60, shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, 180.0f, 0.0f) == 1) {
@@ -1416,15 +1400,10 @@ extern "C" void em024_act7_sub1(_ENEMY_WORK* self, u8 attack)
 extern "C" void em024_act7_sub2(_ENEMY_WORK* self, u8 attack)
 {
     nw4r::math::MTX34 mtx;
+
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint_pos;
-    nw4r::math::VEC3 tmp;
     EmSpawnRec rec;
-
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint_pos);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1444,8 +1423,8 @@ extern "C" void em024_act7_sub2(_ENEMY_WORK* self, u8 attack)
         }
         if (em_frame_check(self, 0, 88.0f, 0.0f) == 1) {
             rec.id = 21;
-            copyVec3(&rec.pos, setVec3(&tmp, 0.0f, -30.0f, 100.0f));
-            copyVec3(&pos, &rec.pos);
+            rec.pos = VEC3(0.0f, -30.0f, 100.0f);
+            pos = rec.pos;
             rec.field_0x10 = 0;
             if (attack == 1)
                 rec.field_0x12 = 0x600;
@@ -1479,7 +1458,6 @@ extern "C" void em024_act7_sub3(_ENEMY_WORK* self, u8 side, u8 lead)
 {
     nw4r::math::VEC3 joint_pos;
 
-    VEC3_ctor(&joint_pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1557,7 +1535,6 @@ extern "C" void em024_act7_sub5(_ENEMY_WORK* self, u8 attack)
 {
     nw4r::math::VEC3 dir;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1603,7 +1580,7 @@ extern "C" void em024_act7_sub5(_ENEMY_WORK* self, u8 attack)
             dir.y = 0.0f;
             dir.z = 1000.0f + 5.0f * hi;
             rotVecY(&dir, self->field_0x1C0);
-            addVec3To(&dir, &self->pos);
+            dir += self->pos;
             shell_set_func_ptr->method_0x8C(self, 0, &dir, 1.0f, 60, shell_set_func_ptr);
         }
         if (em_mot_end_ck(self) == 1)
@@ -1639,7 +1616,6 @@ extern "C" void em024_act7_sub11(_ENEMY_WORK* self, u8 side)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0: {
         u32 mot;
@@ -1682,11 +1658,8 @@ extern "C" void em024_act7_sub11(_ENEMY_WORK* self, u8 side)
 extern "C" void em024_act7_sub13(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 tmp;
     EmSpawnRec rec;
 
-    VEC3_ctor(&pos);
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1732,7 +1705,7 @@ extern "C" void em024_act7_sub13(_ENEMY_WORK* self, u8 kind)
         case 0:
             if (em_frame_check(self, 0, 22.0f, 0.0f) == 1) {
                 rec.id = 21;
-                copyVec3(&rec.pos, setVec3(&tmp, 0.0f, 0.0f, 100.0f));
+                rec.pos = VEC3(0.0f, 0.0f, 100.0f);
                 rec.field_0x10 = 0;
                 rec.field_0x12 = 0x2000;
                 rec.field_0x14 = 0;
@@ -1771,13 +1744,10 @@ extern "C" void em024_act7_sub13(_ENEMY_WORK* self, u8 kind)
 /* Action 7 sub-state 15: motion 48 with the jet effects and area sound, then switches to state 7/25. */
 extern "C" void em024_act7_sub15(_ENEMY_WORK* self)
 {
-    nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint_pos;
+    nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint_pos);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1803,7 +1773,7 @@ extern "C" void em024_act7_sub15(_ENEMY_WORK* self)
                 get_joint_wpos_em(self, 3, &joint_pos);
                 setVector3(&pos, 0.0f, 2000.0f, 1300.0f);
                 rotVecY(&pos, self->field_0x1C0);
-                addVec3To(&joint_pos, &pos);
+                joint_pos += pos;
                 eft019_set_vec(&joint_pos, reinterpret_cast<_CP_VECTOR*>(&self->field_0x1BC), self->area_no, 0x81, 1.0f);
             }
         }
@@ -1821,11 +1791,9 @@ extern "C" void em024_act7_sub15(_ENEMY_WORK* self)
 /* Writes the point ahead of the monster, rotated by the offset angle `kind` selects. */
 extern "C" void em024_act7_aim_pos(_ENEMY_WORK* self, u8 kind, nw4r::math::VEC3* out)
 {
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 target;
     s32 angle;
 
-    setVec3(&dir, 0.0f, 0.0f, 100.0f);
+    nw4r::math::VEC3 dir(0.0f, 0.0f, 100.0f);
     switch (kind) {
     default:
         angle = 0x2000;
@@ -1842,8 +1810,7 @@ extern "C" void em024_act7_aim_pos(_ENEMY_WORK* self, u8 kind, nw4r::math::VEC3*
     }
     angle = (u16)(self->field_0x1C0 + angle);
     rotVecY(&dir, angle);
-    addVec3(&target, &self->pos, &dir);
-    copyVec3(out, &target);
+    *out = self->pos + dir;
 }
 
 /* Action 7 sub-states 16, 17, 22, 23 and 36: the turn sequences with per-frame effects, sound and shell jobs. */
@@ -1851,17 +1818,14 @@ extern "C" void em024_act7_aim_pos(_ENEMY_WORK* self, u8 kind, nw4r::math::VEC3*
 extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
 {
     f32 dist;
-    nw4r::math::VEC3 aim;
-    nw4r::math::VEC3 joint_pos;
-    nw4r::math::VEC3 pos;
     u32 kind_off;
     u32 joint;
     f32 speed_a = 1.0f;
     f32 speed_b = speed_a;
 
-    VEC3_ctor(&aim);
-    VEC3_ctor(&joint_pos);
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 aim;
+    nw4r::math::VEC3 joint_pos;
+    nw4r::math::VEC3 pos;
     switch (kind) {
     case 1:
         speed_a = 0.83f;
@@ -2129,15 +2093,12 @@ extern "C" void em024_act7_sub16(_ENEMY_WORK* self, u8 kind)
 extern "C" void em024_act7_scatter_pos(nw4r::math::VEC3* out, nw4r::math::VEC3* origin, s32 angle, u16 seed)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 target;
 
-    VEC3_ctor(&offset);
     setVector3(&offset, 0.0f, 2000.0f, 1000.0f);
     offset.x += 10.0f * (f32)((u8)seed - 0x80);
     offset.z += 5.0f * (f32)(u16)(((u16)seed & 0xFF00) >> 8);
     rotVecY(&offset, angle);
-    addVec3(&target, origin, &offset);
-    copyVec3(out, &target);
+    *out = *origin + offset;
 }
 
 /* Action 7 sub-state 25: starts motion 62 and throws three shell jobs at seed-derived positions. */
@@ -2147,8 +2108,6 @@ extern "C" void em024_act7_sub25(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 unused_pos;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused_pos);
     switch (self->state) {
     case 0: {
         u16 seed;
@@ -2174,12 +2133,12 @@ extern "C" void em024_act7_sub25(_ENEMY_WORK* self)
 }
 #pragma opt_common_subs reset
 
-nw4r::math::VEC3 em024_pick_offsets[] = {
+nw4r::math::_VEC3 em024_pick_offsets[] = {
     {800.0f, 0.0f, 800.0f}, {-800.0f, 0.0f, 800.0f}, {1200.0f, 0.0f, 0.0f},
     {-1200.0f, 0.0f, 0.0f}, {800.0f, 0.0f, -800.0f}, {-800.0f, 0.0f, -800.0f},
 };
 
-nw4r::math::VEC3 em024_field_offsets[] = {
+nw4r::math::_VEC3 em024_field_offsets[] = {
     {-1792.1f, 250.0f, 2111.5f}, {272.3f, 244.2f, 3262.2f}, {-551.4f, 249.7f, 2475.8f},
     {477.8f, 250.0f, 1710.2f}, {-1222.0f, 250.0f, -156.8f}, {-1942.4f, 250.0f, -2254.0f},
     {-3184.1f, 250.0f, -1495.2f}, {-2635.1f, 250.0f, 3046.5f}, {-1279.7f, 246.8f, 3489.3f},
@@ -2219,8 +2178,6 @@ extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 spawn_pos;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&spawn_pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2244,29 +2201,22 @@ extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
             self->timer_0x020++;
         }
         if (em_frame_check(self, 0, 164.0f, 0.0f) == 1) {
-            nw4r::math::VEC3 target;
-
             self->state_0x006 = self->bits_0x1EC % 6;
             vec_to_mh_vec3(&pos, reinterpret_cast<struct Vec*>(&em024_pick_offsets[self->state_0x006]));
             rotVecY(&pos, self->field_0x1C0);
-            addVec3(&target, &self->pos, &pos);
-            copyVec3(&spawn_pos, &target);
+            spawn_pos = self->pos + pos;
             shell_set_func_ptr->method_0x8C(self, 1, &spawn_pos, 1.0f, 60, shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, 224.0f, 0.0f) == 1) {
-            nw4r::math::VEC3 target;
-
             self->state_0x007 = ((s32)self->bits_0x1EC >> 4) % 5;
             if (self->state_0x007 >= self->state_0x006)
                 self->state_0x007++;
             vec_to_mh_vec3(&pos, reinterpret_cast<struct Vec*>(&em024_pick_offsets[self->state_0x007]));
             rotVecY(&pos, self->field_0x1C0);
-            addVec3(&target, &self->pos, &pos);
-            copyVec3(&spawn_pos, &target);
+            spawn_pos = self->pos + pos;
             shell_set_func_ptr->method_0x8C(self, 1, &spawn_pos, 1.0f, 60, shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, 284.0f, 0.0f) == 1) {
-            nw4r::math::VEC3 target;
             u8 first;
             u8 second;
             u8 pick;
@@ -2287,8 +2237,7 @@ extern "C" void em024_act7_sub26(_ENEMY_WORK* self)
             }
             vec_to_mh_vec3(&pos, reinterpret_cast<struct Vec*>(&em024_pick_offsets[pick]));
             rotVecY(&pos, self->field_0x1C0);
-            addVec3(&target, &self->pos, &pos);
-            copyVec3(&spawn_pos, &target);
+            spawn_pos = self->pos + pos;
             shell_set_func_ptr->method_0x8C(self, 1, &spawn_pos, 1.0f, 60, shell_set_func_ptr);
         }
         if (em_mot_end_ck(self) == 1)
@@ -2303,7 +2252,6 @@ extern "C" void em024_act7_sub27(_ENEMY_WORK* self, u8 side)
 {
     nw4r::math::VEC3 joint_pos;
 
-    VEC3_ctor(&joint_pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2352,7 +2300,6 @@ extern "C" void em024_act7_sub29(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 joint_pos;
 
-    VEC3_ctor(&joint_pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2536,7 +2483,6 @@ extern "C" void em024_act7_field_burst(_ENEMY_WORK* self, u8 group, u8 index, u1
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (group < 4 && index < 0x23) {
         u32 hit = 0;
 
@@ -2552,7 +2498,7 @@ extern "C" void em024_act7_field_burst(_ENEMY_WORK* self, u8 group, u8 index, u1
         }
         if (hit == 1) {
             em_target_pos_set(self, NULL);
-            copyVec3(&pos, &self->vec_0x36C);
+            pos = self->vec_0x36C;
         } else {
             u32 angle;
 
@@ -2582,13 +2528,10 @@ extern "C" void em024_act7_field_burst(_ENEMY_WORK* self, u8 group, u8 index, u1
 /* Action 7 sub-state 32: plays motion 48 and steps the field-burst script over 35 positions. */
 extern "C" void em024_act7_sub32(_ENEMY_WORK* self)
 {
-    nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint_pos;
+    nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint_pos);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2618,7 +2561,7 @@ extern "C" void em024_act7_sub32(_ENEMY_WORK* self)
                 get_joint_wpos_em(self, 3, &joint_pos);
                 setVector3(&pos, 0.0f, 2000.0f, 1300.0f);
                 rotVecY(&pos, self->field_0x1C0);
-                addVec3To(&joint_pos, &pos);
+                joint_pos += pos;
                 eft019_set_vec(&joint_pos, reinterpret_cast<_CP_VECTOR*>(&self->field_0x1BC), self->area_no, 0x81,
                                1.0f);
             }
@@ -2807,11 +2750,10 @@ extern "C" void em024_magma_burst(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if ((u32)(em_get_mot_no(self) - 0x67) <= 1) {
         if (self->state_0x006 == 0 && em_magma_check(self) == 1 && self->pos.y < self->field_0x214) {
             self->state_0x006++;
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
             pos.y = 5.0f + self->field_0x214;
             eft009_set_pos(0x88, &pos, reinterpret_cast<_CP_VECTOR*>(&self->field_0x1BC), 1.5f, self->area_no);
         }
@@ -3185,8 +3127,6 @@ extern "C" void em024_act13_sub0(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint_pos;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint_pos);
     em_frame_flag_set(self);
     switch (self->state) {
     case 0:
@@ -3435,7 +3375,6 @@ extern "C" void em024_gauge_aura_fx(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (em_alt_mode_ck(self) == 1 && system_w.field_0x0c % 24 == 0) {
         setVector3(&pos, 0.0f, -20.0f, 100.0f);
         if (self->field_0x1E4 == 2)
@@ -3450,7 +3389,6 @@ extern "C" void em024_effect_spawn(_ENEMY_WORK* self, u8 mode, u8 id, u32 joint,
 {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (mode) {
     case 0:
         if (joint == 0xFF) {
@@ -3464,7 +3402,7 @@ extern "C" void em024_effect_spawn(_ENEMY_WORK* self, u8 mode, u8 id, u32 joint,
         break;
     case 1:
         if (joint == 0xFF)
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         else
             get_joint_wpos_em(self, joint, &pos);
         pos.y = self->field_0x20C;
@@ -3473,7 +3411,7 @@ extern "C" void em024_effect_spawn(_ENEMY_WORK* self, u8 mode, u8 id, u32 joint,
         break;
     case 2:
         if (joint == 0xFF)
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         else
             get_joint_wpos_em(self, joint, &pos);
         pos.y = self->field_0x20C;
@@ -3490,8 +3428,6 @@ extern "C" void em024_motion_events(_ENEMY_WORK* self)
     nw4r::math::VEC3 pos;
     u16 mot;
 
-    VEC3_ctor(&unused_pos);
-    VEC3_ctor(&pos);
     em024_part_lock_sync(self);
     em024_gauge_aura_fx(self);
     mot = em_get_mot_no(self);
@@ -3697,7 +3633,7 @@ extern "C" void em024_motion_events(_ENEMY_WORK* self)
     case 0x26:
         if (em_after_frame_check(self, 0, 10.0f, 0.0f) == 1) {
             if (em_magma_check(self) == 1) {
-                copyVec3(&pos, &self->pos);
+                pos = self->pos;
                 pos.y = 5.0f + self->field_0x214;
                 eft009_set_pos(0x88, &pos, reinterpret_cast<_CP_VECTOR*>(&self->field_0x1BC), 1.5f, self->area_no);
             } else {

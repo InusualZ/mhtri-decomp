@@ -10,11 +10,10 @@
 
 #include "types.h"
 #include "enemy/ENEMY_WORK.h"          /* EmGroundRec, the placement an entry spawns at */
-#include "enemy/em_ground_rec_clear.h" /* em_ground_rec_clear (rule 2) */
 #include "quest/quest_types.h"         /* Q_UserData, Q_CountSet, Q_ElementBlock */
 #include "mh3_pad/lb_param_work.h"     /* EmSetPointRow */
 
-/* The ground record an entry carries, prepared by `em_ground_rec_clear` (0x80125F54) when the entry is built.
+/* The ground record an entry carries, constructed by `EmGroundRec::EmGroundRec` (0x80125F54) when the entry is built.
  * size: 0x20 */
 struct EmSetGround {
     /* +0x00 */ EmGroundRec rec;

@@ -1,5 +1,5 @@
-#ifndef MHTRI_EF_FN_800FD718_H
-#define MHTRI_EF_FN_800FD718_H
+#ifndef MHTRI_EF_EFT002_FOLLOW_H
+#define MHTRI_EF_EFT002_FOLLOW_H
 
 #include "types.h"
 
@@ -12,12 +12,12 @@ extern "C" {
 
 struct _EFT;
 
-void fn_800FD718(struct _EFT* self);
-void fn_800FD850(struct _EFT* self);
-void fn_800FD860(struct _EFT* self);
+void eft002_follow(struct _EFT* self);
+void eft002_state_next(struct _EFT* self);
+void eft002_release(struct _EFT* self);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MHTRI_EF_FN_800FD718_H */
+#endif /* MHTRI_EF_EFT002_FOLLOW_H */

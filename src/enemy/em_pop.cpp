@@ -41,7 +41,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "ef/fn_800CDB2C.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "enemy/em_pop.h"
@@ -90,7 +90,7 @@
 #include "Pl/fn_80262940.h"                /* init_player_work, player_init_data_load (rule 2) */
 #include "light/light.h"                   /* light_init (rule 2) */
 #include "stage/shell.h"                   /* shell_work_init (rule 2) */
-#include "mh3_pad.h"                       /* setVec3, copyVec3 (rule 2) */
+#include "mh3_pad.h"                       /* VEC3(x, y, z), VEC3::operator= (rule 2) */
 #include "enemy/fn_8013F764.h"             /* em_kind_release (rule 2) */
 #include "menu/quest_str_tbl_35_get.h"     /* quest_str_tbl_35_get (rule 2) */
 #include "ef/eft_res.h"                    /* eft_control_init, eft_common_load (rule 2) */
@@ -612,7 +612,7 @@ s32 em_set_area_enter(Q_MoveWork* work) {
         return 0;
     }
     stage_area_enter(work->phase_0xE9, work->sub_0xEA);
-    copyVec3(&work->entry_pos_0x128, stage_entry_pos_get(work->phase_0xE9, work->sub_0xEA));
+    work->entry_pos_0x128 = *stage_entry_pos_get(work->phase_0xE9, work->sub_0xEA);
     angle = stage_entry_angle_get(work->phase_0xE9, work->sub_0xEA);
     work->entry_angle_0x134 = angle;
     pl_area_entry_set(&work->entry_pos_0x128, angle, work->phase_0xE9, work->sub_0xEA);
@@ -629,10 +629,9 @@ s32 em_set_area_enter(Q_MoveWork* work) {
 /* Warps the local player to the start of stage 1 (the hub): the stage's start position and facing go through
  * `pl_warp_start` with the work's warp stage. */
 void quest_warp_hub(void) {
-    nw4r::math::VEC3 pos;
     s32 angle;
 
-    setVec3(&pos, 0.0f, 0.0f, 0.0f);
+    nw4r::math::VEC3 pos(0.0f, 0.0f, 0.0f);
     stage_start_get(1, &pos, &angle);
     pl_act_stage_latch_set(my_player_work_get(), 2);
     pl_warp_start(em_set_work_ptr.work->warp_stage_0x000A, &pos, angle);
@@ -1015,9 +1014,7 @@ void em_set_enemy_detach(struct _ENEMY_WORK* enemy) {
 } /* extern "C" */
 
 /* Builds an entry's ground record. */
-inline EmSetEntry::EmSetEntry() {
-    em_ground_rec_clear(&ground_0x08.rec);
-}
+inline EmSetEntry::EmSetEntry() {}
 
 /* The constructors are inline, so they follow the static initialiser; `__sinit` (compiled at the end of the file)
  * calls the work's constructor out of line. */

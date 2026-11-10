@@ -32,7 +32,7 @@
 #include "gx.h"
 #include "nw4r/math.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h"                 /* VEC3_ctor / copyVec3 (rule 2) */
+#include "mh3_pad.h"                 /* VEC3::VEC3() / VEC3::operator= (rule 2) */
 #include "main.h"                    /* _MH_VEC2 (rule 1) */
 #include "screen_size_float_get.h"
 #include "MTX/mtx.h"
@@ -383,7 +383,7 @@ extern "C" void draw_shape_arm_pos(const nw4r::math::VEC3* pos, s32 timer, u8 ar
     s->timer = timer;
     s->joint = 0;
     s->use_pos = 1;
-    copyVec3(&s->pos, pos);
+    s->pos = *pos;
     s->area = area;
 }
 
@@ -394,12 +394,10 @@ extern "C" s32 draw_sprite_track(DrawSpriteSlot* s) {
     GXColor color;
     u32 camera;
     _MH_VEC2 size;
-    nw4r::math::VEC3 screen;
-    nw4r::math::VEC3 world;
     struct _ENEMY_WORK* enemy = s->enemy;
 
-    VEC3_ctor(&screen);
-    VEC3_ctor(&world);
+    nw4r::math::VEC3 screen;
+    nw4r::math::VEC3 world;
     if (s->active == 0) {
         return 0;
     }
@@ -411,7 +409,7 @@ extern "C" s32 draw_sprite_track(DrawSpriteSlot* s) {
         if (s->use_pos == 0) {
             get_joint_wpos_em(enemy, s->joint, &world);
         } else {
-            copyVec3(&world, &s->pos);
+            world = s->pos;
         }
         screen_size_float_get(&size);
         camera = scn_root_get_current_camera(pRoot);

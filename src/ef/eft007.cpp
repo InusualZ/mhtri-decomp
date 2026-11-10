@@ -33,7 +33,7 @@
 #include "unsplit/g3d.h"
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 #include "ef/eft007_types.h"
@@ -286,7 +286,7 @@ void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VE
     work->param_id = id;
     work->paramscale = scale;
     if (vec != 0) {
-        copyVec3(&work->pos_0x14, vec);
+        work->pos_0x14 = *vec;
     } else {
         setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
@@ -342,7 +342,7 @@ void eft007_set_vec(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math
     work->param_id = id;
     work->paramscale = scale;
     if (vec != 0) {
-        copyVec3(&work->pos_0x14, vec);
+        work->pos_0x14 = *vec;
     } else {
         setVector3(&work->pos_0x14, 0.0f, 0.0f, 0.0f);
     }
@@ -414,13 +414,11 @@ extern "C" void fn_80102D0C(_EFT007* self)
  * shares one tail, so the arms only `break`. */
 extern "C" void fn_80102D48(_EFT007* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
     _PLW* model = self->model_0x30;
     _EFT007_WORK* work = self->work_0x38;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
     self->state_0x05++;
     work->effects[0] =
         res_eft_create(eft007_effect_ids[self->type_0x02], eft007_param_ids[self->type_0x02], 0);
@@ -441,7 +439,7 @@ extern "C" void fn_80102D48(_EFT007* self)
     case 13:
     case 14:
     case 15: {
-        copyVec3(&pos, &work->pos_0x14);
+        pos = work->pos_0x14;
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
@@ -489,7 +487,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         } else {
             self->timer_0x0C = 12;
         }
-        copyVec3(&pos, &work->pos_0x14);
+        pos = work->pos_0x14;
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
@@ -503,7 +501,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         } else {
             self->timer_0x0C = 12;
         }
-        copyVec3(&pos, &work->pos_0x14);
+        pos = work->pos_0x14;
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
@@ -516,7 +514,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         break;
     case 18:
         fn_8010383C(self, &mtx);
-        copyVec3(&pos, &work->pos_0x14);
+        pos = work->pos_0x14;
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -539,23 +537,18 @@ extern "C" void fn_80102D48(_EFT007* self)
  * model. */
 extern "C" void fn_80103130(_EFT007* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 pos;
     /* Retail initialises four vectors here; only `pos` is read back, but the other three
-     * `VEC3_ctor` calls print in the object, so the locals have to stay. */
-    nw4r::math::VEC3 spare_a;
-    nw4r::math::VEC3 spare_b;
-    nw4r::math::VEC3 spare_c;
-    nw4r::math::VEC3 cam;
+     * constructor calls print in the object, so the locals have to stay. */
     _GXColor color;
     _EFT007_WORK* work = self->work_0x38;
     _PLW* model = self->model_0x30;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&spare_a);
-    VEC3_ctor(&spare_b);
-    VEC3_ctor(&spare_c);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 spare_a;
+    nw4r::math::VEC3 spare_b;
+    nw4r::math::VEC3 spare_c;
+    nw4r::math::_VEC3 cam;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -614,7 +607,7 @@ extern "C" void fn_80103130(_EFT007* self)
         break;
     }
     if (do_place == 1) {
-        copyVec3(&pos, &work->pos_0x14);
+        pos = work->pos_0x14;
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
@@ -663,7 +656,7 @@ extern "C" void fn_80103130(_EFT007* self)
         change_color_eff(work->effects[0], &self->pos_0x18, color);
     }
     if ((u32)(self->type_0x02 - 13) <= 2) {
-        get_camera_pos_c1(&cam);
+        get_camera_pos_c1((nw4r::math::VEC3*)&cam);
         if (cam.y < model->field_0x064) {
             eft_res_models_spawn(self, work->effects, 1, work->count, 0);
         }
@@ -676,12 +669,10 @@ extern "C" void fn_80103130(_EFT007* self)
 extern "C" void fn_80103518(_EFT007* self)
 {
     s32 i;
-    nw4r::math::VEC3 vec;
-    nw4r::math::MTX34 mtx;
     _EFT007_WORK* work = self->work_0x38;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
+    nw4r::math::VEC3 vec;
+    nw4r::math::MTX34 mtx;
 
     if ((u32)(self->type_0x02 - 6) <= 1 || (u32)(self->type_0x02 - 9) <= 1 ||
         (u32)(self->type_0x02 - 16) <= 1) {
@@ -696,7 +687,7 @@ extern "C" void fn_80103518(_EFT007* self)
             /* fallthrough */
         }
         case 1: {
-            copyVec3(&vec, &work->pos_0x14);
+            vec = work->pos_0x14;
             fn_8010383C(self, &mtx);
             mulVecMat(&vec, &mtx);
             mtx34_trans_add(&mtx, &vec);
@@ -774,13 +765,11 @@ extern "C" s32 fn_801036C0(_EFT007* self)
  * per-effect-type local rotation set (which is what gives each weapon type its own swing axis). */
 extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
 {
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 origin;
     _PLW* model = self->model_0x30;
     _EFT007_WORK* work = self->work_0x38;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&origin);
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 origin;
     mhchar_joint_mtx_get(&((_MHcharJoints*)model->physics_0x13C)->joint_0x004, work->param_id, mtx);
     switch (self->type_0x02) {
     case 0:
@@ -834,7 +823,7 @@ extern "C" void eft007_part_offset_get(_ENEMY_WORK* enemy, u32 part, nw4r::math:
     _EFT_EMITTER* emitter = (_EFT_EMITTER*)fn_80103B60(enemy, part);
 
     if (emitter != NULL) {
-        copyVec3(&emitter->joint->offset, offset);
+        emitter->joint->offset = *offset;
     }
 }
 

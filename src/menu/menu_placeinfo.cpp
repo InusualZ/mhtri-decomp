@@ -84,7 +84,6 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "lobby/lobby_w.h"
 #include "lobby/lb_interior_load.h"
-#include "lobby/mhchar_construct.h"
 #include "menu/get_option_pair.h"
 #include "menu/pig_name_set.h"
 #include "menu/placeinfo_model_create.h"
@@ -168,14 +167,12 @@
  * slot state.  size: 0x174 */
 class PlaceModel {
 public:
-    PlaceModel() { mhchar_construct(&chr); }
+    PlaceModel() {}
 
     /* +0x000 */ nw4r::g3d::AnmObj* anm;   /* the UV animation `nw_res_anm_create` built (NULL: none) */
     /* +0x004 */ struct _g3d_work* works[2];   /* the g3d works the animation runs on */
-    /* +0x00C */ union {
-        MHchar chr;                 /* the model */
-        u8 chr_bytes[0x164];        /* its whole record, which the init clears */
-    };
+    /* +0x00C */ MHchar chr;                    /* the model; the init clears it and the tail */
+    /* +0x14C */ u8 chr_tail[0x170 - 0x14C];    /* the rest of the model record (0x164 bytes in all) */
     /* +0x170 */ u8 used;           /* 1 while the slot holds a model */
     /* +0x171 */ u8 interior_id;    /* the interior resource (`lb_interior_load`'s id; 0xFF: none) */
     /* +0x172 */ u8 flags;          /* `place_interior_flags[kind]`: 1 starts the motion, 2 builds the UV animation */
@@ -2738,7 +2735,7 @@ void place_model_work_init(void) {
         model->anm = NULL;
         model->works[0] = NULL;
         model->works[1] = NULL;
-        memset(model->chr_bytes, 0, sizeof(model->chr_bytes));
+        memset(&model->chr, 0, sizeof(model->chr) + sizeof(model->chr_tail));
         model->used = 0;
         model->interior_id = 0xFF;
         model->flags = 0;

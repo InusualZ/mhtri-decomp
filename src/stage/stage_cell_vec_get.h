@@ -9,8 +9,9 @@
 extern "C" {
 #endif
 
-/* 0x802B02C4 - copies vector `k` of the area cell row `i` into `out`. */
-void stage_cell_vec_get(nw4r::math::VEC3* out, u8 i, u8 k);
+/* 0x802B02C4 - returns a copy of vector `k` of the current area's cell row `i`. */
+/* free: C linkage evidenced - the map row is the unmangled `stage_cell_vec_get` */
+nw4r::math::VEC3 stage_cell_vec_get(u8 i, u8 k);
 
 #ifdef __cplusplus
 }

@@ -40,16 +40,16 @@
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80105314_types.h"
 #include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "enemy/fn_8012BDF4.h" /* em_work_die_ck (rule 2) */
-#include "fn_8004CAD8.h" /* addVec3, addVec3To, vec_to_mh_vec3, vec3_scale_in_place (rule 2) */
+#include "fn_8004CAD8.h" /* addVec3, VEC3::operator+=, vec_to_mh_vec3, vec3_scale_in_place (rule 2) */
 #include "ef/mtx34_trans_get.h"
 #include "ef/mtx34_trans_add.h"
 #include "ef/eft001.h" /* mtx34_set_trans */
-#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_calcworld.h" /* VEC3::operator+= (rule 2) */
 #include "enemy/fn_8012EC74.h" /* em_water_check, get_em_scale, get_joint_wmat_em (rule 2) */
 #include "rotLocalMatX.h"
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
@@ -366,10 +366,10 @@ extern "C" void eft_spawn_type10(_ENEMY_WORK* self, u8 type, u32 a, nw4r::math::
     case 29:
     case 30:
     case 31:
-        copyVec3(&e->pos_0x18, b);
+        e->pos_0x18 = *b;
         break;
     default:
-        copyVec3(&work->pos_0x14, b);
+        work->pos_0x14 = *b;
         break;
     }
     work->joint_0x10 = a;
@@ -425,7 +425,7 @@ extern "C" _EFT013* fn_80105888(_ENEMY_WORK* self, u8 type, u32 a, nw4r::math::V
     _EFT013_WORK_A* work = (_EFT013_WORK_A*)e->work_0x38;
     work->count = eft013_effect_counts[(u8)type];
     work->joint_0x10 = a;
-    copyVec3(&work->pos_0x14, b);
+    work->pos_0x14 = *b;
     work->scale_0x20 = scale;
     e->field_0x03 = 10;
     e->type_0x02 = type;
@@ -474,17 +474,13 @@ extern "C" void fn_801059AC(_EFT013* self) {
 extern "C" void fn_801059E8(_EFT013* self)
 {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 scale;
     _EFT013_WORK_A* work;
     _ENEMY_WORK* enemy;
     s32 i;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&pos);
-    VEC3_ctor(&scale);
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 pos;
+    nw4r::math::VEC3 scale;
     work = (_EFT013_WORK_A*)self->work_0x38;
     enemy = self->source_0x30;
     self->state_0x05++;
@@ -522,7 +518,7 @@ extern "C" void fn_801059E8(_EFT013* self)
             setVector3(&scale, 1.0f, 1.0f, 1.0f);
             setScaleMat34W(&mtx, &scale);
         }
-        copyVec3(&offset, &work->pos_0x14);
+        offset = work->pos_0x14;
         for (i = 0; i < work->count; i++) {
             work->effects[i] = res_eft_create(eft013_em_effect_ids[self->type_0x02], eft013_em_param_ids[self->type_0x02], 0);
             if (work->effects[i] == NULL) {
@@ -576,13 +572,11 @@ extern "C" void fn_801059E8(_EFT013* self)
                 work->effects[i]->owner_0x44 = self;
             }
             if (eft013_spawn_offsets[self->type_0x02] != NULL) {
-                nw4r::math::VEC3 sum;
                 vec_to_mh_vec3(&offset, &eft013_spawn_offsets[self->type_0x02][i]);
                 mulVecMat(&offset, &mtx);
-                addVec3(&sum, &self->pos_0x18, &offset);
-                copyVec3(&pos, &sum);
+                pos = self->pos_0x18 + offset;
             } else {
-                copyVec3(&pos, &self->pos_0x18);
+                pos = self->pos_0x18;
             }
             mtx34_set_trans(&mtx, &pos);
             mtx34_trans_get(&mtx, &self->pos_0x18);
@@ -598,7 +592,7 @@ extern "C" void fn_801059E8(_EFT013* self)
                 fn_801065F8(self);
                 return;
             }
-            copyVec3(&offset, &work->pos_0x14);
+            offset = work->pos_0x14;
             if (eft013_spawn_offsets[self->type_0x02] != NULL) {
                 Vec* add = &eft013_spawn_offsets[self->type_0x02][i];
                 offset.x += add->x;
@@ -619,7 +613,7 @@ extern "C" void fn_801059E8(_EFT013* self)
         pos.x = root->m[0][3];
         pos.y = root->m[1][3];
         pos.z = root->m[2][3];
-        addVec3To(&pos, &self->pos_0x18);
+        pos += self->pos_0x18;
         vec3_scale_in_place(&pos, 0.5f);
         se_req_pos_ps(enemy->se_handle_0xB14, 22, 2, &pos);
     }
@@ -679,8 +673,6 @@ extern "C" void fn_80105EFC(_EFT013* self) {
  * y 0 (above it they are not handed on). */
 extern "C" void fn_80105F30(_EFT013* self)
 {
-    nw4r::math::VEC3 offset;
-    nw4r::math::MTX34 mtx;
     s32 i;
     u32 spawn;
     _ENEMY_WORK* enemy;
@@ -689,10 +681,10 @@ extern "C" void fn_80105F30(_EFT013* self)
     _GXColor color;
 
     spawn = 1;
-    VEC3_ctor(&offset);
+    nw4r::math::VEC3 offset;
     enemy = self->source_0x30;
     work = (_EFT013_WORK_A*)self->work_0x38;
-    MTX34_ctor(&mtx);
+    nw4r::math::MTX34 mtx;
     if (em_work_die_ck(enemy) != 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -724,9 +716,9 @@ extern "C" void fn_80105F30(_EFT013* self)
         for (i = 0; i < work->count; i++) {
             if (eft013_spawn_offsets[self->type_0x02] != NULL) {
                 vec_to_mh_vec3(&offset, &eft013_spawn_offsets[self->type_0x02][i]);
-                addVec3To(&offset, &work->pos_0x14);
+                offset += work->pos_0x14;
             } else {
-                copyVec3(&offset, &work->pos_0x14);
+                offset = work->pos_0x14;
             }
             fn_801065FC(self, enemy, &offset, work->joint_0x10, (u8)i);
         }
@@ -766,22 +758,17 @@ extern "C" void fn_80105F30(_EFT013* self)
  * work's offset (rotated by the record's x angle, type 13 at unit scale), scaled by the enemy and handed on. */
 extern "C" void fn_80106180(_EFT013* self)
 {
-    nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 offset;
-    nw4r::math::VEC3 joint_pos;
-    nw4r::math::VEC3 scale;
-    nw4r::math::VEC2 unused;
     s32 i;
     _ENEMY_WORK* enemy;
     _EFT013_WORK_A* work;
 
     enemy = self->source_0x30;
     work = (_EFT013_WORK_A*)self->work_0x38;
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&offset);
-    VEC3_ctor(&joint_pos);
-    VEC3_ctor(&scale);
-    VEC2_ctor(&unused);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 offset;
+    nw4r::math::VEC3 joint_pos;
+    nw4r::math::VEC3 scale;
+    nw4r::math::VEC2 unused;
     if (em_work_die_ck(enemy) != 0) {
         self->state_0x05++;
         self->field_0x06 = 0;
@@ -802,7 +789,7 @@ extern "C" void fn_80106180(_EFT013* self)
             get_joint_wpos_em(enemy, work->joint_0x10, &joint_pos);
             if (em_water_check_c1(enemy) != 1) {
                 self->area_0x44 = enemy->act_id;
-                copyVec3(&offset, &work->pos_0x14);
+                offset = work->pos_0x14;
                 get_joint_wmat_em(enemy, work->joint_0x10, &mtx);
                 mulVecMat(&offset, &mtx);
                 mtx34_trans_add(&mtx, &offset);
@@ -828,16 +815,14 @@ extern "C" void fn_80106180(_EFT013* self)
 extern "C" void fn_801063A8(_EFT013* self)
 {
     nw4r::math::VEC3 offset;
-    nw4r::math::MTX34 mtx;
     _ENEMY_WORK* enemy;
     _EFT013_WORK_A* work;
     s32 i;
     _GXColor color;
 
-    VEC3_ctor(&offset);
     enemy = self->source_0x30;
     work = (_EFT013_WORK_A*)self->work_0x38;
-    MTX34_ctor(&mtx);
+    nw4r::math::MTX34 mtx;
     if (em_work_die_ck(enemy) != 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -848,9 +833,9 @@ extern "C" void fn_801063A8(_EFT013* self)
         for (i = 0; i < work->count; i++) {
             if (eft013_spawn_offsets[self->type_0x02] != NULL) {
                 vec_to_mh_vec3(&offset, &eft013_spawn_offsets[self->type_0x02][i]);
-                addVec3To(&offset, &work->pos_0x14);
+                offset += work->pos_0x14;
             } else {
-                copyVec3(&offset, &work->pos_0x14);
+                offset = work->pos_0x14;
             }
             fn_801065FC(self, enemy, &offset, work->joint_0x10, (u8)i);
             effect_retire(work->effects[i], 0);
@@ -866,7 +851,6 @@ extern "C" void fn_801063A8(_EFT013* self)
 /* 0x80106530 - state-2 handler: retire the emitter, tick the effect, then drive its colour/scale. */
 extern "C" void fn_80106530(_EFT013* self) {
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     if (self->type_0x02 != 2) {
         self->state_0x05++;
@@ -897,7 +881,6 @@ extern "C" void fn_801065F8(_EFT013* self) {
  * position into it, fold in the effect's own rotation and set the root matrix. */
 extern "C" void fn_801065FC(_EFT013* self, _ENEMY_WORK* enemy, nw4r::math::VEC3* v, u32 joint, u32 index) {
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     get_joint_wmat_em(enemy, joint, &mtx);
     mulVecMat(v, &mtx);
@@ -940,7 +923,7 @@ extern "C" void eft_spawn_type11(_ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 k
     e->flag_0x01 = 1;
     e->field_0x03 = 11;
     e->type_0x02 = kind;
-    copyVec3(&e->pos_0x18, pos);
+    e->pos_0x18 = *pos;
     e->source_0x30 = self;
     e->area_0x44 = self->act_id;
     eft_state_flags_set((_EFT*)e, 0, 0);
@@ -970,7 +953,7 @@ extern "C" void eft_area_part_break_set(u8 type, nw4r::math::VEC3* pos, f32 scal
     e->flag_0x01 = 1;
     e->field_0x03 = 11;
     e->type_0x02 = type;
-    copyVec3(&e->pos_0x18, pos);
+    e->pos_0x18 = *pos;
     e->source_0x30 = NULL;
     e->area_0x44 = areano;
     e->rot_0x24.x = 0;
@@ -1027,7 +1010,6 @@ u8 eft013_shell_colors_alt[20] = {0x08, 0x28, 0x08, 0xFF, 0x08, 0x28, 0x08, 0xFF
  * effect's own rotation/position, recolour it by type and hand off to the state-1 handler. */
 extern "C" void fn_8010695C(_EFT013* self) {
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     self->state_0x05++;
     work->effects[0] = res_eft_create(eft013_burst_ids[(u8)self->type_0x02], eft013_burst_params[(u8)self->type_0x02], 0);
@@ -1127,7 +1109,7 @@ extern "C" void eft013_shell_spawn(nw4r::math::VEC3* pos, u32 type, _CP_VECTOR* 
     work->scale_0x04 = scale;
     e->field_0x03 = 12;
     e->type_0x02 = type;
-    copyVec3(&e->pos_0x18, pos);
+    e->pos_0x18 = *pos;
     e->rot_0x24.x = rot->x;
     e->rot_0x24.y = rot->y;
     e->rot_0x24.z = 0;
@@ -1201,7 +1183,7 @@ extern "C" void eft013_guard_spawn(nw4r::math::VEC3* pos, u32* rot, f32 scale, _
     work->scale_0x04 = scale;
     e->field_0x03 = 12;
     e->type_0x02 = 3;
-    copyVec3(&e->pos_0x18, pos);
+    e->pos_0x18 = *pos;
     e->rot_0x24.x = rot[0];
     e->rot_0x24.y = rot[1];
     e->rot_0x24.z = 0;
@@ -1244,8 +1226,6 @@ extern "C" void fn_80106F5C(_EFT013* self) {
     s32 i;
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
-    VEC3_ctor(&v);
-    MTX34_ctor(&mtx);
     _EFT013_POOL2* work = (_EFT013_POOL2*)self->work_0x38;
     self->state_0x05++;
     work->effects[0] = res_eft_create(eft013_shell_ids[(u8)self->type_0x02], eft013_shell_params[(u8)self->type_0x02], 0);

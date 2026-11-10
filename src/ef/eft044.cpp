@@ -158,10 +158,7 @@ extern "C" void eft044_move(_EFT* self)
     _ENEMY_WORK* enemy = (_ENEMY_WORK*)self->source_0x30;
     VEC3 offset;
     nw4r::math::MTX34 mtx;
-    VEC3 tmp;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&mtx);
     if (em_work_die_ck(enemy)) {
         self->flag_0x01 = 0;
         self->state_0x05++;
@@ -198,7 +195,7 @@ extern "C" void eft044_move(_EFT* self)
     work->models[0]->scale_0x1C.y = fx->scale * getKeyData(eft044_scale_keys, (f32)self->timer_0x0C);
     self->rot_0x24.y = enemy->field_0x1C0;
     if (fx != NULL) {
-        copyVec3(&offset, setVec3(&tmp, fx->x, fx->y, fx->z));
+        offset = VEC3(fx->x, fx->y, fx->z);
         vec3_scale_in_place(&offset, get_em_chg_scale(enemy));
         get_joint_wmat_em(enemy, fx->joint, &mtx);
         mulVecMat(&offset, &mtx);
@@ -210,7 +207,7 @@ extern "C" void eft044_move(_EFT* self)
         self->field_0x06 = 0;
         return;
     }
-    copyVec3(&work->models[0]->pos_0x04, &self->pos_0x18);
+    work->models[0]->pos_0x04 = self->pos_0x18;
     work->models[0]->move(0);
     if (em_flag_0x8AD_ck(enemy) == 0)
         eft_res_models_spawn(self, (void**)work->models, 2, work->count, 0);

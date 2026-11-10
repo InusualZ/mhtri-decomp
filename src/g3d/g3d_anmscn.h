@@ -13,11 +13,9 @@ extern "C" {
 /* The cluster's owns with plain `fn_XXXXXXXX` map names, so C linkage. */
 /* 0x80064C14 - releases the object the second argument points at (`light/light.cpp`'s fn_802C1AD8 tail-calls it). */
 void light_obj_pos_vec_set(void *self, const f32 *v);
-void *vec3_copy_construct(void *out, void *in);     /* 0x80067E54 - copies a VEC3 (three floats), returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 #ifdef __cplusplus
 /* 0x80067E70 - the posture record's constructor: default-constructs its position, target and up vectors. */
-nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
 #endif
 
 #ifdef __cplusplus
@@ -97,6 +95,7 @@ void operator delete(void* block, void* place);
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle */
 #include "g3d/g3d_obj.h"         /* AnmScn, FrameCtrl */
+#include "g3d/g3d_anmclr.h"      /* color_ctor_white, the colours LightAnmResult constructs (rule 2) */
 
 namespace nw4r {
 namespace g3d {
@@ -135,6 +134,13 @@ struct LightAnmResult {
     /* +0x34 */ f32 cutoff;
     /* +0x38 */ GXColor specColor;
     /* +0x3C */ f32 shininess;
+
+    /* 0x800677D8 (0x4C): retail's out-of-line constructor: the two vectors, then the two colours white. */
+    LightAnmResult() __attribute__((never_inline))
+    {
+        color_ctor_white((u32*)&color);
+        color_ctor_white((u32*)&specColor);
+    }
 };
 
 /* A fog's evaluated result: the fog type, the z range and the colour.  size: 0x10 */
@@ -160,9 +166,12 @@ struct CameraAnmResult {
     /* +0x14 */ f32 aspect;
     /* +0x18 */ f32 near;
     /* +0x1C */ f32 far;
-    /* +0x20 */ math::VEC3 rotate;
+    /* +0x20 */ math::_VEC3 rotate;  /* the rotation or the aim (the camera type picks which) */
     /* +0x2C */ f32 twist;
     /* +0x30 */ f32 perspFovy;
+
+    /* 0x80067EB4 (0x34): retail's out-of-line constructor (its position). */
+    CameraAnmResult() __attribute__((never_inline)) {}
 };
 
 /* The scene animation over a ResAnmScn resource, with optional result caches.  size: 0x38 (Construct's

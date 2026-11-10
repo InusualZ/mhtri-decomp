@@ -1593,7 +1593,7 @@ void lb_box_screen_draw(void)
 #include "MSL/strlen.h"
 #include "draw_shape.h"                      /* res_file_ctor, res_file_assign */
 #include "color_rgba_copy.h"
-#include "mh3_pad.h"                         /* copyVec3 */
+#include "mh3_pad.h"                         /* the owner header */
 #include "sound/mhchar.h"                    /* mhchar_reset, mhchar_node_count */
 #include "sound/mhchar_model_create.h"
 #include "sound/mhchar_draw_mode_set.h"
@@ -2689,7 +2689,7 @@ void pl_rig_model_place(PlSeRig* rig, MHchar* model, _PLW* plw, f32 scale)
     model->field_0x28 = plw->param_0x54;
     model->field_0x2C = plw->field_0x058;
     model->field_0x30 = plw->rot_z_0x5C;
-    copyVec3(&model->pos_0x04, &plw->vec_0x03C);
+    model->pos_0x04 = plw->vec_0x03C;
     model->scale_0x1C.x = scale;
     model->scale_0x1C.y = scale;
     model->scale_0x1C.z = scale;
@@ -3091,12 +3091,7 @@ extern "C" PlSeVecPair* pl_rig_guard_pose_get(_PLW* plw, u16 motion, u8 kind, Pl
  * weapon state; returns the attachment's scale. */
 extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
 {
-    nw4r::math::MTX34 mtx;
     PlSeVecPair keyed;
-    nw4r::math::VEC3 unused_a;
-    f32 rot[3];
-    nw4r::math::VEC3 unused_b;
-    nw4r::math::VEC3 trans;
     PlSeJointAdj* adj;
     _PLW* plw = rig->plw;
     s32 i;
@@ -3106,9 +3101,11 @@ extern "C" f32 pl_rig_attach_pose_set(PlSeRig* rig, u32 index, u32 kind)
     f32 scale;
     s32 mode;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 unused_a;
+    f32 rot[3];
+    nw4r::math::VEC3 unused_b;
+    nw4r::math::_VEC3 trans;
     for (i = 0, adj = rig->attachments_0x1230[index].adj_0x014; i < 7; i++) {
         pl_rig_joint_adj_reset(rig, &adj[i]);
     }
@@ -4192,9 +4189,6 @@ extern "C" void pl_rig_kind4_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_c;
     u8 alt;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     alt = pl_weapon_alt_form_ck(plw);
     pl_rig_kind4_scale_set(plw, attach, motion, alt);
     attach->adj_0x014[4].scale_0x00.x = attach->adj_0x014[3].scale_0x00.y;
@@ -4212,11 +4206,8 @@ extern "C" void pl_rig_kind0_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_a;
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 unused_c;
-    nw4r::math::VEC3* scale;
+    nw4r::math::_VEC3* scale;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     scale = &attach->adj_0x014[3].scale_0x00;
     if (system_lobby_flag_get() == 2) {
         scale->x = 2.6f;
@@ -4379,9 +4370,6 @@ extern "C" void pl_rig_kind1_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_c;
     u8 leaning;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     if (system_lobby_flag_get() == 2) {
         attach->adj_0x014[2].scale_0x00.z = 3.0f;
         return;
@@ -4442,11 +4430,8 @@ extern "C" void pl_rig_kind9_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_a;
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 unused_c;
-    nw4r::math::VEC3* scale;
+    nw4r::math::_VEC3* scale;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     scale = &attach->adj_0x014[2].scale_0x00;
     if (system_lobby_flag_get() != 2) {
         u8 leaning = ((PlSeRig*)plw->physics_0x13C)->models_0x004[0].model.field_0x44 > 0.0f;
@@ -4527,9 +4512,6 @@ extern "C" void pl_rig_kind7_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     s32 variant;
     f32 span;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     root = &attach->adj_0x014[5];
     if (system_lobby_flag_get() == 2) {
         pl_rig_lobby_pose_apply(root, plw, 7, 1);
@@ -4732,9 +4714,6 @@ extern "C" void pl_rig_kind8_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 unused_c;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     if (system_lobby_flag_get() != 2) {
         PlSeJointAdj* grip = &attach->adj_0x014[3];
         PlSeJointAdj* head = &attach->adj_0x014[4];
@@ -4902,9 +4881,6 @@ extern "C" void pl_rig_kind3_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 unused_c;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     if (system_lobby_flag_get() != 2) {
         u8 leaning = ((PlSeRig*)plw->physics_0x13C)->models_0x004[0].model.field_0x44 > 0.0f;
 
@@ -5032,9 +5008,6 @@ extern "C" void pl_rig_kind2_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
     nw4r::math::VEC3 unused_b;
     nw4r::math::VEC3 unused_c;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    VEC3_ctor(&unused_c);
     if (system_lobby_flag_get() != 2) {
         PlSeJointAdj* spin = &attach->adj_0x014[4];
         u8 leaning = ((PlSeRig*)plw->physics_0x13C)->models_0x004[0].model.field_0x44 > 0.0f;
@@ -5231,12 +5204,9 @@ void LbEquipModelCallbackB::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r
 {
     nw4r::math::MTX34 mtx;
     nw4r::math::MTX33 rot;
-    nw4r::math::VEC3 trans;
     f32 angle;
 
-    MTX34_ctor(&mtx);
-    MTX33_ctor(&rot);
-    VEC3_ctor(&trans);
+    nw4r::math::VEC3 trans;
     switch (pFuncObj->GetCallbackNodeID()) {
     default:
         return;
@@ -5278,10 +5248,6 @@ void LbEquipModelCallbackB::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
     nw4r::math::MTX34 turn;
     nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
-    MTX34_ctor(&turn);
-    MTX34_ctor(&mtx);
     if (node_map_0x10[node] != 0xFFFFFFFF) {
         nw4r::math::MTX34* arr = mhchar_wld_mtx_array_get((nw4r::g3d::ScnMdlSimple*)body_0x08->field_0x118);
         joint_mtx_store((MtxHolder*)pManip, &arr[node_map_0x10[node]]);
@@ -5361,7 +5327,6 @@ void LbEquipModelCallbackA::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r
     PlRigNodeRule* rule;
     PlSeJointAdj* adj;
 
-    VEC3_ctor(&v);
     node = pFuncObj->GetCallbackNodeID();
     rules = pl_rig_node_rules[kind_0x10];
     rule = &rules[node];
@@ -5400,13 +5365,10 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
     u32 node = pFuncObj->GetCallbackNodeID();
     nw4r::math::MTX34 mtx;
     nw4r::math::MTX34 joint_mtx;
-    nw4r::math::VEC3 trans;
     PlRigNodeRule* rules;
     PlRigNodeRule* rule;
 
-    MTX34_ctor(&mtx);
-    MTX34_ctor(&joint_mtx);
-    VEC3_ctor(&trans);
+    nw4r::math::VEC3 trans;
     rules = pl_rig_node_rules[kind_0x10];
     rule = &rules[node];
     if (rule->mode_0x00 == 2) {

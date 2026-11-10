@@ -9,7 +9,7 @@
 
 struct _ENEMY_WORK;
 
-/* The 0x18-byte spawn record the unit's `em_spawn_rec_init`/`em001_spawn_rec_fill` fill and `em001_spawn_step` builds on
+/* The 0x18-byte spawn record `EmSpawnRec::EmSpawnRec` (0x80149788)/`em001_spawn_rec_fill` fill and `em001_spawn_step` builds on
  * its stack.  Same layout as `enemy/em001_prog.cpp`'s private `ShellParams` (its +0x12/+0x14 u16 pair
  * is the one that unit reads back): one record, two definitions.
  * size: 0x18 */
@@ -19,6 +19,10 @@ typedef struct EmSpawnRec {
     /* +0x10 */ u8 field_0x10;
     /* +0x12 */ u16 field_0x12;
     /* +0x14 */ u16 field_0x14;
+#ifdef __cplusplus
+    /* 0x80149788 (0x34): constructs the position; emitted out of line after its first user. */
+    EmSpawnRec() __attribute__((never_inline)) {}
+#endif
 } EmSpawnRec;
 
 #ifdef __cplusplus
@@ -28,7 +32,6 @@ extern "C" {
 #ifdef __cplusplus
 void fn_801481FC(struct _ENEMY_WORK* self);
 void em001_spawn_step(struct _ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);
-EmSpawnRec* em_spawn_rec_init(EmSpawnRec* rec);
 void em001_act3_0(struct _ENEMY_WORK* self);
 void em001_act3_1(struct _ENEMY_WORK* self);
 void em001_dive_step(struct _ENEMY_WORK* self);
@@ -38,7 +41,6 @@ void em001_act3_4(struct _ENEMY_WORK* self);
 /* The consumers' old-style spellings (C only). */
 void fn_801481FC();
 void em001_spawn_step();
-void em_spawn_rec_init();
 void em001_act3_0();
 void em001_act3_1();
 void em001_dive_step();

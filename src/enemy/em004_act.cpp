@@ -26,7 +26,7 @@
  *    ours folds it into one `beq` (early return, empty-then, success-first and `else return` all measured);
  *  - `em004_act8_call`: the max/targets and pending/bit register pairs swap (declaration hill-climb, local optimum);
  *  - `em004_act3_dive_turn2`: the turn flag's `and` result lands in r0, retail's in r7.
- *   Data: `.ctors` is not emitted (`em004_offset_init` is a plain function: `setVec3`/`assignVec3` are C-linkage
+ *   Data: `.ctors` is not emitted (`em004_offset_init` is a plain function: `VEC3(x, y, z)`/`VEC3::operator=` are C-linkage
  *   helpers, not a constructor pair), so the unit cannot flip.
  * SHAPES. The `ShellSetFuncs` +0x14/+0x3C/+0x54/+0x64 calls go through spellings without the trailing table
  *   argument (the shared slot types hoist the table load).  Float arguments are listed where retail loads them:
@@ -124,8 +124,8 @@ typedef void (*ShellEftJobFn)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math
 #define em_team_mate_state_ck_v ((u32 (*)(struct _ENEMY_WORK*, u8, u8))em_team_mate_state_ck)
 
 
-/* The unit's `.bss`: the two offset vectors the static initializer seeds.  The name is a GUESS. */
-Vec em004_offset_vec[2];
+/* The unit's `.bss`: the offset point and step MWCC's `__sinit` (0x801CA870) builds.  The name is a GUESS. */
+EmSeShiftPair em004_offset_vec = {nw4r::math::VEC3(0.0f, 70.0f, 0.0f), nw4r::math::VEC3(0.0f, -0.6f, 0.0f)};
 
 extern "C" {
 
@@ -434,7 +434,6 @@ void em004_hover_height_step(struct _ENEMY_WORK* self) {
  * the enemy on its map-4 area-4 route point. */
 void em004_init(struct _ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     self->em004_0x328.fade_0x328 = 0.0f;
     self->em004_0x328.height_bias_0x32C = 0.0f;
     self->em004_0x328.timer_0x330 = 0;
@@ -464,7 +463,6 @@ void em004_idle(struct _ENEMY_WORK* self) {
 /* 0x801C2E0C (0x248): the event notify: per `kind`/`sub`, flags, drop spawns and the 120-frame timer. */
 void em004_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (kind) {
     case 1:
         switch (sub) {
@@ -658,7 +656,6 @@ void em004_act0_run(struct _ENEMY_WORK* self) {
 /* 0x801C33E8 (0x17C): the ground slam: hit window, shape and dust at frame 114, dust trails from 120 to 240. */
 void em004_act1_slam(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -692,7 +689,6 @@ void em004_act1_slam(struct _ENEMY_WORK* self) {
 /* 0x801C3564 (0x100): the stamina-costing roar: breath sparks every fourth frame from 20 to 68. */
 void em004_act1_roar(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -747,7 +743,6 @@ void em004_act1_motion10(struct _ENEMY_WORK* self) {
 /* 0x801C375C (0x118): the breath warm-up: one flash, then breath sparks every fourth frame from 40 to 88. */
 void em004_act1_breath(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1111,7 +1106,6 @@ void em004_act3_hover_approach(struct _ENEMY_WORK* self) {
 /* 0x801C42C8 (0x1C0): the dive attack: impact at frame 50, then the ceiling run until the timer ends. */
 void em004_act3_dive_attack(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     em_fx_flag_set(self);
     switch (self->state) {
     case 0:
@@ -1222,8 +1216,6 @@ void em004_act3_ground_charge(struct _ENEMY_WORK* self) {
 void em004_act3_ground_pounce(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&dir);
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1237,15 +1229,13 @@ void em004_act3_ground_pounce(struct _ENEMY_WORK* self) {
             em_turn_to_target(self, 0x100);
         }
         if (em_mot_end_ck(self) == 1) {
-            nw4r::math::VEC3 diff;
             self->state++;
             em_fall_height_get(self);
             em_fall_start(self);
             em_move_sub_mode_set(self, 0);
             em_mot_set(self, 0xD4, 0, 2);
             em_hit_window_set(self, 0, 5, 3);
-            subVec3(&diff, &self->vec_0x36C, &self->pos);
-            copyVec3(&dir, &diff);
+            dir = self->vec_0x36C - self->pos;
             rotVecY(&dir, -self->field_0x1C0);
             if (dir.z < 0.0f) {
                 dir.z = 0.0f;
@@ -1322,7 +1312,6 @@ void em004_act3_ground_motionC9(struct _ENEMY_WORK* self) {
 /* 0x801C4A6C (0x18C): the ground-mode slam (the action-1 slam with the second dust trail). */
 void em004_act3_ground_slam(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1454,9 +1443,6 @@ void em004_act3_jump(struct _ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 pos2;
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 saved;
-    VEC3_ctor(&pos2);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&saved);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1487,10 +1473,8 @@ void em004_act3_jump(struct _ENEMY_WORK* self, u8 mode) {
             self->field_0x320 = -5.0f;
             self->field_0x318 = 60.0f;
             if ((u8)(mode + 0xFE) <= 1) {
-                nw4r::math::VEC3 diff;
                 f32 dist;
-                subVec3(&diff, &self->vec_0x36C, &self->pos);
-                copyVec3(&dir, &diff);
+                dir = self->vec_0x36C - self->pos;
                 rotVecY(&dir, -self->field_0x1C0);
                 dist = dir.z - 1900.0f;
                 if (dist > 0.0f) {
@@ -1505,7 +1489,7 @@ void em004_act3_jump(struct _ENEMY_WORK* self, u8 mode) {
         }
         break;
     case 2:
-        copyVec3(&saved, &self->pos);
+        saved = self->pos;
         CancelFade(self);
         em_turn_in_window(self, 0.0f, 36.0f, 0x8000);
         em_fall_height_get(self);
@@ -1523,7 +1507,7 @@ void em004_act3_jump(struct _ENEMY_WORK* self, u8 mode) {
             } else {
                 em_state_set(self, 3, 0x29);
             }
-            copyVec3(&self->pos, &saved);
+            self->pos = saved;
         }
         break;
     case 3:
@@ -1736,8 +1720,6 @@ void em004_act3_dive_turn2(struct _ENEMY_WORK* self, u8 mode) {
 void em004_act3_short_jump(struct _ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 pos2;
     nw4r::math::VEC3 saved;
-    VEC3_ctor(&pos2);
-    VEC3_ctor(&saved);
     switch (self->state) {
     case 0: {
         u16 motion;
@@ -1774,7 +1756,7 @@ void em004_act3_short_jump(struct _ENEMY_WORK* self, u8 mode) {
         }
         break;
     case 2:
-        copyVec3(&saved, &self->pos);
+        saved = self->pos;
         CancelFade(self);
         em_fall_height_get(self);
         if (em_ground_ck(self) == 1) {
@@ -1787,7 +1769,7 @@ void em004_act3_short_jump(struct _ENEMY_WORK* self, u8 mode) {
         if (mode <= 1 && em_busy_ck(self) == 1 && em_frame_check(self, 3, 10.0f, 30.0f) == 1 &&
             em004_turn_away_start(self, 0xFFFF, 1) == 1) {
             em_state_set(self, 3, 0x31);
-            copyVec3(&self->pos, &saved);
+            self->pos = saved;
         }
         break;
     case 3:
@@ -1859,7 +1841,6 @@ void em004_act3_dive_motionDE(struct _ENEMY_WORK* self) {
 /* 0x801C5D88 (0x184): the water-mode slam (the action-1 slam in water mode). */
 void em004_act3_dive_slam(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2126,12 +2107,9 @@ void em004_act7_charge_bite(struct _ENEMY_WORK* self) {
 /* 0x801C63E0 (0x368): the fire breath: mode 0/1 shoot a fireball at frame 100 (mode 2 the part effect), mode 2
  * also scatters the shell job at frame 108. */
 void em004_act7_fire_breath(struct _ENEMY_WORK* self, u8 mode) {
-    EmSpawnRec rec;
     nw4r::math::VEC3 joint;
     nw4r::math::VEC3 offset;
-    VEC3_ctor(&joint);
-    VEC3_ctor(&offset);
-    em_spawn_rec_init(&rec);
+    EmSpawnRec rec;
     switch (self->state) {
     case 0:
         self->state++;
@@ -2180,7 +2158,7 @@ void em004_act7_fire_breath(struct _ENEMY_WORK* self, u8 mode) {
             offset.z = 100.0f;
             rotVecY(&offset, self->field_0x1C0);
             get_joint_wpos_em(self, 0x1C, &joint);
-            addVec3To(&joint, &offset);
+            joint += offset;
             if (em_parts_damage_level_get(self, 0) >= 2) {
                 ((ShellPosJobFn)shell_set_func_ptr->method_0x14)(self, &joint, 0x1A, self->area_no, 0xFFFF);
             } else {
@@ -2198,7 +2176,6 @@ void em004_act7_fire_breath(struct _ENEMY_WORK* self, u8 mode) {
  * then the closing motion at frame 264. */
 void em004_act7_flame_sweep(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2242,7 +2219,6 @@ void em004_act7_flame_sweep(struct _ENEMY_WORK* self) {
 /* 0x801C692C (0xEC): the flame wind-up: part sparks every fourth frame from 20 to 68, then action 7 sub 8 at 114. */
 void em004_act7_flame_windup(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2289,7 +2265,6 @@ void em004_act7_double_swing(struct _ENEMY_WORK* self) {
 /* 0x801C6B00 (0x1AC): the flame pillar: at frame 2 the core effect and the shell job at the head joint. */
 void em004_act7_flame_pillar(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2360,7 +2335,6 @@ void em004_act7_charge(struct _ENEMY_WORK* self, u8 mode) {
  * and 374. */
 void em004_act7_fire_spread(struct _ENEMY_WORK* self, u8 mode) {
     EmSpawnRec rec;
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2600,8 +2574,6 @@ void em004_act7_run(struct _ENEMY_WORK* self) {
 void em004_act8_call(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 unused;
     nw4r::math::VEC3 head;
-    VEC3_ctor(&unused);
-    VEC3_ctor(&head);
     em004_hover_height_step(self);
     self->flags_0x836 &= 0x7FFF;
     switch (self->state) {
@@ -3242,7 +3214,6 @@ f32 em004_demo_turn_keys[24] = {
 /* 0x801C81C4 (0x634): the intro demo: the timed motion, camera position and rotation keys. */
 void em004_act13_demo(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     em_frame_flag_set(self);
     em_ceiling_latch(self);
     switch (self->state) {
@@ -3445,7 +3416,6 @@ void em004_action_run(struct _ENEMY_WORK* self) {
 /* 0x801C8914 (0x84): in the alternate mode, a body spark every 32 frames. */
 void em004_body_spark(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     if (em_alt_mode_ck(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
         setVector3(&pos, 0.0f, 0.0f, 50.0f);
         eft_spawn_type10(self, 0x17, 0x1C, &pos, 1.0f);
@@ -3456,7 +3426,6 @@ void em004_body_spark(struct _ENEMY_WORK* self) {
  * is 0xFF, else at the joint; modes 1/2 the area and splash variants. */
 void em004_step_eft_set(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s32 id, f32 scale) {
     nw4r::math::VEC3 pos;
-    VEC3_ctor(&pos);
     switch (mode) {
     case 0:
         if ((self->field_0x228 & 0x6) != 0) {
@@ -3562,7 +3531,7 @@ void em004_step_eft_set(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s
     case 1:
         if ((self->field_0x228 & 0x6) == 0) {
             if (joint == 0xFF) {
-                copyVec3(&pos, &self->pos);
+                pos = self->pos;
             } else {
                 get_joint_wpos_em(self, joint, &pos);
             }
@@ -3573,7 +3542,7 @@ void em004_step_eft_set(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s
         break;
     case 2:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -3589,11 +3558,9 @@ void em004_step_eft_set(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, s
 /* 0x801C8D38 (0x12CC): the motion events: footstep and impact effects, hit windows and camera shakes per motion
  * frame, and the alternate-mode part flag. */
 void em004_motion_events(struct _ENEMY_WORK* self) {
-    EmSpawnRec rec;
     nw4r::math::VEC3 sp8;
+    EmSpawnRec rec;
 
-    VEC3_ctor(&sp8);
-    em_spawn_rec_init(&rec);
     em004_body_spark(self);
     switch (em_get_mot_no(self)) {
     case 0x5:
@@ -3971,7 +3938,6 @@ u8 em004_route_point_pick(struct _ENEMY_WORK* self) {
     u8 j;
     u8 best;
     f32 best_dist;
-    VEC3_ctor(&pos);
     if ((u8)self->field_0x1E2 != 1 || (u8)self->field_0x1E3 != 1) {
         return 0xFF;
     }
@@ -4138,21 +4104,12 @@ s32 em004_area_change_ck(struct _ENEMY_WORK* self, u16 timer) {
 
 /* 0x801CA7F0 (0x80): fills a spawn record: kind 0x1C, the fixed vector and the three scalar fields. */
 void em004_spawn_rec_fill(EmSpawnRec* rec, u8 a, u16 b, u16 c) {
-    VEC3 v;
-    setVec3(&v, 0.0f, 0.0f, 50.0f);
+    VEC3 v(0.0f, 0.0f, 50.0f);
     rec->id = 0x1C;
-    copyVec3(&rec->pos, &v);
+    rec->pos = v;
     rec->field_0x10 = a;
     rec->field_0x12 = b;
     rec->field_0x14 = c;
-}
-
-/* 0x801CA870 (0x6C): seeds the two offset vectors. */
-void em004_offset_init(void) {
-    nw4r::math::VEC3 a;
-    nw4r::math::VEC3 b;
-    assignVec3(&em004_offset_vec[0], (Vec*)setVec3(&a, 0.0f, 70.0f, 0.0f));
-    assignVec3(&em004_offset_vec[1], (Vec*)setVec3(&b, 0.0f, -0.6f, 0.0f));
 }
 
 } /* extern "C" */

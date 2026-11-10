@@ -16,7 +16,7 @@
  *   flipcheck: `.text` differs from the target object (the residual above shifts the bytes after it).
  * SHAPES. `#pragma peephole off` over the unit; the interpreter loop is `while (finished == 0)` with the abort test
  *   after it (retail enters through a `b` to the test and every `continue` branches there); the two locals `finished`
- *   and `aborted` are declared before `save`, whose `VEC3_ctor` runs between them and the other initialisers; the
+ *   and `aborted` are declared before `save`, whose `VEC3::VEC3()` runs between them and the other initialisers; the
  *   helpers are defined after the interpreter (address order); a `switch` for the inner `case 10` sub-command; each
  *   branch's then
  *   block first (`if (stack_0x961[1] == 0) em_userdata_state_reenter_alt(); else fn_801408B4();`); `case 2` re-reads +0x9A4 in each
@@ -31,7 +31,7 @@
 #include "enemy/fn_8013ACC4.h"
 #include "enemy/fn_80138074.h" /* the user-data accessors this interpreter drives (rule 2) */
 #include "stage/niku_find.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 /* With the peephole pass on, MWCC fuses the record index's `clrlwi` + `slwi` (0x8013AE34) into `clrlslwi`;
  * retail keeps the pair (measured in docs/enemy.md). */
@@ -82,7 +82,7 @@ struct EmRunRec {
  * size: 0xB18 (lower bound: the range reads nothing past +0x9E4) */
 struct EmWork {
     /* +0x0000 */ u8 unused_0x0000[0x036C];
-    /* +0x036C */ nw4r::math::VEC3 vec_0x36C;  /* the position `copyVec3` snapshots with the state */
+    /* +0x036C */ nw4r::math::VEC3 vec_0x36C;  /* the position `VEC3::operator=` snapshots with the state */
     /* +0x0378 */ u8 unused_0x0378[0x0380 - 0x0378];
     /* +0x0380 */ u8 field_0x380;  /* the state snapshot's first byte (`fn_8013A0xx` writes it) */
     /* +0x0381 */ u8 field_0x381;  /* the state snapshot's second byte */
@@ -293,7 +293,6 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
     u32 finished = 0;
     u32 aborted = 0;
     EmUserSave save;
-    VEC3_ctor(&save.vec_0x00);
     u32 roll;
     u8 save380, save381, save382, save383;
     f32 save384;
@@ -328,7 +327,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
         save384 = self->field_0x384;
         save424 = self->field_0x424;
 
-        copyVec3(&save.vec_0x00, &self->vec_0x36C);
+        save.vec_0x00 = self->vec_0x36C;
 
         switch (self->field_0x95C) {
         case 3:

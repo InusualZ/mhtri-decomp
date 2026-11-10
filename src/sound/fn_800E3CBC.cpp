@@ -55,7 +55,7 @@
 #include "sound/sound_job.h" /* prim_rec_init (rule 2) */
 #include "unsplit/sound.h" /* prim_rec_capacity (rule 2: the band) */
 #include "sound/fn_800E46E8.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h"
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/nw_res_manager.h"
 #include "g3d/g3d_state.h" /* g3d_state_invalidate (rule 2) */
@@ -67,7 +67,7 @@
 
 /* ------------------------------------------------------------------ types */
 
-/* The working buffer `MTX34_ctor` initialises; fn_800E4148 reads +0x20..+0x2C, prim_list_exec reads +0x1C.
+/* The camera matrix viewed as a record; fn_800E4148 reads +0x20..+0x2C, prim_list_exec reads +0x1C.
  * Only the read fields are named; the rest is untouched padding.  size: 0x30 (approximate) */
 typedef struct WorkBuf {
     /* 0x00 */ u8 pad_0x00[0x1C];
@@ -199,17 +199,14 @@ extern "C" void sound_free_lists_reset(void)
  * `mode` selects the state filter (`1` keeps only the flag-0x2 records). */
 extern "C" void prim_list_exec(void* a, u8 mode)
 {
-    WorkBuf b40;
-    WorkBuf b10;
+    MTX34 b40;
+    MTX34 b10;
     f32 scalef;
     f32 f31;
 
-    /* `b40` is the unit's own `WorkBuf`, whose leading block is the matrix (its `.text` is what
-     * the calls below hand on); the record's type is the helper's (rule 11). */
-    MTX34_ctor((MTX34*)&b40);
-    MTX34_ctor((MTX34*)&b10);
+    /* `b40` is the camera matrix the callbacks below read through the `WorkBuf` view. */
     GXInvalidateVtxCache();
-    ((nw4r::g3d::Camera*)a)->GetCameraMtx((MTX34*)&b40);
+    ((nw4r::g3d::Camera*)a)->GetCameraMtx(&b40);
     DrawCtx* ctx = (DrawCtx*)word_read(a);
     s32 sel = stage_water_enabled_ck();
     if (sel == 1) {
@@ -258,9 +255,9 @@ extern "C" void prim_list_exec(void* a, u8 mode)
                     reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(h)->CalcSkinning();
                     p->started = 1;
                 }
-                h->vtbl->slot3(h, 4, 0, &b40);
+                h->vtbl->slot3(h, 4, 0, (WorkBuf*)&b40);
             }
-            if (!fn_800E4148(p, &b40)) {
+            if (!fn_800E4148(p, (WorkBuf*)&b40)) {
                 continue;
             }
             switch (p->layer) {
@@ -277,8 +274,8 @@ extern "C" void prim_list_exec(void* a, u8 mode)
                     }
                 } else {
                     reinterpret_cast<nw4r::g3d::ScnObj*>(p->handle)->GetMtx(
-                        nw4r::g3d::ScnObj::MTX_LOCAL, reinterpret_cast<nw4r::math::MTX34*>(&b10));
-                    f1 = b10.f_0x1C;
+                        nw4r::g3d::ScnObj::MTX_LOCAL, &b10);
+                    f1 = b10.m[1][3];
                 }
                 if (sel == 1) {
                     if (f31 < scalef) {
@@ -307,7 +304,6 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
 {
     VEC3 v;
 
-    VEC3_ctor(&v);
     if (self->flags & 0x1) {
         vec3_dot(&self->pos, &arg->v_0x20);
         self->key = -(arg->f_0x2C + vec3_dot(&self->pos, &arg->v_0x20));

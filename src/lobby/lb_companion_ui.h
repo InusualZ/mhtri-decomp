@@ -14,6 +14,7 @@
 #include "id_value.h" /* IdValue, the item box slots */
 #include "hud/layout.h" /* _mh_ivec2_, _SPR_DATA_ and the draw_* family (rule 1, rule 2) */
 #include "lobby/lb_list.h" /* LbList, LbItemCount (rule 1) */
+#include "enemy/ENEMY_WORK.h" /* EmGroundRec, the text command's +0x0C record (rule 1) */
 
 /* `quest_element_pick_ck` (owner `lobby/lb_quest_screen.h`) is declared below with the owner's signature. */
 struct QuestWork;
@@ -205,7 +206,10 @@ typedef struct LbCmdSub0F {          /* sub 0x0F: the text/name command (0x2C by
     /* +0x05 */ u8 flag_0x05;
     /* +0x06 */ u16 id_0x06;
     /* +0x08 */ f32 scale_0x08;
-    /* +0x0C */ LbNameTail text_0x0C;
+    /* +0x0C */ EmGroundRec text_0x0C; /* read as an `LbNameTail` by the copy */
+
+    /* 0x803393A4 (0x34): retail's out-of-line constructor (the +0x0C record). */
+    LbCmdSub0F() __attribute__((never_inline)) {}
 } LbCmdSub0F; /* size: 0x2C */
 
 typedef struct LbCmdSub10 {          /* sub 0x10: one signed byte */
@@ -515,7 +519,6 @@ void menu_item_close(void);
 void snd_quest_start_bgm_set(void);
 void quest_slot_arm_all_a(s8 index);
 void cockpit_pointer_target_set(u16 id, s8 index);
-void em_ground_rec_clear(void* text);
 void em_small_spawn_stat(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void em_res_peer_count_inc(s8 value, u8 index);
 void stage_area_flag_set(u8 a, u8 b);

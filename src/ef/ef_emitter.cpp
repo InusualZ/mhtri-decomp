@@ -61,7 +61,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h" /* fn_800AB9F4 / fn_800AE360 are that unit's (rule 2) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_util.h" /* ef_mtx34_column_length, owned by ef_util.cpp's range (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
@@ -88,7 +88,6 @@ void fn_800A4474(void* manager, void* self);
 void fn_800A486C(void* manager, void* emitter);
 u32 ef_emres_get_name(void* p);
 void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
-void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
 void* fn_800A5484(void* p);
@@ -106,7 +105,6 @@ void fn_8009BCB4(void* mtx, void* vec);
 void ef_mtx34_scale_columns(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
 f32 sqrt_f32(f32 x);
-void subVec3(void* dst, void* a, void* b);
 void* vec3_to_const_vec(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
 void mtx34_identity(void* mtx);
@@ -175,7 +173,7 @@ typedef struct EfEmitterWork {
 } EfEmitterWork; /* size: 0x8C (lower bound: the record continues past it) */
 
 /* The parameter block `fn_800A3390` copies into the object's +0xFC. */
-typedef struct EfEmitterParam {
+typedef struct EfEmitterParamHead {
     /* +0x00 */ s16 field_0x00;
     /* +0x02 */ u8 field_0x02;
     /* +0x03 */ u8 field_0x03;
@@ -184,9 +182,13 @@ typedef struct EfEmitterParam {
     /* +0x06 */ u8 field_0x06;
     /* +0x07 */ u8 field_0x07;
     /* +0x08 */ u8 pad_0x08[0x04];
-    /* +0x0C */ nw4r::math::VEC3 vec_0x0C;
-    /* +0x18 */ nw4r::math::VEC3 vec_0x18;
-} EfEmitterParam; /* size: 0x24 (lower bound: the highest byte fn_800A3390 copies) */
+} EfEmitterParamHead; /* size: 0xC */
+
+/* The whole block as `fn_800A3390` reads it from the resource: the head and its two vectors. */
+struct EfEmitterParam : EfEmitterParamHead {
+    /* +0x0C */ nw4r::math::_VEC3 vec_0x0C;
+    /* +0x18 */ nw4r::math::_VEC3 vec_0x18;
+}; /* size: 0x24 (lower bound: the highest byte fn_800A3390 copies) */
 
 /* The effect-side resource block the manager keeps at `managerEF + 0x20`.  Its random block is at
  * +0xC01C, the reference position at +0xC020, a matrix at +0xC02C and two range floats at
@@ -239,6 +241,39 @@ typedef nw4r::ef::Emitter EfEmitterObj;
 namespace nw4r {
 namespace ef {
 
+/* The emitter's +0x20 sub-object: the parameters copied from its resource and its four transform vectors, which
+ * its constructor builds. size: 0x94 */
+struct EfSysResourceSub {
+    EfSysResourceSub(); /* 0x800A62C0 (0x4C) */
+
+    /* +0x000 */ u32 flags;
+    /* +0x004 */ u32 flags2; /* a pointer to the emitter's parameter record */
+    /* +0x008 */ union {
+        f32 scale;
+        u32 scale_flags;
+    } scale_0x028;
+    /* +0x00C */ f32 scale_step;
+    /* +0x010 */ u16 interval;    /* the frames between spawns */
+    /* +0x012 */ u16 life_frames; /* the life a spawn starts with */
+    /* +0x014 */ f32 rate;
+    /* +0x018 */ f32 life;
+    /* +0x01C */ u16 life_max;
+    /* +0x020 */ f32 color_r;
+    /* +0x024 */ f32 color_g;
+    /* +0x028 */ f32 color_b;
+    /* +0x02C */ f32 animate_0x4C[3];
+    /* +0x038 */ f32 animate_0x58[3];
+    /* +0x044 */ u8 flags3;
+    /* +0x045 */ s8 alpha;
+    /* +0x046 */ u8 field_0x066;
+    /* +0x047 */ u8 field_0x067;
+    /* +0x048 */ f32 float_0x068[7];
+    /* +0x064 */ EfVec vec_0x84;
+    /* +0x070 */ EfVec position;
+    /* +0x07C */ EfVec vec_0x9C;
+    /* +0x088 */ EfVec rotation;
+}; /* size: 0x94 */
+
 /* The emitter: the reference-counted base (its life status at +0x0C, its table at +0x1C), the parameters copied
  * from its resource, its particle-manager list at +0xC0, the parent chain and its matrix.  Its eight virtuals are
  * this unit's; `SendClosing` is the key function, so the table is emitted here. */
@@ -258,37 +293,11 @@ public:
     virtual void CalcEmission();
     virtual void CalcBillboard();
 
-    /* +0x020 */ u32 flags;
-    /* +0x024 */ u32 flags2; /* a pointer to the emitter's parameter record */
-    /* +0x028 */ union {
-        f32 scale;
-        u32 scale_flags;
-    } scale_0x028;
-    /* +0x02C */ f32 scale_step;
-    /* +0x030 */ u16 interval;    /* the frames between spawns */
-    /* +0x032 */ u16 life_frames; /* the life a spawn starts with */
-    /* +0x034 */ f32 rate;
-    /* +0x038 */ f32 life;
-    /* +0x03C */ u16 life_max;
-    /* +0x040 */ f32 color_r;
-    /* +0x044 */ f32 color_g;
-    /* +0x048 */ f32 color_b;
-    /* +0x04C */ f32 animate_0x4C[3];
-    /* +0x058 */ f32 animate_0x58[3];
-    /* +0x064 */ u8 flags3;
-    /* +0x065 */ s8 alpha;
-    /* +0x066 */ u8 field_0x066;
-    /* +0x067 */ u8 field_0x067;
-    /* +0x068 */ f32 float_0x068[7];
-    /* +0x084 */ EfVec vec_0x84;
-    /* +0x090 */ EfVec position;
-    /* +0x09C */ EfVec vec_0x9C;
-    /* +0x0A8 */ EfVec rotation;
+    /* +0x020 */ EfSysResourceSub res; /* the parameters and transform vectors its own constructor builds */
     /* +0x0B4 */ u32 field_0x0B4;
     /* +0x0B8 */ EfEmitterWork* work;
     /* +0x0BC */ EfEmitterManager* managerEF;
-    /* +0x0C0 */ EfList particles; /* mActivityList.mActiveList */
-    /* +0x0D8 */ u8 pad_0x0D8[0x04];
+    /* +0x0C0 */ EfEffActivityList particles; /* mActivityList */
     /* +0x0DC */ u8 field_0x0DC; /* set by the initialiser; one spawn pass keeps a scaled life at 1 or more */
     /* +0x0DD */ u8 pad_0x0DD;
     /* +0x0DE */ u16 field_0x0DE; /* the spawn countdown the frame tick uses */
@@ -301,7 +310,9 @@ public:
     /* +0x0F0 */ nw4r::ef::EmitterForm* form; /* mForm: the shape whose Emission spawns the particles */
     /* +0x0F4 */ EfEmitterObj* parent;
     /* +0x0F8 */ void* orig;
-    /* +0x0FC */ EfEmitterParam param;
+    /* +0x0FC */ EfEmitterParamHead param; /* the parameter block's head; its two vectors follow */
+    /* +0x108 */ nw4r::math::VEC3 param_vec_0x0C;
+    /* +0x114 */ nw4r::math::VEC3 param_vec_0x18;
     /* +0x120 */ u8 transform_dirty;
     /* +0x124 */ nw4r::math::MTX34 matrix;
 }; /* size: 0x154 (lower bound: +0x124 is the highest field any body touches) */
@@ -394,20 +405,8 @@ static inline EfEmitterWork* EfGetWork(void* p) {
  * rule 9's violation - the sibling ef units spell it the same way). */
 void operator delete(void* ptr) throw();
 
-/* The +0x20 sub-object of the emitter-side object `fn_800A62C0` initialises: four transform vectors,
- * cleared in this order.  The offsets are relative to the sub-object. size: 0x94 */
-typedef struct EfSysResourceSub {
-    /* +0x00 */ u8 pad_0x00[0x64];
-    /* +0x64 */ nw4r::math::VEC3 vec_0x84;
-    /* +0x70 */ nw4r::math::VEC3 vec_0x90;
-    /* +0x7C */ nw4r::math::VEC3 vec_0x9C;
-    /* +0x88 */ nw4r::math::VEC3 vec_0xA8;
-} EfSysResourceSub; /* size: 0x94 */
-
 extern "C" {
-EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self);
 void* fn_800A630C(void* self, s16 flag);
-void* fn_800A3FFC(void* list, u32 linkOffset);
 }
 /* This unit's own symbols, in address order (the file defines them in that order). */
 extern "C" {
@@ -532,7 +531,7 @@ extern "C" inline __attribute__((never_inline)) u16 fn_800A8CE8(void* res) {
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" inline __attribute__((never_inline)) u32 fn_800A8D18(EfEmitterObj* self) {
-    return (self->flags & 0x200) != 0;
+    return (self->res.flags & 0x200) != 0;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -571,31 +570,20 @@ extern "C" inline __attribute__((never_inline)) EfVec* ef_particle_get_move_dir(
 #line 300
     NW4R_POINTER_ASSERT("particle.h", result, "NW4R:Pointer Error\nresult(=%p) is not valid pointer.");
     {
-        EfVec v;
-        subVec3(&v, &self->offset, &self->position);
-        copyVec3(result, &v);
+        *result = self->offset - self->position;
     }
     return result;
 }
 
 #pragma dont_inline on
-/* 0x800A6258 (0x68): builds the emitter: the base, its transform vectors, its particle-manager list and matrix. */
-nw4r::ef::Emitter::Emitter() {
-    fn_800A62C0((EfSysResourceSub*)&flags);
-    fn_800A3FFC(&particles, 0x14);
-    VEC3_ctor(&param.vec_0x0C);
-    VEC3_ctor(&param.vec_0x18);
-    MTX34_ctor(&matrix);
+/* 0x800A6258 (0x68): builds the emitter: the base, its parameter sub-object, its particle-manager list, its
+ * parameter block's vectors and its matrix. */
+nw4r::ef::Emitter::Emitter() : particles(0x14) {
 }
 #pragma dont_inline reset
 
-/* 0x800A62C0 - the resource object's +0x20 sub-object: clear its four transform vectors. */
-extern "C" EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self) {
-    VEC3_ctor(&self->vec_0x84);
-    VEC3_ctor(&self->vec_0x90);
-    VEC3_ctor(&self->vec_0x9C);
-    VEC3_ctor(&self->vec_0xA8);
-    return self;
+/* 0x800A62C0 (0x4C): constructs the sub-object's four transform vectors. */
+nw4r::ef::EfSysResourceSub::EfSysResourceSub() {
 }
 
 /* 0x800A630C - the resource object's deleting destructor. */
@@ -639,11 +627,11 @@ void nw4r::ef::Emitter::DestroyFunc() {
     if (self->form != NULL) {
         self->form = NULL;
     }
-    if ((self->flags & 1) != 0) {
+    if ((self->res.flags & 1) != 0) {
         fn_800A6350(self);
     }
     fn_800A6938(self);
-    if ((self->flags & 1) != 0) {
+    if ((self->res.flags & 1) != 0) {
 #line 88
         NW4R_ASSERT(fn_800A4AF0(&self->managerEF->emitters) < NW4R_EF_MAX_EMITTER, "ef_emitter.cpp", __LINE__, "NW4R:Failed assertion UtlistSize(&mManagerEF->mActivityList.mActiveList) < NW4R_EF_MAX_EMITTER");
         s32 size = fn_800A4AF0(&self->managerEF->emitters);
@@ -733,44 +721,44 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     work = EfGetWork(eh);
     self->field_0x0B4 = 0;
     self->field_0x0E8 = work->field_0x16;
-    self->flags = work->flags;
-    self->flags2 = work->field_0x04;
-    self->life_max = work->life;
+    self->res.flags = work->flags;
+    self->res.flags2 = work->field_0x04;
+    self->res.life_max = work->life;
     self->field_0x0DE = work->field_0x14;
     self->field_0x0E0 = 0;
-    self->color_g = (f32)work->color_g / 100.0f;
-    self->color_r = (f32)work->color_r / 100.0f;
-    self->color_b = (f32)work->color_b / 100.0f;
-    self->scale_0x028.scale = work->scale;
-    self->scale_step = (f32)work->scale_range / 100.0f;
-    self->interval = work->interval;
-    self->life_frames = work->field_0x34;
-    self->rate = (f32)work->rate / 100.0f;
-    self->life = 0.0f;
+    self->res.color_g = (f32)work->color_g / 100.0f;
+    self->res.color_r = (f32)work->color_r / 100.0f;
+    self->res.color_b = (f32)work->color_b / 100.0f;
+    self->res.scale_0x028.scale = work->scale;
+    self->res.scale_step = (f32)work->scale_range / 100.0f;
+    self->res.interval = work->interval;
+    self->res.life_frames = work->field_0x34;
+    self->res.rate = (f32)work->rate / 100.0f;
+    self->res.life = 0.0f;
     self->field_0x0DC = 1;
-    copyVec3(&self->position, &work->vec_0x78);
-    copyVec3(&self->vec_0x9C, &work->vec_0x60);
-    copyVec3(&self->rotation, &work->vec_0x6C);
-    self->flags3 = 3;
-    self->alpha = 100;
-    self->field_0x066 = work->field_0x36;
-    self->field_0x067 = work->field_0x37;
+    self->res.position = work->vec_0x78;
+    self->res.vec_0x9C = work->vec_0x60;
+    self->res.rotation = work->vec_0x6C;
+    self->res.flags3 = 3;
+    self->res.alpha = 100;
+    self->res.field_0x066 = work->field_0x36;
+    self->res.field_0x067 = work->field_0x37;
     for (s32 i = 0; i < 7; i++) {
-        self->float_0x068[i] = work->float_0x38[i];
+        self->res.float_0x068[i] = work->float_0x38[i];
     }
-    copyVec3(&self->vec_0x84, &work->vec_0x54);
+    self->res.vec_0x84 = work->vec_0x54;
     ef_resource_instance();
     self->seed = (u16)work->field_0x088;
     if (self->seed == 0) {
         self->seed = ef_random_u16(&ef->effect->random);
     }
     self->random.Srand(self->seed);
-    self->animate_0x4C[0] = work->vec_0x1C[0];
-    self->animate_0x4C[1] = work->vec_0x1C[1];
-    self->animate_0x4C[2] = work->vec_0x1C[2];
-    self->animate_0x58[0] = work->vec_0x28[0];
-    self->animate_0x58[1] = work->vec_0x28[1];
-    self->animate_0x58[2] = work->vec_0x28[2];
+    self->res.animate_0x4C[0] = work->vec_0x1C[0];
+    self->res.animate_0x4C[1] = work->vec_0x1C[1];
+    self->res.animate_0x4C[2] = work->vec_0x1C[2];
+    self->res.animate_0x58[0] = work->vec_0x28[0];
+    self->res.animate_0x58[1] = work->vec_0x28[1];
+    self->res.animate_0x58[2] = work->vec_0x28[2];
     self->transform_dirty = 1;
     self->orig = NULL;
     {
@@ -835,7 +823,7 @@ s32 nw4r::ef::Emitter::Initialize(EfEmitterManager* aParentEF, void* eh, u8 valu
             nw4r::db::Panic("ef_emitter.cpp", __LINE__, "NW4R:Failed assertion false");
             return 0;
         }
-        ef_ref_object_add_ref(self->managerEF);
+        ef_ref_object_add_ref((EffectManager*)self->managerEF);
         ef_activity_list_add(&self->particles, created);
         fn_800A66A4((EfEmitterObj*)created, 1);
         created->flags = 0;
@@ -876,31 +864,29 @@ nw4r::ef::Emitter* nw4r::ef::Emitter::CreateEmitter(void* em, const EfEmitterPar
     }
     e->field_0x0E8 += life_bonus;
     e->parent = self;
-    ef_ref_object_add_ref(e->parent);
-    e->flags3 = 0;
-    if ((self->flags & 0x80) != 0) {
-        e->flags3 |= 1;
+    ef_ref_object_add_ref((EffectManager*)e->parent);
+    e->res.flags3 = 0;
+    if ((self->res.flags & 0x80) != 0) {
+        e->res.flags3 |= 1;
     }
-    if ((self->flags & 0x100) != 0) {
-        e->flags3 |= 2;
+    if ((self->res.flags & 0x100) != 0) {
+        e->res.flags3 |= 2;
     }
-    e->alpha = EfGetWork(self->work)->alpha;
-    if ((self->flags & 0x800) != 0) {
-        e->flags3 |= 4;
+    e->res.alpha = EfGetWork(self->work)->alpha;
+    if ((self->res.flags & 0x800) != 0) {
+        e->res.flags3 |= 4;
     }
     {
-        EfVec v;
-        nw4r::math::MTX34 m1, m2;
-        assignVec3((Vec*)&v, (Vec*)&e->position);
-        e->position.x = 0.0f;
-        e->position.y = 0.0f;
-        e->position.z = 0.0f;
+        EfVec v = e->res.position;
+        e->res.position.x = 0.0f;
+        e->res.position.y = 0.0f;
+        e->res.position.z = 0.0f;
         fn_800A95D8(e);
-        MTX34_ctor(&m1);
-        MTX34_ctor(&m2);
+        nw4r::math::MTX34 m1;
+        nw4r::math::MTX34 m2;
         mtx34_identity(&m1);
-        ef_mtx34_rotate_xyz(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
-        fn_8009CBA0(&m1, &m1, &e->vec_0x9C);
+        ef_mtx34_rotate_xyz(&m1, e->res.rotation.x, e->res.rotation.y, e->res.rotation.z);
+        fn_8009CBA0(&m1, &m1, &e->res.vec_0x9C);
         ef_emitter_get_mtx(e, &m2);
         mtx34_inverse(&m2, &m2);
         mtx34_concat(&m1, &m1, &m2);
@@ -915,19 +901,19 @@ nw4r::ef::Emitter* nw4r::ef::Emitter::CreateEmitter(void* em, const EfEmitterPar
         } else {
             nw4r::math::MTX34Trans(&m1, &m1, (const nw4r::math::VEC3*)host);
         }
-        ef_mtx34_rotate_xyz(&m2, e->rotation.x, e->rotation.y, e->rotation.z);
-        fn_8009CBA0(&m2, &m2, &e->vec_0x9C);
+        ef_mtx34_rotate_xyz(&m2, e->res.rotation.x, e->res.rotation.y, e->res.rotation.z);
+        fn_8009CBA0(&m2, &m2, &e->res.vec_0x9C);
         mtx34_inverse(&m2, &m2);
         mtx34_concat(&m1, &m1, &m2);
-        e->position.x = v.x + m1.m[0][3];
-        e->position.y = v.y + m1.m[1][3];
-        e->position.z = v.z + m1.m[2][3];
+        e->res.position.x = v.x + m1.m[0][3];
+        e->res.position.y = v.y + m1.m[1][3];
+        e->res.position.z = v.z + m1.m[2][3];
         fn_800A95D8(e);
     }
     if (params->field_0x00 != 0 || params->field_0x02 != 0 || params->field_0x03 != 0 ||
         params->field_0x04 != 0 || (params->field_0x07 & 2) != 0) {
         e->orig = pm;
-        ef_ref_object_add_ref(pm);
+        ef_ref_object_add_ref((EffectManager*)pm);
         fn_800A3390(&e->param, params);
     }
     return e;
@@ -952,33 +938,30 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
     {
         EfEmitterObj e;
         EfEmitterObj* ep;
-        EfVec v;
 
         ef_res_emitter_desc(eh);
         fn_800A6A04(&e, eh, self->managerEF);
         e.field_0x0E8 += life_bonus;
         e.managerEF = self->managerEF;
         e.parent = self;
-        e.flags3 = 0;
-        if ((self->flags & 0x1000) != 0) {
-            e.flags3 |= 1;
+        e.res.flags3 = 0;
+        if ((self->res.flags & 0x1000) != 0) {
+            e.res.flags3 |= 1;
         }
-        if ((self->flags & 0x2000) != 0) {
-            e.flags3 |= 2;
+        if ((self->res.flags & 0x2000) != 0) {
+            e.res.flags3 |= 2;
         }
-        e.alpha = EfGetWork(self->work)->scale_step;
-        if ((s8)e.alpha != 0) {
-            e.alpha = 100;
+        e.res.alpha = EfGetWork(self->work)->scale_step;
+        if ((s8)e.res.alpha != 0) {
+            e.res.alpha = 100;
         }
-        if ((self->flags & 0x800) != 0) {
-            e.flags3 |= 4;
+        if ((self->res.flags & 0x800) != 0) {
+            e.res.flags3 |= 4;
         }
         ep = &e;
         if ((params->field_0x07 & 1) != 0 && params->field_0x00 != 0) {
+            EfVec v;
             nw4r::math::MTX34 m1, m2;
-            VEC3_ctor(&v);
-            MTX34_ctor(&m1);
-            MTX34_ctor(&m2);
             ef_pm_get_mtx((void*)pm->manager, &m2);
             m2.m[0][3] = m2.m[1][3] = m2.m[2][3] = 0.0f;
             ef_particle_get_move_dir(pm, &v);
@@ -988,24 +971,22 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                     vec3_scale_by(&v, &v, -1.0f);
                 }
                 ef_mtx34_from_y_axis(m1.m[0], &v.x);
-                ef_mtx34_rotate_xyz(&m2, ep->rotation.x, ep->rotation.y, ep->rotation.z);
+                ef_mtx34_rotate_xyz(&m2, ep->res.rotation.x, ep->res.rotation.y, ep->res.rotation.z);
                 mtx34_concat(&m1, &m1, &m2);
-                fn_8009BCB4(&m1, &ep->rotation);
+                fn_8009BCB4(&m1, &ep->res.rotation);
             }
         }
         {
-            EfVec pos;
-            nw4r::math::MTX34 m1, m2;
-            assignVec3((Vec*)&pos, (Vec*)&ep->position);
-            ep->position.x = 0.0f;
-            ep->position.y = 0.0f;
-            ep->position.z = 0.0f;
+            EfVec pos = ep->res.position;
+            ep->res.position.x = 0.0f;
+            ep->res.position.y = 0.0f;
+            ep->res.position.z = 0.0f;
             fn_800A95D8(ep);
-            MTX34_ctor(&m1);
-            MTX34_ctor(&m2);
+            nw4r::math::MTX34 m1;
+            nw4r::math::MTX34 m2;
             mtx34_identity(&m1);
-            ef_mtx34_rotate_xyz(&m1, ep->rotation.x, ep->rotation.y, ep->rotation.z);
-            fn_8009CBA0(&m1, &m1, &ep->vec_0x9C);
+            ef_mtx34_rotate_xyz(&m1, ep->res.rotation.x, ep->res.rotation.y, ep->res.rotation.z);
+            fn_8009CBA0(&m1, &m1, &ep->res.vec_0x9C);
             ef_emitter_get_mtx(ep, &m2);
             mtx34_inverse(&m2, &m2);
             mtx34_concat(&m1, &m1, &m2);
@@ -1020,13 +1001,13 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             } else {
                 nw4r::math::MTX34Trans(&m1, &m1, (const nw4r::math::VEC3*)host);
             }
-            ef_mtx34_rotate_xyz(&m2, ep->rotation.x, ep->rotation.y, ep->rotation.z);
-            fn_8009CBA0(&m2, &m2, &ep->vec_0x9C);
+            ef_mtx34_rotate_xyz(&m2, ep->res.rotation.x, ep->res.rotation.y, ep->res.rotation.z);
+            fn_8009CBA0(&m2, &m2, &ep->res.vec_0x9C);
             mtx34_inverse(&m2, &m2);
             mtx34_concat(&m1, &m1, &m2);
-            ep->position.x = pos.x + m1.m[0][3];
-            ep->position.y = pos.y + m1.m[1][3];
-            ep->position.z = pos.z + m1.m[2][3];
+            ep->res.position.x = pos.x + m1.m[0][3];
+            ep->res.position.y = pos.y + m1.m[1][3];
+            ep->res.position.z = pos.z + m1.m[2][3];
             fn_800A95D8(ep);
         }
         e.CalcEmitter();
@@ -1040,15 +1021,15 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             u8 b;
             EfPmView* created;
             use_a = 0;
-            if ((self->flags & 0x1000) != 0 && (EfGetWork(eh)->flags & 0x20) != 0) {
+            if ((self->res.flags & 0x1000) != 0 && (EfGetWork(eh)->flags & 0x20) != 0) {
                 use_a = 1;
             }
             use_b = 0;
-            if ((self->flags & 0x2000) != 0 && (EfGetWork(eh)->flags & 0x40) != 0) {
+            if ((self->res.flags & 0x2000) != 0 && (EfGetWork(eh)->flags & 0x40) != 0) {
                 use_b = 1;
             }
             use_c = 1;
-            if ((self->flags & 0x800) == 0 && (EfGetWork(eh)->flags & 0x400) == 0) {
+            if ((self->res.flags & 0x800) == 0 && (EfGetWork(eh)->flags & 0x400) == 0) {
                 use_c = 0;
             }
             a = EfGetWork(self->work)->scale_step;
@@ -1092,15 +1073,13 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             if (params->field_0x00 != 0 || params->field_0x02 != 0 || params->field_0x03 != 0 ||
                 params->field_0x04 != 0 || (params->field_0x07 & 2) != 0) {
                 e.orig = pm;
-                ef_ref_object_add_ref(pm);
+                ef_ref_object_add_ref((EffectManager*)pm);
                 fn_800A3390(&e.param, params);
             } else {
                 e.orig = NULL;
             }
             {
                 nw4r::math::MTX34 m3, m4;
-                MTX34_ctor(&m3);
-                MTX34_ctor(&m4);
                 ef_pm_get_mtx((void*)created, &m4);
                 mtx34_inverse(&m4, &m4);
                 ef_emitter_get_mtx(&e, &m3);
@@ -1189,67 +1168,66 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
         self->field_0x0E0--;
         return;
     }
-    self->field_0x0E0 = self->interval;
-    if (0.0f != self->rate) {
-        self->field_0x0E0 += (u16)ef_truncate_float(((f32)self->interval * self->rate - 1.0f) *
+    self->field_0x0E0 = self->res.interval;
+    if (0.0f != self->res.rate) {
+        self->field_0x0E0 += (u16)ef_truncate_float(((f32)self->res.interval * self->res.rate - 1.0f) *
                                                     ef_random_float(&self->random.mState));
     }
-    if ((self->flags2 & 0x20000) != 0) {
-        self->life = (f32)self->life_frames;
+    if ((self->res.flags2 & 0x20000) != 0) {
+        self->res.life = (f32)self->res.life_frames;
     } else {
         f32 step;
-        if (0.0f == self->scale_step) {
-            step = self->scale_0x028.scale;
+        if (0.0f == self->res.scale_step) {
+            step = self->res.scale_0x028.scale;
         } else {
-            step = self->scale_0x028.scale +
-                   self->scale_0x028.scale * self->scale_step *
+            step = self->res.scale_0x028.scale +
+                   self->res.scale_0x028.scale * self->res.scale_step *
                        (2.0f * ef_random_float(&self->random.mState) - 1.0f);
         }
-        if ((self->flags2 & 0x100) != 0) {
+        if ((self->res.flags2 & 0x100) != 0) {
             EfEffectData* effect = self->managerEF->effect;
             EfVec v;
-            VEC3_ctor(&v);
-            mtx34_mult_vec3(&v, ef_emitter_get_mtx(self, NULL), &self->position);
-            step *= self->color_b +
-                    (1.0f - self->color_b) *
+            mtx34_mult_vec3(&v, ef_emitter_get_mtx(self, NULL), &self->res.position);
+            step *= self->res.color_b +
+                    (1.0f - self->res.color_b) *
                         fn_800A8220(&v, &effect->ref_pos, effect->range_a, effect->range_b,
-                                    self->color_g, self->color_r);
+                                    self->res.color_g, self->res.color_r);
         }
-        self->life += step;
-        if (self->field_0x0DC != 0 && 0.0f != self->scale_0x028.scale &&
-            self->life < 1.0f) {
-            self->life = 1.0f;
+        self->res.life += step;
+        if (self->field_0x0DC != 0 && 0.0f != self->res.scale_0x028.scale &&
+            self->res.life < 1.0f) {
+            self->res.life = 1.0f;
         }
     }
-    if (self->life >= 1.0f) {
+    if (self->res.life >= 1.0f) {
         ef_resource_instance();
         work = (EfEmitterWork*)ef_res_emitter_desc(self->work);
         if (self->form != NULL) {
 #line 835
             NW4R_POINTER_ASSERT("ef_emitter.cpp", self->managerEF, "NW4R:Pointer Error\nmManagerEF(=%p) is not valid pointer.");
             if (self->managerEF->field_0x48 != NULL) {
-                s32 life_i = (s32)self->life;
-                u32 f2 = self->flags2;
+                s32 life_i = (s32)self->res.life;
+                u32 f2 = self->res.flags2;
                 f32 anim[6];
                 u16 frames;
                 f32 scale;
-                nw4r::math::MTX34 mc;
-                anim[0] = self->animate_0x4C[0];
-                anim[1] = self->animate_0x4C[1];
-                anim[2] = self->animate_0x4C[2];
-                anim[3] = self->animate_0x58[0];
-                anim[4] = self->animate_0x58[1];
-                anim[5] = self->animate_0x58[2];
+                _MTX34 mc;
+                anim[0] = self->res.animate_0x4C[0];
+                anim[1] = self->res.animate_0x4C[1];
+                anim[2] = self->res.animate_0x4C[2];
+                anim[3] = self->res.animate_0x58[0];
+                anim[4] = self->res.animate_0x58[1];
+                anim[5] = self->res.animate_0x58[2];
                 frames = work->field_0x0A;
                 scale = (f32)work->field_0x0C / 100.0f;
-                ef_mtx34_copy(&mc, mtx);
+                ef_mtx34_copy((MTX34*)&mc, mtx);
                 ((void (*)(EfEmitterObj*, EfParticleRec*, s32*, u32*, f32*, u16*, f32*,
                            nw4r::math::MTX34*))self->managerEF->field_0x48)(self, pm, &life_i, &f2,
-                                                                        anim, &frames, &scale, &mc);
-                self->form->Emission((EfWork*)self, (ParticleManager*)pm, life_i, f2, anim, frames, scale, &mc);
+                                                                        anim, &frames, &scale, (MTX34*)&mc);
+                self->form->Emission((EfWork*)self, (ParticleManager*)pm, life_i, f2, anim, frames, scale, (MTX34*)&mc);
             } else {
-                self->form->Emission((EfWork*)self, (ParticleManager*)pm, (s32)self->life, self->flags2,
-                                     self->animate_0x4C, work->field_0x0A, (f32)work->field_0x0C / 100.0f, mtx);
+                self->form->Emission((EfWork*)self, (ParticleManager*)pm, (s32)self->res.life, self->res.flags2,
+                                     self->res.animate_0x4C, work->field_0x0A, (f32)work->field_0x0C / 100.0f, mtx);
             }
             {
                 s32 a;
@@ -1262,7 +1240,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
                 }
             }
         }
-        self->life -= (f32)(s32)self->life;
+        self->res.life -= (f32)(s32)self->res.life;
     }
     if (self->field_0x0DC != 0) {
         self->field_0x0DC = 0;
@@ -1338,11 +1316,11 @@ void nw4r::ef::Emitter::CalcEmitter() {
         return;
     }
     {
-        u32 flags = self->flags & 4;
+        u32 flags = self->res.flags & 4;
         u32 frame;
         if (flags == 0) {
             frame = self->field_0x0E4;
-            if (frame >= self->life_max) {
+            if (frame >= self->res.life_max) {
                 fn_800A486C(self->managerEF, self);
                 return;
             }
@@ -1353,7 +1331,7 @@ void nw4r::ef::Emitter::CalcEmitter() {
                 return;
             }
         }
-        s32 range = flags != 0 ? -1 : (s32)self->life_max;
+        s32 range = flags != 0 ? -1 : (s32)self->res.life_max;
         s32 found = 0;
         u16 i;
         for (i = frame == 0 ? (u16)0 : fn_800A8CE8(self->work); i < ef_emres_num_emit_track(self->work); i++) {
@@ -1421,8 +1399,6 @@ void nw4r::ef::Emitter::CalcEmission() {
     if (self->mLifeStatus == 1) {
         EfParticleRec* pm = (EfParticleRec*)ef_list_get_first(&self->particles);
         nw4r::math::MTX34 m1, m2;
-        MTX34_ctor(&m1);
-        MTX34_ctor(&m2);
         ef_pm_get_mtx(pm, &m2);
         mtx34_inverse(&m2, &m2);
         ef_emitter_get_mtx(self, &m1);
@@ -1451,18 +1427,18 @@ void nw4r::ef::Emitter::CalcBillboard() {
     if (self->mLifeStatus != 1 && self->mLifeStatus != 2) {
         return;
     }
-    if ((self->flags2 & 0x10000) == 0 && (self->flags2 & 0x8000) == 0) {
+    if ((self->res.flags2 & 0x10000) == 0 && (self->res.flags2 & 0x8000) == 0) {
         return;
     }
     {
-        nw4r::math::MTX34 m1, m2, m3, m4;
-        MTX34_ctor(&m1);
-        self->rotation.x = self->rotation.y = self->rotation.z = 0.0f;
+        nw4r::math::MTX34 m1;
+        self->res.rotation.x = self->res.rotation.y = self->res.rotation.z = 0.0f;
         self->transform_dirty = 1;
         ef_emitter_get_mtx(self, &m1);
-        MTX34_ctor(&m2);
+        nw4r::math::MTX34 m2;
+        _MTX34 m3;
         mtx34_concat(&m2, &self->managerEF->effect->ref_mtx, &m1);
-        ef_mtx34_copy(&m3, &m2);
+        ef_mtx34_copy((MTX34*)&m3, &m2);
         m3.m[0][0] = ef_mtx34_column_length((const f32*)&m3, 0);
         m3.m[2][0] = 0.0f;
         m3.m[1][0] = 0.0f;
@@ -1472,16 +1448,16 @@ void nw4r::ef::Emitter::CalcBillboard() {
         m3.m[2][2] = ef_mtx34_column_length((const f32*)&m3, 2);
         m3.m[1][2] = 0.0f;
         m3.m[0][2] = 0.0f;
-        if ((self->flags2 & 0x8000) != 0) {
-            MTX34_ctor(&m4);
+        if ((self->res.flags2 & 0x8000) != 0) {
+            nw4r::math::MTX34 m4;
             ef_mtx34_rotate_xyz(&m4, 1.5707964f, 0.0f, 0.0f);
-            mtx34_concat(&m3, &m3, &m4);
+            mtx34_concat((MTX34*)&m3, (MTX34*)&m3, &m4);
         }
         mtx34_inverse(&m2, &m2);
-        mtx34_concat(&m2, &m2, &m3);
-        fn_8009CCAC(&m2, &m2, &self->rotation);
-        ef_mtx34_scale_columns(&m2, &self->vec_0x9C, &m2);
-        fn_8009BCB4(&m2, &self->rotation);
+        mtx34_concat(&m2, &m2, (MTX34*)&m3);
+        fn_8009CCAC(&m2, &m2, &self->res.rotation);
+        ef_mtx34_scale_columns(&m2, &self->res.vec_0x9C, &m2);
+        fn_8009BCB4(&m2, &self->res.rotation);
         fn_800A95D8(self);
     }
 }
@@ -1509,13 +1485,11 @@ extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c
     mtx34_identity(dst);
     {
         EfVec offset;
-        VEC3_ctor(&offset);
         fn_8009BF08(orig, &offset);
         if (c == 100) {
             nw4r::math::MTX34Trans((nw4r::math::MTX34*)dst, (nw4r::math::MTX34*)dst, &offset);
         } else if (c != 0) {
             EfVec pt;
-            VEC3_ctor(&pt);
             vec3_scale_by(&pt, &offset, (f32)c / 100.0f);
             nw4r::math::MTX34Trans((nw4r::math::MTX34*)dst, (nw4r::math::MTX34*)dst, &pt);
         }
@@ -1525,19 +1499,16 @@ extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c
             }
             if (b != 0) {
                 nw4r::math::MTX34 m;
-                MTX34_ctor(&m);
                 fn_8009B650(orig, &m);
                 mtx34_concat(dst, dst, &m);
             }
             if (a != 0) {
                 EfVec pt;
-                VEC3_ctor(&pt);
                 fn_8009C040(orig, &pt);
                 fn_8009CBA0(dst, dst, &pt);
             }
             if (d != 0 && c != 100) {
                 EfVec pt;
-                VEC3_ctor(&pt);
                 vec3_scale_by(&pt, &offset, -1.0f);
                 nw4r::math::MTX34Trans((nw4r::math::MTX34*)dst, (nw4r::math::MTX34*)dst, &pt);
             }
@@ -1553,20 +1524,18 @@ extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c
 extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
     if (self->transform_dirty != 0) {
         nw4r::math::MTX34 m;
-        MTX34_ctor(&m);
         if (self->parent == NULL) {
             mtx34_copy_ps(&self->matrix, ef_effect_root_mtx(self->managerEF));
         } else {
             nw4r::math::MTX34 p;
-            MTX34_ctor(&p);
             ef_emitter_get_mtx(self->parent, &p);
-            ef_calc_inherit_mtx(&self->matrix, &p, self->flags3 & 1, self->flags3 & 2, self->alpha,
-                        self->flags3 & 4);
+            ef_calc_inherit_mtx(&self->matrix, &p, self->res.flags3 & 1, self->res.flags3 & 2, self->res.alpha,
+                        self->res.flags3 & 4);
         }
-        nw4r::math::MTX34Trans(&self->matrix, &self->matrix, &self->position);
-        ef_mtx34_rotate_xyz(&m, self->rotation.x, self->rotation.y, self->rotation.z);
+        nw4r::math::MTX34Trans(&self->matrix, &self->matrix, &self->res.position);
+        ef_mtx34_rotate_xyz(&m, self->res.rotation.x, self->res.rotation.y, self->res.rotation.z);
         mtx34_concat(&self->matrix, &self->matrix, &m);
-        fn_8009CBA0(&self->matrix, &self->matrix, &self->vec_0x9C);
+        fn_8009CBA0(&self->matrix, &self->matrix, &self->res.vec_0x9C);
         self->transform_dirty = 0;
     }
     if (out != NULL) {

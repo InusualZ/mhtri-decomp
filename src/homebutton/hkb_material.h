@@ -184,26 +184,32 @@ struct ResBlockSet {
     /* +0xC */ ResourceAccessor* pResAccessor;
 };
 
-/* A VEC2 built in place from its components or copied member by member: it stands in for nw4r::math::VEC2's own
- * constructors, which src/nw4r/math.h does not declare. size: 0x8 */
-struct Point : public math::VEC2 {
+/* A 2D point built in place from its components or copied member by member.  This library inlines nw4r's vector
+ * members, so its storage is the constructor-less base `_VEC2` (the game build calls `VEC2`'s out of line). size: 0x8 */
+struct Point : public math::_VEC2 {
     Point() {}
     Point(f32 px, f32 py) {
         x = px;
         y = py;
     }
-    Point& operator=(const math::VEC2& v) {
+    Point& operator=(const math::_VEC2& v) {
         x = v.x;
         y = v.y;
         return *this;
     }
 };
 
+/* A vector of this library's handed to a parameter that keeps nw4r's derived type (its mangling): the two share one
+ * layout, so the reference is reinterpreted, no code. */
+inline const math::VEC2& AsVEC2(const math::_VEC2& v) {
+    return static_cast<const math::VEC2&>(v);
+}
+
 /* A texture scale/rotate/translate. size: 0x14 */
 struct TexSRT {
-    /* +0x00 */ math::VEC2 translate;
+    /* +0x00 */ math::_VEC2 translate;
     /* +0x08 */ f32 rotate;
-    /* +0x0C */ math::VEC2 scale;
+    /* +0x0C */ math::_VEC2 scale;
 };
 
 /* One texture coordinate generator. size: 0x4 */

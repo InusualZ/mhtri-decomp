@@ -125,11 +125,20 @@
 #include "face_buf_reset.h"
 #include "fn_8004CAD8.h"         /* vec3_distance */
 #include "mh3_pad/control.h"   /* get_ControlType */
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "mh3_pad/rc_record.h"
 #include "mh3_pad/disp_beta.h"
 #include "menu/get_pop_dat_ptr.h"   /* option_cfg_eq_ck */
 #include "menu/menu_pad_map_set.h"
+
+/* 0x80041E70 (0x1C): copies a vector's three components (declared in `mh3_pad/vec3_assign.h`; emitted after its
+ * first user, `VEC3::operator=`). */
+extern "C" inline void vec3_assign(nw4r::math::_VEC3* dst, const nw4r::math::_VEC3* src) __attribute__((never_inline))
+{
+    dst->x = src->x;
+    dst->y = src->y;
+    dst->z = src->z;
+}
 
 /* ------------------------------------------------------------------ *
  * Local types
@@ -398,8 +407,6 @@ Vec2* vec2_copy(Vec2* dst, const Vec2* src);
 void vec3_float_copy(f32* dst, f32* src);
 void kpad_read_acc(WPADStatus* sample);
 void kpad_read_dpd(WPADStatus* sample);
-PlayerPad* player_pad_construct(PlayerPad* pad);
-PadFsBlock* pad_fs_block_construct(PadFsBlock* blk);
 }
 
 extern "C" {
@@ -1122,11 +1129,8 @@ extern "C" void pad_wpad_init(void)
         memset(prev, 0, sizeof(PlayerPad));
         memset(state, 0, sizeof(PadChanState));
         for (i = 0; i < 16; i++) {
-            VEC3 zero_acc;
-            VEC3 zero_fs_acc;
-
-            copyVec3((VEC3*)pad->acc_hist_0x1E4[i], setVec3(&zero_acc, 0.0f, 0.0f, 0.0f));
-            copyVec3((VEC3*)pad->fs_acc_hist_0x124[i], setVec3(&zero_fs_acc, 0.0f, 0.0f, 0.0f));
+            pad->fs_block.acc_ring[1][i] = VEC3(0.0f, 0.0f, 0.0f);
+            pad->fs_block.acc_ring[0][i] = VEC3(0.0f, 0.0f, 0.0f);
         }
         for (i = 0; i < 16; i++) {
             pad->button_0x2C0.wait_table_0x24[0][i] = 3;
@@ -1249,7 +1253,7 @@ extern "C" void pad_wpad_read(s32 chan)
     }
 
     pad2 = &Psw[chan];
-    fsb = (PadFsBlock*)&pad2->control_0x0FC;
+    fsb = &pad2->fs_block;
     from = pad_btn_table_2.bit;
     to = pad_btn_map_out;
     pad2->core_prev_0xCC = pad2->field_0xca;
@@ -1302,24 +1306,21 @@ extern "C" void pad_wpad_read(s32 chan)
         fsb->btn.rept = pad2->field_0xd2;
         fsb->btn.rept_count = pad2->core_rept_count_0xD4;
         pad_fs_stick_read(chan, chan_pad);
-        fsb->acc[fsb->index][0] = fs->core.accX;
-        fsb->acc[fsb->index][1] = fs->core.accY;
-        fsb->acc[fsb->index][2] = fs->core.accZ;
-        fsb->fs_acc[fsb->index][0] = fs->fsAccX;
-        fsb->fs_acc[fsb->index][1] = fs->fsAccY;
-        fsb->fs_acc[fsb->index][2] = fs->fsAccZ;
+        fsb->acc_ring[1][fsb->index].x = fs->core.accX;
+        fsb->acc_ring[1][fsb->index].y = fs->core.accY;
+        fsb->acc_ring[1][fsb->index].z = fs->core.accZ;
+        fsb->acc_ring[0][fsb->index].x = fs->fsAccX;
+        fsb->acc_ring[0][fsb->index].y = fs->fsAccY;
+        fsb->acc_ring[0][fsb->index].z = fs->fsAccZ;
     } else {
-        VEC3 zero_acc;
-        VEC3 zero_fs_acc;
-
         fsb->btn.hold = 0;
         fsb->btn.stick_hold = 0;
         fsb->btn.angle[1] = 0;
         fsb->btn.angle[0] = 0;
         fsb->btn.mag[1] = 0;
         fsb->btn.mag[0] = 0;
-        copyVec3((VEC3*)fsb->acc[fsb->index], setVec3(&zero_acc, 0.0f, 0.0f, 0.0f));
-        copyVec3((VEC3*)fsb->fs_acc[fsb->index], setVec3(&zero_fs_acc, 0.0f, 0.0f, 0.0f));
+        fsb->acc_ring[1][fsb->index] = VEC3(0.0f, 0.0f, 0.0f);
+        fsb->acc_ring[0][fsb->index] = VEC3(0.0f, 0.0f, 0.0f);
         pad_fs_stick_read(chan, &Psw[chan]);
     }
     fsb->btn.trig = fsb->btn.hold & ~fsb->btn.prev;
@@ -1337,36 +1338,6 @@ extern "C" void pad_wpad_read(s32 chan)
         fsb->btn.rept_count = 0;
     }
     pad_menu_merge(chan);
-}
-
-/* ------------------------------------------------------------------ *
- * 0x80041E40 - 0x80041E9C  (vector helpers)
- * ------------------------------------------------------------------ */
-
-/* The record these three work on is `nw4r::math::VEC3` (0xC, x/y/z at +0/+4/+8) - see
- * `mh3_pad/vec3.h` for the evidence (`setVec3`'s body is byte-identical to the map's
- * `setVector3__FPQ34nw4r4math4VEC3fff`).  The parameters were `void*` until the type-fix pass. */
-extern "C" void vec3_assign(VEC3* dst, const VEC3* src)
-{
-    dst->x = src->x;
-    dst->y = src->y;
-    dst->z = src->z;
-}
-
-extern "C" VEC3* copyVec3(VEC3* dst, const VEC3* src)
-{
-    vec3_assign(dst, src);
-    return dst;
-}
-
-/* The return is the first argument, as the callers use it (`mr r4,r3` after the `bl`); the body
- * leaves r3 alone, so `return out;` costs no instruction. */
-extern "C" VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z)
-{
-    out->x = x;
-    out->y = y;
-    out->z = z;
-    return out;
 }
 
 /* Creates an expandable heap over `size` bytes at `base`. */
@@ -1398,17 +1369,17 @@ extern "C" void pad_input_clear(s32 chan)
     pad->cl_deg_0xEE[0] = pad->cl_deg_0xEE[1] = 0;
     pad->cl_dist_0xF2[0] = pad->cl_dist_0xF2[1] = 0;
     pad->cl_dir_0xF6[0] = pad->cl_dir_0xF6[1] = 0;
-    pad->control_0x0FC = 0;
-    pad->field_0x100 = 0;
-    pad->wpad_word2_0x102 = 0;
-    pad->control_0x104 = 0;
-    pad->fs_stick_trig_0x108 = 0;
-    pad->fs_stick_release_0x10A = 0;
-    pad->fs_angle_0x10C[0] = pad->fs_angle_0x10C[1] = 0;
-    pad->fs_mag_0x110[0] = pad->fs_mag_0x110[1] = 0;
-    pad->fs_deg_0x114[0] = pad->fs_deg_0x114[1] = 0;
-    pad->fs_dist_0x118[0] = pad->fs_dist_0x118[1] = 0;
-    pad->fs_dir_0x11C[0] = pad->fs_dir_0x11C[1] = 0;
+    pad->fs_block.btn.hold = 0;
+    pad->fs_block.btn.trig = 0;
+    pad->fs_block.btn.release = 0;
+    pad->fs_block.btn.stick_hold = 0;
+    pad->fs_block.btn.stick_trig = 0;
+    pad->fs_block.btn.stick_release = 0;
+    pad->fs_block.btn.angle[0] = pad->fs_block.btn.angle[1] = 0;
+    pad->fs_block.btn.mag[0] = pad->fs_block.btn.mag[1] = 0;
+    pad->fs_block.btn.deg[0] = pad->fs_block.btn.deg[1] = 0;
+    pad->fs_block.btn.dist[0] = pad->fs_block.btn.dist[1] = 0;
+    pad->fs_block.btn.dir[0] = pad->fs_block.btn.dir[1] = 0;
 }
 
 /* Clears channel `chan`'s remote and menu button words while the pads are locked. */
@@ -1451,12 +1422,12 @@ extern "C" void pad_wpad_busy(s32 chan)
     pad->cc_word2_0x0DC = 0;
     pad->cl_stick_trig_0xE2 = 0;
     pad->cl_stick_release_0xE4 = 0;
-    pad->fs_prev_0xFE = 0x8000;
-    pad->control_0x0FC = 0x8000;
-    pad->field_0x100 = 0;
-    pad->wpad_word2_0x102 = 0;
-    pad->fs_stick_trig_0x108 = 0;
-    pad->fs_stick_release_0x10A = 0;
+    pad->fs_block.btn.prev = 0x8000;
+    pad->fs_block.btn.hold = 0x8000;
+    pad->fs_block.btn.trig = 0;
+    pad->fs_block.btn.release = 0;
+    pad->fs_block.btn.stick_trig = 0;
+    pad->fs_block.btn.stick_release = 0;
     pad->core_prev_0xCC = 0x8000;
     pad->field_0xca = 0x8000;
     pad->field_0xce = 0;
@@ -1768,7 +1739,7 @@ extern "C" void pad_fs_stick_read(s32 chan, PlayerPad* pad)
     u16 bits;
     u8 dir;
 
-    fsb = (PadFsBlock*)&pad->control_0x0FC;
+    fsb = &pad->fs_block;
     if (pad->mode != 1) {
         memset(fsb, 0, sizeof(PadFsBlock));
         return;
@@ -1924,12 +1895,6 @@ extern "C" void pad_clear_device_cb(s32 arg0)
     }
 }
 
-/* The retail body is a bare `blr`; the parameter is the record the call sites pass. */
-extern "C" void VEC3_ctor(VEC3* out)
-{
-    (void)out;
-}
-
 
 /* Copies the float pair `src` into `dst` and returns `dst`. */
 extern "C" Vec2* vec2_copy(Vec2* dst, const Vec2* src)
@@ -1957,11 +1922,11 @@ extern "C" void pad_acc_hist_get(s32 chan, VEC3* out, u8 count)
     u8 i;
     u8 idx;
 
-    fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
+    fsb = &Psw[chan].fs_block;
     if (out != NULL) {
         idx = fsb->index;
         for (i = 0; i < count; i++) {
-            copyVec3(out++, (VEC3*)fsb->acc[idx]);
+            *(out++) = fsb->acc_ring[1][idx];
             idx = (idx - 1) & 0xF;
         }
     }
@@ -1974,11 +1939,11 @@ extern "C" void pad_fs_acc_hist_get(s32 chan, VEC3* out, u8 count)
     u8 i;
     u8 idx;
 
-    fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
+    fsb = &Psw[chan].fs_block;
     if (out != NULL) {
         idx = fsb->index;
         for (i = 0; i < count; i++) {
-            copyVec3(out++, (VEC3*)fsb->fs_acc[idx]);
+            *(out++) = fsb->acc_ring[0][idx];
             idx = (idx - 1) & 0xF;
         }
     }
@@ -1989,15 +1954,15 @@ extern "C" s32 pad_acc_y_delta(s32 chan)
 {
     PadFsBlock* fsb;
     u8 idx;
-    f32* prev;
-    f32* cur;
+    VEC3* prev;
+    VEC3* cur;
     f32 delta;
 
-    fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
+    fsb = &Psw[chan].fs_block;
     idx = fsb->index;
-    cur = fsb->acc[idx];
-    prev = fsb->acc[(idx - 1) & 0xF];
-    delta = prev[1] - cur[1];
+    cur = &fsb->acc_ring[1][idx];
+    prev = &fsb->acc_ring[1][(idx - 1) & 0xF];
+    delta = prev->y - cur->y;
     if (delta < 0.0f) {
         delta = -delta;
     }
@@ -2009,15 +1974,15 @@ extern "C" s32 pad_fs_acc_y_delta(s32 chan)
 {
     PadFsBlock* fsb;
     u8 idx;
-    f32* prev;
-    f32* cur;
+    VEC3* prev;
+    VEC3* cur;
     f32 delta;
 
-    fsb = (PadFsBlock*)&Psw[chan].control_0x0FC;
+    fsb = &Psw[chan].fs_block;
     idx = fsb->index;
-    cur = fsb->fs_acc[idx];
-    prev = fsb->fs_acc[(idx - 1) & 0xF];
-    delta = prev[1] - cur[1];
+    cur = &fsb->acc_ring[0][idx];
+    prev = &fsb->acc_ring[0][(idx - 1) & 0xF];
+    delta = prev->y - cur->y;
     if (delta < 0.0f) {
         delta = -delta;
     }
@@ -2892,7 +2857,7 @@ u16 get_rcSwitch_on(s32 chan)
     case 0:
         return pad->field_0xce;
     case 1:
-        return pad->field_0x100;
+        return pad->fs_block.btn.trig;
     case 2:
         return pad->field_0xda;
     default:
@@ -2909,7 +2874,7 @@ u16 get_rcSwitch_rept(s32 chan)
     case 0:
         return pad->field_0xd2;
     case 1:
-        return pad->field_0x11e;
+        return pad->fs_block.btn.rept;
     case 2:
         return pad->field_0xf8;
     default:
@@ -2969,8 +2934,6 @@ extern "C" void pointer_smooth(void)
     VEC3 sample;
     VEC3 center;
 
-    VEC3_ctor(&sample);
-    VEC3_ctor(&center);
     if (pointer_freeze != 0) {
         return;
     }
@@ -2980,14 +2943,10 @@ extern "C" void pointer_smooth(void)
         return;
     }
     {
-        VEC3 tmp;
-
-        copyVec3(&sample, setVec3(&tmp, pointer_hist_x[0], pointer_hist_y[0], 0.0f));
+        sample = VEC3(pointer_hist_x[0], pointer_hist_y[0], 0.0f);
     }
     {
-        VEC3 tmp;
-
-        copyVec3(&center, setVec3(&tmp, pointer_center[0], pointer_center[1], 0.0f));
+        center = VEC3(pointer_center[0], pointer_center[1], 0.0f);
     }
     if ((pointer_dist = vec3_distance(&sample, &center)) < pointer_dist_limit) {
         pointer_offset[0] = 0.0f;
@@ -3170,7 +3129,7 @@ extern "C" void pad_menu_merge(u8 chan)
         switch (btn->device_0x22) {
         case 1:
             if (kind == 0) {
-                if (pad->control_0x0FC & mask) {
+                if (pad->fs_block.btn.hold & mask) {
                     btn->hold_0x00 |= out;
                 }
             } else {
@@ -3198,10 +3157,10 @@ extern "C" void pad_menu_merge(u8 chan)
         }
     }
     if (btn->device_0x22 == 1) {
-        btn->press_0x08 = pad->control_0x104;
-        btn->stick_deg_0x18 = pad->fs_deg_0x114[0];
-        btn->stick_dist_0x1A = pad->fs_dist_0x118[0];
-        btn->stick_dir_0x1C = pad->fs_dir_0x11C[0];
+        btn->press_0x08 = pad->fs_block.btn.stick_hold;
+        btn->stick_deg_0x18 = pad->fs_block.btn.deg[0];
+        btn->stick_dist_0x1A = pad->fs_block.btn.dist[0];
+        btn->stick_dir_0x1C = pad->fs_block.btn.dir[0];
     }
     if (btn->device_0x22 == 2) {
         btn->press_0x08 = pad->control_0x0DE;
@@ -3504,33 +3463,6 @@ extern "C" f32 clamp_acc(f32 value, f32 limit)
         return limit;
     }
     return value;
-}
-
-/* Constructs both pad record arrays (`Psw`, `Psw_prev`) element by element. */
-extern "C" void pad_records_construct(void)
-{
-    __construct_array(Psw, (void*)player_pad_construct, NULL, sizeof(PlayerPad), 4);
-    __construct_array(Psw_prev, (void*)player_pad_construct, NULL, sizeof(PlayerPad), 4);
-}
-
-/* Constructs one pad record: its Nunchuk block. */
-extern "C" PlayerPad* player_pad_construct(PlayerPad* pad)
-{
-    pad_fs_block_construct((PadFsBlock*)&pad->control_0x0FC);
-    return pad;
-}
-
-/* Constructs a Nunchuk block: the 32 accelerometer samples of its two rings. */
-extern "C" PadFsBlock* pad_fs_block_construct(PadFsBlock* blk)
-{
-    VEC3* v;
-
-    v = (VEC3*)blk->fs_acc;
-    do {
-        VEC3_ctor(v);
-        v++;
-    } while (v < (VEC3*)&blk->index);
-    return blk;
 }
 
 /* ------------------------------------------------------------------ *

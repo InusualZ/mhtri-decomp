@@ -9,7 +9,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void vec3_div(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 divisor);
 #ifdef __cplusplus
 }
 #endif

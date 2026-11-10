@@ -54,7 +54,7 @@
 #include "anim_key_curve_eval.h"
 #include "enemy/fn_8019ED34.h"
 #include "lobby/lb_quest_screen.h" /* quest_rand_next (the owner's header, rule 2) */
-#include "fn_8004CAD8.h" /* MTX34_ctor, mulVecMatAddTrans */
+#include "fn_8004CAD8.h" /* MTX34::MTX34(), mulVecMatAddTrans */
 #include "unsplit/enemy.h"
 #include "gx.h"
 #include "sound/mhchar.h"
@@ -205,8 +205,6 @@ struct Em025MaskView {
     /* +0x2C (+0x354) */ u8 mask_0x354[4];   /* the action bit set: bit `id % 8` of byte `id / 8` (clamped to 3) */
 };
 
-/* `em_vec3_copy` as this unit calls it: two arguments, the copy returned through the first. */
-#define em_vec3_copy_c1 ((void* (*)(void*, void*))em_vec3_copy)
 /* `em_ground_ck` with the f1 height its callers here pass. */
 #define em_ground_ck_c1 ((u32 (*)(struct _ENEMY_WORK*, f32))em_ground_ck)
 /* `em_act_ck` with the unsigned result the `== 1` tests compare (`cmplwi`). */
@@ -226,8 +224,8 @@ struct Em025HitRec {
     /* +0x0A */ u16 flags_0x0A;
     /* +0x0C */ u32 mask_0x0C;
     /* +0x10 */ f32 radius_0x10;
-    /* +0x14 */ nw4r::math::VEC3 end_a_0x14;
-    /* +0x20 */ nw4r::math::VEC3 end_b_0x20;
+    /* +0x14 */ nw4r::math::_VEC3 end_a_0x14;
+    /* +0x20 */ nw4r::math::_VEC3 end_b_0x20;
 };
 
 extern "C" {
@@ -674,9 +672,8 @@ void em025_shore_drift(struct _ENEMY_WORK* self) {
 void em025_joint_quake(struct _ENEMY_WORK* self, s32 joint, s32 kind, s32 level) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     if ((u32)joint == 0xFFFFFFFF) {
-        copyVec3(&pos, &self->pos);
+        pos = self->pos;
     } else {
         get_joint_wpos_em(self, joint, &pos);
     }
@@ -931,12 +928,10 @@ void em025_act1_0(struct _ENEMY_WORK* self) {
 /* 0x8019F378 (0x1F4): the roar: motion 24 with the shout window at 350, the hit windows at 550 and the breath
  * effects every tenth frame of the 388..528 window. */
 void em025_act1_1(struct _ENEMY_WORK* self, u32 shore) {
-    nw4r::math::VEC3 pos;
-
     if ((u8)shore == 1) {
         em_flag_0x116_set(self);
     }
-    VEC3_ctor(&pos);
+    nw4r::math::VEC3 pos;
     switch (self->state) {
     case 0:
         self->state++;
@@ -1432,7 +1427,7 @@ void em025_act6_1(struct _ENEMY_WORK* self, u32 speed) {
         s32 angle = calcVecAng2(&self->vec_0x36C, &self->pos);
         setVector3(&self->offset_0x30C.vec_0x310, 0.0f, 0.0f, -step);
         rotVecY(&self->offset_0x30C.vec_0x310, angle);
-        addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+        self->pos += self->offset_0x30C.vec_0x310;
         self->value_0x378 -= vec3_len(&self->offset_0x30C.vec_0x310.x);
         if (self->value_0x378 <= 0.0f) {
             self->state++;
@@ -1517,7 +1512,7 @@ void em025_act6_8(struct _ENEMY_WORK* self, u32 fast) {
         s32 angle = calcVecAng2(&self->vec_0x36C, &self->pos);
         setVector3(&self->offset_0x30C.vec_0x310, 0.0f, 0.0f, -step);
         rotVecY(&self->offset_0x30C.vec_0x310, angle);
-        addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+        self->pos += self->offset_0x30C.vec_0x310;
         self->value_0x378 -= vec3_len(&self->offset_0x30C.vec_0x310.x);
         if (self->value_0x378 <= 0.0f) {
             em_action_finish_stand(self);
@@ -1576,18 +1571,11 @@ void em025_act6_9(struct _ENEMY_WORK* self, u32 kind) {
 /* 0x801A0C48 (0x3A4): the side swim: accelerates along the target direction up to `speed`, blends the swim layer
  * by the drift, turns toward the drift and brakes once the distance runs out. */
 void em025_act6_10(struct _ENEMY_WORK* self, u32 slow) {
-    nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 accel;
-    nw4r::math::VEC3 scaled;
-    nw4r::math::VEC3 clamp;
-    nw4r::math::VEC3 brake;
-    nw4r::math::VEC3 back;
-    nw4r::math::VEC3 neg;
     f32 speed;
     f32 rate;
     u32 done;
 
-    setVec3(&dir, 0.0f, 0.0f, 1.0f);
+    nw4r::math::VEC3 dir(0.0f, 0.0f, 1.0f);
     done = 0;
     switch ((u8)slow) {
     case 1:
@@ -1609,12 +1597,10 @@ void em025_act6_10(struct _ENEMY_WORK* self, u32 slow) {
         break;
     case 1:
         rotVecY(&dir, calcVecAng2(&self->pos, &self->vec_0x36C));
-        vec3_scale(&scaled, &dir, speed);
-        vec3_scale(&accel, &scaled, 0.005f);
-        addVec3To(&self->offset_0x30C.vec_0x310, &accel);
+        nw4r::math::VEC3 accel = (dir * speed) * 0.005f;
+        self->offset_0x30C.vec_0x310 += accel;
         if (vec3_len(&self->offset_0x30C.vec_0x310.x) > speed) {
-            vec3_scale(&clamp, &dir, speed);
-            copyVec3(&self->offset_0x30C.vec_0x310, &clamp);
+            self->offset_0x30C.vec_0x310 = dir * speed;
         }
         rate = -(self->offset_0x30C.vec_0x310.x / 10.0f);
         em_motion_blend_step(self, rate, 1.0f);
@@ -1628,14 +1614,11 @@ void em025_act6_10(struct _ENEMY_WORK* self, u32 slow) {
         self->field_0x1C0 = em_angle_approach(
             (u16)(s32)(0.5f + (65536.0f * (30.0f * self->frames_0x454[4])) / 360.0f) + 0x8000,
             self->field_0x1C0, 0x40);
-        addVec3To(&self->pos, &self->offset_0x30C.vec_0x310);
+        self->pos += self->offset_0x30C.vec_0x310;
         self->value_0x378 -= vec3_len(&self->offset_0x30C.vec_0x310.x);
         if (self->value_0x378 <= 0.0f) {
             self->state++;
-            vec3_negate(&neg, &dir);
-            vec3_scale(&back, &neg, speed);
-            vec3_scale(&brake, &back, 0.005f);
-            copyVec3(&self->vec_0x31C, &brake);
+            self->vec_0x31C = (-dir * speed) * 0.005f;
         }
         break;
     case 2:
@@ -1690,8 +1673,6 @@ void em025_act6_12(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 unused_a;
     nw4r::math::VEC3 unused_b;
 
-    VEC3_ctor(&unused_a);
-    VEC3_ctor(&unused_b);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2063,11 +2044,7 @@ void em025_act7_2(struct _ENEMY_WORK* self, u32 shore) {
 void em025_act7_3(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 near;
-    nw4r::math::VEC3 far;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2087,15 +2064,13 @@ void em025_act7_3(struct _ENEMY_WORK* self) {
         if (em_frame_check(self, 0, 516.0f, 0.0f) == 1) {
             setVector3(&ofs, 0.0f, 0.0f, 4000.0f);
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3(&near, &self->pos, &ofs);
-            copyVec3(&pos, &near);
+            pos = self->pos + ofs;
             shell_set_func_ptr->method_0x68(self, 0, 18, 1.5f, &pos);
         }
         if (em_frame_check(self, 0, 518.0f, 0.0f) == 1) {
             setVector3(&ofs, 0.0f, 0.0f, 8000.0f);
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3(&far, &self->pos, &ofs);
-            copyVec3(&pos, &far);
+            pos = self->pos + ofs;
             em_wave_amp(&pos, &pos, 1000.0f, 0, (self->bits_0x1EC + 0x27EAD) >> 5);
             shell_set_func_ptr->method_0x68(self, 0, 18, 1.5f, &pos);
         }
@@ -2116,7 +2091,6 @@ void em025_act7_3(struct _ENEMY_WORK* self) {
 void em025_act7_4(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2163,15 +2137,8 @@ void em025_act7_5(struct _ENEMY_WORK* self) {
  * motion 7 with the speed steps, the shell drop and the shell-table hit at frame 576. */
 void em025_act7_6(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 start;
-    nw4r::math::VEC3 to;
-    nw4r::math::VEC3 from;
-    nw4r::math::VEC3 lim;
-    nw4r::math::VEC3 clampv;
-    nw4r::math::VEC3 end;
     f32 x0;
 
-    VEC3_ctor(&ofs);
     em_frame_flag_set(self);
     switch (self->state) {
     case 0:
@@ -2179,21 +2146,20 @@ void em025_act7_6(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 4);
         em_mot_set(self, 6, 0, 284);
         em_height_set(self, em_height_base_get(self));
-        copyVec3(&self->pos, setVec3(&start, -10200.0f, 0.0f, -19000.0f));
+        self->pos = VEC3(-10200.0f, 0.0f, -19000.0f);
         self->field_0x1C0 = 0x8000;
         break;
     case 1:
-        x0 = setVec3(&from, -10200.0f, 0.0f, -19000.0f)->x;
-        self->pos.x += (setVec3(&to, 220.0f, 0.0f, -19000.0f)->x - x0) / 360.0f;
-        if (self->pos.x > setVec3(&lim, 220.0f, 0.0f, -19000.0f)->x) {
-            self->pos.x = setVec3(&clampv, 220.0f, 0.0f, -19000.0f)->x;
+        self->pos.x += (nw4r::math::VEC3(220.0f, 0.0f, -19000.0f).x - nw4r::math::VEC3(-10200.0f, 0.0f, -19000.0f).x) / 360.0f;
+        if (self->pos.x > nw4r::math::VEC3(220.0f, 0.0f, -19000.0f).x) {
+            self->pos.x = nw4r::math::VEC3(220.0f, 0.0f, -19000.0f).x;
         }
         self->field_0x1C0 -= 91;
         if ((u32)(self->field_0x1C0 - 91) > 65353) {
             self->state++;
             em_mot_set(self, 7, 0, 0);
             self->field_0x1C0 = 0;
-            copyVec3(&self->pos, setVec3(&end, 220.0f, 0.0f, -19000.0f));
+            self->pos = VEC3(220.0f, 0.0f, -19000.0f);
             em_hit_window_set(self, 0, 8, 8);
             break;
         }
@@ -2262,7 +2228,6 @@ void em025_act7_7(struct _ENEMY_WORK* self) {
 void em025_act7_8(struct _ENEMY_WORK* self, u32 shore) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2280,7 +2245,7 @@ void em025_act7_8(struct _ENEMY_WORK* self, u32 shore) {
                 setVector3(&pos, 0.0f, 0.0f, 0.0f);
                 em_wave_amp(&pos, &pos, 1000.0f, 0, self->bits_0x1EC);
             } else {
-                copyVec3(&pos, &self->vec_0x36C);
+                pos = self->vec_0x36C;
             }
             shell_set_func_ptr->method_0x68(self, 0, 18, 1.0f, &pos);
         }
@@ -2305,9 +2270,7 @@ void em025_act7_8(struct _ENEMY_WORK* self, u32 shore) {
  * and the shell-table impact at 680. */
 void em025_act7_9(struct _ENEMY_WORK* self, u32 shore) {
     nw4r::math::VEC3 pos;
-    nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&pos);
     if ((u8)shore == 1) {
         em_flag_0x116_set(self);
     }
@@ -2335,7 +2298,7 @@ void em025_act7_9(struct _ENEMY_WORK* self, u32 shore) {
         }
         if (em_frame_check(self, 0, 680.0f, 0.0f) == 1) {
             em025_joint_quake(self, 25, 6, 3);
-            copyVec3(&pos, setVec3(&ofs, 0.0f, -840.0f, -450.0f));
+            pos = VEC3(0.0f, -840.0f, -450.0f);
             ((ShellSetScaleJobFn)shell_set_func_ptr->method_0x2C)(self, 9, 20, &pos, 6.8f, 0xFFFF);
             if (self->pos.x > 5200.0f) {
                 em_busy_net_notify(self, 80);
@@ -2354,15 +2317,8 @@ void em025_act7_10(struct _ENEMY_WORK* self, u32 shore) {
     nw4r::math::VEC3 pos;
     nw4r::math::VEC3 joint;
     nw4r::math::VEC3 ofs;
-    nw4r::math::VEC3 tmp;
-    nw4r::math::VEC3 ahead;
-    nw4r::math::VEC3 left;
-    nw4r::math::VEC3 right;
     u32 aim;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&joint);
-    VEC3_ctor(&ofs);
     aim = 0;
     switch (self->state) {
     case 0:
@@ -2385,7 +2341,7 @@ void em025_act7_10(struct _ENEMY_WORK* self, u32 shore) {
         }
         if (em_frame_check(self, 0, 326.0f, 0.0f) == 1) {
             em025_joint_quake(self, 25, 5, 3);
-            copyVec3(&ofs, setVec3(&tmp, 0.0f, -800.0f, 400.0f));
+            ofs = VEC3(0.0f, -800.0f, 400.0f);
             ((ShellSetScaleJobFn)shell_set_func_ptr->method_0x2C)(self, 9, 20, &ofs, 4.0f, 0xFFFF);
             if (self->pos.x > 5380.0f) {
                 em_busy_net_notify(self, 40);
@@ -2416,25 +2372,22 @@ void em025_act7_10(struct _ENEMY_WORK* self, u32 shore) {
                 aim = 1;
             }
             if (aim == 1) {
-                copyVec3(&pos, &self->vec_0x36C);
+                pos = self->vec_0x36C;
             } else {
                 setVector3(&ofs, 0.0f, 0.0f, 6000.0f);
                 rotVecY(&ofs, self->field_0x1C0);
-                addVec3(&ahead, &self->pos, &ofs);
-                copyVec3(&pos, &ahead);
+                pos = self->pos + ofs;
                 em_wave_amp(&pos, &pos, 2000.0f, 0, self->bits_0x1EC);
             }
             shell_set_func_ptr->method_0x68(self, 1, 18, 1.0f, &pos);
             setVector3(&ofs, 2000.0f, 0.0f, 4000.0f);
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3(&left, &self->pos, &ofs);
-            copyVec3(&pos, &left);
+            pos = self->pos + ofs;
             em_wave_amp(&pos, &pos, 1500.0f, 0, (self->bits_0x1EC + 0x157E7) >> 4);
             shell_set_func_ptr->method_0x68(self, 1, 18, 1.0f, &pos);
             setVector3(&ofs, -2000.0f, 0.0f, 4000.0f);
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3(&right, &self->pos, &ofs);
-            copyVec3(&pos, &right);
+            pos = self->pos + ofs;
             em_wave_amp(&pos, &pos, 1500.0f, 0, (self->bits_0x1EC + 0x27EAD) >> 5);
             shell_set_func_ptr->method_0x68(self, 1, 18, 1.0f, &pos);
         }
@@ -2677,7 +2630,6 @@ void em025_act11_se_play(struct _ENEMY_WORK* self) {
 void em025_act13_2(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2764,7 +2716,6 @@ void em025_act13_2(struct _ENEMY_WORK* self) {
 void em025_act13_3(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2871,7 +2822,6 @@ void em025_act13_3(struct _ENEMY_WORK* self) {
 void em025_act13_4(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3083,7 +3033,6 @@ void em025_status_bits_update(struct _ENEMY_WORK* self) {
  * `out`.  The four-argument call sites are the distance probes in `em025_act7_10`. */
 void em025_joint_point_get(struct _ENEMY_WORK* self, u32 joint, Vec3* out, Vec3* tmp) {
     nw4r::math::MTX34 m;
-    MTX34_ctor(&m);
     get_joint_wmat_em(self, joint, &m);
     mulVecMatAddTrans(tmp, &m);
     out->x = tmp->x;
@@ -3096,7 +3045,6 @@ void em025_joint_point_get(struct _ENEMY_WORK* self, u32 joint, Vec3* out, Vec3*
 void em025_effect_spawn(struct _ENEMY_WORK* self, u32 family, u32 type, u32 joint, s32 arg, f32 scale) {
     nw4r::math::VEC3 pos;
 
-    VEC3_ctor(&pos);
     switch ((u8)family) {
     case 0:
         if (joint == 0xFF) {
@@ -3110,7 +3058,7 @@ void em025_effect_spawn(struct _ENEMY_WORK* self, u32 family, u32 type, u32 join
         break;
     case 1:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -3120,7 +3068,7 @@ void em025_effect_spawn(struct _ENEMY_WORK* self, u32 family, u32 type, u32 join
         break;
     case 2:
         if (joint == 0xFF) {
-            copyVec3(&pos, &self->pos);
+            pos = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &pos);
         }
@@ -3136,16 +3084,11 @@ void em025_effect_spawn(struct _ENEMY_WORK* self, u32 family, u32 type, u32 join
 void em025_motion_events(_ENEMY_WORK* self) {
     Em025Block* blk = &self->em025_0x328;
     nw4r::math::MTX34 mtx;
+    u16 temp_r3;
+
     nw4r::math::VEC3 v2C;
     nw4r::math::VEC3 v20;
     nw4r::math::VEC3 v14;
-    nw4r::math::VEC3 rec8;
-    u16 temp_r3;
-
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&v2C);
-    VEC3_ctor(&v20);
-    VEC3_ctor(&v14);
     em025_flags_update(self);
     em025_posture_update(self);
     em025_status_bits_update(self);
@@ -4306,7 +4249,7 @@ void em025_motion_events(_ENEMY_WORK* self) {
                 if (idx != 0xFF) {
                     e = &table[idx];
                     get_joint_wmat_em(self, e->joint, &mtx);
-                    copyVec3(&v2C, (const nw4r::math::VEC3*)em_vec3_copy_c1(&rec8, &e->vec));
+                    v2C = nw4r::math::VEC3(*(const Vec*)&e->vec);
                     mulVecMatAddTrans(&v2C, &mtx);
                     em_roster_record_pos_set(blk->handles_0x328[i], &v2C, self->area_no);
                 }
@@ -4322,7 +4265,6 @@ void em025_model_effect_update(_ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
     _GXColor color;
 
-    MTX34_ctor(&mtx);
     if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 1) {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*) self->field_0x13C, 6);
         if (copied_mat_access_valid_ck(&access) != 0) {
@@ -4514,15 +4456,12 @@ void em025_sway_update(struct _ENEMY_WORK* self) {
  * the area, within 600 and at the joint's height, inside each joint's angle limits. */
 void em025_head_track(struct _ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 head;
-    nw4r::math::VEC3 target;
     Em025Block* blk;
     u32 base;
     s32 i;
 
-    MTX34_ctor(&mtx);
-    VEC3_ctor(&head);
-    VEC3_ctor(&target);
+    nw4r::math::VEC3 head;
+    nw4r::math::VEC3 target;
     u32 joints[2] = {23, 24};
     f32 limits[2][2] = {{10.0f, -15.0f}, {15.0f, -10.0f}};
     get_joint_wmat_em(self, 20, &mtx);
@@ -4553,11 +4492,11 @@ void em025_head_track(struct _ENEMY_WORK* self) {
                     s32 rel = calcVecAng2(&head, &pl->vec_0x03C) - base;
                     if (i == 0) {
                         if ((u16)rel <= 0x8000) {
-                            copyVec3(&target, &pl->vec_0x03C);
+                            target = pl->vec_0x03C;
                             best = dist;
                         }
                     } else if ((u16)rel >= 0x8000) {
-                        copyVec3(&target, &pl->vec_0x03C);
+                        target = pl->vec_0x03C;
                         best = dist;
                     }
                 }
@@ -4599,7 +4538,6 @@ void Em025UserData::CalcMtxItemEx(nw4r::g3d::WorldMtxManip* pManip, nw4r::g3d::R
     struct _ENEMY_WORK* work = this->work;
     nw4r::math::MTX34 mtx;
 
-    MTX34_ctor(&mtx);
     if ((s32)item->field_0x04 == 0xFF) {
         switch (joint) {
         case 23:

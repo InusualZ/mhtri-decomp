@@ -6,6 +6,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "Pl/plw.h"   /* _PLW (`lb_npc_act_set`'s player work) */
+#include "Pl/fn_8028F66C.h"   /* LandData, the ground probe record */
 #include "ef/cp_vector.h"   /* _CP_VECTOR, the NPC's rotation view */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -55,13 +56,6 @@ typedef struct LbNpcModel {
     /* +0x007 */ u8 pad_0x007;
 } LbNpcModel;
 
-/* The ground probe record `em_land_data_init` constructs and the ground query fills: the ground attribute and the
- * surface normal.  size: 0x14 */
-typedef struct LbNpcGround {
-    /* +0x00 */ u16 attr_0x00;
-    /* +0x02 */ u8 pad_0x02[6];
-    /* +0x08 */ VEC3 normal_0x08;
-} LbNpcGround;
 
 /* One 8-byte model-dressing op of an `npc_sub_data` list (an op of 0xFF ends the list): 0 hides node `node_0x1`,
  * 2 shows it, 1 sets its material colour to the RGB in `color_0x4`.  size: 0x8 */
@@ -109,7 +103,7 @@ typedef struct LbNpcMoveTables {
 typedef struct LbSpot {
     /* +0x00 */ s16 kind_0x00;
     /* +0x02 */ s16 id_0x02;
-    /* +0x04 */ VEC3 pos_0x04;
+    /* +0x04 */ _VEC3 pos_0x04;
     /* +0x10 */ u32 angle_0x10;
     /* +0x14 */ f32 radius_0x14;   /* the XZ distance the lobby target marker picks the spot within */
 } LbSpot;
@@ -398,9 +392,6 @@ typedef struct LbNpcWork {
 extern "C" {
 #endif
 
-/* 0x801FF984 - the block constructor `fn_802C2698` hands a record's +0x08 to; unwritten, so the declaration is that
- * call site's view. */
-void mhchar_construct(void* block);
 
 #ifdef __cplusplus
 }
@@ -423,7 +414,7 @@ void lb_npc_map_setup(void);
 /* 0x801FC6EC - the lobby's per-frame world update (GUESS name). */
 void lobby_frame_update(void);
 /* 0x80209070 - places the local player at spawn record `spawn` (entry `id`) of map `map`'s area `area` (GUESS name). */
-void lb_player_spawn_set(u8* spawn, u16 id, u8 map, u8 area);
+void lb_player_spawn_set(nw4r::math::VEC3* pos, u16 angle, u8 map, u8 area);
 
 /* 0x801FE5B0 - the live NPC of kind `kind` (GUESS name). */
 struct _LB_NPC* lb_npc_find(u8 kind);

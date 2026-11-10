@@ -60,7 +60,7 @@
 #include "g3d/res_node_mtx_id_get.h"
 #include "g3d/fn_8005AA28.h"       /* res_node_is_valid */
 #include "g3d/anm_chr_result_scale_get.h"
-#include "g3d/chr_anm_result_init.h"
+#include "g3d/res_anm_chr_copy_ctor.h"
 #include "g3d/res_file_get_res_anm_chr.h"
 #include "nw_anm_chr_res_create.h"
 #include "hermite_interp.h"
@@ -68,9 +68,9 @@
 #include "g3d/CleanUpTracks.h"
 #include "draw_shape.h"            /* res_file_ctor, res_file_assign */
 #include "draw_shape/mtx34_copy.h"
-#include "fn_8004CAD8.h"           /* cpSetRotMatrixZXY, subVec3, MTX34_ctor */
+#include "fn_8004CAD8.h"           /* cpSetRotMatrixZXY, subVec3, MTX34::MTX34() */
 #include "vec3_scale.h"
-#include "g3d/g3d_calcworld.h"     /* addVec3To */
+#include "g3d/g3d_calcworld.h"     /* VEC3::operator+= */
 #include "MSL_C/string.h"     /* strstr */
 #include "MSL_C/strtoul.h"         /* atoi */
 #include "Runtime.PPCEABI.H/memset.h"
@@ -292,7 +292,7 @@ void MHchar::move(u16 flags)
 extern "C" void scn_leaf_scale_set(nw4r::g3d::ScnLeaf* self, nw4r::math::VEC3* src)
 {
     if (src) {
-        copyVec3(&self->mScale, src);
+        self->mScale = *src;
     }
 }
 
@@ -332,7 +332,6 @@ extern "C" void mhchar_model_mtx_update(MHchar* chr)
 {
     MHcharModel* self = reinterpret_cast<MHcharModel*>(chr);
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
 
     if (self->scn_mdl) {
         scn_leaf_scale_set(self->scn_mdl, &self->scale);
@@ -350,7 +349,7 @@ extern "C" void mhchar_model_mtx_update(MHchar* chr)
 /* Copy `src` into the model's position offset. */
 extern "C" void mhchar_ofs_set(MHchar* self, nw4r::math::VEC3* src)
 {
-    copyVec3(&self->field_0x10, src);
+    self->field_0x10 = *src;
 }
 
 /* Clear the model's position offset. */
@@ -397,7 +396,6 @@ void MHchar::get_joint_wpos(u32 joint, nw4r::math::VEC3* out)
 {
     MHcharModel* self = reinterpret_cast<MHcharModel*>(this);
     nw4r::math::MTX34 mtx;
-    MTX34_ctor(&mtx);
 
     if (self->scn_mdl) {
         void* entry = self->mdl.GetResNode(joint).mpData;
@@ -792,10 +790,6 @@ extern "C" u32 mhchar_motion_flag_ck(MHchar* self, u32 mask)
 extern "C" void mhchar_motion_update(MHchar* chr)
 {
     MHcharModel* self = reinterpret_cast<MHcharModel*>(chr);
-    nw4r::g3d::ChrAnmResult result;
-    nw4r::math::VEC3 move;
-    nw4r::math::VEC3 delta;
-    nw4r::math::VEC3 scaled;
     int i;
 
     if (self->blend && mhchar_layer_anm_get(chr, 0)) {
@@ -803,9 +797,9 @@ extern "C" void mhchar_motion_update(MHchar* chr)
         self->anim_skip--;
         return;
     }
-    chr_anm_result_init(&result);
-    VEC3_ctor(&move);
-    VEC3_ctor(&delta);
+    nw4r::g3d::ChrAnmResult result;
+    nw4r::math::VEC3 move;
+    nw4r::math::VEC3 delta;
     self->prev_frame[0] = self->frame[0];
     self->prev_frame[1] = self->frame[1];
     self->prev_frame[2] = self->frame[2];
@@ -847,8 +841,8 @@ extern "C" void mhchar_motion_update(MHchar* chr)
                 to = 0.0f;
             }
             mhchar_layer_trans_delta_get(chr, &delta, i, from, to);
-            vec3_scale(&scaled, &delta, self->blend->GetWeight(i));
-            addVec3To(&move, &scaled);
+            nw4r::math::VEC3 scaled = delta * (self->blend->GetWeight(i));
+            move += scaled;
         }
     }
     if (self->move_skip != 0) {
@@ -860,7 +854,7 @@ extern "C" void mhchar_motion_update(MHchar* chr)
         move.y *= self->scale.y;
         move.z *= self->scale.z;
         rotVecZXY(&move, &self->rot);
-        addVec3To(&self->pos, &move);
+        self->pos += move;
     }
     }
 }
@@ -890,14 +884,10 @@ extern "C" nw4r::g3d::AnmObjChr* anm_obj_chr_node_get_child(nw4r::g3d::AnmObjChr
 extern "C" void mhchar_layer_trans_delta_get(MHchar* chr, nw4r::math::VEC3* out, s32 layer, f32 from, f32 to)
 {
     MHcharModel* self = reinterpret_cast<MHcharModel*>(chr);
+
     nw4r::g3d::ChrAnmResult result;
     nw4r::math::VEC3 at_from;
     nw4r::math::VEC3 at_to;
-    nw4r::math::VEC3 diff;
-
-    chr_anm_result_init(&result);
-    VEC3_ctor(&at_from);
-    VEC3_ctor(&at_to);
     nw4r::g3d::AnmObjChr* anm = mhchar_layer_anm_get(chr, layer);
     if (anm == 0) {
         out->x = 0.0f;
@@ -910,8 +900,7 @@ extern "C" void mhchar_layer_trans_delta_get(MHchar* chr, nw4r::math::VEC3* out,
     anm_chr_result_trans_get((struct ResAnmChrObj*)anm->GetResult(&result, self->root_node_id), &at_from.x);
     anm->SetFrame(to);
     anm_chr_result_trans_get((struct ResAnmChrObj*)anm->GetResult(&result, self->root_node_id), &at_to.x);
-    subVec3(&diff, &at_to, &at_from);
-    copyVec3(out, &diff);
+    *out = at_to - at_from;
     anm->SetFrame(frame);
 }
 
@@ -1524,7 +1513,6 @@ void MHcharWorldCallback::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r::
                                         nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
     nw4r::math::VEC3 zero;
-    VEC3_ctor(&zero);
     zero.x = 0.0f;
     zero.y = 0.0f;
     zero.z = 0.0f;

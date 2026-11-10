@@ -51,7 +51,7 @@
 
 #include "types.h"
 #include "fn_8004CAD8.h"    /* the VEC3 helpers this range owns (rule 2) */
-#include "mh3_pad.h"        /* VEC3_ctor - owner src/mh3_pad.cpp (rule 2) */
+#include "mh3_pad.h"        /* VEC3::VEC3() - owner src/mh3_pad.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* fn_800610AC - owner src/g3d/g3d_anmchr.cpp (rule 2) */
 #include "nw4r/math_triangular.h" /* nw4r::math::sSinCosTbl - owner src/nw4r/math_triangular.cpp (rule 2) */
 #include "ef/ef_util.h" /* the unit's own header */
@@ -225,30 +225,27 @@ extern "C" inline void fn_8009B840(f32* mtx, s32 index, const f32* vec) {
 /* Builds an orthonormal 3x4 matrix from the first two columns of `src` (Gram-Schmidt): the first column
  * is normalised, the second is made perpendicular to it, and the third is their cross product. */
 extern "C" void fn_8009B650(const f32* src, f32* mtx) {
-    f32 v20[3];
-    f32 v14[3];
-    f32 v8[3];
 
     NW4R_POINTER_ASSERT(mtx, 0x1F6, "NW4R:Pointer Error\ndst(=%p) is not valid pointer.");
 
-    VEC3_ctor((nw4r::math::VEC3*)v20);
-    VEC3_ctor((nw4r::math::VEC3*)v14);
-    VEC3_ctor((nw4r::math::VEC3*)v8);
+    nw4r::math::VEC3 v20;
+    nw4r::math::VEC3 v14;
+    nw4r::math::VEC3 v8;
 
-    fn_8009BA78(src, 0, v20);
-    if (ef_vec3_normalize_to(v20, v20) == 0)
-        v20[0] = ef_util_f32_one;
+    fn_8009BA78(src, 0, &v20.x);
+    if (ef_vec3_normalize_to(&v20.x, &v20.x) == 0)
+        v20.x = ef_util_f32_one;
 
-    fn_8009BA78(src, 1, v14);
-    if (ef_vec3_normalize_to(v14, v14) == 0)
-        v14[1] = ef_util_f32_one;
+    fn_8009BA78(src, 1, &v14.x);
+    if (ef_vec3_normalize_to(&v14.x, &v14.x) == 0)
+        v14.y = ef_util_f32_one;
 
-    vec3_cross(v8, v20, v14);
-    vec3_cross(v14, v8, v20);
+    vec3_cross(&v8.x, &v20.x, &v14.x);
+    vec3_cross(&v14.x, &v8.x, &v20.x);
 
-    fn_8009B840(mtx, 0, v20);
-    fn_8009B840(mtx, 1, v14);
-    fn_8009B840(mtx, 2, v8);
+    fn_8009B840(mtx, 0, &v20.x);
+    fn_8009B840(mtx, 1, &v14.x);
+    fn_8009B840(mtx, 2, &v8.x);
     mtx[3] = ef_util_f32_zero;
     mtx[7] = ef_util_f32_zero;
     mtx[11] = ef_util_f32_zero;
@@ -315,52 +312,48 @@ extern "C" void fn_8009BF08(const f32* mtx, f32* vec) {
  * left-handed basis; a collapsed column gives 0). */
 extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
     f32 d[3];
-    f32 vCol0[3];
-    f32 vCol1[3];
-    f32 vCol2[3];
-    f32 vTmp[3];
     f32 len;
     f32 r;
 
     NW4R_POINTER_ASSERT(scale, 0x266, "NW4R:Pointer Error\nscale(=%p) is not valid pointer.");
 
-    VEC3_ctor((nw4r::math::VEC3*)vCol0);
-    VEC3_ctor((nw4r::math::VEC3*)vCol1);
-    VEC3_ctor((nw4r::math::VEC3*)vCol2);
-    VEC3_ctor((nw4r::math::VEC3*)vTmp);
+    nw4r::math::VEC3 vCol0;
+    nw4r::math::VEC3 vCol1;
+    nw4r::math::VEC3 vCol2;
+    nw4r::math::VEC3 vTmp;
 
-    fn_8009BA78(mtx, 0, vCol0);
-    len = vec3_length_sq(vCol0);
+    fn_8009BA78(mtx, 0, &vCol0.x);
+    len = vec3_length_sq(&vCol0.x);
     if (len > ef_util_f32_epsilon) {
         r = nw4r::math::FrSqrt(len);
         scale[0] = math_reciprocal(r);
-        vec3_scale_by(vCol0, vCol0, r);
+        vec3_scale_by(&vCol0.x, &vCol0.x, r);
 
-        fn_8009BA78(mtx, 1, vCol1);
-        d[0] = vec3_dot(vCol0, vCol1);
-        vec3_scale_by(vTmp, vCol0, d[0]);
-        PSVECSubtract(vCol1, vCol1, vTmp);
+        fn_8009BA78(mtx, 1, &vCol1.x);
+        d[0] = vec3_dot(&vCol0.x, &vCol1.x);
+        vec3_scale_by(&vTmp.x, &vCol0.x, d[0]);
+        PSVECSubtract(&vCol1.x, &vCol1.x, &vTmp.x);
 
-        len = vec3_length_sq(vCol1);
+        len = vec3_length_sq(&vCol1.x);
         if (len > ef_util_f32_epsilon) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
             d[0] = d[0] * r;
-            vec3_scale_by(vCol1, vCol1, r);
+            vec3_scale_by(&vCol1.x, &vCol1.x, r);
 
-            fn_8009BA78(mtx, 2, vCol2);
-            d[2] = vec3_dot(vCol1, vCol2);
-            vec3_scale_by(vTmp, vCol1, d[2]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            d[1] = vec3_dot(vCol0, vCol2);
-            vec3_scale_by(vTmp, vCol0, d[1]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
+            fn_8009BA78(mtx, 2, &vCol2.x);
+            d[2] = vec3_dot(&vCol1.x, &vCol2.x);
+            vec3_scale_by(&vTmp.x, &vCol1.x, d[2]);
+            PSVECSubtract(&vCol2.x, &vCol2.x, &vTmp.x);
+            d[1] = vec3_dot(&vCol0.x, &vCol2.x);
+            vec3_scale_by(&vTmp.x, &vCol0.x, d[1]);
+            PSVECSubtract(&vCol2.x, &vCol2.x, &vTmp.x);
 
-            len = vec3_length_sq(vCol2);
+            len = vec3_length_sq(&vCol2.x);
             if (len > ef_util_f32_epsilon) {
                 scale[2] = sqrt_f32(len);
-                vec3_cross(vTmp, vCol1, vCol2);
-                if (vec3_dot(vCol0, vTmp) < ef_util_f32_zero) {
+                vec3_cross(&vTmp.x, &vCol1.x, &vCol2.x);
+                if (vec3_dot(&vCol0.x, &vTmp.x) < ef_util_f32_zero) {
                     scale[0] = scale[0] * ef_util_f64_minus_one;
                     scale[1] = scale[1] * ef_util_f64_minus_one;
                     scale[2] = scale[2] * ef_util_f64_minus_one;
@@ -370,11 +363,11 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
             }
         } else {
             scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, vCol2);
-            d[1] = vec3_dot(vCol0, vCol2);
-            vec3_scale_by(vTmp, vCol0, d[1]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            len = vec3_length_sq(vCol2);
+            fn_8009BA78(mtx, 2, &vCol2.x);
+            d[1] = vec3_dot(&vCol0.x, &vCol2.x);
+            vec3_scale_by(&vTmp.x, &vCol0.x, d[1]);
+            PSVECSubtract(&vCol2.x, &vCol2.x, &vTmp.x);
+            len = vec3_length_sq(&vCol2.x);
             if (len > ef_util_f32_epsilon)
                 scale[2] = sqrt_f32(len);
             else
@@ -382,22 +375,22 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
         }
     } else {
         scale[0] = ef_util_f32_zero;
-        fn_8009BA78(mtx, 1, vCol1);
-        len = vec3_length_sq(vCol1);
+        fn_8009BA78(mtx, 1, &vCol1.x);
+        len = vec3_length_sq(&vCol1.x);
         if (len > ef_util_f32_epsilon) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
-            vec3_scale_by(vCol1, vCol1, r);
+            vec3_scale_by(&vCol1.x, &vCol1.x, r);
 
-            fn_8009BA78(mtx, 2, vCol2);
-            d[2] = vec3_dot(vCol1, vCol2);
-            vec3_scale_by(vTmp, vCol1, d[2]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            scale[2] = vec3_len(vCol2);
+            fn_8009BA78(mtx, 2, &vCol2.x);
+            d[2] = vec3_dot(&vCol1.x, &vCol2.x);
+            vec3_scale_by(&vTmp.x, &vCol1.x, d[2]);
+            PSVECSubtract(&vCol2.x, &vCol2.x, &vTmp.x);
+            scale[2] = vec3_len(&vCol2.x);
         } else {
             scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, vCol2);
-            scale[2] = vec3_len(vCol2);
+            fn_8009BA78(mtx, 2, &vCol2.x);
+            scale[2] = vec3_len(&vCol2.x);
         }
     }
 }
@@ -818,16 +811,15 @@ scale_rows:
 /* Builds the reciprocal of the scale vector `scale` (a zero component becomes 100000.0f) and applies it
  * to the 3x4 matrix `mtx` through `nw4r::math::MTX34Scale`. */
 extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
-    f32 inv[3];
 
-    VEC3_ctor((nw4r::math::VEC3*)inv);
+    nw4r::math::VEC3 inv;
     if (ef_util_f32_zero != scale[0])
-        inv[0] = math_reciprocal(scale[0]);
+        inv.x = math_reciprocal(scale[0]);
     else
-        inv[0] = ef_util_f32_100000;
-    inv[1] = ef_util_f32_zero != scale[1] ? math_reciprocal(scale[1]) : ef_util_f32_100000;
-    inv[2] = ef_util_f32_zero != scale[2] ? math_reciprocal(scale[2]) : ef_util_f32_100000;
-    nw4r::math::MTX34Scale((nw4r::math::MTX34*)dst, (const nw4r::math::MTX34*)mtx, (const nw4r::math::VEC3*)inv);
+        inv.x = ef_util_f32_100000;
+    inv.y = ef_util_f32_zero != scale[1] ? math_reciprocal(scale[1]) : ef_util_f32_100000;
+    inv.z = ef_util_f32_zero != scale[2] ? math_reciprocal(scale[2]) : ef_util_f32_100000;
+    nw4r::math::MTX34Scale((nw4r::math::MTX34*)dst, (const nw4r::math::MTX34*)mtx, (const nw4r::math::VEC3*)&inv.x);
 }
 
 /* 0x8009CD64 (0x58): returns the length of column `index` of the 3x4 matrix `mtx` (paired-single, with one

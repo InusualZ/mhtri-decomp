@@ -26,9 +26,9 @@
 #include "ef/fn_800CDB2C.h"
 #include "enemy/ENEMY_WORK.h"
 #include "pl.h"
-#include "fn_8004CAD8.h"               /* MTX34_ctor */
-#include "Pl/fn_8028F66C.h"            /* copyVec3 */
-#include "g3d/g3d_calcworld.h"         /* addVec3To */
+#include "fn_8004CAD8.h"               /* MTX34::MTX34() */
+#include "Pl/fn_8028F66C.h"            /* VEC3::operator= */
+#include "g3d/g3d_calcworld.h"         /* VEC3::operator+= */
 #include "sound/fn_800D7F54.h"         /* em015_denki_eft_se_req, se_req_pos_ps */
 #include "stage/stg_w.h"               /* get_now_areano */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset - owner Runtime.PPCEABI.H/memset.c */
@@ -113,9 +113,6 @@ Vec eft034_ray_tip_offsets[3] = {
 }
 
 /* The by-value spelling of the out-pointer vector subtraction (the result pointer is the hidden first argument). */
-#define VEC3_SUB ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))subVec3)
-#define VEC3_ADD ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, const nw4r::math::VEC3*))addVec3)
-#define VEC3_SCALE ((nw4r::math::VEC3 (*)(const nw4r::math::VEC3*, f32))vec3_scale)
 
 /* `eft004_key_spawn` (`ef/eft004_fx.cpp`'s ground burst) with its scale third: every caller loads f1 between r4 and r5. */
 #define EFT_GROUND_BURST ((void (*)(u8, nw4r::math::VEC3*, f32, u32, u8, u8))eft004_key_spawn)
@@ -261,8 +258,6 @@ extern "C" void fn_802F3B48(_EFT* self)
 extern "C" void fn_802F3D94(_EFT* self)
 {
     _PLW* plw;
-    nw4r::math::VEC3 wander;
-    nw4r::math::VEC3 fx;
     Eft034Work* work;
     _GXColor col;
     s32 hits;
@@ -275,8 +270,8 @@ extern "C" void fn_802F3D94(_EFT* self)
     s32 need;
 
     plw = (_PLW*)self->source_0x30;
-    VEC3_ctor(&wander);
-    VEC3_ctor(&fx);
+    nw4r::math::VEC3 wander;
+    nw4r::math::VEC3 fx;
     work = (Eft034Work*)self->work_0x38;
     if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
@@ -289,13 +284,13 @@ extern "C" void fn_802F3D94(_EFT* self)
         eft034_orb_move(self);
         if (self->pos_0x18.y < work->floor_0x48 - 20.0f) {
             self->pos_0x18.y = work->floor_0x48 - 20.0f;
-            copyVec3(&work->target_0x18, &self->pos_0x18);
+            work->target_0x18 = self->pos_0x18;
             work->vel_0x0C.x = 0.0f;
             work->vel_0x0C.y = 0.0f;
             work->vel_0x0C.z = 0.0f;
             self->timer_0x0C = 0;
             self->field_0x06++;
-            copyVec3(&fx, &work->target_0x18);
+            fx = work->target_0x18;
             fx.y = 5.0f + work->floor_0x48;
             EFT_GROUND_BURST(2, &fx, 0.6f, 0, plw->area_0x16, 1);
             EFT_GROUND_BURST(1, &fx, 0.6f, 0, plw->area_0x16, 1);
@@ -319,8 +314,8 @@ extern "C" void fn_802F3D94(_EFT* self)
             return;
         }
         if (work->timer_0x30 < plw->field_0x59A || ((_EFT034_PL_CHARGE*)plw)->stage_0x597 > work->stage_0x43) {
-            copyVec3(&fx, &work->target_0x18);
-            copyVec3(&self->pos_0x18, &fx);
+            fx = work->target_0x18;
+            self->pos_0x18 = fx;
             fx.y = 5.0f + work->floor_0x48;
             EFT_GROUND_BURST(2, &fx, 1.2f, 0, plw->area_0x16, 1);
             if (self->area_0x44 == get_now_areano()) {
@@ -383,7 +378,7 @@ extern "C" void fn_802F3D94(_EFT* self)
             break;
         case 342:
             if (Pl_frame_check(plw, 1, 26.0f, 0.0f) != 0) {
-                copyVec3(&fx, &work->target_0x18);
+                fx = work->target_0x18;
                 fx.y = 5.0f + work->floor_0x48;
                 EFT_GROUND_BURST(2, &fx, 0.6f, 0, plw->area_0x16, 1);
                 EFT_GROUND_BURST(1, &fx, 0.6f, 0, plw->area_0x16, 1);
@@ -402,7 +397,7 @@ extern "C" void fn_802F3D94(_EFT* self)
         eft034_orb_move(self);
         break;
     case 3:
-        copyVec3(&wander, &work->vel_0x0C);
+        wander = work->vel_0x0C;
         if ((s32)work->scaled_0x40 == 0) {
             vec3_scale_in_place(&wander, 0.2f);
             rotVecY(&wander, (ran_suu(0) & 0x7FFF) - 0x4000);
@@ -410,7 +405,7 @@ extern "C" void fn_802F3D94(_EFT* self)
             vec3_scale_in_place(&wander, 0.5f);
             rotVecY(&wander, (ran_suu(0) & 0x3FFF) - 0x2000);
         }
-        addVec3To(&work->vel_0x0C, &wander);
+        work->vel_0x0C += wander;
         if (vec3_len((f32*)&work->vel_0x0C) > 400.0f) {
             vec3_normalize_into(&work->vel_0x0C, &work->vel_0x0C);
             vec3_scale_in_place(&work->vel_0x0C, 400.0f);
@@ -423,7 +418,7 @@ extern "C" void fn_802F3D94(_EFT* self)
             work->gravity_0x38 = 1.0f;
         }
         if ((self->timer_0x0C & 7) == 0) {
-            copyVec3(&fx, &self->pos_0x18);
+            fx = self->pos_0x18;
             fx.y = work->target_0x18.y;
             EFT_GROUND_BURST(2, &fx, 1.2f, 0, plw->area_0x16, 1);
             EFT_GROUND_BURST(1, &fx, 1.2f, 0, plw->area_0x16, 1);
@@ -434,9 +429,9 @@ extern "C" void fn_802F3D94(_EFT* self)
         eft034_orb_move(self);
         dist = vec3_distance(&self->pos_0x18, &work->target_0x18);
         if (dist > 100.0f) {
-            copyVec3(&wander, &VEC3_SUB(&self->pos_0x18, &work->target_0x18));
+            wander = *(&(self->pos_0x18 - work->target_0x18));
             vec3_scale_in_place(&wander, 100.0f / dist);
-            copyVec3(&self->pos_0x18, &VEC3_ADD(&work->target_0x18, &wander));
+            self->pos_0x18 = *(&(work->target_0x18 + wander));
         }
         switch (Get_motion_no(plw)) {
         case 340:
@@ -444,7 +439,7 @@ extern "C" void fn_802F3D94(_EFT* self)
         case 341:
             if (Pl_frame_check(plw, 1, 16.0f, 0.0f) != 0) {
                 work->phase_0x41 = 0;
-                copyVec3(&fx, &self->pos_0x18);
+                fx = self->pos_0x18;
                 fx.y = 5.0f + work->floor_0x48;
                 eft034_throw_start(self, 0);
                 EFT_GROUND_BURST(2, &fx, 2.5f, 0, plw->area_0x16, 1);
@@ -555,7 +550,7 @@ extern "C" void fn_802F3D94(_EFT* self)
     for (i = 0; i < 2; i++) {
         work->models_0x04[0]->setTevKColor(i, (_GXTevKColorID)3, &col);
     }
-    copyVec3(&work->models_0x04[0]->pos_0x04, &self->pos_0x18);
+    work->models_0x04[0]->pos_0x04 = self->pos_0x18;
     work->models_0x04[0]->field_0x2C = self->rot_0x24.y;
     eft034_ray_flicker(self);
     work->models_0x04[0]->move(0);
@@ -587,10 +582,6 @@ extern "C" void eft034_ray_flicker(_EFT* self)
     u32 ang_x;
     u32 ang_y;
 
-    VEC3_ctor(&tip);
-    VEC3_ctor(&dir);
-    VEC3_ctor(&unused);
-    MTX34_ctor(&mtx);
     if ((s32)self->field_0x06 == 3) {
         if ((s32)work->ray_on_0x42 == 0) {
             if ((ran_suu(0) & 7) == 0) {
@@ -605,7 +596,7 @@ extern "C" void eft034_ray_flicker(_EFT* self)
     }
     if (work->ray_on_0x42 == 1) {
         eft034_ray_origin_get(self, &tip);
-        copyVec3(&dir, &VEC3_SUB(&self->pos_0x18, &tip));
+        dir = *(&(self->pos_0x18 - tip));
         len = vec3_len((f32*)&dir);
         mtx34_identity(&mtx);
         calcVecAngXY(&dir, &ang_x, &ang_y);
@@ -625,14 +616,10 @@ extern "C" void eft034_ray_origin_get(_EFT* self, nw4r::math::VEC3* out)
     _PLW* plw = (_PLW*)self->source_0x30;
     nw4r::math::MTX34 joint;
     nw4r::math::MTX34 rot;
-    nw4r::math::VEC3 base;
-    nw4r::math::VEC3 tip;
     s32 pose;
 
-    MTX34_ctor(&joint);
-    MTX34_ctor(&rot);
-    VEC3_ctor(&base);
-    VEC3_ctor(&tip);
+    nw4r::math::VEC3 base;
+    nw4r::math::VEC3 tip;
     switch (Get_motion_no(plw)) {
     case 0x154:
         if (Pl_frame_check(plw, 2, 20.0f, 0.0f) != 0) {
@@ -706,9 +693,6 @@ extern "C" void eft034_throw_start(_EFT* self, u8 phase)
     Eft034Work* work;
     f32 dist;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     plw = (_PLW*)self->source_0x30;
     work = (Eft034Work*)self->work_0x38;
     work->phase_0x41 = phase;
@@ -716,7 +700,7 @@ extern "C" void eft034_throw_start(_EFT* self, u8 phase)
     ofs.y = 140.0f;
     ofs.z = 100.0f;
     rotVecY(&ofs, plw->field_0x058);
-    copyVec3(&work->target_0x18, &VEC3_ADD(&plw->vec_0x03C, &ofs));
+    work->target_0x18 = *(&(plw->vec_0x03C + ofs));
     self->field_0x06 = 4;
     from.x = self->pos_0x18.x;
     from.y = 0.0f;
@@ -727,12 +711,12 @@ extern "C" void eft034_throw_start(_EFT* self, u8 phase)
     switch (work->phase_0x41) {
     case 0:
         work->gravity_0x38 = -2.0f;
-        copyVec3(&ofs, &VEC3_SUB(&to, &from));
+        ofs = *(&(to - from));
         dist = vec3_len((f32*)&ofs);
         if (dist > 0.001f) {
             vec3_normalize_into(&ofs, &ofs);
             dist = dist / 35.0f;
-            copyVec3(&work->vel_0x0C, &VEC3_SCALE(&ofs, dist));
+            work->vel_0x0C = *(&(ofs * dist));
             work->vel_0x0C.y = (work->target_0x18.y - self->pos_0x18.y) / 35.0f - 35.0f * (0.5f * work->gravity_0x38);
         } else {
             work->vel_0x0C.y = 0.0f;
@@ -740,12 +724,12 @@ extern "C" void eft034_throw_start(_EFT* self, u8 phase)
         break;
     case 1:
         work->gravity_0x38 = -1.0f;
-        copyVec3(&ofs, &VEC3_SUB(&to, &from));
+        ofs = *(&(to - from));
         dist = vec3_len((f32*)&ofs);
         if (dist > 0.001f) {
             vec3_normalize_into(&ofs, &ofs);
             dist = dist / 27.0f;
-            copyVec3(&work->vel_0x0C, &VEC3_SCALE(&ofs, dist));
+            work->vel_0x0C = *(&(ofs * dist));
             work->vel_0x0C.y = (work->target_0x18.y - self->pos_0x18.y) / 27.0f - 27.0f * (0.5f * work->gravity_0x38);
         } else {
             work->vel_0x0C.y = 0.0f;
@@ -764,7 +748,7 @@ extern "C" void eft034_orb_move(_EFT* self)
 {
     Eft034Work* work = (Eft034Work*)self->work_0x38;
 
-    addVec3To(&self->pos_0x18, &work->vel_0x0C);
+    self->pos_0x18 += work->vel_0x0C;
     work->vel_0x0C.y += work->gravity_0x38;
 }
 

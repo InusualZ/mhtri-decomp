@@ -13,7 +13,7 @@
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resnode.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 
 #pragma pool_data off
 
@@ -39,7 +39,6 @@ s32 res_node_is_valid(const ResHandle* pSelf);                     /* owner: src
 void* res_handle_ptr(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
 ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 ResNodeData* res_node_ref_nonconst(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
-VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/g3d_anmscn.cpp */
 void mtx34_rot_xyz_deg(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
 void* res_user_data_ctor(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
 }
@@ -83,13 +82,12 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
                 } else {
                     flags &= ~0x10;
                 }
-                copyVec3((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
+                *(VEC3*)pResult->scale = *((const VEC3*)pData->mScale);
                 flags &= ~0xA;
             }
         }
         if ((flags & 0x100) != 0) {
-            VEC3 translate;
-            setVec3(&translate, pResult->mtx[3], pResult->mtx[7], pResult->mtx[11]);
+            VEC3 translate(pResult->mtx[3], pResult->mtx[7], pResult->mtx[11]);
             if ((pData->mFlags & 0x4) != 0) {
                 mtx34_identity((MTX34*)pResult->mtx);
                 flags |= 0x20;
@@ -146,14 +144,13 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
             if ((dataFlags & 0x10) != 0) {
                 flags |= 0x10;
             }
-            copyVec3((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
+            *(VEC3*)pResult->scale = *((const VEC3*)pData->mScale);
         }
         if ((pData->mFlags & 0x4) != 0) {
             mtx34_identity((MTX34*)pResult->mtx);
             flags |= 0x20;
         } else {
-            VEC3 rotate;
-            copyVec3((VEC3*)pResult->rotate, vec3_copy_construct(&rotate, (const VEC3*)pData->mRotate));
+            *(VEC3*)pResult->rotate = VEC3(*(const nw4r::math::_VEC3*)pData->mRotate);
             mtx34_rot_xyz_deg(pResult->mtx, pData->mRotate[0], pData->mRotate[1], pData->mRotate[2]);
         }
         if ((pData->mFlags & 0x2) != 0) {

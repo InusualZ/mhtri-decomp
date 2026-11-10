@@ -670,7 +670,7 @@ struct HbmCursorInput {
     /* +0x0120 */ s32 nodeValue;            /* the node's word, cleared when a touch places the caret */
     /* +0x0124 */ u8 unused_0x0124[0x17D4];
     /* +0x18F8 */ nw4r::ut::Rect textRect;  /* the text box on the screen */
-    /* +0x1908 */ nw4r::math::MTX34 textMtx;
+    /* +0x1908 */ nw4r::math::_MTX34 textMtx;
     /* +0x1938 */ u8 unused_0x1938[0x04];
     /* +0x193C */ HbmCursorFieldView* textField;
     /* +0x1940 */ HbmCursorFieldView* candidateList;
@@ -707,14 +707,14 @@ struct HbmCursorInput {
     /* +0x1B0C */ f32 touchLineTop;         /* the touched line's top */
     /* +0x1B10 */ s32 rows;
     /* +0x1B14 */ nw4r::ut::Rect buttonRect;           /* the text box button on the screen */
-    /* +0x1B24 */ nw4r::math::VEC3 buttonTranslate;    /* the button pane's laid-out translation */
+    /* +0x1B24 */ nw4r::math::_VEC3 buttonTranslate;    /* the button pane's laid-out translation */
     /* +0x1B30 */ f32 buttonWidth;
     /* +0x1B34 */ f32 buttonHeight;
-    /* +0x1B38 */ nw4r::math::VEC3 textBoxTranslate;   /* the text box pane's laid-out translation */
+    /* +0x1B38 */ nw4r::math::_VEC3 textBoxTranslate;   /* the text box pane's laid-out translation */
     /* +0x1B44 */ f32 textBoxWidth;
     /* +0x1B48 */ f32 textBoxHeight;
-    /* +0x1B4C */ nw4r::math::MTX34 buttonMtx;
-    /* +0x1B7C */ nw4r::math::MTX34 textBoxMtx;
+    /* +0x1B4C */ nw4r::math::_MTX34 buttonMtx;
+    /* +0x1B7C */ nw4r::math::_MTX34 textBoxMtx;
     /* +0x1BAC */ u32 scroll_1BAC;
     /* +0x1BB0 */ u8 unused_0x1BB0[0x1C];
     /* +0x1BCC */ HbmCursorPopupView* popup;
@@ -1441,7 +1441,7 @@ void fn_80568004(KbObject* self, f32 value)
 }
 
 /* Returns the screen point of the rectangle's bottom-left corner under the matrix (y up). */
-static inline Vec2f hbmKbCursorRectOrigin(const nw4r::math::MTX34& mtx, const nw4r::ut::Rect& rect)
+static inline Vec2f hbmKbCursorRectOrigin(const nw4r::math::_MTX34& mtx, const nw4r::ut::Rect& rect)
 {
     Vec corner;
     Vec2f origin;
@@ -1478,7 +1478,7 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
         hbmKbCursorPlacePane(self->textBoxButtonPane, HbmCursorPoint(self->buttonTranslate.x, y));
     }
     self->textBoxButtonPane->CalculateMtx(self->drawInfo);
-    self->manager()->calcDrawMtx(&self->buttonMtx, self->drawInfo, &self->textBoxButtonPane->mGlbMtx);
+    self->manager()->calcDrawMtx((nw4r::math::MTX34*)&self->buttonMtx, self->drawInfo, (const nw4r::math::MTX34*)&self->textBoxButtonPane->mGlbMtx);
     {
         nw4r::ut::Rect rect;
         Vec2f scale;
@@ -1505,8 +1505,8 @@ void hbmKbCursorUpdate(HbmCursorInput* self)
     self->textBoxPane->mSize = nw4r::lyt::Size(self->textBoxPane->mSize.width, textHeight);
     hbmKbCursorPlacePane(self->textBoxPane, HbmCursorPoint(self->textBoxTranslate.x, textTop));
     self->textBoxPane->CalculateMtx(self->drawInfo);
-    self->manager()->calcDrawMtx(&self->textBoxMtx, self->drawInfo, &self->textBoxPane->mGlbMtx);
-    self->manager()->calcDrawMtx(&self->textMtx, self->drawInfo, &self->textBoxPane->mGlbMtx);
+    self->manager()->calcDrawMtx((nw4r::math::MTX34*)&self->textBoxMtx, self->drawInfo, (const nw4r::math::MTX34*)&self->textBoxPane->mGlbMtx);
+    self->manager()->calcDrawMtx((nw4r::math::MTX34*)&self->textMtx, self->drawInfo, (const nw4r::math::MTX34*)&self->textBoxPane->mGlbMtx);
     self->textRect = self->textBoxPane->GetPaneRect(self->drawInfo);
     self->textAlpha = self->textBoxPane->mAlpha;
 

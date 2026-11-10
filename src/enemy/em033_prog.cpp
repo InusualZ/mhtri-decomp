@@ -231,12 +231,10 @@ s32 em033_turn_rate_a = 0x80;
 s32 em033_turn_rate_b = 0x80;
 
 void em033_reset(struct _ENEMY_WORK* self) {
-    nw4r::math::VEC3 one;
-
     self->em033_0x328.color_0x340[2] = 0x7F;
     self->em033_0x328.color_0x340[1] = 0x7F;
     self->em033_0x328.color_0x340[0] = 0x7F;
-    copyVec3(&self->em033_0x328.scale_0x348, setVec3(&one, 1.0f, 1.0f, 1.0f));
+    self->em033_0x328.scale_0x348 = VEC3(1.0f, 1.0f, 1.0f);
     self->em033_0x328.color_mode_0x339 = 0;
     self->em033_0x328.color_step_0x338 = 0;
     self->em033_0x328.timer_0x328 = 0;
@@ -336,7 +334,7 @@ void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
             id = em033_roster_pick(self, 0);
             if (id != 0xFF) {
                 self->em033_0x328.record_0x33B = id;
-                copyVec3(&self->vec_0x36C, em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no));
+                self->vec_0x36C = *em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
                 em_reaction_req(self, 6, 0xFF, 0);
                 em_motion_kind_set(self, 5, 1);
             }
@@ -346,7 +344,7 @@ void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
             id = em033_roster_pick(self, 0);
             if (id != 0xFF) {
                 self->em033_0x328.record_0x33B = id;
-                copyVec3(&self->vec_0x36C, em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no));
+                self->vec_0x36C = *em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
                 em_reaction_req(self, 6, 0xFF, 0);
                 em_motion_kind_set(self, 5, 1);
             }
@@ -356,7 +354,7 @@ void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
             id = em033_roster_pick(self, 0);
             if (id != 0xFF) {
                 self->em033_0x328.record_0x33B = id;
-                copyVec3(&self->vec_0x36C, em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no));
+                self->vec_0x36C = *em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
                 em_reaction_req(self, 6, 0xFF, 0);
                 em_motion_kind_set(self, 5, 1);
             }
@@ -366,7 +364,7 @@ void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
             id = em033_roster_pick(self, 0);
             if (id != 0xFF) {
                 self->em033_0x328.record_0x33B = id;
-                copyVec3(&self->vec_0x36C, em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no));
+                self->vec_0x36C = *em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
                 em_reaction_req(self, 6, 0xFF, 0);
                 em_motion_kind_set(self, 5, 1);
             }
@@ -597,7 +595,6 @@ void em033_act1_13(struct _ENEMY_WORK* self) {
 void em033_act1_14(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_frame_flag_set(self);
     em_busy_timer_reset(self);
     em_fx_flag_set(self);
@@ -747,11 +744,8 @@ void em033_act2_1(struct _ENEMY_WORK* self, u8 reach, u8 fast) {
 void em033_act2_2(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 dir;
-    nw4r::math::VEC3 back;
     s32 i;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0:
         self->state++;
@@ -765,8 +759,7 @@ void em033_act2_2(struct _ENEMY_WORK* self) {
                 if (self->slots_0x244[i].flags & 8) {
                     em_action_finish(self);
                     em_fx_flag_set(self);
-                    vec3_scale(&back, &self->slots_0x244[i].vec, -1.0f);
-                    copyVec3(&dir, &back);
+                    dir = self->slots_0x244[i].vec * -1.0f;
                     self->field_0x1C0 = calcVecAng3(&dir);
                     break;
                 }
@@ -785,38 +778,32 @@ void em033_act2_3(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 shift;
     nw4r::math::VEC3 param;
     nw4r::math::VEC3 point;
-    nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 step;
 
-    VEC3_ctor(&shift);
-    VEC3_ctor(&param);
-    VEC3_ctor(&point);
     em_fx_flag_set(self);
     em_busy_set(self);
     em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
-        copyVec3(&param, &self->move_param_0x21C);
+        param = self->move_param_0x21C;
         em_fall_height_get(self);
         em_fall_start(self);
         em_move_sub_mode_set(self, 1);
-        subVec3(&diff, &param, &self->move_param_0x21C);
-        copyVec3(&shift, &diff);
+        shift = param - self->move_param_0x21C;
         shift.y = 0.0f;
         rotVecY(&shift, self->field_0x1C0);
         self->pos.x += shift.x;
         self->pos.z += shift.z;
         vec3_scale_in_place(&shift, -1.0f);
-        copyVec3(&self->em033_0x328.vec_0x32C, &shift);
+        self->em033_0x328.vec_0x32C = shift;
         em_move_vec_set_c1(self, *(Vec*)&shift);
         em_mot_set_ck(self, 3, 2, 0);
         self->timer_0x020 = 11;
         break;
     case 1:
         if (self->timer_0x020 > 0) {
-            vec3_div(&step, &self->em033_0x328.vec_0x32C, self->timer_0x020);
-            vec3_sub_assign((Vec*)&self->em033_0x328.vec_0x32C, (Vec*)&step);
+            vec3_sub_assign((Vec*)&self->em033_0x328.vec_0x32C,
+                            (Vec*)&static_cast<const nw4r::math::VEC3&>(self->em033_0x328.vec_0x32C / self->timer_0x020));
             em_move_vec_set_c1(self, *(Vec*)&self->em033_0x328.vec_0x32C);
             self->timer_0x020--;
         }
@@ -841,7 +828,7 @@ void em033_act2_3(struct _ENEMY_WORK* self) {
         em_flag_0x116_set(self);
         setVector3(&shift, 0.0f, 0.0f, 2.0f);
         rotVecY(&shift, self->field_0x1C0);
-        copyVec3(&self->offset_0x30C.vec_0x310, &shift);
+        self->offset_0x30C.vec_0x310 = shift;
         em_move_offset_apply(self);
         self->field_0x1BC += 0x38E;
         if (self->field_0x1BC < 0x1000) {
@@ -871,8 +858,6 @@ void em033_act2_4(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     em_fx_flag_set(self);
     switch (self->state) {
     case 0:
@@ -894,9 +879,6 @@ void em033_act2_5(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 b;
     nw4r::math::VEC3 point;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
-    VEC3_ctor(&point);
     em_fx_flag_set(self);
     em_busy_set(self);
     em_frame_flag_set(self);
@@ -1026,7 +1008,6 @@ void em033_act2_dispatch(struct _ENEMY_WORK* self) {
 void em033_act7_0(struct _ENEMY_WORK* self, u8 lunge) {
     nw4r::math::VEC3 a;
 
-    VEC3_ctor(&a);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1085,9 +1066,7 @@ void em033_act7_1(struct _ENEMY_WORK* self, u8 lunge) {
 
 void em033_act7_2(struct _ENEMY_WORK* self) {
     EmSpawnRec rec;
-    nw4r::math::VEC3 offset;
 
-    em_spawn_rec_init(&rec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1097,7 +1076,7 @@ void em033_act7_2(struct _ENEMY_WORK* self) {
     case 1:
         if (em_frame_check(self, 0, 92.0f, 0.0f) == 1) {
             rec.id = 0x17;
-            copyVec3(&rec.pos, setVec3(&offset, 0.0f, -10.0f, -20.0f));
+            rec.pos = VEC3(0.0f, -10.0f, -20.0f);
             rec.field_0x10 = 0;
             rec.field_0x12 = 0;
             rec.field_0x14 = 0;
@@ -1370,7 +1349,6 @@ void em033_act12_1(struct _ENEMY_WORK* self) {
 void em033_act12_2(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_fx_flag_set(self);
     em_frame_flag_set(self);
     switch (self->state) {
@@ -1464,7 +1442,6 @@ void em033_color_update(struct _ENEMY_WORK* self) {
     GXColor hold_4 = {0xAA, 0xB4, 0xA0, 0x00};
     GXColor hold_2 = {0x7F, 0xC3, 0x53, 0x00};
     GXColor hold_3 = {0x37, 0xA6, 0xCC, 0x00};
-    nw4r::math::VEC3 one;
     s32 step;
     f32 scale;
 
@@ -1508,7 +1485,7 @@ void em033_color_update(struct _ENEMY_WORK* self) {
         self->em033_0x328.timer_0x328 = 0;
         self->em033_0x328.color_mode_0x339 = 0;
         self->em033_0x328.color_step_0x338 = 0;
-        copyVec3(&self->em033_0x328.scale_0x348, setVec3(&one, 1.0f, 1.0f, 1.0f));
+        self->em033_0x328.scale_0x348 = VEC3(1.0f, 1.0f, 1.0f);
     }
 }
 
@@ -1532,12 +1509,7 @@ void em033_tev_color_update(struct _ENEMY_WORK* self) {
 u8 em033_state_ck(_ENEMY_WORK* self, u8 mode) {
     VEC3 a;
     VEC3 b;
-    VEC3 c2;
-    VEC3 c3;
-    VEC3 c5;
 
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
     switch (mode) {
     case 0:
         return self->field_0x1E4;
@@ -1545,20 +1517,17 @@ u8 em033_state_ck(_ENEMY_WORK* self, u8 mode) {
         return self->em033_0x328.attack_kind_0x33E;
     case 2:
         em033_point_get(self, 0, &a);
-        subVec3(&c2, &a, &self->pos);
-        copyVec3(&b, &c2);
+        b = a - self->pos;
         return vec3_len((const f32*)&b) <= 150.0f;
     case 3:
         em033_point_get(self, 1, &a);
-        subVec3(&c3, &a, &self->pos);
-        copyVec3(&b, &c3);
+        b = a - self->pos;
         return vec3_len((const f32*)&b) <= 250.0f;
     case 4:
         return self->em033_0x328.phase_0x33F;
     case 5:
         em033_point_get(self, 2, &a);
-        subVec3(&c5, &a, &self->pos);
-        copyVec3(&b, &c5);
+        b = a - self->pos;
         return vec3_len((const f32*)&b) <= 100.0f;
     case 6:
         return em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no) != 0;
@@ -1684,7 +1653,6 @@ u8 em033_roster_pick(_ENEMY_WORK* self, u8 a) {
     u8 buf[0x10];
     nw4r::math::VEC3 hit;
     nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 tmp;
     u8* p;
     nw4r::math::VEC3* aim;
     s32 i;
@@ -1695,8 +1663,6 @@ u8 em033_roster_pick(_ENEMY_WORK* self, u8 a) {
     u8 best;
     u8 prev;
 
-    VEC3_ctor(&hit);
-    VEC3_ctor(&diff);
     best = 0xFF;
     n = em_roster_kind_collect(self->area_no, buf, 0x10);
     if (n > 0x10) {
@@ -1712,8 +1678,7 @@ u8 em033_roster_pick(_ENEMY_WORK* self, u8 a) {
                 aim = em_roster_kind_aim_pos_get(*p, self->area_no);
                 if (aim != NULL) {
                     if (findInterSection(&self->pos, aim, &hit, 1, 0xFFFF, self->area_no, em_hit_mask_get(self), 0) > 0) {
-                        subVec3(&tmp, &hit, aim);
-                        copyVec3(&diff, &tmp);
+                        diff = hit - *aim;
                         len = vec3_len((const f32*)&diff);
                         if (len > em_roster_record_get(*p)->radius_0x1F0) {
                             break;
@@ -1878,7 +1843,7 @@ void em033_target_lock(_ENEMY_WORK* self, u8 a) {
 
     if (id != 0xFF) {
         self->em033_0x328.record_0x33B = id;
-        copyVec3(&self->vec_0x36C, em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no));
+        self->vec_0x36C = *em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
         em_reaction_req(self, 6, 0xFF, 0);
         em_motion_kind_set(self, 5, 1);
     } else {
@@ -1896,23 +1861,19 @@ void em033_target_lock(_ENEMY_WORK* self, u8 a) {
 void em033_target_track(_ENEMY_WORK* self) {
     nw4r::math::VEC3 hit;
     nw4r::math::VEC3 diff;
-    nw4r::math::VEC3 tmp;
     nw4r::math::VEC3* aim;
     f32 len;
 
-    VEC3_ctor(&hit);
-    VEC3_ctor(&diff);
     if (em033_record_area_ck(self->em033_0x328.record_0x33B, self->area_no) == 1) {
         aim = em_roster_kind_aim_pos_get(self->em033_0x328.record_0x33B, self->area_no);
         if (findInterSection(&self->pos, aim, &hit, 1, 0xFFFF, self->area_no, em_hit_mask_get(self), 0) > 0) {
-            subVec3(&tmp, &hit, aim);
-            copyVec3(&diff, &tmp);
+            diff = hit - *aim;
             len = vec3_len((const f32*)&diff);
             if (len > em_roster_record_get(self->em033_0x328.record_0x33B)->radius_0x1F0) {
                 return;
             }
         }
-        copyVec3(&self->vec_0x36C, aim);
+        self->vec_0x36C = *aim;
         em_reaction_req(self, 6, 0xFF, 0);
         self->em033_0x328.phase_0x33F = 2;
     } else {
@@ -2005,10 +1966,9 @@ void Em033UserData::Attach() {
  * nodes 5/6 by 1.5 while the work's +0x00A flag is set. */
 void Em033UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* b, nw4r::g3d::ResMdl mdl,
                                   nw4r::g3d::FuncObjCalcWorld* pFuncObj, u32 e, UserDataItem* item) {
-    VEC3 v;
     struct EmAimSource* p = (struct EmAimSource*)this->work;
 
-    VEC3_ctor(&v);
+    VEC3 v;
     if ((s32)item->field_0x04 == 0xFF) {
         switch (e) {
         case 0x17:
@@ -2051,17 +2011,17 @@ void em035_init(_ENEMY_WORK* self, u8 a) {
         }
         self->field_0x1CC = 0.8f;
         if (run->flags & 1) {
-            copyVec3(&self->pos, &run->pos);
+            self->pos = run->pos;
             self->field_0x1C0 = run->angle;
         } else {
             run->angle = (u16)self->field_0x1C0;
-            copyVec3(&run->pos, &self->pos);
+            run->pos = self->pos;
         }
         em_state_refresh(self);
         break;
     case 0:
         if (self->field_0x00A != 0) {
-            copyVec3(&self->pos, &run->pos);
+            self->pos = run->pos;
             self->field_0x1C0 = run->angle;
         }
         break;

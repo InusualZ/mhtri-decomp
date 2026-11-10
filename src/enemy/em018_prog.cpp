@@ -76,8 +76,9 @@
 #include "ef/mtx34_trans_add.h" /* mtx34_trans_add (rule 2: the owner's header) */
 #include "ef/mtx34_trans_get.h" /* mtx34_trans_get (rule 2: the owner's header) */
 #include "types.h"
+#include "Pl/pl_hit_sphere.h" /* PlSphere (rule 1) */
 #include "nw4r/math.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "enemy/em016_prog_types.h"
 #include "enemy/ENEMY_WORK.h"
@@ -101,7 +102,7 @@
 #include "Pl/Pl_master_ck.h"     /* Pl_act_ck */
 #include "Pl/fn_80273B14.h"     /* fn_802754C0 */
 #include "enemy/em_model.h"     /* em_roster_record_release / em_roster_slot_effect_set */
-#include "g3d/g3d_calcworld.h"  /* addVec3To */
+#include "g3d/g3d_calcworld.h"  /* VEC3::operator+= */
 #include "sound/fn_800D7F54.h"   /* se_req_pos_ps */
 #include "stage/stg_w.h"        /* get_now_areano */
 #include "enemy/em_se_record.h"  /* EmSeEntry */
@@ -122,7 +123,6 @@
 #include "menu/hit_list_capsule_ck.h" /* hit_list_capsule_ck */
 #include "ef/effect.h"            /* eft_vec_ctor */
 #include "ef/eft022_spawn.h"      /* eft022_spawn */
-#include "ef/eft_capsule_ctor.h"   /* eft_capsule_ctor */
 #include "enemy/em_roll_cooldown_ck.h" /* em_roll_cooldown_ck */
 #include "g3d/anm_chr_result_scale_get.h" /* anm_chr_result_scale_get / _trans_get / _scale_set / _trans_set */
 #include "camera/camera_mode12_set.h" /* camera_mode12_set */
@@ -134,7 +134,6 @@
 #define mtx34_trans_add_c1 ((void (*)(MTX34*, VEC3*))mtx34_trans_add)
 #define mtx34_trans_get_c1 ((void (*)(MTX34*, VEC3*))mtx34_trans_get)
 #define eft026_pl_spawn_c1 ((void (*)(struct _ENEMY_WORK*, u8, nw4r::math::VEC3*, u32, f32))eft026_pl_spawn)
-#define assignVec3_c1 ((void (*)(VEC3*, VEC3*))assignVec3)
 #define em_water_check_c1 ((u32 (*)(struct _ENEMY_WORK*))em_water_check)
 #define em_fall_height_get_c1 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
 #define em_fall_start_c1 ((void (*)(struct _ENEMY_WORK*, f32))em_fall_start)
@@ -155,10 +154,6 @@
 typedef void (*Em018ShellJobFn)(struct _ENEMY_WORK* self, u32 kind, u32 count, VEC3* pos, f32 scale, u16 id);
 /* The spin's capsule-hit record: `eft_vec_ctor` zeroes its point and `hit_list_capsule_ck` writes the hit point
  * into it; the frame reserves 0x10 bytes for it (the layout `ef/effect.cpp`'s `EftSphere` gives). size: 0x10 */
-struct Em018HitSphere {
-    /* +0x00 */ VEC3 center;
-    /* +0x0C */ f32 radius;
-};
 /* the effect spawners with the float-first order the call sites evaluate (the owner header lists it last) */
 #define em_eft_fx_spawn_ff ((void (*)(struct _ENEMY_WORK*, u32, u32, f32, u32))em_eft_fx_spawn)
 #define em_eft_fx_spawn_pair_ff ((void (*)(struct _ENEMY_WORK*, u32, u32, u32, f32, u32))em_eft_fx_spawn_pair)
@@ -402,21 +397,14 @@ extern "C" const u32 em018_turn_desc_d[16] = {
 u32 em018_se_seq_B2_end_arg[2] = {0x0AE40000, 0x00000000};
 
 /* The unit's `.bss`: a pair of model-space points the sound record `em018_se_rec_34_1` shifts by, built by MWCC's
- * `__sinit_\em018_prog_cpp` (each vector is set through `setVec3` into a temporary and copied with `assignVec3`).
+ * `__sinit_\em018_prog_cpp` (each vector is constructed into a temporary and copied, `EmSeShift`).
  * The name is a GUESS.  size: 0x18 */
 struct Em018SegPoints {
-    /* +0x00 */ VEC3 hi;
-    /* +0x0C */ VEC3 lo;
+    /* +0x00 */ EmSeShift hi;
+    /* +0x0C */ EmSeShift lo;
 
     /* Builds (0, 54, 0) and (0, -2.4, 0). */
-    Em018SegPoints()
-    {
-        VEC3 b;
-        VEC3 a;
-
-        assignVec3_c1(&hi, setVec3(&a, 0.0f, 54.0f, 0.0f));
-        assignVec3_c1(&lo, setVec3(&b, 0.0f, -2.4f, 0.0f));
-    }
+    Em018SegPoints() : hi(0.0f, 54.0f, 0.0f), lo(0.0f, -2.4f, 0.0f) {}
 };
 
 Em018SegPoints em018_seg_points;  /* +0x806A7A70 */
@@ -504,9 +492,6 @@ void em018_aim_effect_fire(EmActWork* self) {
     VEC3 ofs;
     MTX34 mtx;
 
-    VEC3_ctor(&out);
-    VEC3_ctor(&ofs);
-    MTX34_ctor(&mtx);
     em_hit_window_set((struct _ENEMY_WORK*)self, 0, 0x12, 0x205);
     setVector3(&ofs, 0.0f, 0.0f, 500.0f);
     get_joint_wmat_em((struct _ENEMY_WORK*)self, 0x1A, &mtx);
@@ -527,14 +512,10 @@ void em018_aim_arm(struct _ENEMY_WORK* self_) {
 /* Initialises the aim record. */
 void em018_aim_init(EmActWork* self) {
     EmAimRec* rec = &self->aim_0x328;
-    VEC3 v1;
-    VEC3 v2;
 
     /* The aim record's +0x00 is read as a scalar, but retail copies a whole 3-float record over it. */
-    copyVec3((nw4r::math::VEC3*)&rec->angle_0x00,
-             setVec3(&v1, 1.0f, 1.0f, 1.0f));
-    copyVec3((nw4r::math::VEC3*)&rec->rot_0x10,
-             setVec3(&v2, 1.0f, 1.0f, 1.0f));
+    *(nw4r::math::VEC3*)&rec->angle_0x00 = VEC3(1.0f, 1.0f, 1.0f);
+    *(nw4r::math::VEC3*)&rec->rot_0x10 = VEC3(1.0f, 1.0f, 1.0f);
     rec->vec_0x1C.x = 0.0f;
     rec->vec_0x1C.y = 127.0f;
     rec->vec_0x1C.z = 255.0f;
@@ -557,7 +538,6 @@ void em018_aim_init(EmActWork* self) {
 void em018_init(struct _ENEMY_WORK* self, u8 mode) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     if (em_res_user_data_ck(self) == 0) {
         Em018UserData* data = (Em018UserData*)operator new(sizeof(Em018UserData));
         new (data) Em018UserData;
@@ -1093,7 +1073,6 @@ void em018_mot1b_step(struct _ENEMY_WORK* self) {
 void em018_wake_back_step(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1301,7 +1280,6 @@ void em018_climb_turn(struct _ENEMY_WORK* self) {
 void em018_wake_mot_step(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     switch (self->state) {
     case 0:
         self->state++;
@@ -1387,7 +1365,6 @@ void em018_mot3a_swim(struct _ENEMY_WORK* self) {
 void em018_leap(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1463,7 +1440,6 @@ void em018_mot3d_step(struct _ENEMY_WORK* self) {
 void em018_dive(struct _ENEMY_WORK* self, u32 a) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1513,7 +1489,6 @@ void em018_dive(struct _ENEMY_WORK* self, u32 a) {
 void em018_surface_splash(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     switch (self->state) {
     case 0:
@@ -1736,7 +1711,6 @@ void em018_release(struct _ENEMY_WORK* self) {
 void em018_knockback_arc(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em_busy_set(self);
     em_busy_timer_reset(self);
     switch (self->state) {
@@ -2468,8 +2442,6 @@ void em018_jaw_scan(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
     self->field_0x35B = 1;
     switch (self->state) {
     case 0:
@@ -2484,7 +2456,7 @@ void em018_jaw_scan(struct _ENEMY_WORK* self) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -50.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             eft022_spawn(self, &pos, self->area_no);
         }
         if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
@@ -2631,11 +2603,9 @@ void em018_mot59_step(struct _ENEMY_WORK* self) {
  * stores the clamped turn toward the target (at most 60 degrees) and turns through it while the motion runs. */
 void em018_tail_sweep(struct _ENEMY_WORK* self, u32 side, u32 aim) {
     VEC3 dir;
-    VEC3 diff;
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0: {
         u32 motion;
@@ -2656,8 +2626,7 @@ void em018_tail_sweep(struct _ENEMY_WORK* self, u32 side, u32 aim) {
         em_stamina_add(self, -0xC);
         if ((u8)aim == 1) {
             u32 turn;
-            subVec3(&diff, &self->vec_0x36C, &self->pos);
-            copyVec3(&dir, &diff);
+            dir = self->vec_0x36C - self->pos;
             calcVecAngXY(&dir, &pitch, &yaw);
             turn = (u16)(yaw - (u16)(self->field_0x1C0 + ((u8)side == 1 ? 0x4000 : 0xC000)));
             if (turn - 1 <= 0x7FFE) {
@@ -2745,11 +2714,9 @@ void em018_mot4e_hold(struct _ENEMY_WORK* self) {
  * (clamped to +-0x900), steps forward when `lunge == 1` and turns once more when `track == 1`. */
 void em018_bite(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
     VEC3 dir;
-    VEC3 diff;
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2766,8 +2733,7 @@ void em018_bite(struct _ENEMY_WORK* self, u32 lunge, u32 track) {
     case 1:
         if (em_frame_check(self, 3, 30.0f, 60.0f) == 1) {
             u16 rot;
-            subVec3(&diff, &self->vec_0x36C, &self->pos);
-            copyVec3(&dir, &diff);
+            dir = self->vec_0x36C - self->pos;
             calcVecAngXY(&dir, &pitch, &yaw);
             rot = em_angle_approach((u16)pitch, (u16)self->field_0x1BC, 0x100);
             self->field_0x1BC = rot;
@@ -2918,8 +2884,6 @@ void em018_jaw_effect(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -2931,7 +2895,7 @@ void em018_jaw_effect(struct _ENEMY_WORK* self) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -60.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             eft022_spawn(self, &pos, self->area_no);
         }
         if (em_frame_check(self, 0, 180.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
@@ -2948,18 +2912,15 @@ void em018_jaw_effect(struct _ENEMY_WORK* self) {
  * 0x52/0x53 by its side and turns through it while the motion runs. */
 void em018_side_swipe(struct _ENEMY_WORK* self) {
     VEC3 dir;
-    VEC3 diff;
     u32 pitch;
     u32 yaw;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0: {
         u32 turn;
         self->state++;
         em_move_mode_set(self, 2);
-        subVec3(&diff, &self->vec_0x36C, &self->pos);
-        copyVec3(&dir, &diff);
+        dir = self->vec_0x36C - self->pos;
         calcVecAngXY(&dir, &pitch, &yaw);
         turn = (u16)(yaw - self->field_0x1C0);
         if (turn < 0x2AAB) {
@@ -3034,8 +2995,6 @@ void em018_breach(struct _ENEMY_WORK* self) {
     VEC3 ofs;
     VEC3 pos;
 
-    VEC3_ctor(&ofs);
-    VEC3_ctor(&pos);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3191,8 +3150,6 @@ void em018_jaw_dim(struct _ENEMY_WORK* self) {
     VEC3 pos;
     VEC3 ofs;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&ofs);
     self->field_0x35B = 1;
     switch (self->state) {
     case 0:
@@ -3207,7 +3164,7 @@ void em018_jaw_dim(struct _ENEMY_WORK* self) {
             get_joint_wpos_em(self, 0x1A, &pos);
             setVector3(&ofs, 0.0f, 20.0f * get_em_scale(self), -50.0f * get_em_scale(self));
             rotVecY(&ofs, self->field_0x1C0);
-            addVec3To(&pos, &ofs);
+            pos += ofs;
             eft022_spawn(self, &pos, self->area_no);
         }
         if (em_frame_check(self, 0, 210.0f, 0.0f) == 1 && em018_aim_part_level_ck((EmActWork*)self) == 0) {
@@ -3228,7 +3185,6 @@ void em018_jaw_dim(struct _ENEMY_WORK* self) {
 void em018_lunge(struct _ENEMY_WORK* self) {
     VEC3 ofs;
 
-    VEC3_ctor(&ofs);
     switch (self->state) {
     case 0:
         self->state++;
@@ -3286,14 +3242,10 @@ void em018_lunge(struct _ENEMY_WORK* self) {
 void em018_spin(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
     VEC3 unused;
     VEC3 ofs;
-    Em018HitSphere hit;
-    nw4r::math::CAPSULE capsule;
+    PlSphere hit;
     f32 blend;
 
-    VEC3_ctor(&unused);
-    VEC3_ctor(&ofs);
-    eft_vec_ctor(&hit.center);
-    eft_capsule_ctor(&capsule);
+    nw4r::math::CAPSULE capsule;
     em_shake_req_set(self);
     switch (self->state) {
     case 0:
@@ -3355,7 +3307,7 @@ void em018_spin(struct _ENEMY_WORK* self, u32 alt, u32 reverse) {
             if (0.0f == self->offset_0x30C.vec_0x310.x && em_frame_check(self, 0, 50.0f, 0.0f) == 1) {
                 self->offset_0x30C.vec_0x310.x = 1.0f;
             }
-            if (self->offset_0x30C.vec_0x310.x > 0.0f && hit_list_capsule_ck(self->hit_0xA08, &capsule, &hit.center, 0) == 1 &&
+            if (self->offset_0x30C.vec_0x310.x > 0.0f && hit_list_capsule_ck(self->hit_0xA08, &capsule, &hit.pos, 0) == 1 &&
                 self->area_no == get_now_areano()) {
                 shell_se_req2(self->se_0xB14, &capsule, 7, self->field_0x01A);
             }
@@ -4226,9 +4178,7 @@ void em018_hunt_bite(struct _ENEMY_WORK* self) {
  * target that stops 600 short (at most 50 per frame), then picks the hunted-record chase or action 5's step 10. */
 void em018_closing_turn(struct _ENEMY_WORK* self) {
     VEC3 dir;
-    VEC3 diff;
 
-    VEC3_ctor(&dir);
     switch (self->state) {
     case 0: {
         u16 angle;
@@ -4237,8 +4187,7 @@ void em018_closing_turn(struct _ENEMY_WORK* self) {
         em_move_mode_set(self, 2);
         em_turn_seq_start(self, (void*)em018_turn_desc_b, 0, 1, 0);
         self->timer_0x020 = 0x32;
-        subVec3(&diff, &self->vec_0x36C, &self->pos);
-        copyVec3(&dir, &diff);
+        dir = self->vec_0x36C - self->pos;
         angle = calcVecAng3(&dir);
         dir.y = 0.0f;
         step = vec3_len((const f32*)&dir);
@@ -4317,8 +4266,6 @@ void em018_entrance(struct _ENEMY_WORK* self) {
     VEC3 vec;
     MTX34 mtx;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     switch (self->state) {
     case 0:
         self->state++;
@@ -4527,11 +4474,10 @@ void em018_action_dispatch(struct _ENEMY_WORK* self) {
  * work's own position at the +0x20C/+0x210 height), then `eft009_set_pos`, `eft009_spawn_at_joint`,
  * `eft_spawn_pos_in_area` or `eft_spawn_type11`. */
 void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s32 delta, f32 scale) {
-    VEC3 vec;
     u8 id;
 
     id = type;
-    VEC3_ctor(&vec);
+    VEC3 vec;
     switch (kind) {
     case 0:
         if ((self->field_0x228 & 6) != 0) {
@@ -4619,7 +4565,7 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
             }
         }
         if (joint == 0xFF) {
-            copyVec3(&vec, &self->pos);
+            vec = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &vec);
         }
@@ -4629,7 +4575,7 @@ void em018_effect_spawn(struct _ENEMY_WORK* self, u8 kind, u8 type, u32 joint, s
         return;
     case 2:
         if (joint == 0xFF) {
-            copyVec3(&vec, &self->pos);
+            vec = self->pos;
         } else {
             get_joint_wpos_em(self, joint, &vec);
         }
@@ -4647,8 +4593,6 @@ void em018_drip_effect(struct _ENEMY_WORK* self) {
     MTX34 mtx;
     u16 angle;
 
-    VEC3_ctor(&vec);
-    MTX34_ctor(&mtx);
     if (em_alt_mode_ck(self) == 0) {
         return;
     }
@@ -4700,7 +4644,6 @@ void em018_drip_effect(struct _ENEMY_WORK* self) {
 void em018_motion_events(struct _ENEMY_WORK* self) {
     VEC3 vec;
 
-    VEC3_ctor(&vec);
     em018_drip_effect(self);
     switch (em_get_mot_no(self)) {
     case 0x2:
@@ -5859,7 +5802,6 @@ void Em018UserData::CalcAnmItemEx(nw4r::g3d::ChrAnmResult* holder, nw4r::g3d::Re
     struct _ENEMY_WORK* work;
     EmFadeRec* rec;
 
-    VEC3_ctor(&vec);
     work = this->work;
     rec = &((EmActWork*)work)->fade_0x328;
     switch (item->field_0x04) {

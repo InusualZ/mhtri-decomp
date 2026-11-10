@@ -6,7 +6,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "mh3_pad/vec3.h"
+#include "nw4r/math.h" /* nw4r::math::VEC3 (rule 1) */
 #include "Pl/yure_joint_apply.h"
 
 #ifdef __cplusplus
@@ -88,10 +88,7 @@ struct YureWorld {
     /* +0x0C */ u8 unused_0x0C[0x1C];
 
     /* Points gravity straight down; MWCC's `__sinit` runs it for the file-scope `yure_world`. */
-    YureWorld()
-    {
-        setVec3(&gravity_0x00, 0.0f, -1.0f, 0.0f);
-    }
+    YureWorld() : gravity_0x00(0.0f, -1.0f, 0.0f) {}
 };
 
 extern YureWorld yure_world;

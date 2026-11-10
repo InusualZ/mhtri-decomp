@@ -73,7 +73,7 @@
  *   `IScnObjCallback` subclass, never stored by hand).  The array's `__sinit` (`lb_npc_static_init`), its ctor/dtor
  *   chain and the hook's destructor and CALC_MAT override are written as free functions with the retail bodies; the
  *   class form needs `_LB_NPC` +0x54 modelled as a `LbNpcChar` member and the `VEC3` constructor calls
- *   (`VEC3_ctor`) as member construction, so the `.ctors` word and both vtables stay unemitted.
+ *   as member construction, so the `.ctors` word and both vtables stay unemitted.
  *   18 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
  *  - `lb_arm_wrestle_step`: the opponent search's found path branches to the post-switch `step == 3` test where ours
  *    `return`s to the epilogue (one branch target); no goto-free spelling reaches it (playbook 217: MWCC threads no
@@ -94,11 +94,13 @@
  *  - `lb_npc_map_setup`: retail loads the record's first byte into r3 for the loop test;
  *  - `lb_npc_walk_blend_set`: retail stores the raw frame count where ours reuses the `extsh` copy;
  *  - `lb_player_menu_area_return`: the strength-reduced peer pointer and the counter are stepped in the other order;
- *  - `mhchar_construct` and the two constructors: above and on the flipcheck line.
+ *  - `lb_npc_ctor`/`lb_npc_char_ctor`/`MHchar::MHchar`: above and on the flipcheck line.
  *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata` claimed, not emitted; `.data` and `.sdata2` short of the claim (the
  *   tables and the float pool are written as literals and externs); `.text`/extab/extabindex short of the claim;
- *   `mhchar_construct` (MHchar's compiler-generated constructor in retail) builds its `nw4r::g3d::ResMdl` at +0x114
- *   with a placement `new`, which adds the `__nw__FUlPv` call and its null test retail's member construction lacks;
+ *   `MHchar::MHchar` builds its `nw4r::g3d::ResMdl` at +0x114 with a placement `new` (the `__nw__FUlPv` call and its
+ *   null test retail's member construction lacks) and constructs the +0x10 union's vector twice; `lb_npc_ctor` and
+ *   `lb_npc_char_ctor` build their vectors and the model body with placement `new` until `_LB_NPC`/`LbNpcChar` are
+ *   classes whose members construct themselves;
  *   90 functions are defined out of address order (the `.text` and `extabindex` order differ from the target's);
  *   lb_npc, lb_npc_func, lb_cat_name, lb_pig_name, lb_tr_flag_data, lb_item_get_data, lobby_hidden_flag and the
  *   `.data` tables other units read are not defined here.
@@ -169,7 +171,7 @@ typedef struct LbNpcChar {
     /* +0x16C */ LbNpcMatCallback callback_0x16C;
 } LbNpcChar;
 #include "lobby/lobby_w.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 #include "Network/network_pat_control.h" /* isNetCityMode (rule 2: its owner's header) */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "g3d/g3d_scnmdl.h"   /* g3d_root_model_bind, pRoot */
@@ -848,9 +850,7 @@ void* get_move_work_adrs(u8 idx);
 namespace s_801FBF78 {
 
 extern "C" {
-void em_land_data_init(LbNpcGround* out);
 void eft_rot_vec_copy(_CP_VECTOR* dst, _CP_VECTOR* src);
-void addVec3To(VEC3* a, VEC3* b);
 void mtx34_set_trans(nw4r::math::MTX34* m, VEC3* v);
 void lb_quest_board_effect_spawn(_LB_NPC* self, s32 kind, s32 joint, VEC3* offset, f32 scale);
 s8 my_player_no(void);
@@ -886,12 +886,10 @@ void lb_npc_ground_drop(_LB_NPC* self)
     VEC3 from;
     VEC3 to;
 
-    VEC3_ctor(&from);
-    VEC3_ctor(&to);
     if (self->field_0x22B == 0) {
-        copyVec3(&from, &self->field_0x01C);
+        from = self->field_0x01C;
         from.y += 48.0f;
-        copyVec3(&to, &self->pos_0x10);
+        to = self->pos_0x10;
         to.y += 48.0f;
         self->field_0x22A = coll_wall_slide(&from, &to, &self->pos_0x10, 0xFFFF, 0, 1, self->field_0x004);
     }
@@ -900,17 +898,14 @@ void lb_npc_ground_drop(_LB_NPC* self)
 /* 0x801FE2B4 - snaps the NPC onto the ground height below it and latches the ground attribute. */
 void lb_npc_ground_snap(_LB_NPC* self)
 {
-    LbNpcGround ground;
-    VEC3 a;
-    VEC3 b;
+    LandData ground;
     f32 height;
 
-    em_land_data_init(&ground);
-    VEC3_ctor(&a);
-    VEC3_ctor(&b);
+    VEC3 a;
+    VEC3 b;
     if (npc_ground_check(self, &self->pos_0x10, &ground, &height, 0xFFFF) == 1) {
         self->pos_0x10.y = self->field_0x034 = height;
-        self->field_0x230 = ground.attr_0x00;
+        self->field_0x230 = ground.field_0x00;
     }
 }
 
@@ -1063,7 +1058,7 @@ s32 lb_npc_talk_ok_npc23(u32 id)
 void lb_npc_npc23_state_save(_LB_NPC* self)
 {
     if (self->field_0x002 == 0x17) {
-        copyVec3(&lobby_w.npc_pos_0x058, &self->pos_0x10);
+        lobby_w.npc_pos_0x058 = self->pos_0x10;
         eft_rot_vec_copy(&lobby_w.npc_rot_0x064, &self->rot_0x028);
         lobby_w.npc_motion_0x070 = self->field_0x204;
         lobby_w.npc_motion_index_0x074 = self->field_0x208;
@@ -1134,12 +1129,11 @@ void lb_npc_joint_effect_spawn(_LB_NPC* self, u8 type, u32 joint, f32 scale)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (joint != 0xFF) {
         lb_npc_body(self)->get_joint_wpos(joint, &pos);
         pos.y = 5.0f + self->field_0x034;
     } else {
-        copyVec3(&pos, &self->pos_0x10);
+        pos = self->pos_0x10;
         pos.y = 5.0f + self->field_0x034;
     }
     eft004_set(type, &pos, scale, self->field_0x02C, self->field_0x004);
@@ -1153,9 +1147,6 @@ void lb_npc_motion_effects(_LB_NPC* self)
     VEC3 pos;
     nw4r::math::MTX34 mtx;
 
-    VEC3_ctor(&offset);
-    VEC3_ctor(&pos);
-    MTX34_ctor(&mtx);
     if (self->field_0x001 == 0) {
         return;
     }
@@ -1190,7 +1181,7 @@ void lb_npc_motion_effects(_LB_NPC* self)
                 cpSetRotMatrix(&self->rot_0x028, &mtx);
                 setVector3(&offset, 0.0f, 5.0f, 5.0f);
                 mulVecMatAddTrans(&offset, &mtx);
-                addVec3To(&pos, &offset);
+                pos += offset;
                 mtx34_set_trans(&mtx, &pos);
                 eft004_scaled_spawn(&pos, self->field_0x004, 1.0f);
             }
@@ -1281,7 +1272,7 @@ void lb_npc_motion_effects(_LB_NPC* self)
                     lb_npc_body(self)->get_joint_wpos(11, &pos);
                     setVector3(&offset, 0.0f, 0.0f, -50.0f);
                     rotVecY(&offset, self->field_0x02C);
-                    addVec3To(&pos, &offset);
+                    pos += offset;
                     pos.y = 5.0f + self->field_0x034;
                     eft004_set(1, &pos, 1.8f, self->field_0x02C, self->field_0x004);
                 }
@@ -1295,10 +1286,10 @@ void lb_npc_motion_effects(_LB_NPC* self)
                 }
                 if (fn_801FE1DC(self, 0, 124.0f, 0.0f) == 1 || fn_801FE1DC(self, 0, 130.0f, 0.0f) == 1 ||
                     fn_801FE1DC(self, 0, 136.0f, 0.0f) == 1) {
-                    copyVec3(&pos, &self->pos_0x10);
+                    pos = self->pos_0x10;
                     setVector3(&offset, 0.0f, 20.0f, -10.0f);
                     rotVecY(&offset, self->field_0x02C);
-                    addVec3To(&pos, &offset);
+                    pos += offset;
                     eft004_set(1, &pos, 2.5f, self->field_0x02C, self->field_0x004);
                 }
             }
@@ -1306,9 +1297,9 @@ void lb_npc_motion_effects(_LB_NPC* self)
         case 1174:
             if ((self->field_0x230 & 2) != 0) {
                 if (fn_801FE1DC(self, 3, 2.0f, 128.0f) == 1 && (system_w.frame_0x00C & 7) == 0) {
-                    copyVec3(&pos, &self->pos_0x10);
+                    pos = self->pos_0x10;
                     setVector3(&offset, 0.0f, 10.0f, 0.0f);
-                    addVec3To(&pos, &offset);
+                    pos += offset;
                     eft004_set(1, &pos, 2.5f, self->field_0x02C, self->field_0x004);
                 }
             }
@@ -1363,7 +1354,6 @@ void lb_npc_motion_effects(_LB_NPC* self)
 #include "g3d/scn_obj_callback_dtor.h"
 namespace s_801FBF78 {
 extern "C" {
-MHchar* mhchar_construct(MHchar* self);
 _LB_NPC* lb_npc_ctor(_LB_NPC* self);
 _LB_NPC* lb_npc_dtor(_LB_NPC* self, s16 flag);
 LbNpcChar* lb_npc_char_ctor(LbNpcChar* self);
@@ -1428,21 +1418,21 @@ LbNpcMatCallback* lb_npc_mat_callback_dtor(LbNpcMatCallback* self, s16 flag)
 /* 0x801FF890 (0x6C): constructs an NPC work record: its vectors and its character block. */
 _LB_NPC* lb_npc_ctor(_LB_NPC* self)
 {
-    VEC3_ctor(&self->pos_0x10);
-    VEC3_ctor(&self->field_0x01C);
-    VEC3_ctor(&self->field_0x038);
-    VEC3_ctor(&self->field_0x044);
+    new (&self->pos_0x10) nw4r::math::VEC3;
+    new (&self->field_0x01C) nw4r::math::VEC3;
+    new (&self->field_0x038) nw4r::math::VEC3;
+    new (&self->field_0x044) nw4r::math::VEC3;
     lb_npc_char_ctor((LbNpcChar*)self->field_0x054);
-    VEC3_ctor(&self->target_0x1EC);
-    VEC3_ctor(&self->vel_0x1F8);
-    VEC3_ctor(&self->field_0x258);
+    new (&self->target_0x1EC) nw4r::math::VEC3;
+    new (&self->vel_0x1F8) nw4r::math::VEC3;
+    new (&self->field_0x258) nw4r::math::VEC3;
     return self;
 }
 
 /* 0x801FF8FC (0x3C): constructs a character block: the model body, then the material hook. */
 LbNpcChar* lb_npc_char_ctor(LbNpcChar* self)
 {
-    mhchar_construct(&self->body_0x004);
+    new (&self->body_0x004) MHchar;
     lb_npc_mat_callback_ctor(&self->callback_0x16C);
     return self;
 }
@@ -1461,19 +1451,16 @@ void mhchar_reset(MHchar* self);
 }
 }
 LbResource* ckResourceName(char* name);
+
+/* 0x801FF984 (0x5C): constructs a model body: its vectors and empty resource handles. */
+MHchar::MHchar()
+{
+    s_801FBF78::res_file_ctor((u32*)&field_0x110, 0);
+    new (&field_0x114) nw4r::g3d::ResMdl((void*)0);
+}
+
 namespace s_801FBF78 {
 extern "C" {
-
-/* 0x801FF984 - constructs an NPC's model body: its vectors and empty resource handles. */
-MHchar* mhchar_construct(MHchar* self)
-{
-    VEC3_ctor(&self->pos_0x04);
-    VEC3_ctor(&self->field_0x10);
-    VEC3_ctor(&self->scale_0x1C);
-    res_file_ctor((u32*)&self->field_0x110, 0);
-    new (&self->field_0x114) nw4r::g3d::ResMdl((void*)0);
-    return self;
-}
 
 /* 0x801FF9E0 - binds the character block to NPC `owner`: reset the model and take the NPC's id. */
 void lb_npc_char_bind(LbNpcChar* self, _LB_NPC* owner)
@@ -1594,7 +1581,6 @@ void fn_801FDF70(_LB_NPC* self, s32 ticks);
 u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FE0AC(_LB_NPC* self, u16 motion_id, s32 a, s32 b);
 void fn_801FE128(_LB_NPC* self, u8 value);
-VEC3* em_vec3_copy(VEC3* out, LbNpcMotionEntry* entry);
 f32 vec3_dist_sq(VEC3* a, VEC3* b);
 extern u8 lb_area_light_ids[];   /* .data: the lobby areas' light ids, 0xFF-terminated */
 }
@@ -1735,7 +1721,7 @@ void lb_npc_frame(_LB_NPC* self)
  * restarts its motion and walks it to the entry's position; 1 when the table wrapped. */
 s32 fn_801FFE44(_LB_NPC* self)
 {
-    VEC3 pos;
+    _VEC3 pos;
     LbNpcMotionEntry* table;
     LbNpcMotionEntry* entry;
     s32 wrapped = 0;
@@ -1756,7 +1742,7 @@ s32 fn_801FFE44(_LB_NPC* self)
         lb_npc_motion_restart(self, entry->motion_0x0C);
         if ((entry->count_0x10 == -1 || entry->count_0x10 == -2 || entry->motion_0x0C == 0) &&
             entry->pos_0x00.y > -10000.0f) {
-            copyVec3(&self->target_0x1EC, em_vec3_copy(&pos, entry));
+            self->target_0x1EC = VEC3(*(const Vec*)&entry->pos_0x00);
             fn_801FDD9C(self, 8.0f);
         }
     }
@@ -2352,8 +2338,6 @@ void lb_npc_walk_leg(_LB_NPC* self)
     s32 divisor;
     f32 dist;
 
-    VEC3_ctor(&target);
-    VEC3_ctor(&step);
     divisor = 10;
     spun = 0;
     if (self->field_0x006 == 0) {
@@ -2433,7 +2417,7 @@ void lb_npc_walk_leg(_LB_NPC* self)
             angle = calcVecAng2(&self->pos_0x10, &target);
             setVector3(&step, 0.0f, 0.0f, 4.0f);
             rotVecY(&step, angle);
-            addVec3To(&self->pos_0x10, &step);
+            self->pos_0x10 += step;
         }
         spun = 1;
         break;
@@ -2486,7 +2470,6 @@ void lb_npc_warp_leg(_LB_NPC* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     if (self->field_0x006 == 0) {
         LbNpcMotionEntry* entry;
 
@@ -2494,7 +2477,7 @@ void lb_npc_warp_leg(_LB_NPC* self)
         fn_801FE0AC(self, 1, 4, 0);
         entry = &self->field_0x204[self->field_0x208];
         vec_to_mh_vec3(&pos, (Vec*)entry);
-        copyVec3(&self->pos_0x10, copyVec3(&self->target_0x1EC, &pos));
+        self->pos_0x10 = self->target_0x1EC = pos;
         self->field_0x1D4 = self->field_0x02C = entry->motion_0x0C;
     }
 }
@@ -2569,7 +2552,6 @@ void fn_80201C80(_LB_NPC* self)
     VEC3 unused;
     u16 angle;
 
-    VEC3_ctor(&unused);
     switch (self->field_0x006) {
     case 0:
         self->field_0x006++;
@@ -2738,7 +2720,6 @@ void fn_80202394(_LB_NPC* self)
 {
     VEC3 unused;
 
-    VEC3_ctor(&unused);
     switch (self->field_0x006) {
     case 0:
         self->field_0x006++;
@@ -2768,7 +2749,6 @@ void fn_802024C4(_LB_NPC* self)
 {
     VEC3 unused;
 
-    VEC3_ctor(&unused);
     switch (self->field_0x006) {
     case 0:
         self->field_0x006++;
@@ -2917,8 +2897,6 @@ void lb_npc_talk_select(_LB_NPC* self);
 void lb_npc_char_load(LbNpcChar* chr);
 void lb_npc_char_move(LbNpcChar* chr);
 void lb_quest_board_follow_spawn(_LB_NPC* self);
-void addVec3(VEC3* out, const VEC3* a, const VEC3* b);
-VEC3* setVec3(VEC3* v, f32 x, f32 y, f32 z);
 void word_copy_return_dst(u32* dst, u32* src);
 f32 vec3_distance(VEC3* a, VEC3* b);
 extern LbNpcMoveTables move_npc_tbl_ptr;    /* .bss: the NPC motion tables by NPC, area and event */
@@ -3157,7 +3135,6 @@ void fn_801FD594(_LB_NPC* self)
 {
     VEC3 offset;
 
-    VEC3_ctor(&offset);
     switch (self->field_0x002) {
     case 2:
         setVector3(&offset, -20.0f, 25.0f, 10.0f);
@@ -3174,57 +3151,44 @@ void fn_801FD594(_LB_NPC* self)
 void lb_npc_gate_place(_LB_NPC* self)
 {
     _PLW* plw = (_PLW*)get_move_work_adrs(2);
-    VEC3 offset;
     struct Q_ResultWork* result;
 
     plw += my_player_no();
-    VEC3_ctor(&offset);
+    VEC3 offset;
     result = get_qResult_work();
     if (system_w.field_0x02D != 0) {
         if (system_w.field_0x7CE == 2) {
-            VEC3 pos;
-
-            copyVec3(&self->pos_0x10, setVec3(&pos, 676.0f, 459.0f, 154.0f));
+            self->pos_0x10 = VEC3(676.0f, 459.0f, 154.0f);
         } else {
-            VEC3 pos;
-
-            copyVec3(&self->pos_0x10, setVec3(&pos, 1700.0f, 461.0f, -451.0f));
+            self->pos_0x10 = VEC3(1700.0f, 461.0f, -451.0f);
         }
         self->field_0x028 = 0;
         self->field_0x02C = 0xC001;
         self->field_0x030 = 0;
     } else if (result != 0 && result->kind_0x1E3 == 1 && self->field_0x004 == 0 && lobby_w.field_0x12C == 1) {
-        VEC3 pos;
-
-        copyVec3(&self->pos_0x10, setVec3(&pos, -1007.0f, 179.0f, -391.0f));
+        self->pos_0x10 = VEC3(-1007.0f, 179.0f, -391.0f);
         self->field_0x028 = 0;
         self->field_0x02C = 0x4000;
         self->field_0x030 = 0;
     } else {
-        VEC3 pos;
-
         setVector3(&offset, -40.0f, 0.0f, -60.0f);
         rotVecY(&offset, plw->field_0x058);
-        addVec3(&pos, &plw->vec_0x03C, &offset);
-        copyVec3(&self->pos_0x10, &pos);
+        self->pos_0x10 = plw->vec_0x03C + offset;
         eft_rot_vec_copy(&self->rot_0x028, &plw->rot_0x54);
     }
-    copyVec3(&self->field_0x01C, &self->pos_0x10);
+    self->field_0x01C = self->pos_0x10;
 }
 
 /* 0x801FD7AC - places the NPC beside the player, facing his way. */
 void lb_npc_place_beside_player(_LB_NPC* self)
 {
     _PLW* plw = (_PLW*)get_move_work_adrs(2);
-    VEC3 offset;
-    VEC3 pos;
 
     plw += my_player_no();
-    VEC3_ctor(&offset);
+    VEC3 offset;
     setVector3(&offset, 40.0f, 0.0f, -60.0f);
     rotVecY(&offset, plw->field_0x058);
-    addVec3(&pos, &plw->vec_0x03C, &offset);
-    copyVec3(&self->pos_0x10, &pos);
+    self->pos_0x10 = plw->vec_0x03C + offset;
     eft_rot_vec_copy(&self->rot_0x028, &plw->rot_0x54);
 }
 
@@ -3260,7 +3224,7 @@ void lb_npc_motion_table_start(_LB_NPC* self)
             return;
         }
         if (lobby_w.npc_motion_0x070 != 0) {
-            copyVec3(&self->pos_0x10, &lobby_w.npc_pos_0x058);
+            self->pos_0x10 = lobby_w.npc_pos_0x058;
             eft_rot_vec_copy(&self->rot_0x028, &lobby_w.npc_rot_0x064);
         }
     }
@@ -3273,14 +3237,13 @@ u32 lb_npc_view_range_ck(_LB_NPC* self)
 {
     VEC3 cam;
 
-    VEC3_ctor(&cam);
     if (event_demo_ck() == 1) {
         return 1;
     }
     if ((self->model_0x050->flags_0x005 & 8) != 0) {
         return 1;
     }
-    copyVec3(&cam, &get_camera_pos());
+    cam = *(&get_camera_pos());
     return !(vec3_distance(&self->pos_0x10, &cam) >= self->field_0x20C);
 }
 
@@ -3295,8 +3258,6 @@ u32 lb_npc_on_screen_ck(_LB_NPC* self)
     f32 bottom;
     f32 top;
 
-    VEC3_ctor(&screen);
-    VEC3_ctor(&pos);
     root = scn_root_get_current_camera(pRoot);
     word_copy_return_dst(&camera, &root);
     if (event_demo_ck() == 1) {
@@ -3305,7 +3266,7 @@ u32 lb_npc_on_screen_ck(_LB_NPC* self)
     if ((self->model_0x050->flags_0x005 & 8) != 0) {
         return 1;
     }
-    copyVec3(&pos, &self->pos_0x10);
+    pos = self->pos_0x10;
     pos.y += lb_npc_model_inscreen_get(self->model_0x050->model_0x002);
     camera_world_to_screen(&camera, &screen, &pos);
     bottom = 500.0f;
@@ -3350,15 +3311,15 @@ void fn_801FDBD0(_LB_NPC* self)
     self->field_0x22D = 0;
     self->field_0x22C = 0;
     self->field_0x256 = 0;
-    copyVec3(&self->field_0x01C, &self->pos_0x10);
+    self->field_0x01C = self->pos_0x10;
     lb_npc_frame(self);
     if (self->field_0x003 != 0) {
         body->field_0x28 = self->field_0x028;
         body->field_0x2C = self->field_0x02C;
         body->field_0x30 = self->field_0x030;
-        copyVec3(&body->pos_0x04, &self->pos_0x10);
+        body->pos_0x04 = self->pos_0x10;
         lb_npc_char_move((LbNpcChar*)self->field_0x054);
-        copyVec3(&self->pos_0x10, &body->pos_0x04);
+        self->pos_0x10 = body->pos_0x04;
         if ((self->model_0x050->flags_0x005 & 0x20) != 0 || self->field_0x22C == 1) {
             lb_npc_ground_drop(self);
         }
@@ -3366,7 +3327,7 @@ void fn_801FDBD0(_LB_NPC* self)
             self->field_0x22D == 1) {
             lb_npc_ground_snap(self);
         }
-        copyVec3(&body->pos_0x04, &self->pos_0x10);
+        body->pos_0x04 = self->pos_0x10;
         mhchar_model_mtx_update(body);
         lb_npc_motion_effects(self);
         lb_npc_npc23_state_save(self);
@@ -3606,7 +3567,7 @@ void fn_801FD174(_LB_NPC* self)
     self->pos_0x10.x = 0.0f;
     self->pos_0x10.y = 0.0f;
     self->pos_0x10.z = 0.0f;
-    copyVec3(&self->field_0x01C, &self->pos_0x10);
+    self->field_0x01C = self->pos_0x10;
     self->field_0x028 = 0;
     self->field_0x02C = 0;
     self->field_0x030 = 0;
@@ -3669,7 +3630,7 @@ void fn_801FD174(_LB_NPC* self)
 
 #include "lobby/lb_npc.h"
 #include "unsplit/lobby.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 namespace s_802029B4 {
 
 
@@ -3679,7 +3640,6 @@ namespace s_802029B4 {
  */
 extern "C" {
 f32 vec3_distance(VEC3* a, VEC3* b);
-void addVec3(VEC3* out, const VEC3* a, const VEC3* b);
 void fn_801FDD9C(_LB_NPC* self, f32 duration);
 s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
 void fn_801FDEB4(_LB_NPC* self, s32 to, s32 ticks);
@@ -3755,7 +3715,6 @@ extern "C" {
 __declspec(noinline) void fn_802029B4(_LB_NPC* self)
 {
     VEC3 unused;
-    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -3853,7 +3812,6 @@ __declspec(noinline) void fn_80202C24(_LB_NPC* self)
 __declspec(noinline) void fn_80202D24(_LB_NPC* self)
 {
     VEC3 unused;
-    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -3893,7 +3851,6 @@ __declspec(noinline) void fn_80202DD0(_LB_NPC* self)
 __declspec(noinline) void fn_80202E6C(_LB_NPC* self)
 {
     VEC3 unused;
-    VEC3_ctor(&unused);
 
     switch (self->field_0x006) {
     case 0:
@@ -3913,9 +3870,7 @@ __declspec(noinline) void fn_80202E6C(_LB_NPC* self)
 __declspec(noinline) void fn_80202F00(_LB_NPC* self)
 {
     VEC3 offset;
-    VEC3 delta;
 
-    VEC3_ctor(&offset);
     self->field_0x22D = 1;
     self->field_0x22C = 1;
 
@@ -3948,8 +3903,7 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
         if (vec3_distance(&self->pos_0x10, &self->field_0x214->vec_0x03C) < lbl_807999CC) {
             setVector3(&offset, lbl_807999A0, lbl_807999A0, lbl_807999CC);
             rotVecY(&offset, calcVecAng2(&self->field_0x214->vec_0x03C, &self->pos_0x10));
-            addVec3(&delta, &self->field_0x214->vec_0x03C, &offset);
-            copyVec3(&self->target_0x1EC, &delta);
+            self->target_0x1EC = self->field_0x214->vec_0x03C + offset;
             fn_801FDD9C(self, lbl_807999D0);
             lb_npc_motion_restart(self, 44);
         } else if (fn_801FDFD0(self) == 1) {
@@ -4813,7 +4767,6 @@ void fn_80205424(_LB_NPC* self)
 {
     VEC3 offset;
 
-    VEC3_ctor(&offset);
 
     switch (self->field_0x006) {
     case 0:
@@ -5511,7 +5464,7 @@ void fn_80205764(_LB_NPC* self)
     f32 dist;
 
     work = (LbNpcMoveWorkEntry*)get_move_work_adrs(2);
-    copyVec3(&self->target_0x1EC, &work[(s8)my_player_no()].vec_0x3C);
+    self->target_0x1EC = work[(s8)my_player_no()].vec_0x3C;
     self->field_0x22C = 1;
     self->field_0x22D = 1;
 
@@ -5617,7 +5570,6 @@ void fn_802050AC(_LB_NPC* self)
  */
 void fn_801FDFC8(_LB_NPC* self, u8 value);
 void mtx34_trans_get(nw4r::math::MTX34* m, VEC3* out);
-void subVec3(VEC3* out, const VEC3* a, const VEC3* b);
 s16 camera_frame_get(u8 full);
 u32 fn_80208AC0(_PLW* self);
 LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind);
@@ -5641,9 +5593,6 @@ void lb_npc_pig_release(_LB_NPC* self)
     u8 kind;
     s32 locked;
 
-    VEC3_ctor(&offset);
-    MTX34_ctor(&joint);
-    MTX34_ctor(&unused);
     kind = 0xFF;
     locked = 0;
     fn_801FDFC8(self, 1);
@@ -5663,13 +5612,10 @@ void lb_npc_pig_release(_LB_NPC* self)
         self->pos_0x10.y += offset.y;
         self->pos_0x10.z += offset.z;
         if (fn_80208AC0(self->field_0x214) == 0) {
-            VEC3 pos;
-
             self->field_0x006++;
             setVector3(&offset, 0.0f, 0.0f, 80.0f);
             rotVecY(&offset, self->field_0x214->rot_0x54.y);
-            addVec3(&pos, &self->pos_0x10, &offset);
-            copyVec3(&self->target_0x1EC, &pos);
+            self->target_0x1EC = self->pos_0x10 + offset;
             fn_801FDD9C(self, 20.0f);
             fn_801FE0AC(self, 1101, 20, 0);
         }
@@ -5719,7 +5665,6 @@ void fn_8020623C(_LB_NPC* self)
     VEC3* center = &self->event_pos_0x234;
     VEC3 radius;
 
-    VEC3_ctor(&radius);
     radius.x = 0.0f;
     radius.y = 0.0f;
     radius.z = -60.0f;
@@ -5728,7 +5673,7 @@ void fn_8020623C(_LB_NPC* self)
         self->field_0x006++;
         fn_801FE0AC(self, 11, 0, 0);
         setVector3(&self->pos_0x10, 2046.5f, 475.3f, -487.0f);
-        copyVec3(&self->field_0x01C, &self->pos_0x10);
+        self->field_0x01C = self->pos_0x10;
         self->field_0x02C = 0xC001;
         break;
     case 1:
@@ -5783,24 +5728,18 @@ void fn_8020623C(_LB_NPC* self)
         break;
     case 8:
         if (lb_npc_motion_play(self, 0, 142.0f, 0.0f) == 1) {
-            VEC3 pos;
-
             self->field_0x006++;
             fn_801FDFE4(self, 208, 22, 0);
             rotVecY(&radius, self->field_0x02C);
-            addVec3(&pos, &self->pos_0x10, &radius);
-            copyVec3(center, &pos);
+            *center = self->pos_0x10 + radius;
             self->event_angle_0x240 = self->field_0x02C;
             self->event_spin_0x242 = 0;
         }
         break;
     case 9: {
-        VEC3 pos;
-
         self->field_0x02C = self->event_angle_0x240 += 0x1D1;
         rotVecY(&radius, self->event_angle_0x240);
-        subVec3(&pos, center, &radius);
-        copyVec3(&self->pos_0x10, &pos);
+        self->pos_0x10 = *center - radius;
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 209, 0, 0);
@@ -5811,12 +5750,9 @@ void fn_8020623C(_LB_NPC* self)
         break;
     }
     case 10: {
-        VEC3 pos;
-
         self->field_0x02C = self->event_angle_0x240 += 0x1D1;
         rotVecY(&radius, self->event_angle_0x240);
-        subVec3(&pos, center, &radius);
-        copyVec3(&self->pos_0x10, &pos);
+        self->pos_0x10 = *center - radius;
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 208, 0, 0);
@@ -5827,12 +5763,9 @@ void fn_8020623C(_LB_NPC* self)
         break;
     }
     case 11: {
-        VEC3 pos;
-
         self->field_0x02C = self->event_angle_0x240 += 0x1D1;
         rotVecY(&radius, self->event_angle_0x240);
-        subVec3(&pos, center, &radius);
-        copyVec3(&self->pos_0x10, &pos);
+        self->pos_0x10 = *center - radius;
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 209, 0, 0);
@@ -5843,12 +5776,9 @@ void fn_8020623C(_LB_NPC* self)
         break;
     }
     case 12: {
-        VEC3 pos;
-
         self->field_0x02C = self->event_angle_0x240 += 0x1D1;
         rotVecY(&radius, self->event_angle_0x240);
-        subVec3(&pos, center, &radius);
-        copyVec3(&self->pos_0x10, &pos);
+        self->pos_0x10 = *center - radius;
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 1, 0, 0);
@@ -6242,7 +6172,7 @@ void lb_npc_motion_dispatch(_LB_NPC* self)
 #include "Pl/fn_802693C4.h"
 #include "ef/eft004.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "mh3_pad.h" /* the owner header (rule 2) */
 namespace s_802076D4 {
 
 
@@ -6311,7 +6241,7 @@ void fn_802076D4(_LB_NPC* self)
     if (lobby_w.field_0x12C == 1) {
         return;
     }
-    copyVec3(&self->target_0x1EC, (VEC3*)(work + 0x3C));
+    self->target_0x1EC = *((VEC3*)(work + 0x3C));
     self->field_0x22D = 1;
 
     switch (self->field_0x006) {
@@ -6369,7 +6299,6 @@ __declspec(noinline) void fn_80207938(_LB_NPC* self)
 {
     VEC3 scratch;
 
-    VEC3_ctor(&scratch);
     switch (self->field_0x006) {
     case 0:
         self->field_0x006++;
@@ -6703,14 +6632,13 @@ void lb_npc_model18_hooks(_LB_NPC* self)
 /* 0x80207DC4 - the pig release table of the region (of the NPC's area) it stands in, its index in `kind`. */
 LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind)
 {
-    VEC3 pos;
     LbNpcMotionEntry* found;
     LbPigRegion* region;
     LbPigSpot* spot;
     u8 index;
 
     index = 0;
-    VEC3_ctor(&pos);
+    VEC3 pos;
     found = 0;
     region = village_pig_release[self->field_0x004];
     if (region != 0) {
@@ -7080,7 +7008,6 @@ void* LbStr(u8 kind, u16 idx);
 namespace s_802076D4 {
 extern "C" {
 u32 lb_player_menu_area_ck(_PLW* self);
-LbNpcGround* em_land_data_init(LbNpcGround* out);
 _SLOTENT* userdata_equip_item_slots_get(LbNpcUserData* data);
 void item_pair_copy(_SLOTENT* dst, _SLOTENT* src);
 void lb_player_act_run(_PLW* self);
@@ -7090,7 +7017,6 @@ void lb_player_remote_ease(_PLW* self);
 void pl_rig_model_move(PlSeRig* rig);
 s32 hud_msg_push(u32 ch, const char* text);
 u16 fn_802089F4(_PLW* self);
-void addVec3To(VEC3* a, VEC3* b);
 void yure_player_init(_PLW* self);
 void yure_player_clear_flags(_PLW* self);
 u8 GameMode_ck(void);
@@ -7105,7 +7031,6 @@ void quest_board_flags_send(u8 a, u8 b);
 void fn_8020A70C(_PLW* self, u32 a, s32 b, s32 c);
 VEC3* stage_entry_pos_get(u8 map, u8 area);
 u32 stage_entry_angle_get(u8 map, u8 area);
-VEC3* setVec3(VEC3* v, f32 x, f32 y, f32 z);
 u32 userdata_progress_flag_ck(s32 flag);
 u8 pl_act_stage_get(_PLW* self);
 void pl_act_stage_latch_set(_PLW* self, u8 stage);
@@ -7178,9 +7103,6 @@ void lb_player_first_frame(_PLW* self)
  * the first visit's spot, or the entry point after a quest; then snaps his walk target and model to it. */
 void lb_player_place_entry(_PLW* self, u8 map, u8 area)
 {
-    VEC3 near_pos;
-    VEC3 far_pos;
-    VEC3 gate_pos;
     MHchar* model = &((PlSeRig*)self->physics_0x13C)->models_0x004[0].model;
     struct Q_ResultWork* result = get_qResult_work();
 
@@ -7208,15 +7130,15 @@ void lb_player_place_entry(_PLW* self, u8 map, u8 area)
     if (system_w.field_0x02D != 0) {
         system_w.field_0x02D = 0;
         if (system_w.field_0x7CE == 2) {
-            copyVec3(&self->vec_0x03C, setVec3(&near_pos, 505.0f, 461.0f, 343.0f));
+            self->vec_0x03C = VEC3(505.0f, 461.0f, 343.0f);
         } else {
-            copyVec3(&self->vec_0x03C, setVec3(&far_pos, 1600.0f, 458.0f, -354.0f));
+            self->vec_0x03C = VEC3(1600.0f, 458.0f, -354.0f);
         }
         system_w.field_0x7CE = 0;
         self->rot_0x54.y = 0xC000;
         self->field_0x0A8 = 0xC000;
     } else if (system_w.field_0x7D3 == 1 && system_w.field_0x86A == 1) {
-        copyVec3(&self->vec_0x03C, setVec3(&gate_pos, 0.0f, 0.0f, 127.0f));
+        self->vec_0x03C = VEC3(0.0f, 0.0f, 127.0f);
         self->rot_0x54.y = 0x8000;
     } else if (game_ready_ck() == 0 && Pl_master_ck(self) == 1) {
         if (userdata_progress_flag_ck(99) == 0) {
@@ -7240,7 +7162,7 @@ void lb_player_place_entry(_PLW* self, u8 map, u8 area)
     self->rot_0x54.x = 0;
     self->rot_0x54.z = 0;
     self->field_0x0A8 = self->rot_0x54.y;
-    copyVec3(&self->target_pos_0x090, &self->vec_0x03C);
+    self->target_pos_0x090 = self->vec_0x03C;
     lb_npc_walk_blend_set(self, 0);
     pl_model_pos_sync(self);
     mhchar_model_mtx_update(model);
@@ -7259,7 +7181,7 @@ void lb_player_spawn_set(VEC3* pos, u16 angle, u8 map, u8 area)
     lb_player_place_entry(plw, map, area);
     plw->field_0x0A8 = angle;
     plw->rot_0x54.y = angle;
-    copyVec3(&plw->vec_0x03C, pos);
+    plw->vec_0x03C = *pos;
     plw->field_0x352 = 5;
     plw->field_0x0B0 = 0;
     plw->field_0x0B2 = 0;
@@ -7310,12 +7232,11 @@ u32 lb_player_menu_area_return(_PLW* self)
 {
     LobbyPeerCopy* peer;
     s32 i;
-    VEC3 pos;
     s32 seen;
     LbPeerTable* list;
 
     list = (LbPeerTable*)&lobby_state_block.peer_count_0x0004;
-    setVec3(&pos, 83.71f, 7.41f, -886.41f);
+    VEC3 pos(83.71f, 7.41f, -886.41f);
     if (lobby_w.area_change_0x026 != 0) {
         return 0;
     }
@@ -7351,11 +7272,10 @@ u32 lb_player_menu_area_return(_PLW* self)
 void lb_player_update(_PLW* self)
 {
     MHchar* model = &((PlSeRig*)self->physics_0x13C)->models_0x004[0].model;
-    LbNpcGround ground;
+    LandData ground;
     f32 height;
 
-    em_land_data_init(&ground);
-    copyVec3(&self->vec_0x048, &self->vec_0x03C);
+    self->vec_0x048 = self->vec_0x03C;
     self->field_0x5C9 = 0;
     self->flag_0x30E = 0;
     self->field_0x30A = 1;
@@ -7418,10 +7338,10 @@ void lb_player_update(_PLW* self)
     pl_rig_draw_mode_begin((PlSeRig*)self->physics_0x13C);
     pl_rig_model_move((PlSeRig*)self->physics_0x13C);
     pl_rig_draw_mode_end((PlSeRig*)self->physics_0x13C);
-    copyVec3(&self->vec_0x03C, &model->pos_0x04);
+    self->vec_0x03C = model->pos_0x04;
     if (Pl_master_ck(self) != 0) {
         pl_coll_shape_set(self, 0, 194);
-        if (pl_ground_check(self, &self->vec_0x03C, (LbNpcGround*)&self->field_0x5A4, &height, -6) == 1) {
+        if (pl_ground_check(self, &self->vec_0x03C, (LandData*)&self->field_0x5A4, &height, -6) == 1) {
             self->vec_0x03C.y = self->ground_y_0x060 = height;
         }
         if (game_ready_ck() == 0) {
@@ -7432,7 +7352,7 @@ void lb_player_update(_PLW* self)
                 self->field_0x074 = 0;
             }
         }
-    } else if (pl_ground_check(self, &self->vec_0x03C, (LbNpcGround*)&self->field_0x5A4, &height, -6) == 1) {
+    } else if (pl_ground_check(self, &self->vec_0x03C, (LandData*)&self->field_0x5A4, &height, -6) == 1) {
         self->vec_0x03C.y = self->ground_y_0x060 = height;
     }
     lb_player_menu_area_return(self);
@@ -7446,7 +7366,6 @@ void lb_player_motion_effects(_PLW* self)
 {
     VEC3 offset;
 
-    VEC3_ctor(&offset);
     if ((u8)get_now_mapno() == 22) {
         switch (Get_motion_no(self)) {
         case 2:
@@ -7538,7 +7457,7 @@ void lb_player_motion_effects(_PLW* self)
             if (Pl_frame_check(self, 0, 194.0f, 0.0f) == 1) {
                 setVector3(&offset, 0.0f, 50.0f, 170.0f);
                 rotVecY(&offset, self->rot_0x54.y);
-                addVec3To(&offset, &self->vec_0x03C);
+                offset += self->vec_0x03C;
                 eft004_set(5, &offset, 1.0f, 0, self->area_0x16);
             }
             break;
@@ -7555,7 +7474,7 @@ void lb_player_motion_effects(_PLW* self)
             if (self->field_0x001 != 0 && Pl_frame_check(self, 0, 194.0f, 0.0f) == 1) {
                 setVector3(&offset, 0.0f, 50.0f, 170.0f);
                 rotVecY(&offset, self->rot_0x54.y);
-                addVec3To(&offset, &self->vec_0x03C);
+                offset += self->vec_0x03C;
                 eft004_set(5, &offset, 1.0f, 0, self->area_0x16);
             }
             break;
@@ -7655,7 +7574,7 @@ void lb_npc_walk_blend_set(_PLW* self, s32 frames)
 {
     if (vec3_dist_sq(&self->vec_0x03C, &self->target_pos_0x090) >= 640000.0f || (s16)frames == 0) {
         self->blend_frames_0x0B4 = 0;
-        copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
+        self->vec_0x03C = self->target_pos_0x090;
         self->blend_step_x_0x09C = 0.0f;
         self->blend_step_y_0x0A0 = 0.0f;
         self->blend_step_z_0x0A4 = 0.0f;
@@ -8403,7 +8322,7 @@ void lb_act_invite_jump(_PLW* self) {
                 lobby_w.state_0x000 = 0;
             }
             self->field_0x0A8 = self->rot_0x54.y;
-            copyVec3(&self->target_pos_0x090, &self->vec_0x03C);
+            self->target_pos_0x090 = self->vec_0x03C;
             lb_npc_walk_blend_set(self, 0);
             lb_npc_act_req(self, 0, 0, 0x8000);
             fn_8020A70C(self, 0, 4, 0);
@@ -8817,7 +8736,6 @@ void place_info_set(u8* info);
 void lobby_pig_dress_view_set(u8 dress);
 void lobby_net_place_send(_PLW* self, u8 area, VEC3* pos, u16 angle);
 int strcmp(const char* a, const char* b);
-VEC3* setVec3(VEC3* v, f32 x, f32 y, f32 z);
 extern u16 lb_slot_act_tbl[];            /* .data: the act each armed item slot runs (0xFFFF ends it) */
 extern LbMotionArgs lb_item_motion_tbl[];      /* .data: the looping item acts' motions */
 extern LbMotionArgs lb_item_motion_once_tbl[]; /* .data: the one-shot item acts' motions */
@@ -9267,7 +9185,6 @@ void lb_act_walk(_PLW* self)
 {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9304,7 +9221,6 @@ void lb_act_run(_PLW* self)
 {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9801,7 +9717,6 @@ void lb_act_carry_walk(_PLW* self)
 {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -9839,7 +9754,6 @@ void lb_act_carry_run(_PLW* self)
 {
     VEC3 step;
 
-    VEC3_ctor(&step);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -10031,12 +9945,11 @@ void lb_player_spot_walk(_PLW* self, LbSpot* spot)
     VEC3 pos;
     u32 angle;
 
-    VEC3_ctor(&pos);
     lb_player_latch_release(self);
     lobby_w.active_0x008 = 0;
     vec_to_mh_vec3(&pos, (Vec*)&spot->pos_0x04);
     angle = spot->angle_0x10;
-    copyVec3(&self->target_pos_0x090, &pos);
+    self->target_pos_0x090 = pos;
     lb_npc_walk_blend_set(self, 20);
     self->field_0x0A8 = angle;
     self->field_0x0B6 = spot->id_0x02;
@@ -10048,12 +9961,11 @@ void lb_player_gate_walk(_PLW* self)
 {
     VEC3 pos;
 
-    VEC3_ctor(&pos);
     self->field_0xB00 = 0;
     pos.x = -500.0f;
     pos.y = 170.0f;
     pos.z = -605.0f;
-    copyVec3(&self->target_pos_0x090, &pos);
+    self->target_pos_0x090 = pos;
     lb_npc_walk_blend_set(self, 20);
     self->field_0x0A8 = 0x98E4;
     self->field_0x0B6 = 0;
@@ -10068,12 +9980,9 @@ void lb_player_spot_walk_act6(_PLW* self, LbSpot* spot)
     VEC3 unused2;
     u16 angle;
 
-    VEC3_ctor(&pos);
-    VEC3_ctor(&unused1);
-    VEC3_ctor(&unused2);
     vec_to_mh_vec3(&pos, (Vec*)&spot->pos_0x04);
     angle = spot->angle_0x10;
-    copyVec3(&self->target_pos_0x090, &pos);
+    self->target_pos_0x090 = pos;
     lb_npc_walk_blend_set(self, 20);
     self->field_0x0A8 = angle;
     lb_npc_act_set(self, 0, 6, 0);
@@ -10099,9 +10008,8 @@ void lb_player_npc_talk_start(_PLW* self, _LB_NPC* npc)
 void lb_player_area_enter(_PLW* self, LbPlaceRec* place, u32 quiet)
 {
     LobbyTimerBlock* state = &lobby_state_block;
-    VEC3 pos;
 
-    setVec3(&pos, place->x_0x24, place->y_0x28, place->z_0x2C);
+    VEC3 pos(place->x_0x24, place->y_0x28, place->z_0x2C);
     lobby_player_place(place->area_0x00, &pos, (u16)place->angle_0x30);
     lb_area_view_set(place->area_0x00);
     if ((u8)quiet == 0) {
@@ -10475,7 +10383,6 @@ void lb_player_remote_follow(_PLW* self)
     VEC3 d;
     f32 dist;
 
-    VEC3_ctor(&d);
     if (self->kind_0x09 != 1 && lb_npc_act_busy_ck(self->field_0x00A, self->act_no) != 1) {
         self->target_pos_0x090.y = self->vec_0x03C.y;
         dist = calcVecDistXZ(&self->vec_0x03C, &self->target_pos_0x090);
@@ -10491,7 +10398,7 @@ void lb_player_remote_follow(_PLW* self)
                         lb_npc_act_set(self, 1, 0, 0);
                     } else if (dist < 6.0f) {
                         self->blend_frames_0x0B4 = 0;
-                        copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
+                        self->vec_0x03C = self->target_pos_0x090;
                         lb_npc_act_set(self, 1, 3, 0);
                     } else {
                         self->field_0x0A8 = Atan2Idx(d.x, d.z);
@@ -10500,7 +10407,7 @@ void lb_player_remote_follow(_PLW* self)
                 case 0:
                     if (dist < 6.0f) {
                         self->blend_frames_0x0B4 = 0;
-                        copyVec3(&self->vec_0x03C, &self->target_pos_0x090);
+                        self->vec_0x03C = self->target_pos_0x090;
                         fn_8020A70C(self, 0, 4, 0);
                     } else if (dist > 150.0f) {
                         self->field_0x0A8 = Atan2Idx(d.x, d.z);
