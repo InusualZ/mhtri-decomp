@@ -37,6 +37,7 @@ class ScnObj;
  * size: 0x4 */
 class IScnObjCallback {
 public:
+    IScnObjCallback();   /* 0x801FF974, `lobby/lb_npc.cpp` */
     virtual ~IScnObjCallback();
     /* untyped: caller-owned payload - the pass's info block */
     virtual void ExecCallback_CALC_WORLD(u32 timing, ScnObj* pObj, u32 param, void* pInfo);

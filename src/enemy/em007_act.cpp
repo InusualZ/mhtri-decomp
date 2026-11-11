@@ -4225,7 +4225,7 @@ void em007_model_eft_create(_EFT* self) {
                 self->area_0x44 = get_now_areano();
             } else {
                 self->area_0x44 = lb_npc->field_0x004;
-                work->copy_0x24->model_0x08 = (struct MHchar*)lb_npc->body_0x058;
+                work->copy_0x24->model_0x08 = &lb_npc->chr_0x054.body_0x004;
                 em007_model_copy_bind_nodes(work, i);
             }
             break;

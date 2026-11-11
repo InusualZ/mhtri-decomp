@@ -8,6 +8,10 @@
 #include "Pl/plw.h"   /* _PLW (`lb_npc_act_set`'s player work) */
 #include "Pl/fn_8028F66C.h"   /* LandData, the ground probe record */
 #include "ef/cp_vector.h"   /* _CP_VECTOR, the NPC's rotation view */
+#include "pl.h"   /* MHchar, the NPC's model body (`LbNpcChar` +0x04) */
+#ifdef __cplusplus
+#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::IScnObjCallback, the material hook's base */
+#endif
 
 /* ---------------------------------------------------------------------------------------------------
  * Types
@@ -266,9 +270,51 @@ typedef struct LbNpcMotionEntry {
 } LbNpcMotionEntry;
 
 
+#ifdef __cplusplus
+/* The material hook an NPC's character block carries: an `nw4r::g3d::IScnObjCallback` subclass whose CALC_MAT slot
+ * paints the body's materials (its vtable 0x805B8DA0, over the base's copy 0x805B8D80, both in `lobby/lb_npc.cpp`'s
+ * `.data`).  size: 0xC */
+class LbNpcMatCallback : public nw4r::g3d::IScnObjCallback {
+public:
+    /* 0x801FF938 (0x3C): builds the base and stores the hook's vtable. */
+    LbNpcMatCallback();
+    virtual ~LbNpcMatCallback();
+    /* untyped: caller-owned payload - the pass's info block */
+    virtual void ExecCallback_CALC_MAT(u32 timing, nw4r::g3d::ScnObj* pObj, u32 param, void* pInfo);
+
+    /* +0x04 */ s32 kind_0x04;       /* 6 paints materials 6 and 7 white, any other kind material 5 */
+    /* +0x08 */ MHchar* chr_0x08;    /* the body whose materials are painted */
+};
+#else
+/* The C view of the material hook: its vtable pointer and the two fields.  size: 0xC */
+typedef struct LbNpcMatCallback {
+    /* +0x00 */ u8 vtable_0x00[4];
+    /* +0x04 */ s32 kind_0x04;
+    /* +0x08 */ MHchar* chr_0x08;
+} LbNpcMatCallback;
+#endif
+
+/* The NPC's character block at `_LB_NPC` +0x54: its owner, the model body, the NPC id and the material hook.  The
+ * record's own constructor builds the body and the hook in turn (`__ct__9LbNpcCharFv`); only the members this unit's
+ * model functions touch are named.  size: 0x178 */
+typedef struct LbNpcChar {
+    /* +0x000 */ struct _LB_NPC* owner_0x000;
+    /* +0x004 */ MHchar body_0x004;
+    /* +0x144 */ u8 pad_0x144[0x24];
+    /* +0x168 */ s32 npc_id_0x168;
+    /* +0x16C */ LbNpcMatCallback callback_0x16C;
+#ifdef __cplusplus
+    /* 0x801FF8FC (0x3C): constructs the body, then the material hook. */
+    LbNpcChar();
+    ~LbNpcChar();
+#endif
+} LbNpcChar;
+
 /* One `_LB_NPC` record - the type `lb_npc_Get_motion_no__FP7_LB_NPC` / `lb_npc_area_ck__FP7_LB_NPCUc`
  * take and the 0x12-element `lb_npc` array's element (stride 0x268).  The class name is the map's own
- * (`7_LB_NPC`); `sound/fn_800D7F54.cpp` still carries a partial view of the same name that reads only +0x002. */
+ * (`7_LB_NPC`); `sound/fn_800D7F54.cpp` still carries a partial view of the same name that reads only +0x002.
+ * Its constructor and destructor are the compiler's (`__ct__7_LB_NPCFv` builds the vectors and the character
+ * block in member order; `__dt__7_LB_NPCFv` destroys the block), so the `lb_npc` array is a static object. */
 typedef struct _LB_NPC {
     /* +0x000 */ u8 field_0x000;
     /* +0x001 */ u8 field_0x001;
@@ -295,20 +341,7 @@ typedef struct _LB_NPC {
     /* +0x038 */ VEC3 field_0x038;
     /* +0x044 */ VEC3 field_0x044;
     /* +0x050 */ LbNpcModel* model_0x050;
-    /* +0x054 */ u8 field_0x054[4];
-    /* +0x058 */ u8 body_0x058[0x50];
-    /* +0x0A8 */ u16 motion_0x0A8;
-    /* +0x0AA */ u8 pad_0x0AA[0x9E];
-    /* +0x148 */ u8 field_0x148;
-    /* +0x149 */ u8 field_0x149;
-    /* +0x14A */ u8 field_0x14A;
-    /* +0x14B */ u8 pad_0x14B[0x19];
-    /* +0x164 */ void* field_0x164;
-    /* +0x168 */ u8 pad_0x168[8];
-    /* +0x170 */ s32 field_0x170;
-    /* +0x174 */ u8 pad_0x174[0x0E];
-    /* +0x182 */ u16 field_0x182;
-    /* +0x184 */ u8 pad_0x184[0x48];
+    /* +0x054 */ LbNpcChar chr_0x054;     /* the character block: the model body `MHchar` starts at +0x58 */
     /* +0x1CC */ u16 field_0x1CC;
     /* +0x1CE */ u8 field_0x1CE;
     /* +0x1CF */ u8 pad_0x1CF;
@@ -365,7 +398,8 @@ typedef struct _LB_NPC {
     /* +0x234 */ union {   /* size: 0x20 */
         /* +0x234 */ u8 field_0x234[0x20];   /* the NPC's event scratch: byte 0 the event state, byte 1 its argument */
         struct {   /* size: 0x10 */
-            /* +0x234 */ VEC3 event_pos_0x234;     /* the scripted spin's centre */
+            /* +0x234 */ _VEC3 event_pos_0x234;    /* the scripted spin's centre (ctor-less: the record's
+                                                    * constructor builds no vector here) */
             /* +0x240 */ u16 event_angle_0x240;    /* its angle */
             /* +0x242 */ u16 event_spin_0x242;     /* the spin added to the heading */
         };
@@ -377,6 +411,12 @@ typedef struct _LB_NPC {
     /* +0x258 */ VEC3 field_0x258;
     /* +0x264 */ u8 field_0x264;
     /* +0x265 */ u8 pad_0x265[3];
+#ifdef __cplusplus
+    /* 0x801FF890 (0x6C): constructs the vectors and the character block in member order. */
+    _LB_NPC();
+    /* 0x801FF774 (0x60): destroys the character block. */
+    ~_LB_NPC();
+#endif
 } _LB_NPC; /* size: 0x268 */
 
 /* ---------------------------------------------------------------------------------------------------

@@ -180,9 +180,9 @@ extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
     if (npc->field_0x001 == 0) {
         return;
     }
-    node = mhchar_node_id_get((MHchar*)npc->body_0x058, "HD-00");
+    node = mhchar_node_id_get(&npc->chr_0x054.body_0x004, "HD-00");
     if (node != 0) {
-        ((MHchar*)npc->body_0x058)->get_joint_wpos(node, &joint);
+        (&npc->chr_0x054.body_0x004)->get_joint_wpos(node, &joint);
         wpos.y = joint.y;
     } else {
         wpos.y += 200.0f;
@@ -204,11 +204,11 @@ extern "C" void lb_npc_move_work_draw(_LB_NPC* npc) {
     size = 24.0f * scale;
     wpos = npc->pos_0x10;
     wpos.x += 6.0f;
-    node = mhchar_node_id_get((MHchar*)npc->body_0x058, "HD-00");
+    node = mhchar_node_id_get(&npc->chr_0x054.body_0x004, "HD-00");
     if (node != 0) {
         f32 height;
 
-        ((MHchar*)npc->body_0x058)->get_joint_wpos(node, &joint);
+        (&npc->chr_0x054.body_0x004)->get_joint_wpos(node, &joint);
         height = joint.y - npc->pos_0x10.y;
         if (height < 0.0f) {
             height = 0.0f;

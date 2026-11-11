@@ -1210,7 +1210,7 @@ extern "C" void lb_quest_board_effect_init(_EFT* self) {
             self->state_0x05++;
             return;
         }
-        ((MHchar*)npc->body_0x058)->get_joint_wpos(work->joint, &self->pos_0x18);
+        (&npc->chr_0x054.body_0x004)->get_joint_wpos(work->joint, &self->pos_0x18);
         cpSetRotMatrix(&self->rot_0x24, &mtx);
         offset = work->offset;
         mulVecMat(&offset, &mtx);
@@ -1343,10 +1343,10 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
         }
         motion = lb_npc_Get_motion_no(npc);
         if ((u32)(motion - 1008) <= 2 || (u32)(motion - 1012) <= 1 || motion == 1001 || motion == 1003) {
-            mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+            mhchar_joint_mtx_get(&npc->chr_0x054.body_0x004, work->joint, &mtx);
             apply = 1;
         } else {
-            mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+            mhchar_joint_mtx_get(&npc->chr_0x054.body_0x004, work->joint, &mtx);
             apply = 1;
             spawn = 0;
         }
@@ -1357,7 +1357,7 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
             self->state_0x05++;
             return;
         }
-        mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+        mhchar_joint_mtx_get(&npc->chr_0x054.body_0x004, work->joint, &mtx);
         apply = 1;
         break;
     }
@@ -1422,7 +1422,7 @@ extern "C" void lb_quest_board_flash_move(_EFT* self) {
             work->model->setMatColor(i, GX_COLOR0A0, color, false);
         }
     }
-    ((MHchar*)npc->body_0x058)->get_joint_wpos(10, &self->pos_0x18);
+    (&npc->chr_0x054.body_0x004)->get_joint_wpos(10, &self->pos_0x18);
     self->pos_0x18.y += 30.0f;
     work->model->pos_0x04 = self->pos_0x18;
     eft_rot_vec_copy(&work->model->rot_0x28, &self->rot_0x24);
@@ -1459,7 +1459,7 @@ extern "C" void q_result_effect_follow_npc(_EFT* self) {
         return;
     }
     cpSetRotMatrix(&npc->rot_0x028, &mtx);
-    ((MHchar*)npc->body_0x058)->get_joint_wpos(11, &self->pos_0x18);
+    (&npc->chr_0x054.body_0x004)->get_joint_wpos(11, &self->pos_0x18);
     setVector3(&offset, 25.0f, 16.0f, 3.0f);
     mulVecMat(&offset, &mtx);
     self->pos_0x18 += offset;

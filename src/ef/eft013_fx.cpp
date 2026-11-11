@@ -2803,7 +2803,7 @@ extern "C" void fn_80109A84(_EFT013* self) {
             eft013_set((struct _PLW*)pl, 23);
         }
     }
-    self->area_0x44 = pl->area_0x16;
+    self->area_0x44 = pl->area_0x16();
     mhchar_joint_mtx_get(&((_EFT013_PL_PHYS*)pl->field_0x13C)->chr_0x04, 2, &mtx);
     mtx34_trans_get(&mtx, &self->pos_0x18);
     eft_rot_vec_copy(&self->rot_0x24, &((_EFT013_PL*)pl)->rot_0x54);

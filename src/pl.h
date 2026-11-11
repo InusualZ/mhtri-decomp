@@ -6,6 +6,9 @@
 #include "gx.h"
 #include "ef.h"
 #include "Pl/plw.h"
+#ifdef __cplusplus
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMdl, the model body's resource handle */
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,17 +51,23 @@ enum _GXChannelID {
     GX_ALPHAZERO
 };
 #endif
+#ifdef __cplusplus
+/* The resource file handle at `MHchar` +0x110: its constructor calls `res_file_ctor`.  size: 0x4 */
+struct MHcharResFile {
+    /* +0x00 */ s32 handle;
+    MHcharResFile();   /* `lobby/lb_npc.cpp`: inline there, into `MHchar::MHchar` */
+};
+#endif
+/* The byte view of `MHchar` +0x10..0x1B: the area byte sits at +0x16.  size: 0xC */
+struct MHcharAreaView {
+    /* +0x00 */ u8 pad_0x00[0x6];
+    /* +0x06 */ u8 area_0x16;
+    /* +0x07 */ u8 pad_0x07[0x5];
+};
 typedef struct MHchar {
     /* +0x000 */ u32 field_0x00;
     /* +0x004 */ VEC3 pos_0x04;
-    /* +0x010 */ union {   /* the 0x0C-byte run: a vector for the sound band, the area byte for the AI band */
-        /* +0x010 */ VEC3 field_0x10;
-        struct {
-            /* +0x010 */ u8 pad_0x10[0x6];
-            /* +0x016 */ u8 area_0x16;
-            /* +0x017 */ u8 pad_0x17[0x5];
-        };
-    };
+    /* +0x010 */ VEC3 field_0x10;
     /* +0x01C */ VEC3 scale_0x1C;
     /* +0x028 */ union {   /* the effects copy their rotation into this run (`eft_rot_vec_copy`) */
         struct {
@@ -111,8 +120,13 @@ typedef struct MHchar {
     /* +0x0F2 */ u8 field_0xF2;     /* the second flag, `pl_model_set_state`/`pl_model_aux_flag_clear` */
     /* +0x0F3 */ u8 pad_0xF3[0x19];
     /* +0x10C */ struct _g3d_work* g3d_0x10C;   /* the pooled g3d work `push_shell_chara_heap` releases */
+#ifdef __cplusplus
+    /* +0x110 */ MHcharResFile field_0x110;   /* the resource file handle (constructed first, as retail does) */
+    /* +0x114 */ nw4r::g3d::ResMdl field_0x114;
+#else
     /* +0x110 */ s32 field_0x110;
     /* +0x114 */ s32 field_0x114;
+#endif
     /* +0x118 */ s32 field_0x118;
     /* +0x11C */ s32 field_0x11C;
     /* +0x120 */ u16 field_0x120;
@@ -124,6 +138,9 @@ typedef struct MHchar {
     /* 0x801FF984 (0x5C): constructs the three vectors, the resource file and the model resource
      * (`lobby/lb_npc.cpp`). */
     MHchar();
+
+    /* The area byte at +0x16 (the middle of `field_0x10`'s y float: the AI and effect bands read it as a byte). */
+    u8 area_0x16() const { return ((const MHcharAreaView*)&field_0x10)->area_0x16; }
 
     /* The engine model/joint entry points the effect units drive; their map names are `MHchar` members
      * (`setVisibility__6MHcharFUlb`, ...), so they are declared here once and called as members

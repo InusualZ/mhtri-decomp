@@ -1252,13 +1252,13 @@ extern "C" void stage_area_models_seat(void)
             stage_area_joint_visibility_set(w, w->chars[i], i);
             for (frame = 0; frame < w->chars[i]->anim_count; frame++)
                 w->chars[i]->chr.frame_init(frame, frame, 0.0f, 0, 1.0f);
-            res.data_0x00 = w->chars[i]->chr.field_0x114;
-            mdl.data_0x00 = w->chars[i]->chr.field_0x110;
+            res.data_0x00 = (u32)w->chars[i]->chr.field_0x114.mpData;
+            mdl.data_0x00 = w->chars[i]->chr.field_0x110.handle;
             if (nw_res_anm_work_num(mdl, res, 1, &work) == 0) {
                 w->anims[i] = 0;
             } else {
-                res2.data_0x00 = w->chars[i]->chr.field_0x114;
-                mdl2.data_0x00 = w->chars[i]->chr.field_0x110;
+                res2.data_0x00 = (u32)w->chars[i]->chr.field_0x114.mpData;
+                mdl2.data_0x00 = w->chars[i]->chr.field_0x110.handle;
                 w->anims[i] = (nw4r::g3d::AnmObj*)nw_res_anm_create(mdl2, 1.0f, res2,
                     (nw4r::g3d::ScnMdlSimple*)w->chars[i]->chr.field_0x118, 1, work, 0);
             }

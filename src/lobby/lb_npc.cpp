@@ -1,13 +1,13 @@
 /*
  * lobby/lb_npc.cpp - the lobby NPC group: the NPC tables and motion lookups, the NPC work state machines, the
  *   lobby player's act layer and control, the arm-wrestle and shop screens and the lobby screen dispatcher.
- * RANGE. .text 0x801FBF78-0x80212810 (389 functions); .ctors 0x8056F35C-0x8056F360 (`lb_npc_static_init`), .data
+ * RANGE. .text 0x801FBF78-0x80212810 (389 functions); .ctors 0x8056F35C-0x8056F360 (`__sinit_\lb_npc_cpp`), .data
  *   0x805B8D44-0x805B97BC, .bss 0x806A7B90-0x806AA790 (`lb_npc`, the 0x12 x 0x268 NPC work array), .sdata
  *   0x80791D50-0x80791DC0, .sbss 0x80794AB0-0x80794B08, .sdata2 0x80799880-0x80799C18, extab, extabindex.  Four bands,
  *   each keeping its own declarations in a namespace: the NPC tables and motion lookups 0x801FBF78-0x802029B4; the NPC
  *   work band 0x802029B4-0x802076D4; the act layer 0x802076D4-0x8020C588; the control band 0x8020C588-0x80212810.
  *   Seam evidence against one TU: the `.sdata2` pool restarts its duplicate values at 0x80799990 and 0x80799B28 (one
- *   pool per TU), `__sinit` (`lb_npc_static_init`) sits mid-range, and the two vtables at 0x805B8D80/0x805B8DA0 are followed
+ *   pool per TU), `__sinit` sits mid-range, and the two vtables at 0x805B8D80/0x805B8DA0 are followed
  *   by `jumptable_805B8DC0` (a seam near 0x801FFCA0); not re-drawn here.
  * FLAGS. `cflags_lobby`; `#pragma optimization_level 4` for the whole file (retail lowers a switch range to
  *   `addi` + `cmplwi`, which -O4 reproduces with no row lost); `#pragma peephole off` from `fn_801FC268` to the end of
@@ -61,20 +61,19 @@
  *   lb_shop_banner_draw, lb_shop_buy_list_draw, lb_shop_sell_list_draw, lb_shop_draw, lb_area_light_ids,
  *   lb_slot_act_tbl, lb_item_motion_tbl, lb_item_motion_once_tbl, lb_shop_banner_wide, lb_shop_banner, lb_shop_frame,
  *   lb_shop_buy_frame, lb_shop_buy_cells, lb_shop_sell_frame, lb_shop_sell_cells, lb_shop_pouch_frame,
- *   lb_shop_pouch_cells, lb_shop_choice_sprites, lb_shop_choice_rows, lb_npc_static_init, lb_npc_array_dtor,
- *   lb_npc_dtor, lb_npc_ctor, lb_npc_char_ctor, lb_npc_char_dtor, lb_npc_char_bind, lb_npc_dtor_chain,
- *   LbNpcMatCallback, lb_npc_mat_callback_ctor, lb_npc_mat_callback_base_ctor, lb_npc_mat_callback_dtor,
- *   lb_npc_mat_callback_calc_mat.
+ *   lb_shop_pouch_cells, lb_shop_choice_sprites, lb_shop_choice_rows, lb_npc_char_bind, lb_npc_dtor_chain,
+ *   LbNpcChar, LbNpcMatCallback (the map rows `__ct__7_LB_NPCFv`, `__dt__7_LB_NPCFv`, `__ct__9LbNpcCharFv`,
+ *   `__dt__9LbNpcCharFv`, `__ct__16LbNpcMatCallbackFv`, `__dt__16LbNpcMatCallbackFv`, the CALC_MAT override and the
+ *   vtable rows are the compiler's manglings of those classes).
  *   Foreign names proposed through the registry (GUESS; the evidence is in `config/RMHE08/name_registry.jsonl`):
  *   the leaf headers this file includes after `Network/network_pat_control.h` and before the class group, and
  *   `npc_model_res_ids`.
- * RESIDUALS. 2 rows unwritten (0x4C bytes): the material hook's constructor 0x801FF938-0x801FF974 and its callback
- *   base's 0x801FF974-0x801FF984, which store the vtables 0x805B8DA0/0x805B8D80 (rule 10: emitted by MWCC from the
- *   `IScnObjCallback` subclass, never stored by hand).  The array's `__sinit` (`lb_npc_static_init`), its ctor/dtor
- *   chain and the hook's destructor and CALC_MAT override are written as free functions with the retail bodies; the
- *   class form needs `_LB_NPC` +0x54 modelled as a `LbNpcChar` member and the `VEC3` constructor calls
- *   as member construction, so the `.ctors` word and both vtables stay unemitted.
- *   18 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
+ * RESIDUALS. `_LB_NPC`, `LbNpcChar` and `LbNpcMatCallback` are classes (lobby/lb_npc.h): the `lb_npc` array is a static
+ *   object, so the compiler emits `__sinit`, the array destructor and the whole constructor/destructor chain; the
+ *   body's constructor (`MHchar::MHchar`) builds its vectors, resource file handle and `ResMdl` as members (pl.h).
+ *   Every constructor, destructor and the CALC_MAT override row is at 100.  The base vtable row 0x805B8D80
+ *   (`lb_npc_scn_obj_callback_vtable`) is this unit's own copy of the interface's vtable; g3d_scnobj defines the other.
+   15 rows below 100 (`python tools/objdiff/unitscore.py lobby/lb_npc --threshold 100`); the recorded causes:
  *  - `lb_arm_wrestle_step`: the opponent search's found path branches to the post-switch `step == 3` test where ours
  *    `return`s to the epilogue (one branch target); no goto-free spelling reaches it (playbook 217: MWCC threads no
  *    flag or inlined return, the flag's `li`/`cmpi` survive every backend pass);
@@ -94,13 +93,8 @@
  *  - `lb_npc_map_setup`: retail loads the record's first byte into r3 for the loop test;
  *  - `lb_npc_walk_blend_set`: retail stores the raw frame count where ours reuses the `extsh` copy;
  *  - `lb_player_menu_area_return`: the strength-reduced peer pointer and the counter are stepped in the other order;
- *  - `lb_npc_ctor`/`lb_npc_char_ctor`/`MHchar::MHchar`: above and on the flipcheck line.
  *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata` claimed, not emitted; `.data` and `.sdata2` short of the claim (the
  *   tables and the float pool are written as literals and externs); `.text`/extab/extabindex short of the claim;
- *   `MHchar::MHchar` builds its `nw4r::g3d::ResMdl` at +0x114 with a placement `new` (the `__nw__FUlPv` call and its
- *   null test retail's member construction lacks) and constructs the +0x10 union's vector twice; `lb_npc_ctor` and
- *   `lb_npc_char_ctor` build their vectors and the model body with placement `new` until `_LB_NPC`/`LbNpcChar` are
- *   classes whose members construct themselves;
  *   90 functions are defined out of address order (the `.text` and `extabindex` order differ from the target's);
  *   lb_npc, lb_npc_func, lb_cat_name, lb_pig_name, lb_tr_flag_data, lb_item_get_data, lobby_hidden_flag and the
  *   `.data` tables other units read are not defined here.
@@ -150,26 +144,6 @@ typedef struct LbPigRegion {
     /* +0x4 */ LbNpcMotionEntry* table_0x4;
 } LbPigRegion;
 
-namespace nw4r { namespace g3d { class ScnObj; } }
-
-/* The material hook an NPC's character block carries: in retail an `nw4r::g3d::IScnObjCallback` subclass (its vtable
- * 0x805B8DA0 over the base's 0x805B8D80, both in this unit's `.data`) whose CALC_MAT slot paints the body's
- * materials.  Laid out here without the class until its constructors and vtables can be emitted.  size: 0xC */
-typedef struct LbNpcMatCallback {
-    /* +0x00 */ u8 pad_0x00[4];      /* the vtable pointer the unwritten constructors store */
-    /* +0x04 */ s32 kind_0x04;       /* 6 paints materials 6 and 7 white, any other kind material 5 */
-    /* +0x08 */ MHchar* chr_0x08;    /* the body whose materials are painted */
-} LbNpcMatCallback;
-
-/* The NPC's character block at `_LB_NPC` +0x54 (the bytes `field_0x054` starts): its owner, the model body and the
- * NPC id.  Only the members this unit's model functions touch are named.  size: 0x178 */
-typedef struct LbNpcChar {
-    /* +0x000 */ struct _LB_NPC* owner_0x000;
-    /* +0x004 */ MHchar body_0x004;
-    /* +0x144 */ u8 pad_0x144[0x24];
-    /* +0x168 */ s32 npc_id_0x168;
-    /* +0x16C */ LbNpcMatCallback callback_0x16C;
-} LbNpcChar;
 #include "lobby/lobby_w.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "Network/network_pat_control.h" /* isNetCityMode (rule 2: its owner's header) */
@@ -290,7 +264,6 @@ namespace s_801FBF78 {
  * Data
  */
 extern "C" LbNpcUserData* lobby_world_block;  /* .sbss pointer */
-extern "C" _LB_NPC lb_npc[0x12];        /* .bss 0x806A7BA0 */
 extern "C" f32 lbl_80799880;
 extern "C" f32 lbl_80799884;
 extern "C" f64 lbl_807998D0;
@@ -752,7 +725,7 @@ void fn_801FDFE4(_LB_NPC* self, u32 motion_id, s32 a, s32 b)
     } else {
         motion = fn_802D282C((u16)motion_id);
     }
-    mhchar_motion_set(self->body_0x058, self->field_0x210, 0, (u16)motion_id, a, motion, (f32)b, 0,
+    mhchar_motion_set(&self->chr_0x054.body_0x004, self->field_0x210, 0, (u16)motion_id, a, motion, (f32)b, 0,
                  lbl_80799884);
 }
 
@@ -767,19 +740,19 @@ void fn_801FE0AC(_LB_NPC* self, u16 motion_id, s32 a, s32 b)
 /* 0x801FE11C - clear the NPC's first state byte. */
 __declspec(noinline) void fn_801FE11C(_LB_NPC* self)
 {
-    self->field_0x149 = 0;
+    self->chr_0x054.body_0x004.field_0xF1 = 0;
 }
 
 /* 0x801FE128 - set the NPC's second state byte. */
 void fn_801FE128(_LB_NPC* self, u8 value)
 {
-    self->field_0x14A = value;
+    self->chr_0x054.body_0x004.field_0xF2 = value;
 }
 
 /* 0x801FE130 - clear the NPC's second state byte. */
 __declspec(noinline) void fn_801FE130(_LB_NPC* self)
 {
-    self->field_0x14A = 0;
+    self->chr_0x054.body_0x004.field_0xF2 = 0;
 }
 
 #pragma peephole on
@@ -808,24 +781,24 @@ u32 fn_801FE1AC(_LB_NPC* self, u32 motion_id)
 /* 0x801FE1CC / 0x801FE1DC - true when the NPC's motion crosses frame `frame` (once, or on every loop). */
 u32 lb_npc_motion_play(_LB_NPC* self, u32 motion_id, f32 frame, f32 speed)
 {
-    return mhchar_frame_check(self->body_0x058, (u16)motion_id, 0, frame, speed);
+    return mhchar_frame_check(&self->chr_0x054.body_0x004, (u16)motion_id, 0, frame, speed);
 }
 
 u32 fn_801FE1DC(_LB_NPC* self, u32 motion_id, f32 frame, f32 speed)
 {
-    return mhchar_frame_check(self->body_0x058, (u16)motion_id, 1, frame, speed);
+    return mhchar_frame_check(&self->chr_0x054.body_0x004, (u16)motion_id, 1, frame, speed);
 }
 
 /* 0x801FE1EC - true when the NPC's motion has run out. */
 u32 fn_801FE1EC(_LB_NPC* self)
 {
-    return mhchar_motion_end_ck(self->body_0x058, 0);
+    return mhchar_motion_end_ck(&self->chr_0x054.body_0x004, 0);
 }
 
 /* 0x801FE1F8 - finalise the NPC's model. */
 void fn_801FE1F8(_LB_NPC* self, f32 speed)
 {
-    mhchar_motion_speed_set(self->body_0x058, speed);
+    mhchar_motion_speed_set(&self->chr_0x054.body_0x004, speed);
 }
 
 }
@@ -835,7 +808,7 @@ void fn_801FE1F8(_LB_NPC* self, f32 speed)
 /* 0x801FE1C4 - the NPC's current motion number. */
 u16 lb_npc_Get_motion_no(_LB_NPC* self)
 {
-    return self->motion_0x0A8;
+    return self->chr_0x054.body_0x004.motion_no_0x50;
 }
 
 /* ===================================================================================================
@@ -868,7 +841,7 @@ extern f32* npc_model_cur_height_data;      /* .sbss: per model, the height */
 /* The NPC's model body (the `MHchar` that starts at +0x58). */
 static inline MHchar* lb_npc_body(_LB_NPC* self)
 {
-    return (MHchar*)self->body_0x058;
+    return &self->chr_0x054.body_0x004;
 }
 
 #pragma peephole off
@@ -1346,99 +1319,45 @@ void lb_npc_motion_effects(_LB_NPC* self)
 } /* namespace s_801FBF78 */
 
 /* ---------------------------------------------------------------------------------------------------
- * The NPC work array's construction and destruction (0x801FF700..0x801FF984).
+ * The NPC work array (0x801FF700..0x801FF984): `lb_npc` is a static array of a class with constructors, so the
+ * compiler emits its `__sinit` (`__construct_array` + `__register_global_object`), the array destructor thunk and the
+ * `_LB_NPC` / `LbNpcChar` / `LbNpcMatCallback` constructor and destructor chain from the types in lobby/lb_npc.h.
  */
-#include "Runtime.PPCEABI.H/CPlusLibPPC.h"   /* __construct_array */
-#include "Runtime.PPCEABI.H/__destroy_arr.h"
-#include "Runtime.PPCEABI.H/__register_global_object.h"
-#include "g3d/scn_obj_callback_dtor.h"
-namespace s_801FBF78 {
-extern "C" {
-_LB_NPC* lb_npc_ctor(_LB_NPC* self);
-_LB_NPC* lb_npc_dtor(_LB_NPC* self, s16 flag);
-LbNpcChar* lb_npc_char_ctor(LbNpcChar* self);
-LbNpcChar* lb_npc_char_dtor(LbNpcChar* self, s16 flag);
-LbNpcMatCallback* lb_npc_mat_callback_ctor(LbNpcMatCallback* self);
-LbNpcMatCallback* lb_npc_mat_callback_dtor(LbNpcMatCallback* self, s16 flag);
-/* untyped: an opaque handle passed through - the destructor chain's registered object (unused) */
-void lb_npc_array_dtor(void* object, int flag);
-extern DestructorChain lb_npc_dtor_chain;   /* .bss 0x806A7B90: the array's global destructor chain node */
 
-/* 0x801FF700 (0x58): constructs the 18 NPC work records and registers their array destructor. */
-void lb_npc_static_init(void)
+/* 0x801FF774 (0x60): destroys the character block, then frees the record when `flag` asks. */
+_LB_NPC::~_LB_NPC()
 {
-    __construct_array(lb_npc, (void*)lb_npc_ctor, (void*)lb_npc_dtor, sizeof(_LB_NPC), 18);
-    __register_global_object(0, lb_npc_array_dtor, &lb_npc_dtor_chain);
 }
 
-/* 0x801FF758 (0x1C): destroys the 18 NPC work records. */
-/* untyped: an opaque handle passed through - the destructor chain's registered object (unused) */
-void lb_npc_array_dtor(void* object, int flag)
+/* 0x801FF7D4 (0x60): destroys the material hook, then frees the block when `flag` asks. */
+LbNpcChar::~LbNpcChar()
 {
-    __destroy_arr(lb_npc, (void*)lb_npc_dtor, sizeof(_LB_NPC), 18);
 }
 
-/* 0x801FF774 (0x60): destroys an NPC work record's character block, then frees the record when `flag` asks. */
-_LB_NPC* lb_npc_dtor(_LB_NPC* self, s16 flag)
+/* 0x801FF834 (0x5C): destroys the material hook through the scene-object callback base. */
+LbNpcMatCallback::~LbNpcMatCallback()
 {
-    if (self != 0) {
-        lb_npc_char_dtor((LbNpcChar*)self->field_0x054, -1);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-/* 0x801FF7D4 (0x60): destroys a character block's material hook, then frees the block when `flag` asks. */
-LbNpcChar* lb_npc_char_dtor(LbNpcChar* self, s16 flag)
+/* 0x801FF890 (0x6C): constructs the vectors and the character block in member order. */
+_LB_NPC::_LB_NPC()
 {
-    if (self != 0) {
-        lb_npc_mat_callback_dtor(&self->callback_0x16C, -1);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-/* 0x801FF834 (0x5C): destroys the material hook through the scene-object callback base, then frees it when `flag`
- * asks. */
-LbNpcMatCallback* lb_npc_mat_callback_dtor(LbNpcMatCallback* self, s16 flag)
+/* 0x801FF8FC (0x3C): constructs the body, then the material hook. */
+LbNpcChar::LbNpcChar()
 {
-    if (self != 0) {
-        scn_obj_callback_dtor(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-/* 0x801FF890 (0x6C): constructs an NPC work record: its vectors and its character block. */
-_LB_NPC* lb_npc_ctor(_LB_NPC* self)
+/* 0x801FF938 (0x3C): builds the callback base and stores the hook's vtable. */
+LbNpcMatCallback::LbNpcMatCallback()
 {
-    new (&self->pos_0x10) nw4r::math::VEC3;
-    new (&self->field_0x01C) nw4r::math::VEC3;
-    new (&self->field_0x038) nw4r::math::VEC3;
-    new (&self->field_0x044) nw4r::math::VEC3;
-    lb_npc_char_ctor((LbNpcChar*)self->field_0x054);
-    new (&self->target_0x1EC) nw4r::math::VEC3;
-    new (&self->vel_0x1F8) nw4r::math::VEC3;
-    new (&self->field_0x258) nw4r::math::VEC3;
-    return self;
 }
 
-/* 0x801FF8FC (0x3C): constructs a character block: the model body, then the material hook. */
-LbNpcChar* lb_npc_char_ctor(LbNpcChar* self)
+/* 0x801FF974 (0x10): stores the callback base's vtable. */
+nw4r::g3d::IScnObjCallback::IScnObjCallback()
 {
-    new (&self->body_0x004) MHchar;
-    lb_npc_mat_callback_ctor(&self->callback_0x16C);
-    return self;
 }
-
-} /* extern "C" */
-} /* namespace s_801FBF78 */
 
 /* ---------------------------------------------------------------------------------------------------
  * The NPC character block's model functions (0x801FF984..0x801FFB78).
@@ -1452,11 +1371,15 @@ void mhchar_reset(MHchar* self);
 }
 LbResource* ckResourceName(char* name);
 
-/* 0x801FF984 (0x5C): constructs a model body: its vectors and empty resource handles. */
-MHchar::MHchar()
+/* Builds the empty resource file handle; expanded into `MHchar::MHchar`, the only constructor of it. */
+inline MHcharResFile::MHcharResFile()
 {
-    s_801FBF78::res_file_ctor((u32*)&field_0x110, 0);
-    new (&field_0x114) nw4r::g3d::ResMdl((void*)0);
+    s_801FBF78::res_file_ctor((u32*)&handle, 0);
+}
+
+/* 0x801FF984 (0x5C): constructs a model body: its vectors, the resource file and the model resource. */
+MHchar::MHchar() : field_0x114((void*)0)
+{
 }
 
 namespace s_801FBF78 {
@@ -1519,40 +1442,39 @@ void lb_npc_char_move(LbNpcChar* self)
  * The material hook's CALC_MAT pass (0x801FFB78), the override in its vtable's +0x10 slot.
  */
 #include "sound/mhchar_mat_num_get.h"
+#include "sound/mhchar_model_release.h"
 namespace s_801FBF78 {
-extern "C" {
 
 /* 0x801FFB78 (0x128): on the CALC_MAT pass (timing 4), paints the body's materials: kind 6 lights materials 6 and 7,
  * any other kind material 5; every other material is painted black. */
 /* untyped: caller-owned payload - the pass's info block */
-void lb_npc_mat_callback_calc_mat(LbNpcMatCallback* self, s32 timing, nw4r::g3d::ScnObj* obj, u32 param, void* info)
+void LbNpcMatCallback::ExecCallback_CALC_MAT(u32 timing, nw4r::g3d::ScnObj* pObj, u32 param, void* pInfo)
 {
     _GXColor black = {0, 0, 0, 0};
     _GXColor white = {255, 255, 255, 255};
     u32 i;
 
-    if (timing == 4) {
-        if (self->kind_0x04 == 6) {
-            for (i = 0; i < mhchar_mat_num_get(self->chr_0x08); i++) {
+    if ((s32)timing == 4) {
+        if (kind_0x04 == 6) {
+            for (i = 0; i < mhchar_mat_num_get(chr_0x08); i++) {
                 if (i != 6 && i != 7) {
-                    self->chr_0x08->setMatColor(i, GX_COLOR0A0, black, true);
+                    chr_0x08->setMatColor(i, GX_COLOR0A0, black, true);
                 } else {
-                    self->chr_0x08->setMatColor(i, GX_COLOR0A0, white, true);
+                    chr_0x08->setMatColor(i, GX_COLOR0A0, white, true);
                 }
             }
         } else {
-            for (i = 0; i < mhchar_mat_num_get(self->chr_0x08); i++) {
+            for (i = 0; i < mhchar_mat_num_get(chr_0x08); i++) {
                 if (i != 5) {
-                    self->chr_0x08->setMatColor(i, GX_COLOR0A0, black, true);
+                    chr_0x08->setMatColor(i, GX_COLOR0A0, black, true);
                 } else {
-                    self->chr_0x08->setMatColor(i, GX_COLOR0A0, white, true);
+                    chr_0x08->setMatColor(i, GX_COLOR0A0, white, true);
                 }
             }
         }
     }
 }
 
-} /* extern "C" */
 } /* namespace s_801FBF78 */
 
 /* ===================================================================================================
@@ -3056,7 +2978,7 @@ void fn_801FD338(_LB_NPC* self, LbNpcModel* data)
     self->field_0x002 = data->npc_id_0x000;
     self->model_0x050 = data;
     self->field_0x000 = 1;
-    lb_npc_char_load((LbNpcChar*)self->field_0x054);
+    lb_npc_char_load(&self->chr_0x054);
     lb_npc_talk_select(self);
     if (fn_801FE8CC(self) == 1) {
         lb_npc_dress_model18(self, lobby_w.pig_dress_0x078);
@@ -3318,7 +3240,7 @@ void fn_801FDBD0(_LB_NPC* self)
         body->field_0x2C = self->field_0x02C;
         body->field_0x30 = self->field_0x030;
         body->pos_0x04 = self->pos_0x10;
-        lb_npc_char_move((LbNpcChar*)self->field_0x054);
+        lb_npc_char_move(&self->chr_0x054);
         self->pos_0x10 = body->pos_0x04;
         if ((self->model_0x050->flags_0x005 & 0x20) != 0 || self->field_0x22C == 1) {
             lb_npc_ground_drop(self);
@@ -3373,7 +3295,6 @@ void fn_801FD174(_LB_NPC* self);
 void fn_801FD338(_LB_NPC* self, LbNpcModel* data);
 u32 lb_npc_appear_ck(void);
 void em007_npc_model_eft_start(u8 index);
-void mhchar_model_release(u8* self);
 void mhchar_res_bank_set(s32 a, u8* b, u32* res);
 void nw_res_list_load(void* rec);
 void* memset(void* dst, s32 c, u32 n);
@@ -3469,12 +3390,12 @@ void lb_npc_model_release_all(void)
     npc = lb_npc;
     for (; i < 0x12; i++) {
         if (npc->field_0x000 != 0) {
-            if (npc->field_0x164 != 0) {
-                push_g3d_wk((struct _g3d_work*)npc->field_0x164);
-                npc->field_0x164 = 0;
-                npc->field_0x170 = 0;
+            if (npc->chr_0x054.body_0x004.g3d_0x10C != 0) {
+                push_g3d_wk(npc->chr_0x054.body_0x004.g3d_0x10C);
+                npc->chr_0x054.body_0x004.g3d_0x10C = 0;
+                npc->chr_0x054.body_0x004.field_0x118 = 0;
             }
-            mhchar_model_release(npc->body_0x058);
+            mhchar_model_release(&npc->chr_0x054.body_0x004);
         }
         npc++;
     }
@@ -3575,7 +3496,7 @@ void fn_801FD174(_LB_NPC* self)
     setVector3(&self->field_0x038, 0.0f, 0.0f, 0.0f);
     setVector3(&self->field_0x044, 0.0f, 0.0f, 0.0f);
     self->model_0x050 = 0;
-    lb_npc_char_bind((LbNpcChar*)self->field_0x054, self);
+    lb_npc_char_bind(&self->chr_0x054, self);
     self->field_0x1CC = 0xFFFF;
     self->field_0x1CE = 0;
     self->field_0x1D0 = self->field_0x1CC;
@@ -5662,7 +5583,7 @@ void lb_npc_pig_release(_LB_NPC* self)
 /* 0x8020623C - the opening demo's NPC: stand at the gate, cut to the plaza, then spin round the stored centre. */
 void fn_8020623C(_LB_NPC* self)
 {
-    VEC3* center = &self->event_pos_0x234;
+    VEC3* center = static_cast<VEC3*>(&self->event_pos_0x234);
     VEC3 radius;
 
     radius.x = 0.0f;
@@ -12170,3 +12091,7 @@ extern "C" void lb_sort_order_name_get(u32 kind) {
 } /* namespace s_8020C588 */
 #pragma dont_inline reset
 #pragma peephole reset
+
+/* The eighteen NPC work records (`.bss` 0x806A7BA0, 0x2B50 B = 0x12 x 0x268); the TU's `__sinit` (0x801FF700)
+ * constructs them with `__construct_array` and registers the array destructor (0x801FF758) on the global chain. */
+_LB_NPC lb_npc[0x12];

@@ -640,7 +640,7 @@ extern "C" _EFT* eft042_slot_get(u8 type, u8 area)
  * as the effect's origin. */
 extern "C" void eft042_set(MHchar* model, u8 type)
 {
-    _EFT* eft = eft042_slot_get_typed(type, model->area_0x16);
+    _EFT* eft = eft042_slot_get_typed(type, model->area_0x16());
 
     if (eft != NULL) {
         eft_rot_vec_copy(&eft->rot_0x24, &model->rot_0x54);

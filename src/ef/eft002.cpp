@@ -202,14 +202,6 @@ struct Effect;
 }
 
 namespace g3d {
-/* The texture-SRT handle the material access wraps: 4 bytes, returned and passed by value. */
-struct ResTexSrt { /* size: 0x04 */
-    /* +0x00 */ u32 handle;
-
-    void GetEffectMtx(u32 idx, nw4r::math::MTX34* out) const;
-    void SetEffectMtx(u32 idx, const nw4r::math::MTX34* in);
-};
-
 /* The 0x34-byte material-access block the code constructs on the stack. `ScnMdl` itself is opaque
  * here (only ever used through pointers), so its size is a lower bound. */
 struct ScnMdl { /* size: 0x04 - lower bound, an approximation (opaque here) */

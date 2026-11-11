@@ -18,19 +18,16 @@
  *   unit, the field names of `CamWork` and its members, and the foreign callee names proposed in
  *   config/RMHE08/name_registry.jsonl (lane camera-main) with their leaf headers.
  * RESIDUALS.
- *   - camera_shoulder_update: the eye/hit and the late block's vectors sit one slot (0xC) above retail's; retail
- *     keeps two more 12-byte objects between the rotation matrix and `eye` (the shape that puts them there was not
- *     found: moving `angles`, `from`/`to` measured equal or worse).
+ *   - camera_shoulder_update: the plane intersection's `normal.z` takes f2 where retail uses f10 (the mwcc-debugger
+ *     dump renders stack operands as fixups; the stack slots all pair, so the residual is float colouring only; the debugger's final dump reproduces the
+ *     object's 406 instructions, and `f32 num`/`f32 t` placed before, after or late measured the same).
  *   - `light/light.cpp` views the same 0x4F8 bytes as `LightWork` (light/light_work.h) and declares the accessor
  *     `camera_work_get` with that return type, so this unit returns `camera_work` through that view;
  *     camera_quake_update keeps the `LightWork` member types.
  *   - The unit's `.data` and `.sdata` are not emitted (the tables are declared `extern` under their map names: the
  *     camera ranges, shake, aim-eye, kill-cut key, area, lobby, script and demo-camera tables); `.bss` emits only
  *     `camera_work`.
- *   - camera_shoulder_update: the plane intersection's `from`/`to` take the slots below `key` (0x50/0x44) where
- *     retail gives them 0x98/0xA4 above `eye`; the mwcc-debugger dump renders stack operands as fixups, so the slot
- *     assignment cannot be read from it (declaration order swapped: no change).
- *   - camera_follow_collide: retail jumps from the wall turn (and its step limit) straight into the ground clamp and
+  *   - camera_follow_collide: retail jumps from the wall turn (and its step limit) straight into the ground clamp and
  *     from the swimming line check past it, which MWCC builds only from jumps (it neither threads a flag nor merges
  *     tails, playbook 213).  The goto-free shape (playbook 219) is two inline helpers: camera_follow_collide_move, a
  *     `do { } while (0)` whose `break` reaches the ground clamp and a `return` that skips it, and
@@ -40,9 +37,10 @@
  *   - Register allocation: camera_follow_shake_update keeps two slot bases (`cam + i` for the state and the timer
  *     bytes) where retail keeps one (a sub-struct, a 2-D array and every index type tried); camera_quake_apply keeps
  *     the row where retail keeps the row's byte offset (row types and an inline index tried);
- *     camera_shoulder_update's plane intersection colours `normal.z` f2 where retail uses f10;
  *     camera_event_script_step loads the latch mask into r0 before extending it into r4.
- * SHAPES.  The vector accessors return by value (`get_camera_pos`, `get_camera_direction`, `get_camera_target_pos`,
+ * SHAPES.  camera_shoulder_update's segment end points are one `VEC3 seg[2]` (an array local takes the slots above `eye`
+ *   and constructs in index order, as retail's 0x98/0xA4 do) and `angles` is declared after `key` (below it).
+ *   The vector accessors return by value (`get_camera_pos`, `get_camera_direction`, `get_camera_target_pos`,
  *   `camera_view_pos_get`, `camera_proj_mtx_get`): VEC3's copy constructor makes MWCC build the result in the
  *   caller's return slot; `get_current_view_mtx` returns `CamMtx34` for the same reason (MTX34's copy is implicit).
  *   A local retail never constructs is not declared (camera_follow_collide).  A float parameter's
@@ -2581,7 +2579,6 @@ extern "C" void camera_aim_update(CamWork* work)
  * line of sight. */
 extern "C" void camera_shoulder_update(CamWork* work)
 {
-    _CP_VECTOR angles;
     _PLW* player;
     CamShoulder* cam;
     u8 area;
@@ -2645,6 +2642,7 @@ extern "C" void camera_shoulder_update(CamWork* work)
         nw4r::math::VEC3 offset;
         nw4r::math::VEC3 look;
         nw4r::math::VEC3 key;
+        _CP_VECTOR angles;
         done = 0;
         if (player->kind_0x09 == 3)
             lift = 70.0f;
@@ -2713,8 +2711,7 @@ extern "C" void camera_shoulder_update(CamWork* work)
             f32 num;
             f32 t;
 
-            nw4r::math::VEC3 from;
-            nw4r::math::VEC3 to;
+            nw4r::math::VEC3 seg[2];
             nw4r::math::VEC3 plane;
             nw4r::math::VEC3 normal;
             nw4r::math::VEC3 dir;
@@ -2724,18 +2721,18 @@ extern "C" void camera_shoulder_update(CamWork* work)
             normal.x = look.x;
             normal.y = 0.0f;
             normal.z = look.z;
-            from = cam->pos;
-            to = *(&(cam->target + look));
-            num = normal.z * (plane.z - to.z);
-            num += normal.x * (plane.x - to.x) + normal.y * (plane.y - to.y);
-            dir.x = to.x - from.x;
-            dir.y = to.y - from.y;
-            dir.z = to.z - from.z;
+            seg[0] = cam->pos;
+            seg[1] = *(&(cam->target + look));
+            num = normal.z * (plane.z - seg[1].z);
+            num += normal.x * (plane.x - seg[1].x) + normal.y * (plane.y - seg[1].y);
+            dir.x = seg[1].x - seg[0].x;
+            dir.y = seg[1].y - seg[0].y;
+            dir.z = seg[1].z - seg[0].z;
             t = num * (1.0f / (dir.z * normal.z + (dir.x * normal.x + dir.y * normal.y)));
-            to.x = to.x + dir.x * t;
-            to.y = to.y + dir.y * t;
-            to.z = to.z + dir.z * t;
-            cam->target = to;
+            seg[1].x = seg[1].x + dir.x * t;
+            seg[1].y = seg[1].y + dir.y * t;
+            seg[1].z = seg[1].z + dir.z * t;
+            cam->target = seg[1];
         }
         cam->roll = work->follow.roll;
         cam->fovy = work->follow.fovy;

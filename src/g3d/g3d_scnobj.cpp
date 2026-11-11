@@ -17,8 +17,8 @@
  *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/g3d_scninline.cpp` the ScnLeaf and
  *   ScnGroup type members call); G3dProcGatherScnObj, G3dProcCalcWorld, G3dProcCalcMat and G3dProcCalcView are
  *   GUESSES (the per-pass ScnGroup members DefG3dProcScnGroup dispatches to).
- *   scn_obj_callback_dtor is a GUESS (0x8008147C: IScnObjCallback's deleting destructor, written as the C helper
- *   because defining the member would emit the interface's vtable here); aabb_copy is a GUESS (0x80081804: the
+ *   IScnObjCallback::~IScnObjCallback (0x8008147C) is defined here, so the interface's vtable is emitted by this unit;
+ *   aabb_copy is a GUESS (0x80081804: the
  *   AABB assignment retail calls out of line).
  * RESIDUALS. None in the object: extab/extabindex carry the records of the weak std::find/std::distance copies,
  *   which the link drops with the copies (`g3d/g3d_scninline.cpp` and the earlier units keep the first ones).
@@ -67,8 +67,6 @@ extern "C" const u8 scn_typename_ScnGroup[0x10] = {0x00, 0x00, 0x00, sizeof("Scn
 
 extern "C" {
 void aabb_copy(nw4r::math::AABB* pDst, const nw4r::math::AABB* pSrc);
-/* untyped: opaque handle - the callback object being destroyed */
-void* scn_obj_callback_dtor(void* pSelf, s16 flag);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -164,13 +162,8 @@ nw4r::g3d::ScnObj::~ScnObj()
 
 
 /* 0x8008147C (0x44): the callback interface's deleting destructor (frees only for a positive flag). */
-/* untyped: opaque handle - the callback object being destroyed */
-extern "C" void* scn_obj_callback_dtor(void* pSelf, s16 flag)
+nw4r::g3d::IScnObjCallback::~IScnObjCallback()
 {
-    if (pSelf && flag > 0) {
-        operator delete(pSelf);
-    }
-    return pSelf;
 }
 
 #pragma dont_inline on
