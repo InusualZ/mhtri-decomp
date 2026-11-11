@@ -825,7 +825,7 @@ config.libs = [
             Object(NonMatching, "ef/ef_sphere.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/system_core.cpp"),
             # Data-only unit: src/ef/sys_tex_file_table.cpp header.
-            Object(NonMatching, "ef/sys_tex_file_table.cpp"),
+            Object(Matching, "ef/sys_tex_file_table.cpp"),
             Object(Matching, "ef/eft001.cpp"),
             Object(NonMatching, "ef/eft_res.cpp"),
             Object(NonMatching, "ef/effect.cpp"),
@@ -1060,7 +1060,7 @@ config.libs = [
             Object(Matching, "g3d/g3d_resanmlight.cpp"),
             Object(Matching, "g3d/g3d_resanmscn.cpp"),
             Object(Matching, "g3d/g3d_resfile.cpp"),
-            Object(NonMatching, "g3d/g3d_resmat.cpp"),
+            Object(Matching, "g3d/g3d_resmat.cpp"),
             Object(Matching, "g3d/g3d_resnode.cpp"),
             Object(Matching, "g3d/g3d_resshp.cpp"),
             Object(Matching, "g3d/g3d_restev.cpp"),
@@ -1187,7 +1187,7 @@ config.libs = [
             Object(Matching, "Network/NetworkConnectionStable.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/network_shared_data.cpp"),
+            Object(Matching, "Network/network_shared_data.cpp"),
             # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.
             Object(Matching, "Network/GameSpyInterfaceThread.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
