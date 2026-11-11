@@ -1,38 +1,25 @@
-/* ef/fn_8030681C.cpp - the tail of the eft041 effect machine (states 1-3), the whole eft042 effect family (its
- *   spawners, record pools, release hooks, the per-kind state bodies and their tables) and the two status-screen
- *   entry points at the end of the range.
- * RANGE. .text 0x8030681C-0x80308FB4 (26 functions); extab 0x80015AB4-0x80015B54, extabindex 0x80034674-0x80034764,
- *   .data 0x805DC5E8-0x805DCC50, .sdata 0x80792B78-0x80792BB8, .sdata2 0x8079ADE0-0x8079AE30.  The range is not one
- *   TU: the `.sdata2` pool pools 0.0f twice (0x8079ADE4 for `eft041_move`, 0x8079AE18 for
- *   `eft042_model_create_kind1`) and 1.0f twice (0x8079ADE0 for `ef/fn_803066F0.c`'s `eft041_model_create`,
- *   0x8079AE24), so eft041 (`lobby/fn_8030121C.cpp`'s `lb_area_fx_set` 0x80306524 .. `eft041_kill`, ending
- *   0x80306A98) and eft042 (0x80306A98 ..) are two TUs; `menu_status_page_open`/`menu_status_page_step`
- *   (0x80308EC0..) read `menu/menu_infomation.cpp`'s `StatusScreenWork` and are likely that unit's head (seam
- *   request filed).
+/* ef/fn_8030681C.cpp - the whole eft042 effect family (its spawners, record pools, release hooks, the per-kind state
+ *   bodies and their tables) and the two status-screen entry points at the end of the range.
+ * RANGE. .text 0x80306A98-0x80308FB4 (23 functions); extab 0x80015ABC-0x80015B54, extabindex 0x80034680-0x80034764,
+ *   .data 0x805DC618-0x805DCC50, .sdata 0x80792B78-0x80792BB8, .sdata2 0x8079ADF0-0x8079AE30.  The effect-41 machine
+ *   before it is `ef/eft041.cpp`.  `menu_status_page_open`/`menu_status_page_step` (0x80308EC0..) read
+ *   `menu/menu_infomation.cpp`'s `StatusScreenWork` and are likely that unit's head (seam request filed).
  * FLAGS. `cflags_main` with `#pragma peephole off`, `optimization_level 4`, `fp_contract off` and `pool_data off`
  *   for the whole file: retail keeps the unfused `clrlwi` narrowing and compares, `fmuls` + `fadds`, and each `.data`
  *   table its own `lis`/`addi` (each pragma measured).
- * NAMES. `eft042_set2` is the runtime dump's own name; `eft041_move`/`eft041_end`/`eft041_kill` are the registry's.
- *   GUESSes from the bodies, in the eft041 scheme (state 0 `model_create`, 1 `move`, 2 `end`, 3 `kill`; the
- *   `+0x40`/`+0x34` hooks `release`/`dispatch`): `eft_spawn_type_at_area`, `eft_area_slot_bind`,
+ * NAMES. `eft042_set2` is the runtime dump's own name.  GUESSes from the bodies, in the eft041 scheme (state 0
+ *   `model_create`, 1 `move`, 2 `end`, 3 `kill`; the `+0x40`/`+0x34` hooks `release`/`dispatch`): `eft_spawn_type_at_area`, `eft_area_slot_bind`,
  *   `eft042_slot_get`/`eft042_slot_get_typed` (the two record pools), `eft042_set_placed` (the caller-placed spawn),
  *   `eft042_release`/`eft042_release_kind0`/`eft042_release_models`, `eft042_dispatch`,
  *   `eft042_model_create_kind0..2` and `eft042_move_kind0..2` (the bodies `eft042_kind_tbl` selects),
  *   `eft042_move`, `eft042_end`, `eft042_kill`, `eft042_joint_show`.  Data GUESSes from their readers:
- *   `eft041_place_pos_tbl`, `eft042_kind_tbl`, `eft042_model_id_tbl`, `eft042_scale_tbl`, `eft042_timer_tbl`,
+ *   `eft042_kind_tbl`, `eft042_model_id_tbl`, `eft042_scale_tbl`, `eft042_timer_tbl`,
  *   `eft042_joint_tbl`, `eft042_offset_tbl`, `eft042_color_tbl`, `eft042_alpha_key_tbl`, the `getKeyData3` lists
  *   `eft042_scale_keys_type<N>`, the `getKeyData` lists `eft042_height_keys_type<N>`, `eft042_mat_color_keys`/
  *   `eft042_tev_color_keys` (type 17) and the kind-2 material keys `eft042_mat<0|1>_<rgb|alpha|scroll>_keys`.
- * RESIDUALS. Every row is written; 24 of 26 match.
- *  - `eft041_move`: retail keeps the constant 200 in a register for the `++timer > 200` compare (`cmpw r0,r23`, hoisted
- *    out of the loop) where ours compares the immediate; the callee-saved registers are numbered differently
- *    (a local `limit` and the reversed compare measure the same);
+ * RESIDUALS. Every row is written; 22 of 23 match.
  *  - `eft042_dispatch`: retail gives the case-0 arm its own `b` into the nested kind switch; every spelling tried
  *    falls straight into it (docs/ef.md, "The case-0 nested dispatch"; the `return` form is the closest).
- *   flipcheck: `.data` and `.sdata` are emitted and byte-identical (the claim's last 4 `.data` bytes are the link's
- *   alignment gap); `.sdata2` is the eft042 pool only - the eft041 pool words 0x8079ADE0..0x8079ADF0 (1.0f for
- *   `ef/fn_803066F0.c`, 0.0f/20.0f/4.0f for `eft041_move`) belong to the other TU, which also leaves
- *   `lbl_8079ADE0` undefined for a flip; `.text` is 8 bytes short (the two rows above).
  *   `ef/eft019.cpp` still calls `eft042_set_placed` by its old `fn_` stem (landing respell).
  * SHAPES. A `u8` compared inside a `switch` keeps retail's `cmpwi` (an `if` gives `cmplwi`): the type tests in
  *   `eft_spawn_type_at_area`, `eft042_set2`, `eft042_end`, `eft042_move_kind0` and `eft042_move_kind2`.
@@ -92,37 +79,7 @@
  * record moved with `equip_list_page_count`, its only reader.
  */
 
-/* One model record of the work area: the pooled model handle the spawner stores and the create
- * result the state-0 bodies file.  Two families disagree about the second word - the kind-2 bodies
- * (eft042_set_placed stores, eft042_model_create_kind2 reads) use it as the model's scale factor - so it is a union
- * (rule 5: each member names the site that uses it, and both keep the +0x04 offset).
- * size: 0x08 */
-typedef struct Eft042Model {
-    MHchar* model;      /* +0x00  `eft_res_model_get`'s pooled model handle */
-    union {
-        void* created;  /* +0x04  the `res_eft_UV_model_create*` result (effect 41, kind 0) */
-        f32   scale;    /* +0x04  the model's uniform scale (kind-2 bodies) */
-    } v_0x04;
-} Eft042Model;
-
-/* The work area.  `count`/`models` are the head every family shares; the 0x10 bytes at +0x0C are the
- * four `_g3d_work` handles for effect 41 and the kind-0 bodies (which use the last two), a placement
- * offset plus an angle for effect 42's kind-1 body.  size: 0x20 */
-typedef struct Eft042Work {
-    u32         count;       /* +0x00  the model count `fn_800F8B44`'s record was taken for */
-    Eft042Model models[1];   /* +0x04 */
-    union {
-        /* effect 41 (`ef/fn_803066F0.c`'s `EftWorkData::works`) and the kind-0 bodies, which use
-         * only the last two slots (`eft042_set`/`eft042_slot_get_typed` clear them, `eft042_release_kind0` releases
-         * them, `eft042_model_create_kind0` fills them). */
-        void* works[4];      /* +0x0C */
-        struct {             /* size: 0x10 */
-            nw4r::math::VEC3 pos;  /* +0x0C  the model's placement offset (kind 1) */
-            f32              angle;/* +0x18  its yaw (kind 1) */
-        } kind1;
-    } v_0x0C;
-    void*       resource;    /* +0x1C  the area resource `lb_area_fx_set` stores */
-} Eft042Work;
+#include "ef/eft042_work.h" /* Eft042Model, Eft042Work (rule 1) */
 
 /* The kind-1 work area's own view (the kind-1 types' state bodies): the placement offset and its
  * scale sit in the same 0x10 bytes the effect-41 view calls `works`, and the model's material colour
@@ -173,11 +130,6 @@ typedef struct EnemyModelRef {
  * tables follow them
  * ------------------------------------------------------------------------------------------------- */
 
-/* the stage-2/13 area-10 placements `eft041_move` picks from */
-Vec eft041_place_pos_tbl[4] = {
-    {98.0f, -105.0f, -500.0f}, {-950.0f, -30.0f, 1400.0f},
-    {-3040.0f, -65.0f, -85.0f}, {-4900.0f, 0.0f, -1000.0f},
-};
 
 /* per-frame colours (type 0) */
 _GXColor eft042_color_seq_type0[6] = {
@@ -426,9 +378,6 @@ u32 eft042_joint_tbl[19] = {
  * this unit's own bodies, forward-declared (address order)
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void eft041_move(_EFT* self);
-extern "C" void eft041_end(_EFT* self);
-extern "C" void eft041_kill(_EFT* self);
 extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type);
 extern "C" void eft_area_slot_bind(_ENEMY_WORK* source, u8 type, s32 timer);
 extern "C" _EFT* eft042_slot_get(u8 type, u8 area);
@@ -456,91 +405,6 @@ extern "C" s32  menu_status_page_step(StatusScreenWork* self);
 
 /* `eft_res_slot_get`'s working area (64 bytes per record) and the model pool are the resource manager's;
  * the two entry points here are the ones this unit pools from. */
-
-/* ---------------------------------------------------------------------------------------------------
- * 0x8030681C - the effect-41 machine's state-1 step
- * ------------------------------------------------------------------------------------------------- */
-
-/* Walks the work area's model records: places each model when its step timer expires, reveals its joints, walks it
- * and retires it after the second timer, then hands its position to `eft004_set`. */
-extern "C" void eft041_move(_EFT* self)
-{
-    Eft042Work* work = (Eft042Work*)self->work_0x38;
-    u8 mapno = get_now_mapno();
-    nw4r::math::VEC3 pos;
-    Vec* pos_tbl;
-    u32 pos_num;
-    u32 i;
-
-    pos_tbl = NULL;
-    if ((mapno == 2 || mapno == 13) && self->area_0x44 == 10) {
-        pos_tbl = eft041_place_pos_tbl;
-        pos_num = 4;
-    }
-
-    for (i = 0; i < work->count; i++) {
-        switch (self->field_0x06) {
-        case 0:
-            if (--self->timer_0x0C < 0) {
-                u8 idx;
-                u32 joint;
-                u32 joints;
-
-                self->field_0x06++;
-                ((EftUvModelObject*)work->models[i].v_0x04.created)->set_frame(0.0f);
-
-                idx = ran_suu(1) % pos_num;
-                vec_to_mh_vec3(&work->models[i].model->pos_0x04, &pos_tbl[idx]);
-
-                joints = work->models[i].model->get_joint_num();
-                for (joint = 0; joint < joints; joint++) {
-                    if (joint == ((u8*)work->resource)[idx]) {
-                        work->models[i].model->setVisibility(joint, true);
-                    } else {
-                        work->models[i].model->setVisibility(joint, false);
-                    }
-                }
-            }
-            break;
-        case 1:
-            if (++self->timer_0x0C > 200) {
-                self->field_0x06 = 0;
-                self->timer_0x0C = ran_suu(1) & 0x1F;
-            } else {
-                work->models[i].model->move(0);
-                ((EftUvModelObject*)work->models[i].v_0x04.created)->update();
-                eft_res_models_spawn(self, (void**)&work->models[i], 2, 1, NULL);
-            }
-            break;
-        }
-
-        switch (200 - self->timer_0x0C) {
-        case 15:
-        case 20:
-        case 25:
-        case 30:
-        case 35:
-            se_bank46_id13_req(&work->models[i].model->pos_0x04);
-            break;
-        }
-
-        pos = work->models[i].model->pos_0x04;
-        pos.y -= 20.0f;
-        eft004_set(0, &pos, 4.0f, 0, self->area_0x44);
-    }
-}
-
-/* The machine's state-2 step: one step further into the effect. */
-extern "C" void eft041_end(_EFT* self)
-{
-    self->state_0x05++;
-}
-
-/* The machine's state-3 step (and every failure path): retire the effect. */
-extern "C" void eft041_kill(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
 
 /* ---------------------------------------------------------------------------------------------------
  * 0x80306A98, 0x80306B10, 0x80306B60 - the effect-42 spawn entries

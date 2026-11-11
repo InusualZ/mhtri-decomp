@@ -1725,19 +1725,21 @@ ef/eft_em_tint.cpp:
 	.sdata      start:0x80792AA0 end:0x80792B70
 	.sdata2     start:0x8079ADB8 end:0x8079ADE0
 
-ef/fn_803066F0.c:
-	extab       start:0x80015AAC end:0x80015AB4
-	extabindex  start:0x80034668 end:0x80034674
-	.text       start:0x803066F0 end:0x8030681C align:16
+ef/eft041.cpp:
+	extab       start:0x80015AAC end:0x80015ABC
+	extabindex  start:0x80034668 end:0x80034680
+	.text       start:0x803066F0 end:0x80306A98 align:16
+	.data       start:0x805DC5E8 end:0x805DC618
 	.sdata      start:0x80792B70 end:0x80792B78
+	.sdata2     start:0x8079ADE0 end:0x8079ADF0
 
 ef/fn_8030681C.cpp:
-	extab       start:0x80015AB4 end:0x80015B54
-	extabindex  start:0x80034674 end:0x80034764
-	.text       start:0x8030681C end:0x80308FB4
-	.data       start:0x805DC5E8 end:0x805DCC50
+	extab       start:0x80015ABC end:0x80015B54
+	extabindex  start:0x80034680 end:0x80034764
+	.text       start:0x80306A98 end:0x80308FB4
+	.data       start:0x805DC618 end:0x805DCC50
 	.sdata      start:0x80792B78 end:0x80792BB8
-	.sdata2     start:0x8079ADE0 end:0x8079AE30
+	.sdata2     start:0x8079ADF0 end:0x8079AE30
 
 menu/menu_infomation.cpp:
 	extab       start:0x80015B54 end:0x80015F3C
