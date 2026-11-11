@@ -18,13 +18,13 @@
  *   res_dic_ofs_to_ptr is a GUESS; res_anm_chr_ofs_to_dic is a GUESS; quat_slerp is a GUESS;
  *   quat_from_mtx34 is a GUESS; quat_empty_ctor is a GUESS; mtx34_from_quat is a GUESS; math_fexp is a GUESS;
  *   math_flog_checked is a GUESS; chr_anm_result_init is a GUESS; MTX33_ctor is a GUESS; PSMTXQuat is a GUESS;
- *   QUATMtx is a GUESS; QUATSlerp is a GUESS; anmchr_resnode_class_name is a GUESS;
- *   anmchr_resdic_class_name is a GUESS (the evidence follows).
+ *   QUATMtx is a GUESS; QUATSlerp is a GUESS; "ResNode" is a GUESS;
+ *   "ResDic" is a GUESS (the evidence follows).
  *   The quaternion/matrix helpers are nw4r's blend support: the SDK names follow the neighbours (0x804C6430 sits among
  *   the PSMTX scale/rotation builders), the class-name strings are the `.sdata` records 'ResNode'/'ResDic', and the
  *   ResDic accessors (0x800628A4..0x80062914) mirror the ResNode ones.  The blend flag names (ANMFLAG_BLEND_*, the
  *   ChrAnmResult FLAG_*) follow the asserts' text and the branches they select.
- *   anmchr_resnode_ref_name is a GUESS; res_node_assign is a GUESS; res_node_common_assign is a GUESS;
+ *   "ref" is a GUESS; res_node_assign is a GUESS; res_node_common_assign is a GUESS;
  *   res_node_empty_assign is a GUESS; res_node_get_id is a GUESS; res_node_get_next_sibling is a GUESS;
  *   res_node_get_parent is a GUESS; res_node_ofs_to_node is a GUESS;
  *   res_node_ref_nonconst is a GUESS (the evidence follows).
@@ -51,25 +51,31 @@
  *   ResAnmChr (0x80061898..0x80061D08: GetNumNode, ref, ptr, GetClassName, IsValid, GetAnmPolicy, GetNumFrame), the
  *   AnmObjChrRes constructor, Construct and its vtable members are nw4r's (the vtable at .data 0x8058BCA8 orders
  *   them; ResAnmChrData's field names are GUESSES).  res_anm_chr_copy_ctor is a GUESS; res_anm_chr_common_copy_ctor
- *   is a GUESS; anmchr_resanmchr_class_name is a GUESS; anmchr_resanmchr_ac_file is a GUESS; anmchr_ref_invalid_fmt
- *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
+ *   is a GUESS; "ResAnmChr" is a GUESS; "g3d_resanmchr_ac.h" is a GUESS; "%s::%s: Object not valid."
+ *   is a GUESS; "ref" is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. GetAnmPlayPolicy (0x80061C70, the "g3d_anmobj.h" assert) reads its two-entry table
+ * RESIDUALS. none in this unit's rows (150 at 100 %; `.data`, `.rodata`, `.sdata`, `.bss`, extab and extabindex match).
+ *   GetAnmPlayPolicy (0x80061C70, the "g3d_anmobj.h" assert) reads its two-entry table
  *   anm_play_policy_table (.sdata 0x80790E70, map row lbl_80790E70, rename request g3d-anmtex#3), which sits inside
  *   `mh3_pad.cpp`'s `.sdata` claim (seam request g3d-anmtex#6); it is declared in `mh3_pad.h`.
  *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/g3d_anmobj.cpp`'s claim, declared in the class only.
- *   Partial: the members whose only difference is a relocation name (the strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  G3dObj::IsDerivedFrom is `inline` (`g3d/g3d_obj.h`), so its
  *   copy here is weak and the G3dObj vtable is `g3d/g3d_obj.cpp`'s.
  *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) is
  *   `g3d/g3d_anmobj.cpp`'s `.rodata` claim (0x8056F568-0x8056F578).
- *   flipcheck: `.text` 0x6F18 of 0x6F90; extab 0x3EC of 0x3A4 (__dt__AnmObjChrNode's record is 108 B against 28 B);
- *   extabindex 0x4D4 of 0x4E0; `.rodata`, `.data` (0xA74 of 0xD08), `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
- *   Relocation names that differ from retail: the string literals (ours are `@NNN` pool names, the target's are the
- *   named `.data` rows) and the float pool constants.
+ * ORDER. Retail emits every helper as a deferred inline right after the function that first references it (pending
+ *   references pop last-in first-out); only the class members and `res_mdl_node_subtree_end`, the work-memory accessors,
+ *   `math_reciprocal`, `dVector4Set` and the `AnmObj`/`AnmObjChrBlend`/`AnmObjChrRes` constructors, `UpdateCache`
+ *   and `AnmObj::~AnmObj` are real definitions, in address order.  The helpers are `__declspec(noinline) inline`,
+ *   defined before their first caller; the weak string pools they carry land in reverse definition order, so the
+ *   helpers that own strings are defined in retail's reverse data order.  The `ref` name strings are file-scope
+ *   statics defined in retail's `.sdata` order, `ResNode`/`ResDic` are named globals.  `AnmObjChrNode::~AnmObjChrNode`
+ *   tests its pointer through `anmchr_pointer_valid` (the assert macro's block locals would each open a base-cleanup
+ *   state: extab 108 B against 28 B).  `math_reciprocal` stays an `asm` function: an `asm` block inside an inline
+ *   function compiles to nothing.
  * SHAPES. AnmObjChrBlend::GetResult declares the child's flag word before the blend loop (declared in the body it
  *   takes r23 and the loop index r24, the reverse of retail) and compiles under `#pragma fp_contract off`.
  * SHAPES. The file compiles at `#pragma optimization_level 4`: at the lib's -O3, AnmObjChrRes::Release(ResMdl, u32,
@@ -109,33 +115,20 @@
 
 #pragma pool_data off
 
+/* The `ref` accessors' name argument: small-data strings the unit defines, in retail's `.sdata` order. */
+static char ref_name_resdic[4] = "ref";
+static char ref_name_resanmchr[4] = "ref";
+static char ref_name_resnode_const[4] = "ref";
+static char ref_name_resnode_nonconst[4] = "ref";
+char anmchr_resnode_class_name[8] = "ResNode";
+char anmchr_resdic_class_name[7] = "ResDic";
+
 
 
 /* The `.sdata` strings fn_8005D27C / fn_800628AC hand back (`_SDA_BASE_`-relative), and the two
  * absolute constants the blocked-return helpers hand back (`.bss` / `.data`). */
-extern u8 anmchr_resnode_class_name[8];
-extern u8 anmchr_resdic_class_name[7];
-extern const char anmchr_resdic_ref_invalid_fmt[];     /* "%s::%s: Object not valid." */
-extern const char anmchr_resdic_ac_file_ref[];         /* "g3d_resdict.h" */
-extern const char anmchr_arithmetic_h_file[];          /* "arithmetic.h" */
-extern const char anmchr_flog_domain_msg[];            /* "FLog: Input is out of the domain." */
-extern const char anmchr_resnode_ref_const_invalid_fmt[]; /* "%s::%s: Object not valid." */
-extern const char anmchr_resnode_ac_file_ref_const[];  /* "g3d_resnode_ac.h" */
-extern const char anmchr_resdic_ref_name[4];           /* "ref" (sized: an SDA21 address) */
-extern const char anmchr_resnode_ref_const_name[4];    /* "ref" (the const ResNode accessor's copy) */
-extern u8 lbl_8066AE80[];
-extern u8 anmchr_resanmchr_class_name[];    /* "ResAnmChr" */
-extern const char anmchr_resanmchr_ac_file[]; /* "g3d_resanmchr_ac.h" */
-extern const char anmchr_ref_invalid_fmt[];   /* "%s::%s: Object not valid." */
-extern const char anmchr_ref_name[4];         /* "ref" (sized: an SDA21 address) */
-extern const char anmchr_resnode_ref_name[4]; /* "ref" (ResNode's copy, sized: an SDA21 address) */
-/* The strings the ResNode accessors and the subtree walk pass to Panic, declared so the unit's `.data` keeps its
- * size (literals would grow it and shift the vtables behind them). */
-extern const char anmchr_target_node_valid_msg[]; /* "NW4R:Failed assertion targetNode.IsValid()" */
-extern const char anmchr_resnode_ac_file_ref[];   /* "g3d_resnode_ac.h" */
-extern const char anmchr_resnode_ref_invalid_fmt[]; /* "%s::%s: Object not valid." */
-extern const char anmchr_resnode_ac_file_id[];    /* "g3d_resnode_ac.h" */
-extern const char anmchr_resnode_is_valid_msg[];  /* "NW4R:Failed assertion IsValid()" */
+/* The 0x18000-byte g3d work memory the accessors below hand pieces of out (`.bss`). */
+u8 g3d_work_memory[0x18000];
 extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc);
 
 extern "C" {
@@ -152,463 +145,24 @@ int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::Res
 /* 0x8005CF10 (0x140): one past the last node of node `idx`'s subtree, in the model's node order. */
 u32 res_mdl_node_subtree_end(nw4r::g3d::ResMdl mdl, u32 idx);
 }
-extern const char anmchr_resnode_align_assert_msg[]; /* the ResNode alignment assertion */
-extern const char anmchr_resnode_ac_file[]; /* "g3d_resnode_ac.h" */
-extern const char anmchr_resdic_idx_bounds_msg[]; /* the ResDic index assertion */
-extern const char anmchr_resdic_ac_file[]; /* "g3d_resdict.h" */
-extern const char anmchr_resdic_align_assert_msg[]; /* the ResDic alignment assertion */
-extern const char anmchr_resdic_ac_file_ctor[]; /* "g3d_resdict.h" */
-extern u8 lbl_8056F500[];
-extern u8 lbl_8056F538[];
+/* The `.rodata` run-time type names of the four classes (0x8056F500, 0x8056F510, 0x8056F524, 0x8056F538): the name's
+ * size with its NUL, then the name, padded with at least one NUL to a word. */
+#define ANMCHR_TYPENAME_LEN(s) (sizeof(s) + 4 - sizeof(s) % 4)
+extern "C" const nw4r::g3d::TypeNameData<ANMCHR_TYPENAME_LEN("AnmObjChr")> anm_typename_AnmObjChr = {
+    sizeof("AnmObjChr"), "AnmObjChr"};
+extern "C" const nw4r::g3d::TypeNameData<ANMCHR_TYPENAME_LEN("AnmObjChrNode")> anm_typename_AnmObjChrNode = {
+    sizeof("AnmObjChrNode"), "AnmObjChrNode"};
+extern "C" const nw4r::g3d::TypeNameData<ANMCHR_TYPENAME_LEN("AnmObjChrBlend")> anm_typename_AnmObjChrBlend = {
+    sizeof("AnmObjChrBlend"), "AnmObjChrBlend"};
+extern "C" const nw4r::g3d::TypeNameData<ANMCHR_TYPENAME_LEN("AnmObjChrRes")> anm_typename_AnmObjChrRes = {
+    sizeof("AnmObjChrRes"), "AnmObjChrRes"};
 
-/* --- bodies: the g3d work-memory accessors and tiny constant/identity helpers ---------------------- */
-
-extern "C" u8* fn_8005CED0(void)
-{
-    return lbl_8066AE80;
-}
-
-extern "C" u8* fn_8005CEDC(void)
-{
-    return lbl_8066AE80 + 0x6000;
-}
-
-extern "C" u8* workmem_get_mdl_z_temporary(void)
-{
-    return lbl_8066AE80;
-}
-
-extern "C" u8* g3d_workmem_skinning_mtx(void)
-{
-    return lbl_8066AE80;
-}
-
-extern "C" u8* g3d_billboard_work_mtx(void)
-{
-    return lbl_8066AE80;
-}
-
-extern "C" u32* res_node_ptr(u32** pp)
-{
-    return *pp;
-}
-
-extern "C" void res_node_empty_assign(u32* a, u32* b)
-{
-    (void)a;
-    (void)b;
-}
-
-extern "C" void res_node_common_assign(u32* dst, u32* src)
-{
-    *dst = *src;
-}
-
-/* 0x8005D210 (0x8): stores the block address. */
-NW4R_G3D_RESCOMMON_CTOR(ResNodeData)
-
-/* 0x8005D1AC (0x64): wraps `pData`, asserting its alignment. */
-/* untyped: opaque handle - the node block */
-nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
-    if ((u32)pData & 0x3) {
-        nw4r::db::Panic((const char*)anmchr_resnode_ac_file, 44, (const char*)anmchr_resnode_align_assert_msg);
-    }
-}
-
-extern "C" u8* res_node_get_class_name(void)
-{
-    return anmchr_resnode_class_name;
-}
-
-extern "C" void res_node_common_copy_ctor(u32* dst, u32* src)
-{
-    *dst = *src;
-}
-
-/* 0x8005D2FC (0x14): tells whether the handle is set. */
-bool nw4r::g3d::ResMdl::IsValid() const
-{
-    return mpData != NULL;
-}
-
-/* 0x8005D3E0 (0x4): releases nothing - the objects are freed through their heap. */
-void nw4r::g3d::G3dObj::operator delete(void* pBlock) /* untyped: byte range */
-{
-}
-
-/* Returns the type's name (the record's string, after its length word). */
-const char* nw4r::g3d::G3dObj::TypeObj::GetTypeName() const
-{
-    return mName->str;
-}
-
-extern "C" void **fn_8005DC60(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
-
-extern "C" const u8 **type_obj_set_name_anmchr(const u8 **out, const u8 *v)
-{
-    *out = v;
-    return out;
-}
-
-/* The two ``current chunk`` getters: stash a fixed descriptor address in a local through the setter,
- * then hand the local back (the setter is opaque, so the reload is real). */
-
-
-/* The two-word copy pair the character-animation constructor uses. */
-extern "C" void* res_node_assign(u32* dst, u32* src)
-{
-    res_node_common_assign(dst, src);
-    res_node_empty_assign(dst + 1, src + 1);
-    return dst;
-}
-
-/* 0x800600B8 (0x8): records the parent. */
-void nw4r::g3d::G3dObj::SetParent(G3dObj* pParent)
-{
-    mpParent = pParent;
-}
-
-/* 0x800600C0 (0x8): returns the parent. */
-nw4r::g3d::G3dObj* nw4r::g3d::G3dObj::GetParent() const
-{
-    return mpParent;
-}
-
-/* 0x800604CC (0x8): the placement form: builds the object in the caller's block. */
-/* untyped: byte range - the placement address the Construct functions build the object in */
-void* nw4r::g3d::G3dObj::operator new(unsigned long size, void* pBlock)
-{
-    (void)size;
-    return pBlock;
-}
-
-/* 0x80060FEC (0x4): constructs a quaternion (leaves it unset). */
-extern "C" void quat_empty_ctor(nw4r::math::QUAT*)
-{
-}
-
-/* 0x80061898 (0x24): the animated node count. */
-u32 nw4r::g3d::ResAnmChr::GetNumNode() const
-{
-    return ref().numNode;
-}
-
-/* 0x800618BC (0x64): the resource block, asserting the handle is valid. */
-const nw4r::g3d::ResAnmChrData& nw4r::g3d::ResAnmChr::ref() const
-{
-    if (!IsValid()) {
-        nw4r::db::Panic(anmchr_resanmchr_ac_file, 39, anmchr_ref_invalid_fmt, GetClassName(), anmchr_ref_name);
-    }
-    return *ptr();
-}
-
-/* 0x80061920 (0x8): the resource block, unchecked. */
-const nw4r::g3d::ResAnmChrData* nw4r::g3d::ResAnmChr::ptr() const
-{
-    return mpData;
-}
-
-/* 0x80061928 (0xC): the class name the asserts print. */
-const char* nw4r::g3d::ResAnmChr::GetClassName()
-{
-    return (const char*)anmchr_resanmchr_class_name;
-}
-
-/* 0x80061B30 (0xC): copies the base handle's data pointer. */
-extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
-{
-    pDst->mpData = pSrc->mpData;
-}
-
-/* 0x80062024 (0x8): the current frame. */
-f32 nw4r::g3d::FrameCtrl::GetFrm() const
-{
-    return mFrame;
-}
-
-/* 0x800621DC (0x8): sets the update rate. */
-void nw4r::g3d::FrameCtrl::SetRate(f32 rate)
-{
-    mUpdateRate = rate;
-}
-
-/* 0x80062300 (0x8): the update rate. */
-f32 nw4r::g3d::FrameCtrl::GetRate() const
-{
-    return mUpdateRate;
-}
-
-/* 0x80061EC4 (0x44): sets the frame, folded into the frame range by the play policy. */
-void nw4r::g3d::FrameCtrl::SetFrm(f32 frame)
-{
-    mFrame = mpPlayPolicy(mStartFrame, mEndFrame, frame);
-}
 
 extern "C" {
 /* untyped: byte range - the allocated block */
 static void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size);
 }
 
-/* 0x800604D4 (0x4): allocates `size` bytes from the object heap. */
-/* untyped: byte range - the allocated block */
-void* nw4r::g3d::G3dObj::Alloc(MEMAllocator* pHeap, u32 size)
-{
-    return g3d_obj_alloc_tail(pHeap, size);
-}
-
-extern "C" {
-/* 0x800604D8 (0x4): forwards the allocation to the allocator. */
-/* untyped: byte range - the allocated block */
-static void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size)
-{
-    return MEMAllocFromAllocator(pHeap, size);
-}
-
-/* 0x800610AC (0x18): 1 / value by one Newton-Raphson step from the hardware estimate. */
-asm f32 math_reciprocal(register f32 value)
-{
-    nofralloc
-    fres f0, value
-    ps_add f2, f0, f0
-    ps_mul f0, f0, f0
-    ps_nmsub f0, value, f0, f2
-    fmr f1, f0
-    blr
-}
-}
-
-/* 0x800626BC (0x8): stores the block address. */
-NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResNameData)
-
-/* untyped: opaque handle - the dictionary block */
-extern "C" void* res_dic_ptr(void* self)
-{
-    return *(void**)self;
-}
-
-extern "C" u8* res_dic_get_class_name(void)
-{
-    return anmchr_resdic_class_name;
-}
-
-/* 0x80062978 (0x8): stores the block address. */
-NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResDicData)
-
-extern "C" void res_name_common_copy_ctor(u32* dst, u32* src)
-{
-    *dst = *src;
-}
-
-/* --- assignment helpers that return the object (nw4r's fluent setters) ------------------------------ */
-
-/* 0x8006268C (0x30): wraps `pData`. */
-/* untyped: opaque handle - the name block */
-nw4r::g3d::ResName::ResName(void* pData) : ResCommon<ResNameData>(pData) {}
-
-/* 0x80061B00 (0x30): copy-constructs a character-animation handle and returns the destination. */
-extern "C" nw4r::g3d::ResAnmChr* res_anm_chr_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
-{
-    res_anm_chr_common_copy_ctor(pDst, pSrc);
-    return pDst;
-}
-
-extern "C" void* res_name_copy_ctor(void* self, u32* src)
-{
-    res_name_common_copy_ctor((u32*)self, src);
-    return self;
-}
-
-extern "C" void* res_node_copy_ctor(void* self, u32* src)
-{
-    res_node_common_copy_ctor((u32*)self, src);
-    return self;
-}
-
-/* --- more one-instruction accessors ----------------------------------------------------------------- */
-
-/* 0x80061934 (0x14): whether the handle names a block. */
-bool nw4r::g3d::ResAnmChr::IsValid() const
-{
-    return mpData != NULL;
-}
-
-/* 0x80061C70 (0x74): the frame-folding function for `policy`. */
-nw4r::g3d::PlayPolicyFunc nw4r::g3d::GetAnmPlayPolicy(AnmPolicy policy)
-{
-    bool valid = false;
-    if ((u32)policy <= ANM_POLICY_LOOP) {
-        valid = true;
-    }
-    if (!valid) {
-        nw4r::db::Panic("g3d_anmobj.h", 0x3C, "policy is out of bounds(%d)\n%d <= policy <= %d not satisfied.", policy,
-                        ANM_POLICY_ONETIME, ANM_POLICY_LOOP);
-    }
-    return anm_play_policy_table[policy];
-}
-
-/* 0x80061CE4 (0x24): the play policy. */
-nw4r::g3d::AnmPolicy nw4r::g3d::ResAnmChr::GetAnmPolicy() const
-{
-    return ref().policy;
-}
-
-/* 0x80061D08 (0x24): the frame count. */
-int nw4r::g3d::ResAnmChr::GetNumFrame() const
-{
-    return ref().numFrame;
-}
-
-
-/* untyped: opaque handle - the dictionary block */
-extern "C" u32 res_dic_is_valid(void* self)
-{
-    return *(u32*)self != 0;
-}
-
-/* Returns the word at +0 plus `offset`, or 0 when `offset` is 0 (nw4r's null-safe offset helper). */
-extern "C" u8* res_dic_ofs_to_ptr(u8** p, s32 offset)
-{
-    u8* base = *p;
-
-    if (offset != 0) {
-        return base + offset;
-    }
-    return NULL;
-}
-
-/* The align-up helper: (~(align - 1)) & (offset + align - 1). */
-extern "C" u32 g3d_round_up(u32 offset, unsigned int align)
-{
-    return (align + offset - 1) & ~(align - 1);
-}
-
-/* nw4r's four-float vector setter. */
-extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w)
-{
-    dst[0] = x;
-    dst[1] = y;
-    dst[2] = z;
-    dst[3] = w;
-}
-
-/* --- forwarders into the SDK allocator / matrix helpers --------------------------------------------- */
-
-/* 0x80060F70 (0x3C): the quaternion interpolation of `pFrom` towards `pTo` by `t` into `pOut`. */
-extern "C" nw4r::math::QUAT* quat_slerp(nw4r::math::QUAT* pOut, const nw4r::math::QUAT* pFrom,
-                                        const nw4r::math::QUAT* pTo, f32 t)
-{
-    QUATSlerp(pFrom, pTo, pOut, t);
-    return pOut;
-}
-
-/* 0x80060FAC (0x40): the quaternion of the matrix at `pMtx`. */
-extern "C" nw4r::math::QUAT* quat_from_mtx34(nw4r::math::QUAT* pOut, const nw4r::math::MTX34* pMtx)
-{
-    QUATMtx(pOut, mtx34_const_ptr((u32)pMtx));
-    return pOut;
-}
-
-/* 0x8006244C (0x18): advances the frame by the update rate times the base rate. */
-void nw4r::g3d::FrameCtrl::UpdateFrm()
-{
-    f32 step = mUpdateRate * smBaseUpdateRate;
-
-    SetFrm(mFrame + step);
-}
-
-/* --- nw4r's ``fn_800626F4``-returns-this pair ------------------------------------------------------- */
-
-extern "C" u32 ut_get_int_ptr(u32 value)
-{
-    return value;
-}
-
-extern "C" u32 ut_add_offset_to_ptr(u32 a, u32 b)
-{
-    return b + ut_get_int_ptr(a);
-}
-
-/* --- forwarders into nw4r math ---------------------------------------------------------------------- */
-
-/* The exp forwarder (nw4r's inline `math::FExp`): a tail call with the argument untouched. */
-extern "C" f32 math_fexp(f32 x)
-{
-    return nw4r::math::detail::FExp(x);
-}
-
-/* 0x80060F28 (0x44): builds the rotation matrix of the quaternion into `pOut` and returns it. */
-extern "C" nw4r::math::MTX34* mtx34_from_quat(nw4r::math::MTX34* pOut, const nw4r::math::QUAT* pQuat)
-{
-    PSMTXQuat((nw4r::math::MTX34*)mtx34_get_ptr(pOut), pQuat);
-    return pOut;
-}
-
-/* 0x80060FF0 (0x78): the natural log, NaN (with a warning) outside the domain. */
-extern "C" f32 math_flog_checked(f32 x)
-{
-    if (!(x > 0.0f)) {
-        nw4r::db::Warning(anmchr_arithmetic_h_file, 295, anmchr_flog_domain_msg);
-    }
-    if (x > 0.0f) {
-        return nw4r::math::detail::FLog(x);
-    }
-    return -(0.0f / 0.0f);
-}
-
-/* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
-/* untyped: opaque handle - the dictionary block */
-nw4r::g3d::ResDic::ResDic(void* pData) : ResCommon<ResDicData>(pData) {
-    if ((u32)pData & 0x3) {
-        nw4r::db::Panic((const char*)anmchr_resdic_ac_file_ctor, 84, (const char*)anmchr_resdic_align_assert_msg);
-    }
-}
-
-/* 0x80062750 (0xD4): returns the `idx`-th entry's data, asserting the index is in range. */
-/* untyped: opaque handle - the entry's data block */
-void* nw4r::g3d::ResDic::operator[](int idx) const {
-    if (res_dic_is_valid((u32*)this)) {
-        bool inRange = false;
-        if (idx >= 0 && idx <= (s32)ref().numData - 1) {
-            inRange = true;
-        }
-        if (!inRange) {
-            nw4r::db::Panic((const char*)anmchr_resdic_ac_file, 42, (const char*)anmchr_resdic_idx_bounds_msg, idx, 0,
-                            ref().numData - 1);
-        }
-        return (void*)res_dic_ofs_to_ptr((u8**)this, ref().entry[idx + 1].ofsData);
-    }
-    return NULL;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The pointer-holder accessors (0x80063888-0x80063E60): a local pointer is filled in through one of
- * the two store helpers and the destination address is returned.
- * --------------------------------------------------------------------------------------------- */
-
-/* Stores `v` through `out` and hands `out` back so the caller keeps its address in r3. */
-extern "C" const u8 **type_obj_set_name(const u8 **out, const u8 *v)
-{
-    *out = v;
-    return out;
-}
-
-
-extern "C" void **fn_80063B24(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
-
-
-extern "C" void **fn_80063C8C(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
 
 
 /* --------------------------------------------------------------------------------------------- *
@@ -636,62 +190,1409 @@ extern "C" void **fn_80063C8C(void **out, void *v)
 
 #define ANMCHR_POINTER_ASSERT G3D_POINTER_ASSERT
 
+
 extern "C" u32 g3d_round_up(u32 offset, unsigned int align);
 
-/* 0x80061948 (0x1B8): builds a resource-played character animation over `res`, with an optional result cache. */
-nw4r::g3d::AnmObjChrRes::AnmObjChrRes(MEMAllocator* pHeap, ResAnmChr res, u16* pBindingBuf, int numBinding,
-                                      ChrAnmResult* pCacheBuf)
-    : AnmObjChr(pHeap, pBindingBuf, numBinding), FrameCtrl(0.0f, res.GetNumFrame(), GetAnmPlayPolicy(res.GetAnmPolicy()))
+
+/* Wraps a returned handle word in a class temporary, so a copy helper gets the temporary's address. */
+struct HandleWord {
+    HandleWord(u32 word) { mWord = word; }
+    /* +0x00 */ u32 mWord;
+};
+ /* size: 0x4 */
+
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* res_node_assign(u32* dst, u32* src);
+extern "C" u8* res_dic_get_class_name(void);
+extern "C" u8* res_node_get_class_name(void);
+extern "C" f32 math_flog_checked(f32 x);
+extern "C" u32 res_node_get_id(const ResHandle* pSelf);
+extern "C" const ResNodeData* res_node_ref(const ResHandle* pSelf);
+extern "C" ResNodeData* res_node_ref_nonconst(ResHandle* pSelf);
+extern "C" u32* res_node_ptr(u32** pp);
+extern "C" void res_node_empty_assign(u32* a, u32* b);
+extern "C" void res_node_common_assign(u32* dst, u32* src);
+extern "C" void res_node_common_copy_ctor(u32* dst, u32* src);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void **fn_8005DC60(void **out, void *v);
+extern "C" const u8 **type_obj_set_name_anmchr(const u8 **out, const u8 *v);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* res_node_assign(u32* dst, u32* src);
+extern "C" void quat_empty_ctor(nw4r::math::QUAT*);
+extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* res_dic_ptr(void* self);
+extern "C" void res_name_common_copy_ctor(u32* dst, u32* src);
+extern "C" nw4r::g3d::ResAnmChr* res_anm_chr_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* res_name_copy_ctor(void* self, u32* src);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void* res_node_copy_ctor(void* self, u32* src);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" u32 res_dic_is_valid(void* self);
+extern "C" u8* res_dic_ofs_to_ptr(u8** p, s32 offset);
+extern "C" u32 g3d_round_up(u32 offset, unsigned int align);
+extern "C" nw4r::math::QUAT* quat_slerp(nw4r::math::QUAT* pOut, const nw4r::math::QUAT* pFrom, const nw4r::math::QUAT* pTo, f32 t);
+extern "C" nw4r::math::QUAT* quat_from_mtx34(nw4r::math::QUAT* pOut, const nw4r::math::MTX34* pMtx);
+extern "C" u32 ut_get_int_ptr(u32 value);
+extern "C" u32 ut_add_offset_to_ptr(u32 a, u32 b);
+extern "C" f32 math_fexp(f32 x);
+extern "C" nw4r::math::MTX34* mtx34_from_quat(nw4r::math::MTX34* pOut, const nw4r::math::QUAT* pQuat);
+extern "C" const u8 **type_obj_set_name(const u8 **out, const u8 *v);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void **fn_80063B24(void **out, void *v);
+/* untyped: opaque handle or byte range, as the definition below spells it */
+extern "C" void **fn_80063C8C(void **out, void *v);
+extern "C" s32 res_anm_chr_ofs_to_dic(const nw4r::g3d::ResAnmChr* pSelf, s32 key);
+extern "C" const nw4r::g3d::ResAnmChrNodeData* res_anm_chr_get_node_anm(const nw4r::g3d::ResAnmChr* pSelf, u32 idx);
+extern "C" int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::ResName name);
+extern "C" nw4r::g3d::ResName res_node_get_res_name(const ResHandle* pNode);
+extern "C" u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs);
+extern "C" u32 res_node_get_parent(ResHandle* pSelf);
+extern "C" u32 res_node_get_next_sibling(ResHandle* pSelf);
+extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w);
+
+
+
+extern "C" __declspec(noinline) inline u8* res_dic_get_class_name(void)
 {
-    res_anm_chr_copy_ctor(&mRes, &res);
-    mpResultCache = pCacheBuf;
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x40F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (mpResultCache) {
-        UpdateCache();
+    return (u8*)anmchr_resdic_class_name;
+}
+
+
+
+extern "C" __declspec(noinline) inline u8* res_node_get_class_name(void)
+{
+    return (u8*)anmchr_resnode_class_name;
+}
+
+
+
+/* 0x8005D428 (0x12C): records the parent and the heap the object was allocated from. */
+__declspec(noinline) inline nw4r::g3d::G3dObj::G3dObj(MEMAllocator* pHeap, G3dObj* pParent) : mpParent(pParent), mpHeap(pHeap)
+{
+    ANMCHR_POINTER_ASSERT("g3d_obj.h", pHeap, 0x9C, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+}
+
+
+
+/* 0x80061C70 (0x74): the frame-folding function for `policy`. */
+__declspec(noinline) inline nw4r::g3d::PlayPolicyFunc nw4r::g3d::GetAnmPlayPolicy(AnmPolicy policy)
+{
+    bool valid = false;
+    if ((u32)policy <= ANM_POLICY_LOOP) {
+        valid = true;
+    }
+    if (!valid) {
+        nw4r::db::Panic("g3d_anmobj.h", 0x3C, "policy is out of bounds(%d)\n%d <= policy <= %d not satisfied.", policy,
+                        ANM_POLICY_ONETIME, ANM_POLICY_LOOP);
+    }
+    return anm_play_policy_table[policy];
+}
+
+
+
+/* 0x80061B3C (0x134): starts at frame 0 with rate 1 over [startFrame, endFrame], folding with `pPolicy`. */
+__declspec(noinline) inline nw4r::g3d::FrameCtrl::FrameCtrl(f32 startFrame, f32 endFrame, PlayPolicyFunc pPolicy)
+    : mFrame(0.0f), mUpdateRate(1.0f), mStartFrame(startFrame), mEndFrame(endFrame), mpPlayPolicy(pPolicy)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmobj.h", pPolicy, 0x6A, "NW4R:Pointer Error\npolicy(=%p) is not valid pointer.");
+}
+
+
+
+/* 0x80060FF0 (0x78): the natural log, NaN (with a warning) outside the domain. */
+extern "C" __declspec(noinline) inline f32 math_flog_checked(f32 x)
+{
+    if (!(x > 0.0f)) {
+        nw4r::db::Warning("arithmetic.h", 295, "FLog: Input is out of the domain.");
+    }
+    if (x > 0.0f) {
+        return nw4r::math::detail::FLog(x);
+    }
+    return -(0.0f / 0.0f);
+}
+
+
+
+/* 0x80062840 (0x64): the dictionary block, asserting the handle is valid. */
+__declspec(noinline) inline const nw4r::g3d::ResDicData& nw4r::g3d::ResDic::ref() const
+{
+    if (!res_dic_is_valid(const_cast<ResDic*>(this))) {
+        nw4r::db::Panic("g3d_resdict_ac.h", 84, "%s::%s: Object not valid.", res_dic_get_class_name(),
+                        ref_name_resdic);
+    }
+    return *static_cast<const ResDicData*>(res_dic_ptr(const_cast<ResDic*>(this)));
+}
+
+
+
+/* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the dictionary block */
+__declspec(noinline) inline nw4r::g3d::ResDic::ResDic(void* pData) : ResCommon<ResDicData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic("g3d_resdict_ac.h", 84, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 
-/* 0x80061424 (0x474): sizes a resource-played animation of `res` for `mdl` (with a per-node result cache when
- * `bHasCache`), reports the size through `pSize`, and builds it in one block from `pHeap`. */
-nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrRes::Construct(MEMAllocator* pHeap, u32* pSize, ResAnmChr res,
-                                                            ResMdl mdl, bool bHasCache)
-{
-    if (!res.IsValid() || !mdl.IsValid()) {
-        return NULL;
+
+
+/* 0x80062750 (0xD4): returns the `idx`-th entry's data, asserting the index is in range. */
+/* untyped: opaque handle - the entry's data block */
+__declspec(noinline) inline void* nw4r::g3d::ResDic::operator[](int idx) const {
+    if (res_dic_is_valid((u32*)this)) {
+        bool inRange = false;
+        if (idx >= 0 && idx <= (s32)ref().numData - 1) {
+            inRange = true;
+        }
+        if (!inRange) {
+            nw4r::db::Panic("g3d_resdict_ac.h", 42, "idx is out of bounds(%d)\n%d <= idx <= %d not satisfied.", idx, 0,
+                            ref().numData - 1);
+        }
+        return (void*)res_dic_ofs_to_ptr((u8**)this, ref().entry[idx + 1].ofsData);
     }
-    int numNode = res.GetNumNode();
-    int numBinding = mdl.GetResNodeNumEntries();
-    u32 cacheSize = (bHasCache ? numNode : 0) * 0x4C; /* sizeof(ChrAnmResult) */
-    u32 size = sizeof(AnmObjChrRes) + cacheSize + numBinding * sizeof(u16);
-    if (pSize != NULL) {
-        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pSize, 0x3DB, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
-        *pSize = size;
-    }
-    if (pHeap == NULL) {
-        return NULL;
-    }
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0x3E4, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
-    u8* pBuf = (u8*)Alloc(pHeap, size);
-    if (pBuf == NULL) {
-        return NULL;
-    }
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBuf, 0x3EE, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
-    ChrAnmResult* pCacheBuf = bHasCache ? (ChrAnmResult*)(pBuf + sizeof(AnmObjChrRes)) : NULL;
-    u16* pBindingBuf = (u16*)(pBuf + sizeof(AnmObjChrRes) + cacheSize);
-    if ((u32)pBuf & 3) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F2, "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.",
-                        pBuf);
-    }
-    if ((u32)pCacheBuf & 3) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F3,
-                        "NW4R:Alignment Error(0x%x)\npCacheBuf must be aligned to 4 bytes boundary.", pCacheBuf);
-    }
-    if ((u32)pBindingBuf & 1) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F4,
-                        "NW4R:Alignment Error(0x%x)\npBindBuf must be aligned to 2 bytes boundary.", pBindingBuf);
-    }
-    return new (pBuf) AnmObjChrRes(pHeap, res, pBindingBuf, numBinding, pCacheBuf);
+    return NULL;
 }
+
+
+
+/* 0x800618BC (0x64): the resource block, asserting the handle is valid. */
+__declspec(noinline) inline const nw4r::g3d::ResAnmChrData& nw4r::g3d::ResAnmChr::ref() const
+{
+    if (!IsValid()) {
+        nw4r::db::Panic("g3d_resanmchr_ac.h", 39, "%s::%s: Object not valid.", GetClassName(), ref_name_resanmchr);
+    }
+    return *ptr();
+}
+
+
+
+/* 0x80061928 (0xC): the class name the asserts print. */
+__declspec(noinline) inline const char* nw4r::g3d::ResAnmChr::GetClassName()
+{
+    return "ResAnmChr";
+}
+
+
+
+/* 0x8005D050 (0x74): the node's index in its model (0 for an invalid handle). */
+extern "C" __declspec(noinline) inline u32 res_node_get_id(const ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 56, "NW4R:Failed assertion IsValid()");
+    }
+    if (res_node_is_valid(pSelf)) {
+        return ((ResNodeData*)res_node_ptr((u32**)pSelf))->mNodeID;
+    }
+    return 0;
+}
+
+
+
+/* 0x80062DEC (0x64): the node's block, asserting the handle is valid. */
+extern "C" __declspec(noinline) inline const ResNodeData* res_node_ref(const ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 44, "%s::%s: Object not valid.",
+                        res_node_get_class_name(), ref_name_resnode_const);
+    }
+    return (const ResNodeData*)res_node_ptr((u32**)pSelf);
+}
+
+
+
+/* 0x8005D218 (0x64): the node's block, asserting the handle is valid. */
+extern "C" __declspec(noinline) inline ResNodeData* res_node_ref_nonconst(ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 44, "%s::%s: Object not valid.", res_node_get_class_name(),
+                        ref_name_resnode_nonconst);
+    }
+    return (ResNodeData*)res_handle_ptr(pSelf);
+}
+
+
+
+/* 0x8005D1AC (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the node block */
+__declspec(noinline) inline nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 44, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+}
+
+
+
+extern "C" __declspec(noinline) inline u32* res_node_ptr(u32** pp)
+{
+    return *pp;
+}
+
+
+
+extern "C" __declspec(noinline) inline void res_node_empty_assign(u32* a, u32* b)
+{
+    (void)a;
+    (void)b;
+}
+
+
+
+extern "C" __declspec(noinline) inline void res_node_common_assign(u32* dst, u32* src)
+{
+    *dst = *src;
+}
+
+
+
+/* 0x8005D210 (0x8): stores the block address. */
+template <> __declspec(noinline) inline nw4r::g3d::ResCommon<ResNodeData>::ResCommon(void* pData) : mpData(static_cast<ResNodeData*>(pData)) {}
+
+
+
+extern "C" __declspec(noinline) inline void res_node_common_copy_ctor(u32* dst, u32* src)
+{
+    *dst = *src;
+}
+
+
+
+/* 0x8005D2FC (0x14): tells whether the handle is set. */
+__declspec(noinline) inline bool nw4r::g3d::ResMdl::IsValid() const
+{
+    return mpData != NULL;
+}
+
+
+
+/* 0x8005D3E0 (0x4): releases nothing - the objects are freed through their heap. */
+__declspec(noinline) inline void nw4r::g3d::G3dObj::operator delete(void* pBlock) /* untyped: byte range */
+{
+}
+
+
+
+/* Returns the type's name (the record's string, after its length word). */
+__declspec(noinline) inline const char* nw4r::g3d::G3dObj::TypeObj::GetTypeName() const
+{
+    return mName->str;
+}
+
+
+
+extern "C" __declspec(noinline) inline void **fn_8005DC60(void **out, void *v)
+{
+    *out = v;
+    return out;
+}
+
+
+
+extern "C" __declspec(noinline) inline const u8 **type_obj_set_name_anmchr(const u8 **out, const u8 *v)
+{
+    *out = v;
+    return out;
+}
+
+
+
+/* The two ``current chunk`` getters: stash a fixed descriptor address in a local through the setter,
+ * then hand the local back (the setter is opaque, so the reload is real). */
+
+
+/* The two-word copy pair the character-animation constructor uses. */
+extern "C" __declspec(noinline) inline void* res_node_assign(u32* dst, u32* src)
+{
+    res_node_common_assign(dst, src);
+    res_node_empty_assign(dst + 1, src + 1);
+    return dst;
+}
+
+
+
+/* 0x800600B8 (0x8): records the parent. */
+__declspec(noinline) inline void nw4r::g3d::G3dObj::SetParent(G3dObj* pParent)
+{
+    mpParent = pParent;
+}
+
+
+
+/* 0x800600C0 (0x8): returns the parent. */
+__declspec(noinline) inline nw4r::g3d::G3dObj* nw4r::g3d::G3dObj::GetParent() const
+{
+    return mpParent;
+}
+
+
+
+/* 0x800604CC (0x8): the placement form: builds the object in the caller's block. */
+/* untyped: byte range - the placement address the Construct functions build the object in */
+__declspec(noinline) inline void* nw4r::g3d::G3dObj::operator new(unsigned long size, void* pBlock)
+{
+    (void)size;
+    return pBlock;
+}
+
+
+
+/* 0x80060FEC (0x4): constructs a quaternion (leaves it unset). */
+extern "C" __declspec(noinline) inline void quat_empty_ctor(nw4r::math::QUAT*)
+{
+}
+
+
+
+/* 0x80061898 (0x24): the animated node count. */
+__declspec(noinline) inline u32 nw4r::g3d::ResAnmChr::GetNumNode() const
+{
+    return ref().numNode;
+}
+
+
+
+/* 0x80061920 (0x8): the resource block, unchecked. */
+__declspec(noinline) inline const nw4r::g3d::ResAnmChrData* nw4r::g3d::ResAnmChr::ptr() const
+{
+    return mpData;
+}
+
+
+
+/* 0x80061B30 (0xC): copies the base handle's data pointer. */
+extern "C" __declspec(noinline) inline void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
+{
+    pDst->mpData = pSrc->mpData;
+}
+
+
+
+/* 0x80062024 (0x8): the current frame. */
+__declspec(noinline) inline f32 nw4r::g3d::FrameCtrl::GetFrm() const
+{
+    return mFrame;
+}
+
+
+
+/* 0x800621DC (0x8): sets the update rate. */
+__declspec(noinline) inline void nw4r::g3d::FrameCtrl::SetRate(f32 rate)
+{
+    mUpdateRate = rate;
+}
+
+
+
+/* 0x80062300 (0x8): the update rate. */
+__declspec(noinline) inline f32 nw4r::g3d::FrameCtrl::GetRate() const
+{
+    return mUpdateRate;
+}
+
+
+
+/* 0x80061EC4 (0x44): sets the frame, folded into the frame range by the play policy. */
+__declspec(noinline) inline void nw4r::g3d::FrameCtrl::SetFrm(f32 frame)
+{
+    mFrame = mpPlayPolicy(mStartFrame, mEndFrame, frame);
+}
+
+
+/* 0x800604D8 (0x4): forwards the allocation to the allocator. */
+/* untyped: byte range - the allocated block */
+extern "C" {
+static __declspec(noinline) inline void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size)
+{
+    return MEMAllocFromAllocator(pHeap, size);
+}
+}
+
+
+
+/* 0x800604D4 (0x4): allocates `size` bytes from the object heap. */
+/* untyped: byte range - the allocated block */
+__declspec(noinline) inline void* nw4r::g3d::G3dObj::Alloc(MEMAllocator* pHeap, u32 size)
+{
+    return g3d_obj_alloc_tail(pHeap, size);
+}
+
+
+
+/* 0x800626BC (0x8): stores the block address. */
+template <> __declspec(noinline) inline nw4r::g3d::ResCommon<nw4r::g3d::ResNameData>::ResCommon(void* pData) : mpData(static_cast<nw4r::g3d::ResNameData*>(pData)) {}
+
+
+
+/* untyped: opaque handle - the dictionary block */
+extern "C" __declspec(noinline) inline void* res_dic_ptr(void* self)
+{
+    return *(void**)self;
+}
+
+
+
+/* 0x80062978 (0x8): stores the block address. */
+template <> __declspec(noinline) inline nw4r::g3d::ResCommon<nw4r::g3d::ResDicData>::ResCommon(void* pData) : mpData(static_cast<nw4r::g3d::ResDicData*>(pData)) {}
+
+
+
+extern "C" __declspec(noinline) inline void res_name_common_copy_ctor(u32* dst, u32* src)
+{
+    *dst = *src;
+}
+
+
+
+/* --- assignment helpers that return the object (nw4r's fluent setters) ------------------------------ */
+
+/* 0x8006268C (0x30): wraps `pData`. */
+/* untyped: opaque handle - the name block */
+__declspec(noinline) inline nw4r::g3d::ResName::ResName(void* pData) : ResCommon<ResNameData>(pData) {}
+
+
+
+/* 0x80061B00 (0x30): copy-constructs a character-animation handle and returns the destination. */
+extern "C" __declspec(noinline) inline nw4r::g3d::ResAnmChr* res_anm_chr_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
+{
+    res_anm_chr_common_copy_ctor(pDst, pSrc);
+    return pDst;
+}
+
+
+
+extern "C" __declspec(noinline) inline void* res_name_copy_ctor(void* self, u32* src)
+{
+    res_name_common_copy_ctor((u32*)self, src);
+    return self;
+}
+
+
+
+extern "C" __declspec(noinline) inline void* res_node_copy_ctor(void* self, u32* src)
+{
+    res_node_common_copy_ctor((u32*)self, src);
+    return self;
+}
+
+
+
+/* --- more one-instruction accessors ----------------------------------------------------------------- */
+
+/* 0x80061934 (0x14): whether the handle names a block. */
+__declspec(noinline) inline bool nw4r::g3d::ResAnmChr::IsValid() const
+{
+    return mpData != NULL;
+}
+
+
+
+/* 0x80061CE4 (0x24): the play policy. */
+__declspec(noinline) inline nw4r::g3d::AnmPolicy nw4r::g3d::ResAnmChr::GetAnmPolicy() const
+{
+    return ref().policy;
+}
+
+
+
+/* 0x80061D08 (0x24): the frame count. */
+__declspec(noinline) inline int nw4r::g3d::ResAnmChr::GetNumFrame() const
+{
+    return ref().numFrame;
+}
+
+
+
+
+/* untyped: opaque handle - the dictionary block */
+extern "C" __declspec(noinline) inline u32 res_dic_is_valid(void* self)
+{
+    return *(u32*)self != 0;
+}
+
+
+
+/* Returns the word at +0 plus `offset`, or 0 when `offset` is 0 (nw4r's null-safe offset helper). */
+extern "C" __declspec(noinline) inline u8* res_dic_ofs_to_ptr(u8** p, s32 offset)
+{
+    u8* base = *p;
+
+    if (offset != 0) {
+        return base + offset;
+    }
+    return NULL;
+}
+
+
+
+/* The align-up helper: (~(align - 1)) & (offset + align - 1). */
+extern "C" __declspec(noinline) inline u32 g3d_round_up(u32 offset, unsigned int align)
+{
+    return (align + offset - 1) & ~(align - 1);
+}
+
+
+
+/* --- forwarders into the SDK allocator / matrix helpers --------------------------------------------- */
+
+/* 0x80060F70 (0x3C): the quaternion interpolation of `pFrom` towards `pTo` by `t` into `pOut`. */
+extern "C" __declspec(noinline) inline nw4r::math::QUAT* quat_slerp(nw4r::math::QUAT* pOut, const nw4r::math::QUAT* pFrom,
+                                        const nw4r::math::QUAT* pTo, f32 t)
+{
+    QUATSlerp(pFrom, pTo, pOut, t);
+    return pOut;
+}
+
+
+
+/* 0x80060FAC (0x40): the quaternion of the matrix at `pMtx`. */
+extern "C" __declspec(noinline) inline nw4r::math::QUAT* quat_from_mtx34(nw4r::math::QUAT* pOut, const nw4r::math::MTX34* pMtx)
+{
+    QUATMtx(pOut, mtx34_const_ptr((u32)pMtx));
+    return pOut;
+}
+
+
+
+/* 0x8006244C (0x18): advances the frame by the update rate times the base rate. */
+__declspec(noinline) inline void nw4r::g3d::FrameCtrl::UpdateFrm()
+{
+    f32 step = mUpdateRate * smBaseUpdateRate;
+
+    SetFrm(mFrame + step);
+}
+
+
+
+/* --- nw4r's ``fn_800626F4``-returns-this pair ------------------------------------------------------- */
+
+extern "C" __declspec(noinline) inline u32 ut_get_int_ptr(u32 value)
+{
+    return value;
+}
+
+
+
+extern "C" __declspec(noinline) inline u32 ut_add_offset_to_ptr(u32 a, u32 b)
+{
+    return b + ut_get_int_ptr(a);
+}
+
+
+
+/* --- forwarders into nw4r math ---------------------------------------------------------------------- */
+
+/* The exp forwarder (nw4r's inline `math::FExp`): a tail call with the argument untouched. */
+extern "C" __declspec(noinline) inline f32 math_fexp(f32 x)
+{
+    return nw4r::math::detail::FExp(x);
+}
+
+
+
+/* 0x80060F28 (0x44): builds the rotation matrix of the quaternion into `pOut` and returns it. */
+extern "C" __declspec(noinline) inline nw4r::math::MTX34* mtx34_from_quat(nw4r::math::MTX34* pOut, const nw4r::math::QUAT* pQuat)
+{
+    PSMTXQuat((nw4r::math::MTX34*)mtx34_get_ptr(pOut), pQuat);
+    return pOut;
+}
+
+
+
+/* --------------------------------------------------------------------------------------------- *
+ * The pointer-holder accessors (0x80063888-0x80063E60): a local pointer is filled in through one of
+ * the two store helpers and the destination address is returned.
+ * --------------------------------------------------------------------------------------------- */
+
+/* Stores `v` through `out` and hands `out` back so the caller keeps its address in r3. */
+extern "C" __declspec(noinline) inline const u8 **type_obj_set_name(const u8 **out, const u8 *v)
+{
+    *out = v;
+    return out;
+}
+
+
+
+
+extern "C" __declspec(noinline) inline void **fn_80063B24(void **out, void *v)
+{
+    *out = v;
+    return out;
+}
+
+
+
+
+extern "C" __declspec(noinline) inline void **fn_80063C8C(void **out, void *v)
+{
+    *out = v;
+    return out;
+}
+
+
+
+/* 0x80063A20 (0x8): returns the type's identity (its name record's address). */
+__declspec(noinline) inline u32 nw4r::g3d::G3dObj::TypeObj::GetTypeID() const
+{
+    return (u32)mName;
+}
+
+
+
+/* 0x800639D0 (0x50): whether the two types are the same. */
+__declspec(noinline) inline bool nw4r::g3d::G3dObj::TypeObj::operator==(const TypeObj& rhs) const
+{
+    return GetTypeID() == rhs.GetTypeID();
+}
+
+
+
+/* 0x800639A0 (0x30): returns the G3dObj type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::G3dObj::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_G3dObj));
+}
+
+
+
+/* 0x80063A28 (0x30): returns the AnmObj type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObj::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_AnmObj));
+}
+
+
+
+/* 0x80063AC4 (0x30): returns the AnmObjChr type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChr::GetTypeObjStatic()
+{
+    const TypeObj::TypeName* pName;
+    return *reinterpret_cast<const TypeObj*>(fn_8005DC60((void**)&pName, (void*)&anm_typename_AnmObjChr));
+}
+
+
+
+/* 0x80063D38 (0x30): returns the AnmObjChrBlend type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObjStatic()
+{
+    void* pName;
+    return *reinterpret_cast<const TypeObj*>(fn_80063C8C(&pName, (void*)&anm_typename_AnmObjChrBlend));
+}
+
+
+
+/* 0x80063BD0 (0x30): returns the AnmObjChrNode type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrNode::GetTypeObjStatic()
+{
+    void* pName;
+    return *reinterpret_cast<const TypeObj*>(fn_80063B24(&pName, (void*)&anm_typename_AnmObjChrNode));
+}
+
+
+
+/* 0x80063E30 (0x30): returns the AnmObjChrRes type. */
+__declspec(noinline) inline const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, (const u8*)&anm_typename_AnmObjChrRes));
+}
+
+
+
+/* 0x80063964 (0x3C): whether `type` is G3dObj. */
+__declspec(noinline) inline bool nw4r::g3d::G3dObj::IsDerivedFrom(TypeObj type) const
+{
+    return type == GetTypeObjStatic();
+}
+
+
+
+/* ------------------------------------------------------------------------------------------------ */
+/* AnmObjChrNode                                                                                    */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* Whether `idx` names one of the node's children. */
+static inline bool anmchr_node_idx_valid(const nw4r::g3d::AnmObjChrNode* pNode, int idx)
+{
+    bool valid = false;
+    if (idx >= 0 && idx <= pNode->mChildrenArraySize - 1) {
+        valid = true;
+    }
+    return valid;
+}
+
+
+
+/* Whether `value` is a finite number (not infinite, not NaN): the frame and rate setters' assertion. */
+static inline bool anmchr_value_valid(f32 value)
+{
+    bool valid = false;
+    if (__fpclassifyf(value) > 2 && __fpclassifyf(value) != 1) {
+        valid = true;
+    }
+    return valid;
+}
+
+
+
+/* 0x800628C8 (0x4C): the dictionary the offset `ofs` bytes into the resource names (a null dictionary for 0). */
+extern "C" __declspec(noinline) inline s32 res_anm_chr_ofs_to_dic(const nw4r::g3d::ResAnmChr* pSelf, s32 key)
+{
+    u8* pBase = (u8*)pSelf->mpData;
+    if (key) {
+        return (s32)nw4r::g3d::ResDic(pBase + key).mpData;
+    }
+    return (s32)nw4r::g3d::ResDic(NULL).mpData;
+}
+
+
+
+/* 0x800626F8 (0x58): animated node `idx`'s record, from the resource's node dictionary. */
+extern "C" __declspec(noinline) inline const nw4r::g3d::ResAnmChrNodeData* res_anm_chr_get_node_anm(const nw4r::g3d::ResAnmChr* pSelf, u32 idx)
+{
+    u32 dic = res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic);
+    return (const nw4r::g3d::ResAnmChrNodeData*)(*reinterpret_cast<nw4r::g3d::ResDic*>(&dic))[(int)idx];
+}
+
+
+
+/* 0x80062D04 (0x54): the index of the animated node called `name`, -1 when the resource has none. */
+extern "C" __declspec(noinline) inline int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::ResName name)
+{
+    return reinterpret_cast<nw4r::g3d::ResDic*>(
+               &HandleWord(res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic)).mWord)
+        ->GetIndex(name);
+}
+
+
+
+/* 0x80062D94 (0x58): the node's name. */
+extern "C" __declspec(noinline) inline nw4r::g3d::ResName res_node_get_res_name(const ResHandle* pNode)
+{
+    const ResNodeData* pData = res_node_ref(pNode);
+    s32 ofs = pData->mToResName;
+    if (ofs) {
+        return nw4r::g3d::ResName((u8*)pData + ofs - 4);
+    }
+    return nw4r::g3d::ResName(NULL);
+}
+
+
+
+/* 0x8005D160 (0x4C): the node `ofs` bytes from this one (a null node for offset 0). */
+extern "C" __declspec(noinline) inline u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs)
+{
+    u8* pBase = (u8*)pSelf->mpData;
+    if (ofs) {
+        return (u32)nw4r::g3d::ResNode(pBase + ofs).mpData;
+    }
+    return (u32)nw4r::g3d::ResNode(NULL).mpData;
+}
+
+
+
+/* 0x8005D124 (0x3C): the parent node. */
+extern "C" __declspec(noinline) inline u32 res_node_get_parent(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToParentNode);
+}
+
+
+
+/* 0x8005D284 (0x3C): the next sibling node. */
+extern "C" __declspec(noinline) inline u32 res_node_get_next_sibling(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToNextSibling);
+}
+
+
+
+/* ------------------------------------------------------------------------------------------------ */
+/* AnmObjChrBlend                                                                                   */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* Whether `idx` names one of the blend's children. */
+static inline bool anmchr_blend_idx_valid(const nw4r::g3d::AnmObjChrBlend* pBlend, int idx)
+{
+    bool valid = false;
+    if (idx >= 0 && idx <= pBlend->mChildrenArraySize - 1) {
+        valid = true;
+    }
+    return valid;
+}
+
+/* --- bodies: the g3d work-memory accessors and tiny constant/identity helpers ---------------------- */
+
+extern "C" u8* fn_8005CED0(void)
+{
+    return g3d_work_memory;
+}
+
+
+
+extern "C" u8* fn_8005CEDC(void)
+{
+    return g3d_work_memory + 0x6000;
+}
+
+
+
+extern "C" u8* workmem_get_mdl_z_temporary(void)
+{
+    return g3d_work_memory;
+}
+
+
+
+extern "C" u8* g3d_workmem_skinning_mtx(void)
+{
+    return g3d_work_memory;
+}
+
+
+
+extern "C" u8* g3d_billboard_work_mtx(void)
+{
+    return g3d_work_memory;
+}
+
+
+
+/* 0x8005CF10 (0x140): one past the last node of node `idx`'s subtree: the next sibling of the node or of its
+ * nearest ancestor that has one, else the node count. */
+extern "C" u32 res_mdl_node_subtree_end(nw4r::g3d::ResMdl mdl, u32 idx)
+{
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 42, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    ResHandle target;
+    res_node_copy_ctor(&target, (u32*)&mdl.GetResNode(idx));
+    if (!res_node_is_valid(&target)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 45, "NW4R:Failed assertion targetNode.IsValid()");
+    }
+    ResHandle node;
+    ResHandle next;
+    res_node_copy_ctor(&node, (u32*)&target);
+    res_node_copy_ctor(&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
+    while (!res_node_is_valid(&next)) {
+        res_node_assign((u32*)&node, &HandleWord(res_node_get_parent(&node)).mWord);
+        if (!res_node_is_valid(&node)) {
+            break;
+        }
+        res_node_assign((u32*)&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
+    }
+    if (res_node_is_valid(&next)) {
+        return res_node_get_id(&next);
+    }
+    return mdl.GetResNodeNumEntries();
+}
+
+
+
+/* 0x8005D310 (0x74): constructs the character animation over a binding buffer of `numBinding` words, all
+ * released. */
+nw4r::g3d::AnmObjChr::AnmObjChr(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding)
+    : AnmObj(pHeap, NULL), mNumBinding(numBinding), mpBinding(pBindingBuf)
+{
+    Release();
+}
+
+
+
+
+/* 0x8005D384 (0x5C): destroys the animation object. */
+nw4r::g3d::AnmObj::~AnmObj()
+{
+}
+
+
+
+/* 0x8005D3E4 (0x44): constructs the animation object with no flags set. */
+nw4r::g3d::AnmObj::AnmObj(MEMAllocator* pHeap, G3dObj* pParent) : G3dObj(pHeap, pParent), mFlags(0)
+{
+}
+
+
+
+/* 0x8005D554 (0x168): whether node `idx` has an animation bound. */
+bool nw4r::g3d::AnmObjChr::TestExistence(u32 idx) const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x5C, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x5D, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    return (mpBinding[idx] & 0xC000) == 0;
+}
+
+
+
+/* 0x8005D6BC (0x168): whether node `idx`'s binding is defined. */
+bool nw4r::g3d::AnmObjChr::TestDefined(u32 idx) const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x65, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x66, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    return (mpBinding[idx] & 0x8000) == 0;
+}
+
+
+
+/* 0x8005D824 (0x154): unbinds every node. */
+void nw4r::g3d::AnmObjChr::Release()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x6E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mNumBinding; i++) {
+        mpBinding[i] = 0x8000;
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, false);
+}
+
+
+
+/* 0x8005D978 (0x274): the base cannot attach: warns and returns NULL. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChr::Attach(int idx, AnmObjChrRes* pRes)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x80, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pRes, 0x81, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
+    nw4r::db::Warning("g3d_anmchr.cpp", 0x87, "AnmObjChr::Attach(%d, %p(%s)) called with %s. Maybe uninteded call.",
+                      idx, pRes, reinterpret_cast<G3dObj*>(pRes)->GetTypeName(), GetTypeName());
+    return NULL;
+}
+
+
+
+/* 0x8005DBEC (0x38): returns the type's name. */
+const char* nw4r::g3d::AnmObjChr::GetTypeName() const
+{
+    return GetTypeObj().GetTypeName();
+}
+
+
+
+/* 0x8005DC30 (0x30): returns the type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChr::GetTypeObj() const
+{
+    const TypeObj::TypeName* pName;
+    return *reinterpret_cast<const TypeObj*>(fn_8005DC60((void**)&pName, (void*)&anm_typename_AnmObjChr));
+}
+
+
+
+/* ------------------------------------------------------------------------------------------------ */
+/* The run-time type members of AnmObjChrRes                                                        */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* 0x8005DC68 (0x38): returns the type's name. */
+const char* nw4r::g3d::AnmObjChrRes::GetTypeName() const
+{
+    return GetTypeObj().GetTypeName();
+}
+
+
+
+/* 0x8005DCA0 (0x30): returns the type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, (const u8*)&anm_typename_AnmObjChrRes));
+}
+
+
+
+/* 0x8005DCD8 (0x15C): the base cannot detach: warns and returns NULL. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChr::Detach(int idx)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x90, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    nw4r::db::Warning("g3d_anmchr.cpp", 0x96, "AnmObjChr::Detach(%d) called with %s. Maybe uninteded call.", idx,
+                      GetTypeName());
+    return NULL;
+}
+
+
+
+/* 0x8005DE34 (0x168): the base has no weights: warns. */
+void nw4r::g3d::AnmObjChr::SetWeight(int idx, f32 weight)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xA0, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    nw4r::db::Warning("g3d_anmchr.cpp", 0xA6, "AnmObjChr::Attach(%d, %f) called with %s. Maybe uninteded call.", idx,
+                      weight, GetTypeName());
+}
+
+
+
+/* 0x8005DF9C (0x15C): the base has no weights: warns and returns 0. */
+f32 nw4r::g3d::AnmObjChr::GetWeight(int idx) const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xAD, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    nw4r::db::Warning("g3d_anmchr.cpp", 0xB3, "AnmObjChr::GetWeight(%d) called with %s. Maybe uninteded call.", idx,
+                      GetTypeName());
+    return 0.0f;
+}
+
+
+
+/* 0x8005E0F8 (0x148): the base cannot detach: warns. */
+void nw4r::g3d::AnmObjChr::DetachAll()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xBB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    nw4r::db::Warning("g3d_anmchr.cpp", 0xC1, "AnmObjChr::DetachAll() called with %s. Maybe uninteded call.",
+                      GetTypeName());
+}
+
+
+
+/* 0x8005E240 (0x34C): constructs the node over a binding buffer and an emptied child array. */
+nw4r::g3d::AnmObjChrNode::AnmObjChrNode(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding,
+                                        AnmObjChrRes** ppChildrenBuf, int numChildren)
+    : AnmObjChr(pHeap, pBindingBuf, numBinding), mChildrenArraySize(numChildren), mpChildrenArray(ppChildrenBuf)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0xD4, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBindingBuf, 0xD5,
+                          "NW4R:Pointer Error\npBindingBuffer(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", ppChildrenBuf, 0xD6,
+                          "NW4R:Pointer Error\npChildrenArray(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        mpChildrenArray[i] = NULL;
+    }
+}
+
+
+
+/* 0x8005E58C (0x5C): destroys the character animation. */
+nw4r::g3d::AnmObjChr::~AnmObjChr()
+{
+}
+
+
+
+/* Whether the node falls in one of the seven mapped Wii memory ranges (the pointer assert's test); a function
+ * with the assert's block locals directly in its body would open a base-cleanup state for each of them. */
+static inline BOOL anmchr_pointer_valid(const nw4r::g3d::AnmObjChrNode* ptr)
+{
+    u32 top_;
+    BOOL ok6_, ok5_, ok4_, ok3_, ok2_, ok1_;
+
+    ok1_ = TRUE;
+    ok2_ = TRUE;
+    ok3_ = TRUE;
+    ok4_ = TRUE;
+    ok5_ = TRUE;
+    ok6_ = TRUE;
+    top_ = (u32)(ptr) & 0xFF000000u;
+    if (!(top_ == 0x80000000u) && !(((u32)(ptr) & 0xFF800000u) == 0x81000000u))
+        ok6_ = FALSE;
+    if (!ok6_ && !(((u32)(ptr) & 0xF8000000u) == 0x90000000u))
+        ok5_ = FALSE;
+    if (!ok5_ && !(top_ == 0xC0000000u))
+        ok4_ = FALSE;
+    if (!ok4_ && !(((u32)(ptr) & 0xFF800000u) == 0xC1000000u))
+        ok3_ = FALSE;
+    if (!ok3_ && !(((u32)(ptr) & 0xF8000000u) == 0xD0000000u))
+        ok2_ = FALSE;
+    if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))
+        ok1_ = FALSE;
+    return ok1_;
+}
+
+/* 0x8005E5E8 (0x16C): detaches every child and destroys the node. */
+nw4r::g3d::AnmObjChrNode::~AnmObjChrNode()
+{
+    if (!anmchr_pointer_valid(this)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0xE1, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", this);
+    }
+    DetachAll();
+}
+
+
+
+/* 0x8005E754 (0x314): attaches `pRes` as child `idx`, binding the nodes it defines, and returns the child it
+ * replaced. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrNode::Attach(int idx, AnmObjChrRes* pRes)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xE8, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_node_idx_valid(this, idx)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0xE9, "idx is out of bounds(%d)\n%d <= idx <= %d not satisfied.", idx, 0,
+                        mChildrenArraySize - 1);
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pRes, 0xEA, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
+    AnmObjChrRes* pOld = Detach(idx);
+    bool bound = false;
+    for (u32 i = 0; i < mNumBinding; i++) {
+        if (pRes->TestDefined(i)) {
+            bound = true;
+            mpBinding[i] = 0;
+        }
+    }
+    if (bound) {
+        SetAnmFlag(ANMFLAG_ISBOUND, true);
+    }
+    mpChildrenArray[idx] = pRes;
+    pRes->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
+    return pOld;
+}
+
+
+
+/* 0x8005EA68 (0x33C): detaches child `idx`, rebuilding the binding words from the remaining children, and returns
+ * it. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrNode::Detach(int idx)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x107, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_node_idx_valid(this, idx)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x108, "idx is out of bounds(%d)\n%d <= idx <= %d not satisfied.", idx, 0,
+                        mChildrenArraySize - 1);
+    }
+    AnmObjChrRes* pOld = mpChildrenArray[idx];
+    if (pOld != NULL) {
+        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pOld, 0x10F, "NW4R:Pointer Error\npOld(=%p) is not valid pointer.");
+        pOld->G3dProc(G3DPROC_DETACH_PARENT, 0, this);
+        mpChildrenArray[idx] = NULL;
+        bool bound = false;
+        for (u32 i = 0; i < mNumBinding; i++) {
+            u16 binding = 0x8000;
+            for (int j = 0; j < mChildrenArraySize; j++) {
+                if (mpChildrenArray[j] != NULL && mpChildrenArray[j]->TestDefined(i)) {
+                    bound = true;
+                    binding = 0;
+                    break;
+                }
+            }
+            mpBinding[i] = binding;
+        }
+        if (!bound) {
+            SetAnmFlag(ANMFLAG_ISBOUND, false);
+        }
+    }
+    return pOld;
+}
+
+
+
+/* 0x8005EDA4 (0x14C): detaches every child. */
+void nw4r::g3d::AnmObjChrNode::DetachAll()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x137, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        Detach(i);
+    }
+}
+
+
+
+/* 0x8005EEF0 (0x164): advances every child's frame. */
+void nw4r::g3d::AnmObjChrNode::UpdateFrame()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x142, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->UpdateFrame();
+        }
+    }
+}
+
+
+
+/* 0x8005F054 (0x1C4): sets every child's frame. */
+void nw4r::g3d::AnmObjChrNode::SetFrame(f32 frame)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x150, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x151, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetFrame(frame);
+        }
+    }
+}
+
+
+
+/* 0x8005F218 (0x168): returns the first child's frame, 0 without children. */
+f32 nw4r::g3d::AnmObjChrNode::GetFrame() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x15F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        if (mpChildrenArray[i] != NULL) {
+            return mpChildrenArray[i]->GetFrame();
+        }
+    }
+    return 0.0f;
+}
+
+
+
+/* 0x8005F380 (0x1C4): sets every child's update rate. */
+void nw4r::g3d::AnmObjChrNode::SetUpdateRate(f32 rate)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x16F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x170, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetUpdateRate(rate);
+        }
+    }
+}
+
+
+
+/* 0x8005F544 (0x168): returns the first child's update rate, 1 without children. */
+f32 nw4r::g3d::AnmObjChrNode::GetUpdateRate() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x17E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        if (mpChildrenArray[i] != NULL) {
+            return mpChildrenArray[i]->GetUpdateRate();
+        }
+    }
+    return 1.0f;
+}
+
+
+
+/* 0x8005F6AC (0x210): binds every child to `mdl` and marks the nodes they define bound. */
+bool nw4r::g3d::AnmObjChrNode::Bind(ResMdl mdl)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x18E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x18F, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    bool result = false;
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            bool childResult = pChild->Bind(mdl);
+            result = result || childResult;
+            for (u32 j = 0; j < mNumBinding; j++) {
+                if (pChild->TestDefined(j)) {
+                    mpBinding[j] = 0;
+                }
+            }
+        }
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return result;
+}
+
+
+
+/* 0x8005F8BC (0x220): binds every child to `target` of `mdl` and marks the nodes they define bound. */
+bool nw4r::g3d::AnmObjChrNode::Bind(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1B6, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x1B7, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    bool result = false;
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            bool childResult = pChild->Bind(mdl, target, option);
+            result = result || childResult;
+            for (u32 j = 0; j < mNumBinding; j++) {
+                if (pChild->TestDefined(j)) {
+                    mpBinding[j] = 0;
+                }
+            }
+        }
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return result;
+}
+
+
+
+/* 0x8005FADC (0x16C): releases every child and the node's bindings. */
+void nw4r::g3d::AnmObjChrNode::Release()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1DB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->Release();
+        }
+    }
+    AnmObjChr::Release();
+}
+
+
+
+/* 0x8005FC48 (0x220): releases `target` of `mdl` from every child and rebinds the nodes the children still
+ * define. */
+void nw4r::g3d::AnmObjChrNode::Release(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1F0, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x1F1, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->Release(mdl, target, option);
+        }
+    }
+    AnmObjChr::Release();
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            for (u32 j = 0; j < mNumBinding; j++) {
+                if (pChild->TestDefined(j)) {
+                    mpBinding[j] = 0;
+                }
+            }
+        }
+    }
+}
+
+
+
+/* 0x8005FE68 (0x250): handles a child detaching itself and the node being attached to or detached from a
+ * parent. */
+void nw4r::g3d::AnmObjChrNode::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x218, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    switch (task) {
+    case G3DPROC_CHILD_DETACHED: {
+        int i;
+        for (i = 0; i < mChildrenArraySize; i++) {
+            if (mpChildrenArray[i] == pInfo) {
+                Detach(i);
+                break;
+            }
+        }
+        if (i >= mChildrenArraySize) {
+            nw4r::db::Warning("g3d_anmchr.cpp", 0x22D,
+                              "AnmObjChrNode::G3dProc(G3DPROC_CHILD_DETACHED,%p,%p)\nThe child not found.", param, pInfo);
+        }
+        break;
+    }
+    case G3DPROC_DETACH_PARENT:
+        if (!GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x233, "NW4R:Failed assertion GetParent()");
+        }
+        SetParent(NULL);
+        break;
+    case G3DPROC_ATTACH_PARENT:
+        if (GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x23A, "NW4R:Failed assertion !GetParent()");
+        }
+        SetParent(static_cast<G3dObj*>(pInfo));
+        break;
+    }
+}
+
+
 
 /* 0x800600C8 (0x404): sizes a blend node for `mdl` with `numChildren` weighted children, reports the size through
  * `pSize`, and builds it in one block from `pHeap` (NULL without a heap or memory). */
@@ -730,906 +1631,6 @@ nw4r::g3d::AnmObjChrBlend* nw4r::g3d::AnmObjChrBlend::Construct(MEMAllocator* pH
 }
 
 
-/* 0x8005D384 (0x5C): destroys the animation object. */
-nw4r::g3d::AnmObj::~AnmObj()
-{
-}
-
-/* 0x8005D3E4 (0x44): constructs the animation object with no flags set. */
-nw4r::g3d::AnmObj::AnmObj(MEMAllocator* pHeap, G3dObj* pParent) : G3dObj(pHeap, pParent), mFlags(0)
-{
-}
-
-/* 0x8005D428 (0x12C): records the parent and the heap the object was allocated from. */
-nw4r::g3d::G3dObj::G3dObj(MEMAllocator* pHeap, G3dObj* pParent) : mpParent(pParent), mpHeap(pHeap)
-{
-    ANMCHR_POINTER_ASSERT("g3d_obj.h", pHeap, 0x9C, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
-}
-
-/* 0x8005D310 (0x74): constructs the character animation over a binding buffer of `numBinding` words, all
- * released. */
-nw4r::g3d::AnmObjChr::AnmObjChr(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding)
-    : AnmObj(pHeap, NULL), mNumBinding(numBinding), mpBinding(pBindingBuf)
-{
-    Release();
-}
-
-/* 0x8005D554 (0x168): whether node `idx` has an animation bound. */
-bool nw4r::g3d::AnmObjChr::TestExistence(u32 idx) const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x5C, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!((int)idx <= mNumBinding - 1)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x5D, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
-                        idx, mNumBinding - 1);
-    }
-    return (mpBinding[idx] & 0xC000) == 0;
-}
-
-/* 0x8005D6BC (0x168): whether node `idx`'s binding is defined. */
-bool nw4r::g3d::AnmObjChr::TestDefined(u32 idx) const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x65, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!((int)idx <= mNumBinding - 1)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x66, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
-                        idx, mNumBinding - 1);
-    }
-    return (mpBinding[idx] & 0x8000) == 0;
-}
-
-/* 0x8005D824 (0x154): unbinds every node. */
-void nw4r::g3d::AnmObjChr::Release()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x6E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mNumBinding; i++) {
-        mpBinding[i] = 0x8000;
-    }
-    SetAnmFlag(ANMFLAG_ISBOUND, false);
-}
-
-/* 0x8005D978 (0x274): the base cannot attach: warns and returns NULL. */
-nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChr::Attach(int idx, AnmObjChrRes* pRes)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x80, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pRes, 0x81, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
-    nw4r::db::Warning("g3d_anmchr.cpp", 0x87, "AnmObjChr::Attach(%d, %p(%s)) called with %s. Maybe uninteded call.",
-                      idx, pRes, reinterpret_cast<G3dObj*>(pRes)->GetTypeName(), GetTypeName());
-    return NULL;
-}
-
-/* 0x8005DBEC (0x38): returns the type's name. */
-const char* nw4r::g3d::AnmObjChr::GetTypeName() const
-{
-    return GetTypeObj().GetTypeName();
-}
-
-/* 0x8005DC30 (0x30): returns the type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChr::GetTypeObj() const
-{
-    const TypeObj::TypeName* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DC60((void**)&pName, lbl_8056F500));
-}
-
-/* 0x8005DCD8 (0x15C): the base cannot detach: warns and returns NULL. */
-nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChr::Detach(int idx)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x90, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    nw4r::db::Warning("g3d_anmchr.cpp", 0x96, "AnmObjChr::Detach(%d) called with %s. Maybe uninteded call.", idx,
-                      GetTypeName());
-    return NULL;
-}
-
-/* 0x8005DE34 (0x168): the base has no weights: warns. */
-void nw4r::g3d::AnmObjChr::SetWeight(int idx, f32 weight)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xA0, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    nw4r::db::Warning("g3d_anmchr.cpp", 0xA6, "AnmObjChr::Attach(%d, %f) called with %s. Maybe uninteded call.", idx,
-                      weight, GetTypeName());
-}
-
-/* 0x8005DF9C (0x15C): the base has no weights: warns and returns 0. */
-f32 nw4r::g3d::AnmObjChr::GetWeight(int idx) const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xAD, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    nw4r::db::Warning("g3d_anmchr.cpp", 0xB3, "AnmObjChr::GetWeight(%d) called with %s. Maybe uninteded call.", idx,
-                      GetTypeName());
-    return 0.0f;
-}
-
-/* 0x8005E0F8 (0x148): the base cannot detach: warns. */
-void nw4r::g3d::AnmObjChr::DetachAll()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xBB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    nw4r::db::Warning("g3d_anmchr.cpp", 0xC1, "AnmObjChr::DetachAll() called with %s. Maybe uninteded call.",
-                      GetTypeName());
-}
-
-/* 0x8005E58C (0x5C): destroys the character animation. */
-nw4r::g3d::AnmObjChr::~AnmObjChr()
-{
-}
-
-/* ------------------------------------------------------------------------------------------------ */
-/* The run-time type members of G3dObj, AnmObj and AnmObjChr                                        */
-/* ------------------------------------------------------------------------------------------------ */
-
-/* 0x80063888 (0x30): returns the type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObj::GetTypeObj() const
-{
-    const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_AnmObj));
-}
-
-/* 0x800638C0 (0x38): returns the type's name. */
-const char* nw4r::g3d::AnmObj::GetTypeName() const
-{
-    return GetTypeObj().GetTypeName();
-}
-
-/* 0x800638F8 (0x6C): whether the object is an AnmObj or derives from `type`. */
-bool nw4r::g3d::AnmObj::IsDerivedFrom(TypeObj type) const
-{
-    if (type == GetTypeObjStatic()) {
-        return true;
-    }
-    return G3dObj::IsDerivedFrom(type);
-}
-
-/* 0x80063964 (0x3C): whether `type` is G3dObj. */
-bool nw4r::g3d::G3dObj::IsDerivedFrom(TypeObj type) const
-{
-    return type == GetTypeObjStatic();
-}
-
-/* 0x800639A0 (0x30): returns the G3dObj type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::G3dObj::GetTypeObjStatic()
-{
-    const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_G3dObj));
-}
-
-/* 0x800639D0 (0x50): whether the two types are the same. */
-bool nw4r::g3d::G3dObj::TypeObj::operator==(const TypeObj& rhs) const
-{
-    return GetTypeID() == rhs.GetTypeID();
-}
-
-/* 0x80063A20 (0x8): returns the type's identity (its name record's address). */
-u32 nw4r::g3d::G3dObj::TypeObj::GetTypeID() const
-{
-    return (u32)mName;
-}
-
-/* 0x80063A28 (0x30): returns the AnmObj type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObj::GetTypeObjStatic()
-{
-    const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_AnmObj));
-}
-
-/* 0x80063A58 (0x6C): whether the object is an AnmObjChr or derives from `type`. */
-bool nw4r::g3d::AnmObjChr::IsDerivedFrom(TypeObj type) const
-{
-    if (type == GetTypeObjStatic()) {
-        return true;
-    }
-    return AnmObj::IsDerivedFrom(type);
-}
-
-/* 0x80063AC4 (0x30): returns the AnmObjChr type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChr::GetTypeObjStatic()
-{
-    const TypeObj::TypeName* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DC60((void**)&pName, lbl_8056F500));
-}
-
-/* ------------------------------------------------------------------------------------------------ */
-/* AnmObjChrNode                                                                                    */
-/* ------------------------------------------------------------------------------------------------ */
-
-/* Whether `idx` names one of the node's children. */
-static inline bool anmchr_node_idx_valid(const nw4r::g3d::AnmObjChrNode* pNode, int idx)
-{
-    bool valid = false;
-    if (idx >= 0 && idx <= pNode->mChildrenArraySize - 1) {
-        valid = true;
-    }
-    return valid;
-}
-
-/* 0x8005E240 (0x34C): constructs the node over a binding buffer and an emptied child array. */
-nw4r::g3d::AnmObjChrNode::AnmObjChrNode(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding,
-                                        AnmObjChrRes** ppChildrenBuf, int numChildren)
-    : AnmObjChr(pHeap, pBindingBuf, numBinding), mChildrenArraySize(numChildren), mpChildrenArray(ppChildrenBuf)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0xD4, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBindingBuf, 0xD5,
-                          "NW4R:Pointer Error\npBindingBuffer(=%p) is not valid pointer.");
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", ppChildrenBuf, 0xD6,
-                          "NW4R:Pointer Error\npChildrenArray(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        mpChildrenArray[i] = NULL;
-    }
-}
-
-/* 0x8005E5E8 (0x16C): detaches every child and destroys the node. */
-nw4r::g3d::AnmObjChrNode::~AnmObjChrNode()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xE1, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    DetachAll();
-}
-
-/* 0x8005E754 (0x314): attaches `pRes` as child `idx`, binding the nodes it defines, and returns the child it
- * replaced. */
-nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrNode::Attach(int idx, AnmObjChrRes* pRes)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xE8, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_node_idx_valid(this, idx)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0xE9, "idx is out of bounds(%d)\n%d <= idx <= %d not satisfied.", idx, 0,
-                        mChildrenArraySize - 1);
-    }
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pRes, 0xEA, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
-    AnmObjChrRes* pOld = Detach(idx);
-    bool bound = false;
-    for (u32 i = 0; i < mNumBinding; i++) {
-        if (pRes->TestDefined(i)) {
-            bound = true;
-            mpBinding[i] = 0;
-        }
-    }
-    if (bound) {
-        SetAnmFlag(ANMFLAG_ISBOUND, true);
-    }
-    mpChildrenArray[idx] = pRes;
-    pRes->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
-    return pOld;
-}
-
-/* 0x8005EA68 (0x33C): detaches child `idx`, rebuilding the binding words from the remaining children, and returns
- * it. */
-nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrNode::Detach(int idx)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x107, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_node_idx_valid(this, idx)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x108, "idx is out of bounds(%d)\n%d <= idx <= %d not satisfied.", idx, 0,
-                        mChildrenArraySize - 1);
-    }
-    AnmObjChrRes* pOld = mpChildrenArray[idx];
-    if (pOld != NULL) {
-        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pOld, 0x10F, "NW4R:Pointer Error\npOld(=%p) is not valid pointer.");
-        pOld->G3dProc(G3DPROC_DETACH_PARENT, 0, this);
-        mpChildrenArray[idx] = NULL;
-        bool bound = false;
-        for (u32 i = 0; i < mNumBinding; i++) {
-            u16 binding = 0x8000;
-            for (int j = 0; j < mChildrenArraySize; j++) {
-                if (mpChildrenArray[j] != NULL && mpChildrenArray[j]->TestDefined(i)) {
-                    bound = true;
-                    binding = 0;
-                    break;
-                }
-            }
-            mpBinding[i] = binding;
-        }
-        if (!bound) {
-            SetAnmFlag(ANMFLAG_ISBOUND, false);
-        }
-    }
-    return pOld;
-}
-
-/* 0x8005EDA4 (0x14C): detaches every child. */
-void nw4r::g3d::AnmObjChrNode::DetachAll()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x137, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        Detach(i);
-    }
-}
-
-/* 0x8005EEF0 (0x164): advances every child's frame. */
-void nw4r::g3d::AnmObjChrNode::UpdateFrame()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x142, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            pChild->UpdateFrame();
-        }
-    }
-}
-
-/* Whether `value` is a finite number (not infinite, not NaN): the frame and rate setters' assertion. */
-static inline bool anmchr_value_valid(f32 value)
-{
-    bool valid = false;
-    if (__fpclassifyf(value) > 2 && __fpclassifyf(value) != 1) {
-        valid = true;
-    }
-    return valid;
-}
-
-/* 0x80061B3C (0x134): starts at frame 0 with rate 1 over [startFrame, endFrame], folding with `pPolicy`. */
-nw4r::g3d::FrameCtrl::FrameCtrl(f32 startFrame, f32 endFrame, PlayPolicyFunc pPolicy)
-    : mFrame(0.0f), mUpdateRate(1.0f), mStartFrame(startFrame), mEndFrame(endFrame), mpPlayPolicy(pPolicy)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmobj.h", pPolicy, 0x6A, "NW4R:Pointer Error\npolicy(=%p) is not valid pointer.");
-}
-
-/* 0x80061D2C (0x198): sets the frame and refreshes the result cache. */
-void nw4r::g3d::AnmObjChrRes::SetFrame(f32 frame)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x419, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_value_valid(frame)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x41A, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
-    }
-    SetFrm(frame);
-    if (mpResultCache) {
-        UpdateCache();
-    }
-}
-
-/* 0x80061F08 (0x11C): the current frame. */
-f32 nw4r::g3d::AnmObjChrRes::GetFrame() const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x428, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    return GetFrm();
-}
-
-/* 0x8006202C (0x1B0): sets the update rate; a rate of 0 refreshes the result cache. */
-void nw4r::g3d::AnmObjChrRes::SetUpdateRate(f32 rate)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x430, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_value_valid(rate)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x431, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
-    }
-    SetRate(rate);
-    if (rate == 0.0f && mpResultCache) {
-        UpdateCache();
-    }
-}
-
-/* 0x800621E4 (0x11C): the update rate. */
-f32 nw4r::g3d::AnmObjChrRes::GetUpdateRate() const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x440, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    return GetRate();
-}
-
-/* 0x80062308 (0x144): advances the frame unless the rate is 0, refreshing the result cache. */
-void nw4r::g3d::AnmObjChrRes::UpdateFrame()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x448, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (GetRate() != 0.0f) {
-        UpdateFrm();
-        if (mpResultCache) {
-            UpdateCache();
-        }
-    }
-}
-
-/* 0x800636B0 (0x1D8): advances the frame on the update pass and handles being attached to or detached from a
- * parent. */
-void nw4r::g3d::AnmObjChrRes::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x543, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    switch (task) {
-    case G3DPROC_UPDATEFRAME:
-        UpdateFrame();
-        break;
-    case G3DPROC_DETACH_PARENT:
-        if (!GetParent()) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x54F, "NW4R:Failed assertion GetParent()");
-        }
-        SetParent(NULL);
-        break;
-    case G3DPROC_ATTACH_PARENT:
-        if (GetParent()) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x556, "NW4R:Failed assertion !GetParent()");
-        }
-        SetParent(static_cast<G3dObj*>(pInfo));
-        break;
-    }
-}
-
-/* 0x80063170 (0x2CC): node `idx`'s result: nothing for an unbound node, the cached result, or the resource evaluated
- * at the current frame into `pResult`. */
-const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrRes::GetResult(ChrAnmResult* pResult, u32 idx)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x511, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!((int)idx <= mNumBinding - 1)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x512, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
-                        idx, mNumBinding - 1);
-    }
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pResult, 0x513, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
-    u32 anmId = mpBinding[idx];
-    if (anmId & 0xC000) {
-        pResult->flags = 0;
-        return pResult;
-    }
-    if (anmId != (anmId & 0x3FFF)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x51D, "NW4R:Failed assertion anmId == (anmId & BINDING_ID_MASK)");
-    }
-    if (mpResultCache) {
-        return &mpResultCache[anmId];
-    }
-    mRes.GetAnmResult(pResult, anmId, GetFrm());
-    return pResult;
-}
-
-/* 0x8006343C (0x274): evaluates every bound node's result at the current frame into the result cache. */
-void nw4r::g3d::AnmObjChrRes::UpdateCache()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x52E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", mpResultCache, 0x52F,
-                          "NW4R:Pointer Error\nmpResultCache(=%p) is not valid pointer.");
-    f32 frame = GetFrm();
-    for (u32 i = 0; i < mNumBinding; i++) {
-        u16 binding = mpBinding[i];
-        if (!(binding & 0x8000)) {
-            u32 anmId = binding & 0x3FFF;
-            mRes.GetAnmResult(&mpResultCache[anmId], anmId, frame);
-        }
-    }
-}
-
-/* 0x80062464 (0x228): binds every animated node to the model node of the same name; returns whether any matched. */
-bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x45B, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x45C, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x45D,
-                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
-    }
-    int numNode = mRes.GetNumNode();
-    bool bSuccess = false;
-    for (u16 i = 0; i < numNode; i++) {
-        const nw4r::g3d::ResAnmChrNodeData* pNode = res_anm_chr_get_node_anm(&mRes, i);
-        ResName name((void*)ut_add_offset_to_ptr((u32)pNode, pNode->toResName - 4));
-        ResHandle node;
-        res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(name));
-        if (res_node_is_valid(&node)) {
-            u32 id = res_node_get_id(&node);
-            mpBinding[id] = i;
-            bSuccess = true;
-        }
-    }
-    SetAnmFlag(ANMFLAG_ISBOUND, true);
-    return bSuccess;
-}
-
-/* 0x80062980 (0x384): binds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL) to the animated nodes of
- * the same names; returns whether any matched. */
-bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl, u32 target, BindOption option)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x47F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x480, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x481,
-                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
-    }
-    bool bSuccess = false;
-    switch (option) {
-    case BIND_PARTIAL: {
-        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
-        if ((int)bindIdEnd > mNumBinding) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x48F, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
-        }
-        for (u32 i = target; i < bindIdEnd; i++) {
-            ResHandle node;
-            ResHandle name;
-            res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(i));
-            res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
-            int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
-            if (animId != -1) {
-                bool inRange = false;
-                if (animId >= 0 && animId <= 0xFFFF) {
-                    inRange = true;
-                }
-                if (!inRange) {
-                    nw4r::db::Panic("g3d_anmchr.cpp", 0x49D,
-                                    "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0,
-                                    0xFFFF);
-                }
-                mpBinding[i] = animId;
-                bSuccess = true;
-            }
-        }
-        break;
-    }
-    case BIND_ONE: {
-        ResHandle node;
-        ResHandle name;
-        res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(target));
-        res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
-        int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
-        if (animId != -1) {
-            bool inRange = false;
-            if (animId >= 0 && animId <= 0xFFFF) {
-                inRange = true;
-            }
-            if (!inRange) {
-                nw4r::db::Panic("g3d_anmchr.cpp", 0x4B2,
-                                "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0, 0xFFFF);
-            }
-            mpBinding[target] = animId;
-            bSuccess = true;
-        }
-        break;
-    }
-    default:
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x4BC, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
-        break;
-    }
-    SetAnmFlag(ANMFLAG_ISBOUND, true);
-    return bSuccess;
-}
-
-/* 0x80062E50 (0x320): unbinds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL). */
-void nw4r::g3d::AnmObjChrRes::Release(ResMdl mdl, u32 target, BindOption option)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x4CD, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CE, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CF,
-                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
-    }
-    switch (option) {
-    case BIND_PARTIAL: {
-        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
-        if ((int)bindIdEnd > mNumBinding) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x4D9, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
-        }
-        for (u32 i = target; i < bindIdEnd; i++) {
-            mpBinding[i] = 0x8000;
-        }
-        break;
-    }
-    case BIND_ONE:
-        if ((int)target >= mNumBinding) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x4E8, "NW4R:Failed assertion int(target) < mNumBinding");
-        }
-        mpBinding[target] = 0x8000;
-        break;
-    default:
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x4F3, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
-        break;
-    }
-}
-
-/* Wraps a returned handle word in a class temporary, so a copy helper gets the temporary's address. */
-struct HandleWord {
-    HandleWord(u32 word) { mWord = word; }
-    /* +0x00 */ u32 mWord;
-}; /* size: 0x4 */
-
-extern "C" void* res_node_assign(u32* dst, u32* src);
-
-/* 0x8005D050 (0x74): the node's index in its model (0 for an invalid handle). */
-extern "C" u32 res_node_get_id(const ResHandle* pSelf)
-{
-    if (!res_node_is_valid(pSelf)) {
-        nw4r::db::Panic(anmchr_resnode_ac_file_id, 56, anmchr_resnode_is_valid_msg);
-    }
-    if (res_node_is_valid(pSelf)) {
-        return ((ResNodeData*)res_node_ptr((u32**)pSelf))->mNodeID;
-    }
-    return 0;
-}
-
-/* 0x8005D218 (0x64): the node's block, asserting the handle is valid. */
-extern "C" ResNodeData* res_node_ref_nonconst(ResHandle* pSelf)
-{
-    if (!res_node_is_valid(pSelf)) {
-        nw4r::db::Panic(anmchr_resnode_ac_file_ref, 44, anmchr_resnode_ref_invalid_fmt, res_node_get_class_name(),
-                        anmchr_resnode_ref_name);
-    }
-    return (ResNodeData*)res_handle_ptr(pSelf);
-}
-
-/* 0x80062840 (0x64): the dictionary block, asserting the handle is valid. */
-const nw4r::g3d::ResDicData& nw4r::g3d::ResDic::ref() const
-{
-    if (!res_dic_is_valid(const_cast<ResDic*>(this))) {
-        nw4r::db::Panic(anmchr_resdic_ac_file_ref, 84, anmchr_resdic_ref_invalid_fmt, res_dic_get_class_name(),
-                        anmchr_resdic_ref_name);
-    }
-    return *static_cast<const ResDicData*>(res_dic_ptr(const_cast<ResDic*>(this)));
-}
-
-/* 0x800628C8 (0x4C): the dictionary the offset `ofs` bytes into the resource names (a null dictionary for 0). */
-extern "C" s32 res_anm_chr_ofs_to_dic(const nw4r::g3d::ResAnmChr* pSelf, s32 key)
-{
-    u8* pBase = (u8*)pSelf->mpData;
-    if (key) {
-        return (s32)nw4r::g3d::ResDic(pBase + key).mpData;
-    }
-    return (s32)nw4r::g3d::ResDic(NULL).mpData;
-}
-
-/* 0x800626F8 (0x58): animated node `idx`'s record, from the resource's node dictionary. */
-extern "C" const nw4r::g3d::ResAnmChrNodeData* res_anm_chr_get_node_anm(const nw4r::g3d::ResAnmChr* pSelf, u32 idx)
-{
-    u32 dic = res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic);
-    return (const nw4r::g3d::ResAnmChrNodeData*)(*reinterpret_cast<nw4r::g3d::ResDic*>(&dic))[(int)idx];
-}
-
-/* 0x80062D04 (0x54): the index of the animated node called `name`, -1 when the resource has none. */
-extern "C" int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::ResName name)
-{
-    return reinterpret_cast<nw4r::g3d::ResDic*>(
-               &HandleWord(res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic)).mWord)
-        ->GetIndex(name);
-}
-
-/* 0x80062DEC (0x64): the node's block, asserting the handle is valid. */
-extern "C" const ResNodeData* res_node_ref(const ResHandle* pSelf)
-{
-    if (!res_node_is_valid(pSelf)) {
-        nw4r::db::Panic(anmchr_resnode_ac_file_ref_const, 44, anmchr_resnode_ref_const_invalid_fmt,
-                        res_node_get_class_name(), anmchr_resnode_ref_const_name);
-    }
-    return (const ResNodeData*)res_node_ptr((u32**)pSelf);
-}
-
-/* 0x80062D94 (0x58): the node's name. */
-extern "C" nw4r::g3d::ResName res_node_get_res_name(const ResHandle* pNode)
-{
-    const ResNodeData* pData = res_node_ref(pNode);
-    s32 ofs = pData->mToResName;
-    if (ofs) {
-        return nw4r::g3d::ResName((u8*)pData + ofs - 4);
-    }
-    return nw4r::g3d::ResName(NULL);
-}
-
-/* 0x8005D160 (0x4C): the node `ofs` bytes from this one (a null node for offset 0). */
-extern "C" u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs)
-{
-    u8* pBase = (u8*)pSelf->mpData;
-    if (ofs) {
-        return (u32)nw4r::g3d::ResNode(pBase + ofs).mpData;
-    }
-    return (u32)nw4r::g3d::ResNode(NULL).mpData;
-}
-
-/* 0x8005D124 (0x3C): the parent node. */
-extern "C" u32 res_node_get_parent(ResHandle* pSelf)
-{
-    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToParentNode);
-}
-
-/* 0x8005D284 (0x3C): the next sibling node. */
-extern "C" u32 res_node_get_next_sibling(ResHandle* pSelf)
-{
-    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToNextSibling);
-}
-
-/* 0x8005CF10 (0x140): one past the last node of node `idx`'s subtree: the next sibling of the node or of its
- * nearest ancestor that has one, else the node count. */
-extern "C" u32 res_mdl_node_subtree_end(nw4r::g3d::ResMdl mdl, u32 idx)
-{
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 42, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    ResHandle target;
-    res_node_copy_ctor(&target, (u32*)&mdl.GetResNode(idx));
-    if (!res_node_is_valid(&target)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 45, anmchr_target_node_valid_msg);
-    }
-    ResHandle node;
-    ResHandle next;
-    res_node_copy_ctor(&node, (u32*)&target);
-    res_node_copy_ctor(&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
-    while (!res_node_is_valid(&next)) {
-        res_node_assign((u32*)&node, &HandleWord(res_node_get_parent(&node)).mWord);
-        if (!res_node_is_valid(&node)) {
-            break;
-        }
-        res_node_assign((u32*)&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
-    }
-    if (res_node_is_valid(&next)) {
-        return res_node_get_id(&next);
-    }
-    return mdl.GetResNodeNumEntries();
-}
-
-/* 0x8005F054 (0x1C4): sets every child's frame. */
-void nw4r::g3d::AnmObjChrNode::SetFrame(f32 frame)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x150, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_value_valid(frame)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x151, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
-    }
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            pChild->SetFrame(frame);
-        }
-    }
-}
-
-/* 0x8005F380 (0x1C4): sets every child's update rate. */
-void nw4r::g3d::AnmObjChrNode::SetUpdateRate(f32 rate)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x16F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!anmchr_value_valid(rate)) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x170, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
-    }
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            pChild->SetUpdateRate(rate);
-        }
-    }
-}
-
-/* 0x8005F218 (0x168): returns the first child's frame, 0 without children. */
-f32 nw4r::g3d::AnmObjChrNode::GetFrame() const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x15F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        if (mpChildrenArray[i] != NULL) {
-            return mpChildrenArray[i]->GetFrame();
-        }
-    }
-    return 0.0f;
-}
-
-/* 0x8005F544 (0x168): returns the first child's update rate, 1 without children. */
-f32 nw4r::g3d::AnmObjChrNode::GetUpdateRate() const
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x17E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        if (mpChildrenArray[i] != NULL) {
-            return mpChildrenArray[i]->GetUpdateRate();
-        }
-    }
-    return 1.0f;
-}
-
-/* 0x8005F6AC (0x210): binds every child to `mdl` and marks the nodes they define bound. */
-bool nw4r::g3d::AnmObjChrNode::Bind(ResMdl mdl)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x18E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x18F, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    bool result = false;
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            bool childResult = pChild->Bind(mdl);
-            result = result || childResult;
-            for (u32 j = 0; j < mNumBinding; j++) {
-                if (pChild->TestDefined(j)) {
-                    mpBinding[j] = 0;
-                }
-            }
-        }
-    }
-    SetAnmFlag(ANMFLAG_ISBOUND, true);
-    return result;
-}
-
-/* 0x8005F8BC (0x220): binds every child to `target` of `mdl` and marks the nodes they define bound. */
-bool nw4r::g3d::AnmObjChrNode::Bind(ResMdl mdl, u32 target, BindOption option)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1B6, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x1B7, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    bool result = false;
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            bool childResult = pChild->Bind(mdl, target, option);
-            result = result || childResult;
-            for (u32 j = 0; j < mNumBinding; j++) {
-                if (pChild->TestDefined(j)) {
-                    mpBinding[j] = 0;
-                }
-            }
-        }
-    }
-    SetAnmFlag(ANMFLAG_ISBOUND, true);
-    return result;
-}
-
-/* 0x8005FADC (0x16C): releases every child and the node's bindings. */
-void nw4r::g3d::AnmObjChrNode::Release()
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1DB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            pChild->Release();
-        }
-    }
-    AnmObjChr::Release();
-}
-
-/* 0x8005FC48 (0x220): releases `target` of `mdl` from every child and rebinds the nodes the children still
- * define. */
-void nw4r::g3d::AnmObjChrNode::Release(ResMdl mdl, u32 target, BindOption option)
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x1F0, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    if (!mdl.IsValid()) {
-        nw4r::db::Panic("g3d_anmchr.cpp", 0x1F1, "NW4R:Failed assertion resMdl.IsValid()");
-    }
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            pChild->Release(mdl, target, option);
-        }
-    }
-    AnmObjChr::Release();
-    for (int i = 0; i < mChildrenArraySize; i++) {
-        AnmObjChrRes* pChild = mpChildrenArray[i];
-        if (pChild != NULL) {
-            for (u32 j = 0; j < mNumBinding; j++) {
-                if (pChild->TestDefined(j)) {
-                    mpBinding[j] = 0;
-                }
-            }
-        }
-    }
-}
-
-/* 0x8005FE68 (0x250): handles a child detaching itself and the node being attached to or detached from a
- * parent. */
-void nw4r::g3d::AnmObjChrNode::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
-{
-    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x218, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
-    switch (task) {
-    case G3DPROC_CHILD_DETACHED: {
-        int i;
-        for (i = 0; i < mChildrenArraySize; i++) {
-            if (mpChildrenArray[i] == pInfo) {
-                Detach(i);
-                break;
-            }
-        }
-        if (i >= mChildrenArraySize) {
-            nw4r::db::Warning("g3d_anmchr.cpp", 0x22D,
-                              "AnmObjChrNode::G3dProc(G3DPROC_CHILD_DETACHED,%p,%p)\nThe child not found.", param, pInfo);
-        }
-        break;
-    }
-    case G3DPROC_DETACH_PARENT:
-        if (!GetParent()) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x233, "NW4R:Failed assertion GetParent()");
-        }
-        SetParent(NULL);
-        break;
-    case G3DPROC_ATTACH_PARENT:
-        if (GetParent()) {
-            nw4r::db::Panic("g3d_anmchr.cpp", 0x23A, "NW4R:Failed assertion !GetParent()");
-        }
-        SetParent(static_cast<G3dObj*>(pInfo));
-        break;
-    }
-}
-
-/* ------------------------------------------------------------------------------------------------ */
-/* AnmObjChrBlend                                                                                   */
-/* ------------------------------------------------------------------------------------------------ */
-
-/* Whether `idx` names one of the blend's children. */
-static inline bool anmchr_blend_idx_valid(const nw4r::g3d::AnmObjChrBlend* pBlend, int idx)
-{
-    bool valid = false;
-    if (idx >= 0 && idx <= pBlend->mChildrenArraySize - 1) {
-        valid = true;
-    }
-    return valid;
-}
 
 /* 0x800604F4 (0x164): constructs the blend with every child weight 1. */
 nw4r::g3d::AnmObjChrBlend::AnmObjChrBlend(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding,
@@ -1642,7 +1643,11 @@ nw4r::g3d::AnmObjChrBlend::AnmObjChrBlend(MEMAllocator* pHeap, u16* pBindingBuf,
     }
 }
 
+
+
 #pragma fp_contract off
+
+
 
 /* 0x80060658 (0x8D0): node `idx`'s blended result: the weighted sum of the bound children's results (scale, matrix
  * and translation), blending rotation through quaternions or matrix rows as the animation's flags choose. */
@@ -1811,7 +1816,38 @@ const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult
     return pResult;
 }
 
+
+
 #pragma fp_contract on
+
+
+
+/* 0x800610AC (0x18): 1 / value by one Newton-Raphson step from the hardware estimate. */
+extern "C" {
+asm f32 math_reciprocal(register f32 value)
+{
+    nofralloc
+    fres f0, value
+    ps_add f2, f0, f0
+    ps_mul f0, f0, f0
+    ps_nmsub f0, value, f0, f2
+    fmr f1, f0
+    blr
+}
+}
+
+
+
+/* nw4r's four-float vector setter. */
+extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w)
+{
+    dst[0] = x;
+    dst[1] = y;
+    dst[2] = z;
+    dst[3] = w;
+}
+
+
 
 /* 0x800610D8 (0x1CC): sets child `idx`'s weight. */
 void nw4r::g3d::AnmObjChrBlend::SetWeight(int idx, f32 weight)
@@ -1828,6 +1864,8 @@ void nw4r::g3d::AnmObjChrBlend::SetWeight(int idx, f32 weight)
     mpWeightArray[idx] = weight;
 }
 
+
+
 /* 0x800612A4 (0x180): returns child `idx`'s weight. */
 f32 nw4r::g3d::AnmObjChrBlend::GetWeight(int idx) const
 {
@@ -1839,39 +1877,379 @@ f32 nw4r::g3d::AnmObjChrBlend::GetWeight(int idx) const
     return mpWeightArray[idx];
 }
 
-/* 0x80063C00 (0x5C): destroys the blend. */
-nw4r::g3d::AnmObjChrBlend::~AnmObjChrBlend()
+
+
+/* 0x80061424 (0x474): sizes a resource-played animation of `res` for `mdl` (with a per-node result cache when
+ * `bHasCache`), reports the size through `pSize`, and builds it in one block from `pHeap`. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrRes::Construct(MEMAllocator* pHeap, u32* pSize, ResAnmChr res,
+                                                            ResMdl mdl, bool bHasCache)
 {
+    if (!res.IsValid() || !mdl.IsValid()) {
+        return NULL;
+    }
+    int numNode = res.GetNumNode();
+    int numBinding = mdl.GetResNodeNumEntries();
+    u32 cacheSize = (bHasCache ? numNode : 0) * 0x4C; /* sizeof(ChrAnmResult) */
+    u32 size = sizeof(AnmObjChrRes) + cacheSize + numBinding * sizeof(u16);
+    if (pSize != NULL) {
+        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pSize, 0x3DB, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0x3E4, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    u8* pBuf = (u8*)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBuf, 0x3EE, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    ChrAnmResult* pCacheBuf = bHasCache ? (ChrAnmResult*)(pBuf + sizeof(AnmObjChrRes)) : NULL;
+    u16* pBindingBuf = (u16*)(pBuf + sizeof(AnmObjChrRes) + cacheSize);
+    if ((u32)pBuf & 3) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F2, "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.",
+                        pBuf);
+    }
+    if ((u32)pCacheBuf & 3) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F3,
+                        "NW4R:Alignment Error(0x%x)\npCacheBuf must be aligned to 4 bytes boundary.", pCacheBuf);
+    }
+    if ((u32)pBindingBuf & 1) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F4,
+                        "NW4R:Alignment Error(0x%x)\npBindBuf must be aligned to 2 bytes boundary.", pBindingBuf);
+    }
+    return new (pBuf) AnmObjChrRes(pHeap, res, pBindingBuf, numBinding, pCacheBuf);
 }
 
-/* 0x80063C5C (0x30): returns the type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObj() const
+
+
+/* 0x80061948 (0x1B8): builds a resource-played character animation over `res`, with an optional result cache. */
+nw4r::g3d::AnmObjChrRes::AnmObjChrRes(MEMAllocator* pHeap, ResAnmChr res, u16* pBindingBuf, int numBinding,
+                                      ChrAnmResult* pCacheBuf)
+    : AnmObjChr(pHeap, pBindingBuf, numBinding), FrameCtrl(0.0f, res.GetNumFrame(), GetAnmPlayPolicy(res.GetAnmPolicy()))
 {
-    void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_80063C8C(&pName, anm_typename_AnmObjChrBlend));
+    res_anm_chr_copy_ctor(&mRes, &res);
+    mpResultCache = pCacheBuf;
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x40F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (mpResultCache) {
+        UpdateCache();
+    }
 }
 
-/* 0x80063C94 (0x38): returns the type's name. */
-const char* nw4r::g3d::AnmObjChrBlend::GetTypeName() const
+
+
+/* 0x80061D2C (0x198): sets the frame and refreshes the result cache. */
+void nw4r::g3d::AnmObjChrRes::SetFrame(f32 frame)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x419, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x41A, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
+    }
+    SetFrm(frame);
+    if (mpResultCache) {
+        UpdateCache();
+    }
+}
+
+
+
+/* 0x80061F08 (0x11C): the current frame. */
+f32 nw4r::g3d::AnmObjChrRes::GetFrame() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x428, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    return GetFrm();
+}
+
+
+
+/* 0x8006202C (0x1B0): sets the update rate; a rate of 0 refreshes the result cache. */
+void nw4r::g3d::AnmObjChrRes::SetUpdateRate(f32 rate)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x430, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x431, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
+    }
+    SetRate(rate);
+    if (rate == 0.0f && mpResultCache) {
+        UpdateCache();
+    }
+}
+
+
+
+/* 0x800621E4 (0x11C): the update rate. */
+f32 nw4r::g3d::AnmObjChrRes::GetUpdateRate() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x440, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    return GetRate();
+}
+
+
+
+/* 0x80062308 (0x144): advances the frame unless the rate is 0, refreshing the result cache. */
+void nw4r::g3d::AnmObjChrRes::UpdateFrame()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x448, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (GetRate() != 0.0f) {
+        UpdateFrm();
+        if (mpResultCache) {
+            UpdateCache();
+        }
+    }
+}
+
+
+
+/* 0x80062464 (0x228): binds every animated node to the model node of the same name; returns whether any matched. */
+bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x45B, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x45C, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x45D,
+                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
+    }
+    int numNode = mRes.GetNumNode();
+    bool bSuccess = false;
+    for (u16 i = 0; i < numNode; i++) {
+        const nw4r::g3d::ResAnmChrNodeData* pNode = res_anm_chr_get_node_anm(&mRes, i);
+        ResName name((void*)ut_add_offset_to_ptr((u32)pNode, pNode->toResName - 4));
+        ResHandle node;
+        res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(name));
+        if (res_node_is_valid(&node)) {
+            u32 id = res_node_get_id(&node);
+            mpBinding[id] = i;
+            bSuccess = true;
+        }
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return bSuccess;
+}
+
+
+
+/* 0x80062980 (0x384): binds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL) to the animated nodes of
+ * the same names; returns whether any matched. */
+bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x47F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x480, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x481,
+                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
+    }
+    bool bSuccess = false;
+    switch (option) {
+    case BIND_PARTIAL: {
+        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
+        if ((int)bindIdEnd > mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x48F, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
+        }
+        for (u32 i = target; i < bindIdEnd; i++) {
+            ResHandle node;
+            ResHandle name;
+            res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(i));
+            res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
+            int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
+            if (animId != -1) {
+                bool inRange = false;
+                if (animId >= 0 && animId <= 0xFFFF) {
+                    inRange = true;
+                }
+                if (!inRange) {
+                    nw4r::db::Panic("g3d_anmchr.cpp", 0x49D,
+                                    "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0,
+                                    0xFFFF);
+                }
+                mpBinding[i] = animId;
+                bSuccess = true;
+            }
+        }
+        break;
+    }
+    case BIND_ONE: {
+        ResHandle node;
+        ResHandle name;
+        res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(target));
+        res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
+        int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
+        if (animId != -1) {
+            bool inRange = false;
+            if (animId >= 0 && animId <= 0xFFFF) {
+                inRange = true;
+            }
+            if (!inRange) {
+                nw4r::db::Panic("g3d_anmchr.cpp", 0x4B2,
+                                "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0, 0xFFFF);
+            }
+            mpBinding[target] = animId;
+            bSuccess = true;
+        }
+        break;
+    }
+    default:
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4BC, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
+        break;
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return bSuccess;
+}
+
+
+
+/* 0x80062E50 (0x320): unbinds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL). */
+void nw4r::g3d::AnmObjChrRes::Release(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x4CD, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CE, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CF,
+                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
+    }
+    switch (option) {
+    case BIND_PARTIAL: {
+        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
+        if ((int)bindIdEnd > mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x4D9, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
+        }
+        for (u32 i = target; i < bindIdEnd; i++) {
+            mpBinding[i] = 0x8000;
+        }
+        break;
+    }
+    case BIND_ONE:
+        if ((int)target >= mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x4E8, "NW4R:Failed assertion int(target) < mNumBinding");
+        }
+        mpBinding[target] = 0x8000;
+        break;
+    default:
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4F3, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
+        break;
+    }
+}
+
+
+
+/* 0x80063170 (0x2CC): node `idx`'s result: nothing for an unbound node, the cached result, or the resource evaluated
+ * at the current frame into `pResult`. */
+const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrRes::GetResult(ChrAnmResult* pResult, u32 idx)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x511, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x512, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pResult, 0x513, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    u32 anmId = mpBinding[idx];
+    if (anmId & 0xC000) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (anmId != (anmId & 0x3FFF)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x51D, "NW4R:Failed assertion anmId == (anmId & BINDING_ID_MASK)");
+    }
+    if (mpResultCache) {
+        return &mpResultCache[anmId];
+    }
+    mRes.GetAnmResult(pResult, anmId, GetFrm());
+    return pResult;
+}
+
+
+
+/* 0x8006343C (0x274): evaluates every bound node's result at the current frame into the result cache. */
+void nw4r::g3d::AnmObjChrRes::UpdateCache()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x52E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", mpResultCache, 0x52F,
+                          "NW4R:Pointer Error\nmpResultCache(=%p) is not valid pointer.");
+    f32 frame = GetFrm();
+    for (u32 i = 0; i < mNumBinding; i++) {
+        u16 binding = mpBinding[i];
+        if (!(binding & 0x8000)) {
+            u32 anmId = binding & 0x3FFF;
+            mRes.GetAnmResult(&mpResultCache[anmId], anmId, frame);
+        }
+    }
+}
+
+
+
+/* 0x800636B0 (0x1D8): advances the frame on the update pass and handles being attached to or detached from a
+ * parent. */
+void nw4r::g3d::AnmObjChrRes::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x543, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    switch (task) {
+    case G3DPROC_UPDATEFRAME:
+        UpdateFrame();
+        break;
+    case G3DPROC_DETACH_PARENT:
+        if (!GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x54F, "NW4R:Failed assertion GetParent()");
+        }
+        SetParent(NULL);
+        break;
+    case G3DPROC_ATTACH_PARENT:
+        if (GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x556, "NW4R:Failed assertion !GetParent()");
+        }
+        SetParent(static_cast<G3dObj*>(pInfo));
+        break;
+    }
+}
+
+
+
+/* ------------------------------------------------------------------------------------------------ */
+/* The run-time type members of G3dObj, AnmObj and AnmObjChr                                        */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* 0x80063888 (0x30): returns the type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObj::GetTypeObj() const
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_AnmObj));
+}
+
+
+
+/* 0x800638C0 (0x38): returns the type's name. */
+const char* nw4r::g3d::AnmObj::GetTypeName() const
 {
     return GetTypeObj().GetTypeName();
 }
 
-/* 0x80063CCC (0x6C): whether the object is an AnmObjChrBlend or derives from `type`. */
-bool nw4r::g3d::AnmObjChrBlend::IsDerivedFrom(TypeObj type) const
+
+
+/* 0x800638F8 (0x6C): whether the object is an AnmObj or derives from `type`. */
+bool nw4r::g3d::AnmObj::IsDerivedFrom(TypeObj type) const
 {
     if (type == GetTypeObjStatic()) {
         return true;
     }
-    return AnmObjChrNode::IsDerivedFrom(type);
+    return G3dObj::IsDerivedFrom(type);
 }
 
-/* 0x80063D38 (0x30): returns the AnmObjChrBlend type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObjStatic()
+
+
+/* 0x80063A58 (0x6C): whether the object is an AnmObjChr or derives from `type`. */
+bool nw4r::g3d::AnmObjChr::IsDerivedFrom(TypeObj type) const
 {
-    void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_80063C8C(&pName, anm_typename_AnmObjChrBlend));
+    if (type == GetTypeObjStatic()) {
+        return true;
+    }
+    return AnmObj::IsDerivedFrom(type);
 }
+
+
 
 /* ------------------------------------------------------------------------------------------------ */
 /* The run-time type members of AnmObjChrNode                                                       */
@@ -1881,14 +2259,18 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObjStatic()
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrNode::GetTypeObj() const
 {
     void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_80063B24(&pName, anm_typename_AnmObjChrNode));
+    return *reinterpret_cast<const TypeObj*>(fn_80063B24(&pName, (void*)&anm_typename_AnmObjChrNode));
 }
+
+
 
 /* 0x80063B2C (0x38): returns the type's name. */
 const char* nw4r::g3d::AnmObjChrNode::GetTypeName() const
 {
     return GetTypeObj().GetTypeName();
 }
+
+
 
 /* 0x80063B64 (0x6C): whether the object is an AnmObjChrNode or derives from `type`. */
 bool nw4r::g3d::AnmObjChrNode::IsDerivedFrom(TypeObj type) const
@@ -1899,34 +2281,49 @@ bool nw4r::g3d::AnmObjChrNode::IsDerivedFrom(TypeObj type) const
     return AnmObjChr::IsDerivedFrom(type);
 }
 
-/* 0x80063BD0 (0x30): returns the AnmObjChrNode type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrNode::GetTypeObjStatic()
+
+
+/* 0x80063C00 (0x5C): destroys the blend. */
+nw4r::g3d::AnmObjChrBlend::~AnmObjChrBlend()
 {
-    void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_80063B24(&pName, anm_typename_AnmObjChrNode));
 }
 
-/* ------------------------------------------------------------------------------------------------ */
-/* The run-time type members of AnmObjChrRes                                                        */
-/* ------------------------------------------------------------------------------------------------ */
 
-/* 0x8005DC68 (0x38): returns the type's name. */
-const char* nw4r::g3d::AnmObjChrRes::GetTypeName() const
+
+/* 0x80063C5C (0x30): returns the type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObj() const
+{
+    void* pName;
+    return *reinterpret_cast<const TypeObj*>(fn_80063C8C(&pName, (void*)&anm_typename_AnmObjChrBlend));
+}
+
+
+
+/* 0x80063C94 (0x38): returns the type's name. */
+const char* nw4r::g3d::AnmObjChrBlend::GetTypeName() const
 {
     return GetTypeObj().GetTypeName();
 }
 
-/* 0x8005DCA0 (0x30): returns the type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
+
+
+/* 0x80063CCC (0x6C): whether the object is an AnmObjChrBlend or derives from `type`. */
+bool nw4r::g3d::AnmObjChrBlend::IsDerivedFrom(TypeObj type) const
 {
-    const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
+    if (type == GetTypeObjStatic()) {
+        return true;
+    }
+    return AnmObjChrNode::IsDerivedFrom(type);
 }
+
+
 
 /* 0x80063D68 (0x5C): destroys the resource animation. */
 nw4r::g3d::AnmObjChrRes::~AnmObjChrRes()
 {
 }
+
+
 
 /* 0x80063DC4 (0x6C): whether the object is an AnmObjChrRes or derives from `type`. */
 bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const
@@ -1937,9 +2334,4 @@ bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const
     return AnmObjChr::IsDerivedFrom(type);
 }
 
-/* 0x80063E30 (0x30): returns the AnmObjChrRes type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObjStatic()
-{
-    const u8* pName;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
-}
+
