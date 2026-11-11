@@ -7,10 +7,18 @@
  *   .data 0x805939E8-0x80593E88 (the `__FILE__` string "ef_drawstripestrategy.cpp" first, copies at 0x80593D0C,
  *   0x80593D5C and 0x80593DAC), .sdata2 0x80796120-0x80796150.  Left edge: `ef/ef_resource.cpp`
  *   ends there; right edge: `ef/ef_drawbillboardstrategy.cpp` starts there.
- * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma fp_contract off` and `#pragma dont_inline on`
- *   before the includes (the base destructors the constructor's unwind entry emits call their bases out of line,
- *   as retail's do); inlining comes back on after `ef_stripe_noop` and goes off again at the end (the class's own
- *   destructor); it is on again around `ef_stripe_draw_count`, which calls `GetNumActive` out of line.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma pool_data off` (each string gets its own
+ *   `lis`/`addi`), `#pragma fp_contract off` and `#pragma dont_inline on` before the includes (the base destructors
+ *   the constructor's unwind entry emits call their bases out of line, as retail's do); inlining comes back on after
+ *   `ef_stripe_noop`, is off around `ef_stripe_draw_count` (it calls `GetNumActive` out of line) and goes off again at
+ *   the end (the class's own destructor).
+ * ORDER. Retail emits every helper as a deferred inline right after the function that first references it, the
+ *   pending references popping last-in first-out; only `ef_stripe_draw_ribbon`, the tube builders, `Draw`,
+ *   `ef_stripe_setup_gx`, `ef_stripe_first_ahead`, `GetCalcAheadFunc`, the `AheadContext` constructor and the four
+ *   ahead builders are real definitions, in that order.  The helpers are `__declspec(noinline) inline`, defined before
+ *   their first caller; the weak string pools they carry land in reverse definition order, so the six that own strings
+ *   are defined in retail's reverse data order (view_mtx, modify_rotate, get_rotate, draw_segment, scale_mtx,
+ *   ribbon_vertex).
  * NAMES. GUESS: `ef_vec3_normalize`, `ef_vec3_transform`, `ef_draw_info_view_mtx`, `ef_particle_get_rotate`,
  *   `ef_pm_modify_rotate`, the `ef_draw_setting_*` accessors and the `ef_stripe_*` builders from their bodies and
  *   from how `Draw`, `GetCalcAheadFunc` and the tube select them; `AheadContext` (0x800B8888) from the base context
@@ -31,19 +39,12 @@
  *   GUESS: `ef_gx_write_vec3`, `ef_gx_write_f32x3` (the FIFO writers; the dump's `GXPosition3f32` at 0x800B52BC),
  *   GUESS: `ef_flag_bit0`, `ef_flag_bit3`, `ef_flag_bit4`, `ef_draw_setting_flags_hi2`,
  *   GUESS: `ef_draw_setting_flags_mid3`, `ef_draw_setting_draw_order`, `ef_stripe_param_copy`,
- *   GUESS: `ef_stripe_sample_ctor`; the constants `ef_stripe_one`, `ef_stripe_zero`, `ef_stripe_epsilon` by value.
- * RESIDUALS. 2 partial rows:
- *  - `Draw` (0x800B76C4): the second view-axis temporary (`z1`) and the short-stripe loop's `axis`/`frame` sit in
- *    swapped stack slots (retail: frame 0x50, z0 0x44, z1 0x38);
- *  - `ef_draw_info_view_mtx`: retail reloads the depth offset for every product (ours keeps it in f2); a non-const
- *    `info`, pointer stores, `opt_common_subs off`, `optimization_level 2/3` keep it, `optimization_level 1` drops
- *    the CSE but re-converts the projection type and keeps `pm` in r31.
- *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29).
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_stripe_zero`, `ef_stripe_one`,
- *     `_savegpr_25`,
- *     `_savegpr_26`, `_restgpr_25`, `_restgpr_26`.
+ *   GUESS: `ef_stripe_sample_ctor`; the constants `1.0f`, `0.0f`, `1.1920929e-07f` by value.
+ * RESIDUALS. none: 61 rows at 100 %, `.data`, `.sdata2`, `extab` and `extabindex` match the target.  The object also
+ *   emits five weak nw4r::math copies (`VEC3`/`MTX34` constructors, `VEC3::operator=`, 0x64 bytes) and their unwind
+ *   entry that an earlier link input defines; the link keeps the first definition.
  *   `DrawStripeStrategy` (constructor): the empty body is the whole source - the compiler
- *     emits the base call and the vtable store.
+ *   emits the base call and the vtable store.
  * SHAPES. `ef_stripe_write_edge_pair` takes the scale before the flags (the caller loads f1 before r5).  `EfStripeParam` (in
  *   `ef_drawstripestrategy.h`, shared with the smooth stripe) is the tube ring (three `VEC3` and the texture
  *   coordinate); its copy is the implicit member-wise assignment (words for the vectors, `lfs`/`stfs` for the
@@ -58,6 +59,7 @@
 
 #pragma peephole off
 #pragma dont_inline on
+#pragma pool_data off
 #pragma fp_contract off
 
 #include "types.h"
@@ -100,40 +102,6 @@ extern "C" {
 #endif
 
 
-extern f32 ef_stripe_epsilon; /* FLT_EPSILON (2^-23)  .sdata2 0x80796140 */
-extern f32 ef_stripe_one;     /* 1.0f                 .sdata2 0x80796124 */
-extern f32 ef_stripe_zero;    /* 0.0f                 .sdata2 0x80796130 */
-
-/* This unit's `__FILE__` and pointer-assert strings (its claimed `.data`), declared, never defined. */
-extern char ef_stripe_file_str[]; /* "ef_drawstripestrategy.cpp"                                  .data 0x805939E8 */
-extern char ef_stripe_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."         .data 0x80593BA4 */
-extern char ef_stripe_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."   .data 0x80593BD8 */
-extern char ef_drawinfo_null_result_str[]; /* "NW4R:Pointer must not be NULL (result)"                    .data 0x80593E54 */
-extern char ef_drawinfo_file_str[]; /* "drawinfo.h"                                                .data 0x80593E7C */
-extern char ef_stripe_ahead_assert_str[];     /* "NW4R:Pointer Error\naheadContext(=%p) ..."  .data 0x80593A04 */
-extern char ef_stripe_vertex_ahead_str[];     /* the same, an inline copy                       .data 0x80593CD0 */
-extern char ef_stripe_vertex_file_str[];      /* "ef_drawstripestrategy.cpp", an inline copy    .data 0x80593D0C */
-extern char ef_stripe_scale_pp_str[];         /* "NW4R:Pointer Error\npp(=%p) ...", an inline copy .data 0x80593D28 */
-extern char ef_stripe_scale_file_str[];       /* "ef_drawstripestrategy.cpp", an inline copy    .data 0x80593D5C */
-extern char ef_particle_rotate_assert_str[];  /* "NW4R:Pointer Error\nrotate(=%p) ..."         .data 0x80593DC8 */
-extern char ef_particle_h_file_str[];         /* "particle.h"                                   .data 0x80593E00 */
-extern char ef_pm_base_assert_str[];          /* "NW4R:Pointer Error\nbase(=%p) ..."           .data 0x80593E0C */
-extern char ef_particlemanager_h_file_str[];  /* "particlemanager.h"                            .data 0x80593E40 */
-extern f32 ef_stripe_percent; /* 0.01f           .sdata2 0x80796120 */
-extern f32 ef_stripe_rotate_step; /* 2pi / 256       .sdata2 0x80796134 */
-extern char ef_stripe_trig_assert_str[];        /* "NW4R:Pointer Error\ntrigonometric(=%p) ..." .data 0x80593B18 */
-extern char ef_stripe_tube_divide_assert_str[]; /* "NW4R:Failed assertion 3 <= GetTubeDivide(ed)" .data 0x80593B74 */
-extern f32 ef_stripe_full_circle; /* 360.0f          .sdata2 0x80796144 */
-extern char ef_stripe_dst_assert_str[];        /* "NW4R:Pointer Error\ndst(=%p) ..."        .data 0x80593A40 */
-extern char ef_stripe_context_assert_str[];    /* "NW4R:Pointer Error\ncontext(=%p) ..."    .data 0x80593A74 */
-extern char ef_stripe_pp_assert_str[];         /* "NW4R:Pointer Error\npp(=%p) ..."         .data 0x80593AAC */
-extern char ef_stripe_calc_ahead_assert_str[]; /* "NW4R:Pointer Error\ncalcAhead(=%p) ..."  .data 0x80593AE0 */
-extern char ef_stripe_youngest_assert_str[];   /* "NW4R:Failed assertion youngest"          .data 0x80593B54 */
-extern char ef_stripe_yaxis_assert_str[];    /* "NW4R:Pointer Error\nyAxis(=%p) ..."     .data 0x80593C48 */
-extern char ef_stripe_particle_assert_str[]; /* "NW4R:Pointer Error\nparticle(=%p) ..."  .data 0x80593C7C */
-extern char ef_stripe_inline2_pp_str[];   /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."  .data 0x80593D78 */
-extern char ef_stripe_inline3_file_str[]; /* "ef_drawstripestrategy.cpp" (an inline copy)        .data 0x80593DAC */
-extern char ef_stripe_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."       .data 0x80593C14 */
 
 /* Helpers owned by other units. */
 extern void* vec3_to_const_vec(void* arg);
@@ -217,8 +185,374 @@ extern "C" {
 #endif
 
 /* Nothing to do. */
-void ef_stripe_noop(void) {}
+__declspec(noinline) inline void ef_stripe_noop(void) {}
+
 #pragma dont_inline off
+
+/* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
+__declspec(noinline) inline VEC3* ef_vec3_transform(VEC3* dst, const MTX34* m, const VEC3* v) {
+    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), vec3_to_const_vec((void*)v), vec3_to_vec(dst));
+    return dst;
+}
+
+/* 0x800B7DB0 (0x1A8): copies the draw's view matrix into `result` and, for a nonzero depth offset, pushes it along
+ * the view direction of the depth origin (perspective) or along view Z (orthographic). */
+__declspec(noinline) inline MTX34* ef_draw_info_view_mtx(const EfDrawInfo* info, MTX34* result) {
+    if (result == NULL) {
+        nw4r::db::Panic("drawinfo.h", 123, "NW4R:Pointer must not be NULL (result)");
+    }
+    mtx34_copy(result, (MTX34*)&info->view_mtx);
+    if (0.0f != info->depth_offset) {
+        f32 proj[7];
+
+        GXGetProjectionv(proj);
+        switch ((s32)proj[0]) {
+        case 0: {
+            VEC3 dir;
+
+            ef_vec3_transform(&dir, &info->view_mtx, &info->depth_origin);
+            if (ef_vec3_normalize_to(&dir, &dir) != NULL) {
+                if (dir.z >= 0.0f) {
+                    result->m[0][3] += dir.x * info->depth_offset;
+                    result->m[1][3] += dir.y * info->depth_offset;
+                    result->m[2][3] += dir.z * info->depth_offset;
+                } else {
+                    result->m[0][3] -= dir.x * info->depth_offset;
+                    result->m[1][3] -= dir.y * info->depth_offset;
+                    result->m[2][3] -= dir.z * info->depth_offset;
+                }
+            } else {
+                result->m[2][3] += info->depth_offset;
+            }
+            break;
+        }
+        case 1:
+            result->m[2][3] += info->depth_offset;
+            break;
+        }
+    }
+    return result;
+}
+
+/* 0x800B5698 (0x150): adds the manager's rotation offset. */
+__declspec(noinline) inline void ef_pm_modify_rotate(EfDrawParticleManager* pm, const EfDrawParticle* p, VEC3* rotate) {
+    if (!IsValidPointer((u32)rotate)) {
+        nw4r::db::Panic("particlemanager.h", 576, "NW4R:Pointer Error\nbase(=%p) is not valid pointer.", rotate);
+    }
+    rotate->x += pm->rotate_offset.x;
+    rotate->y += pm->rotate_offset.y;
+    rotate->z += pm->rotate_offset.z;
+}
+
+/* 0x800B54B4 (0x1E4): the particle's rotation plus its per-axis offset steps and its manager's offset. */
+__declspec(noinline) inline void ef_particle_get_rotate(const void* src, Vec3* out) {
+    const EfDrawParticle* p = (const EfDrawParticle*)src;
+
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic("particle.h", 228, "NW4R:Pointer Error\nrotate(=%p) is not valid pointer.", out);
+    }
+    *out = p->rotate;
+    if (p->rotate_offset[0] != 0) {
+        out->x += 0.024543693f * p->rotate_offset[0];
+    }
+    if (p->rotate_offset[1] != 0) {
+        out->y += 0.024543693f * p->rotate_offset[1];
+    }
+    if (p->rotate_offset[2] != 0) {
+        out->z += 0.024543693f * p->rotate_offset[2];
+    }
+    ef_pm_modify_rotate(p->manager, p, out);
+}
+
+/* Writes a pair of f32 to the pipe. */
+__declspec(noinline) inline void ef_gx_write_f32x2(f32 x, f32 y) {
+    GXWGFifo.f32 = x;
+    GXWGFifo.f32 = y;
+}
+
+/* Tests the low bit of a status word (the booleanised `(value & 1) != 0`). */
+__declspec(noinline) inline int ef_flag_bit0(u32 value) {
+    return (value & 1) != 0;
+}
+
+/* Writes three f32 to the pipe. */
+__declspec(noinline) inline void ef_gx_write_f32x3(f32 x, f32 y, f32 z) {
+    GXWGFifo.f32 = x;
+    GXWGFifo.f32 = y;
+    GXWGFifo.f32 = z;
+}
+
+__declspec(noinline) inline void ef_gx_write_vec3(Vec* v) {
+    ef_gx_write_f32x3(v->x, v->y, v->z);
+}
+
+/* Emits two stripe endpoints, each preceded by its scale when the flag's low bit is set. */
+__declspec(noinline) inline void ef_stripe_write_edge_pair(Vec* a, Vec* b, f32 scale, u32 flags) {
+    ef_gx_write_vec3(a);
+    if (ef_flag_bit0(flags)) {
+        ef_gx_write_f32x2(1.0f, scale);
+    }
+    ef_gx_write_vec3(b);
+    if (ef_flag_bit0(flags)) {
+        ef_gx_write_f32x2(0.0f, scale);
+    }
+}
+
+/* A stripe-strategy constant. */
+__declspec(noinline) inline f32 ef_float_epsilon(void) {
+    return 1.1920929e-07f;
+}
+
+/* Resolves the stripe length, returning 0 when it is below the unit's threshold. */
+__declspec(noinline) inline int ef_vec3_normalize(void* self) {
+    f32 length = vec3_dot((const f32*)self, (const f32*)self);
+    if (length < ef_float_epsilon()) {
+        return 0;
+    }
+    vec3_scale_in_place((VEC3*)self, nw4r::math::FrSqrt(length));
+    return 1;
+}
+
+/* Tests one bit of a status word. */
+__declspec(noinline) inline int ef_flag_bit3(u32 value) {
+    return (value & 0x8) != 0;
+}
+
+/* 0x800B57E8 (0x1FC): the frame of one stripe particle: the side axis is the ahead vector crossed with the previous
+ * particle's (or, in view-facing mode, the view's Z axis), the up axis completes the frame and becomes the particle's
+ * new ahead vector, and the position is the translation. */
+__declspec(noinline) inline void ef_stripe_draw_segment(MTX34* out, nw4r::ef::DrawStripeStrategy* self,
+                            nw4r::ef::DrawStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
+                            const VEC3* ahead, const VEC3* pos) {
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 174, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", p);
+    }
+    VEC3 side;
+    VEC3 up;
+    if (ef_flag_bit3(flags) == 0) {
+        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&p->ahead);
+    } else {
+        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&ctx->view_axis_z);
+    }
+    if (ef_vec3_normalize(&side) == 0) {
+        side = ctx->emitter_axis_x;
+    }
+    vec3_cross((f32*)&up, (const f32*)&side, (const f32*)ahead);
+    ef_vec3_normalize(&up);
+    p->ahead = up;
+    mtx34_set(out, side.x, ahead->x, up.x, pos->x, side.y, ahead->y, up.y, pos->y, side.z, ahead->z, up.z,
+                pos->z);
+}
+
+/* 0x800B52D0 (0x1E4): the rotation (about the stripe axis, by the particle's Y rotation) and scale of one ribbon
+ * segment, recentred on the strip width. */
+__declspec(noinline) inline void ef_stripe_scale_mtx(MTX34* out, nw4r::ef::DrawStripeStrategy* self, EfDrawParticle* p, f32 width) {
+    f32 c;
+    f32 s;
+    f32 size;
+
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 206, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", p);
+    }
+    VEC3 rotate;
+    ef_particle_get_rotate(p, &rotate);
+    size = ef_particle_get_scale((EfParticle*)p);
+    ef_sin_cos(&s, &c, rotate.y);
+    s *= size;
+    c *= size;
+    mtx34_set(out, c, 0.0f, -s, width - c * width, 0.0f, 1.0f, 0.0f, 0.0f, s, 0.0f, c, -s * width);
+}
+
+/* The next list node: the manager's per-instance byte offset into the node.  The offset is a runtime
+ * field, so there is no compile-time field name to reach; the byte add is the only spelling. */
+__declspec(noinline) inline void* ef_pm_list_next(void* self, void* node) {
+    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42);
+}
+
+/* Walks the auxiliary list through the per-node offset table until the callback reports 1. */
+__declspec(noinline) inline void* ef_pm_next_alive(void* self, void* node) {
+    void* next = ef_pm_list_next(self, node);
+    while (next != 0 && ef_get_life_status(next) != 1) {
+        next = ef_pm_list_next(self, next);
+    }
+    return next;
+}
+
+/* The particle's stored word at +0x3C. */
+__declspec(noinline) inline u32 ef_pm_list_head(EfParticleState* self) {
+    return self->field_0x3C;
+}
+
+/* Walks the particle list at +0x3C until the callback reports 1 (or the end). */
+__declspec(noinline) inline void* ef_pm_first_alive(EfDrawList* self) {
+    void* node = (void*)ef_pm_list_head((EfParticleState*)self);
+    while (node != 0 && ef_get_life_status(node) != 1) {
+        node = ef_pm_next_alive(self, node);
+    }
+    return node;
+}
+
+/* 0x800B4FE4 (0x214): the two ribbon vertices of one particle (or, for NULL, of the eldest one at `pos`): its frame
+ * times its rotation-and-scale matrix applied to the edge offsets `a`/`b`, with texture coordinate `t`. */
+__declspec(noinline) inline void ef_stripe_ribbon_vertex(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
+                             u32 flags, EfDrawParticle* p, nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead,
+                             const VEC3* pos, const VEC3* a, const VEC3* b, f32 width, f32 t) {
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 236, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
+    }
+    VEC3 ahead;
+    MTX34 mtx;
+    _MTX34 frame;
+    _MTX34 scale;
+    if (p == NULL) {
+        p = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)ctx->particle_manager);
+    }
+    calc_ahead(&ahead, ctx, p);
+    ef_stripe_draw_segment((MTX34*)&frame, self, ctx, flags, p, &ahead, pos);
+    ef_stripe_scale_mtx((MTX34*)&scale, self, p, width);
+    mtx34_concat(&mtx, (MTX34*)&frame, (MTX34*)&scale);
+    VEC3 va;
+    VEC3 vb;
+    mtx34_mult_vec3(&va, &mtx, a);
+    mtx34_mult_vec3(&vb, &mtx, b);
+    ef_stripe_write_edge_pair((Vec*)&va, (Vec*)&vb, t, flags);
+}
+
+/* The particle's packed flags, bits 6-7. */
+__declspec(noinline) inline s32 ef_draw_setting_flags_hi2(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0xC0;
+}
+
+#pragma dont_inline on
+
+/* Returns the list's live particle count. */
+inline s32 EfDrawParticleList::GetNumActive() const {
+    return count;
+}
+
+/* 0x800B5B54 (0x8): the number of particles the manager holds. */
+__declspec(noinline) inline s32 ef_stripe_draw_count(nw4r::ef::DrawStrategyImpl* self, EfDrawParticleManager* pm) {
+    return pm->particles.GetNumActive();
+}
+
+#pragma dont_inline off
+
+/* The Z unit vector. */
+__declspec(noinline) inline const VEC3* ef_get_unit_z_vec(void) {
+    return &ef_unit_z_vec;
+}
+
+/* The X unit vector. */
+__declspec(noinline) inline const VEC3* ef_get_unit_x_vec(void) {
+    return &ef_unit_x_vec;
+}
+
+/* Tests one bit of a status word. */
+__declspec(noinline) inline int ef_flag_bit4(u32 value) {
+    return (value & 0x10) != 0;
+}
+
+/* The particle's layer/parameter index byte. */
+__declspec(noinline) inline s32 ef_draw_setting_tube_divide(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB0;
+}
+
+/* Copies a stripe sample. */
+__declspec(noinline) inline void ef_stripe_param_copy(EfStripeParam* dst, EfStripeParam* src) {
+    *(EfStripeParamImage*)dst = *(const EfStripeParamImage*)src;
+}
+
+}  // extern "C"
+
+/* 0x800B6954 (0x40): constructs a tube ring's three vectors. */
+__declspec(noinline) inline EfStripeParam::EfStripeParam() {
+}
+
+extern "C" {
+
+/* The particle's state bit 0x800. */
+__declspec(noinline) inline u32 ef_draw_setting_draw_order(void* ctx, EfParticleState* particle) {
+    return particle->flags_0x00 & 0x800;
+}
+
+/* Draws eight stripe steps at one scale when the flag is set. */
+__declspec(noinline) inline void ef_stripe_begin_side(u32 cull_mode, u32 enabled, u32 flags) {
+    GXSetCullMode(cull_mode);
+    if (enabled != 0) {
+        GXBegin(0x98, 0, 8);
+        for (int i = 0; i < 8; i++) {
+            ef_gx_write_f32x3(0.0f, 0.0f, 0.0f);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(0.0f, 0.0f);
+            }
+        }
+        ef_stripe_noop();
+    }
+}
+
+/* The particle's packed flags, bits 0-2. */
+__declspec(noinline) inline s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0x7;
+}
+
+/* The particle's packed flags, bits 3-5. */
+__declspec(noinline) inline s32 ef_draw_setting_flags_mid3(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0x38;
+}
+
+/* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
+__declspec(noinline) inline void ef_ahead_manager_axis_y(nw4r::math::VEC3* dst, EfParticleState* particle) {
+    *dst = nw4r::math::VEC3(*(const nw4r::math::_VEC3*)&particle->field_0xB0);
+}
+
+/* Copies the particle's +0x98 block into `dst`. */
+__declspec(noinline) inline void ef_ahead_emitter_axis_y(nw4r::math::VEC3* dst, EfParticleState* particle) {
+    *dst = *((const nw4r::math::VEC3*)&particle->field_0x98);
+}
+
+/* Subtracts the two ahead vectors and copies the reference block when the result is degenerate. */
+__declspec(noinline) inline void ef_ahead_from_emitter(Vec* a, EfParticleState* particle, EfAheadItem* item) {
+    PSVECSubtract((f32*)a, (const f32*)&item->field_0xAC, (const f32*)&particle->field_0xA4);
+    if (ef_vec3_normalize(a) == 0) {
+        *(nw4r::math::VEC3*)a = *((const nw4r::math::VEC3*)&particle->field_0x98);
+    }
+}
+
+/* untyped: opaque handle passed through to ef_particle_get_move_dir */
+__declspec(noinline) inline void ef_ahead_move_dir(Vec* a, EfParticleState* particle, void* arg) {
+    ef_particle_get_move_dir(arg, a);
+    if (ef_vec3_normalize(a) == 0) {
+        *(nw4r::math::VEC3*)a = *((const nw4r::math::VEC3*)&particle->field_0x98);
+    }
+}
+
+__declspec(noinline) inline void* ef_pm_list_prev(void* self, void* node) {
+    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42 + 4);
+}
+
+/* Walks a node chain through ef_pm_list_prev until the callback reports 1 (or the end). */
+__declspec(noinline) inline void* ef_pm_prev_alive(void* self, void* node) {
+    void* next = ef_pm_list_prev(self, node);
+    while (next != 0 && ef_get_life_status(next) != 1) {
+        next = ef_pm_list_prev(self, next);
+    }
+    return next;
+}
+
+/* The particle's stored word at +0x38. */
+__declspec(noinline) inline u32 ef_pm_list_tail(EfParticleState* self) {
+    return self->field_0x38;
+}
+
+/* Walks the +0x38 head through ef_pm_list_prev until the callback reports 1 (or the end). */
+__declspec(noinline) inline void* ef_pm_last_alive(EfParticleState* self) {
+    void* next = (void*)ef_pm_list_tail(self);
+    while (next != 0 && ef_get_life_status(next) != 1) {
+        next = ef_pm_list_prev(self, next);
+    }
+    return next;
+}
 
 /* 0x800B4BA4 (0x43C): draws the stripe as one ribbon strip: two vertices per particle (the `a`/`b` edge offsets
  * through each particle's frame), plus a closing particle when the stripe loops and the emitter origin when it
@@ -243,7 +577,7 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
     EfDrawParticle* p;
 
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 275, ef_stripe_ahead_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 275, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
     }
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
@@ -252,7 +586,7 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
     count = ef_stripe_draw_count(self, pm);
-    width = ef_stripe_percent * ed->scale_a;
+    width = 0.01f * ed->scale_a;
     loop = (ed->stripe_connect & 7) == 1;
     to_emitter = (ed->stripe_connect & 7) == 2;
     if (loop || to_emitter) {
@@ -260,7 +594,7 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
     }
     GXBegin(0x98, 0, count * 2);
     if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
-        step = ef_stripe_one;
+        step = 1.0f;
     } else {
         step = math_reciprocal(count - 1);
     }
@@ -290,211 +624,6 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
     ef_stripe_noop();
 }
 
-/* 0x800B4FE4 (0x214): the two ribbon vertices of one particle (or, for NULL, of the eldest one at `pos`): its frame
- * times its rotation-and-scale matrix applied to the edge offsets `a`/`b`, with texture coordinate `t`. */
-void ef_stripe_ribbon_vertex(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
-                             u32 flags, EfDrawParticle* p, nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead,
-                             const VEC3* pos, const VEC3* a, const VEC3* b, f32 width, f32 t) {
-
-    if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_vertex_file_str, 236, ef_stripe_vertex_ahead_str, ctx);
-    }
-    VEC3 ahead;
-    MTX34 mtx;
-    _MTX34 frame;
-    _MTX34 scale;
-    if (p == NULL) {
-        p = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)ctx->particle_manager);
-    }
-    calc_ahead(&ahead, ctx, p);
-    ef_stripe_draw_segment((MTX34*)&frame, self, ctx, flags, p, &ahead, pos);
-    ef_stripe_scale_mtx((MTX34*)&scale, self, p, width);
-    mtx34_concat(&mtx, (MTX34*)&frame, (MTX34*)&scale);
-    VEC3 va;
-    VEC3 vb;
-    mtx34_mult_vec3(&va, &mtx, a);
-    mtx34_mult_vec3(&vb, &mtx, b);
-    ef_stripe_write_edge_pair((Vec*)&va, (Vec*)&vb, t, flags);
-}
-
-
-/* Emits two stripe endpoints, each preceded by its scale when the flag's low bit is set. */
-void ef_stripe_write_edge_pair(Vec* a, Vec* b, f32 scale, u32 flags) {
-    ef_gx_write_vec3(a);
-    if (ef_flag_bit0(flags)) {
-        ef_gx_write_f32x2(ef_stripe_one, scale);
-    }
-    ef_gx_write_vec3(b);
-    if (ef_flag_bit0(flags)) {
-        ef_gx_write_f32x2(ef_stripe_zero, scale);
-    }
-}
-
-/* Writes a pair of f32 to the pipe. */
-void ef_gx_write_f32x2(f32 x, f32 y) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-}
-
-/* Tests the low bit of a status word (the booleanised `(value & 1) != 0`). */
-int ef_flag_bit0(u32 value) {
-    return (value & 1) != 0;
-}
-
-void ef_gx_write_vec3(Vec* v) {
-    ef_gx_write_f32x3(v->x, v->y, v->z);
-}
-
-/* Writes three f32 to the pipe. */
-void ef_gx_write_f32x3(f32 x, f32 y, f32 z) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
-}
-
-/* 0x800B52D0 (0x1E4): the rotation (about the stripe axis, by the particle's Y rotation) and scale of one ribbon
- * segment, recentred on the strip width. */
-void ef_stripe_scale_mtx(MTX34* out, nw4r::ef::DrawStripeStrategy* self, EfDrawParticle* p, f32 width) {
-    f32 c;
-    f32 s;
-    f32 size;
-
-    if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_scale_file_str, 206, ef_stripe_scale_pp_str, p);
-    }
-    VEC3 rotate;
-    ef_particle_get_rotate(p, &rotate);
-    size = ef_particle_get_scale((EfParticle*)p);
-    ef_sin_cos(&s, &c, rotate.y);
-    s *= size;
-    c *= size;
-    mtx34_set(out, c, 0.0f, -s, width - c * width, 0.0f, 1.0f, 0.0f, 0.0f, s, 0.0f, c, -s * width);
-}
-
-/* 0x800B54B4 (0x1E4): the particle's rotation plus its per-axis offset steps and its manager's offset. */
-void ef_particle_get_rotate(const void* src, Vec3* out) {
-    const EfDrawParticle* p = (const EfDrawParticle*)src;
-
-    if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_particle_h_file_str, 228, ef_particle_rotate_assert_str, out);
-    }
-    *out = p->rotate;
-    if (p->rotate_offset[0] != 0) {
-        out->x += ef_stripe_rotate_step * p->rotate_offset[0];
-    }
-    if (p->rotate_offset[1] != 0) {
-        out->y += ef_stripe_rotate_step * p->rotate_offset[1];
-    }
-    if (p->rotate_offset[2] != 0) {
-        out->z += ef_stripe_rotate_step * p->rotate_offset[2];
-    }
-    ef_pm_modify_rotate(p->manager, p, out);
-}
-
-/* 0x800B5698 (0x150): adds the manager's rotation offset. */
-void ef_pm_modify_rotate(EfDrawParticleManager* pm, const EfDrawParticle* p, VEC3* rotate) {
-    if (!IsValidPointer((u32)rotate)) {
-        nw4r::db::Panic(ef_particlemanager_h_file_str, 576, ef_pm_base_assert_str, rotate);
-    }
-    rotate->x += pm->rotate_offset.x;
-    rotate->y += pm->rotate_offset.y;
-    rotate->z += pm->rotate_offset.z;
-}
-
-/* Resolves the stripe length, returning 0 when it is below the unit's threshold. */
-int ef_vec3_normalize(void* self) {
-    f32 length = vec3_dot((const f32*)self, (const f32*)self);
-    if (length < ef_float_epsilon()) {
-        return 0;
-    }
-    vec3_scale_in_place((VEC3*)self, nw4r::math::FrSqrt(length));
-    return 1;
-}
-
-/* A stripe-strategy constant. */
-f32 ef_float_epsilon(void) {
-    return ef_stripe_epsilon;
-}
-
-/* Tests one bit of a status word. */
-int ef_flag_bit3(u32 value) {
-    return (value & 0x8) != 0;
-}
-
-/* Walks the particle list at +0x3C until the callback reports 1 (or the end). */
-void* ef_pm_first_alive(EfDrawList* self) {
-    void* node = (void*)ef_pm_list_head((EfParticleState*)self);
-    while (node != 0 && ef_get_life_status(node) != 1) {
-        node = ef_pm_next_alive(self, node);
-    }
-    return node;
-}
-
-/* Walks the auxiliary list through the per-node offset table until the callback reports 1. */
-void* ef_pm_next_alive(void* self, void* node) {
-    void* next = ef_pm_list_next(self, node);
-    while (next != 0 && ef_get_life_status(next) != 1) {
-        next = ef_pm_list_next(self, next);
-    }
-    return next;
-}
-
-/* The next list node: the manager's per-instance byte offset into the node.  The offset is a runtime
- * field, so there is no compile-time field name to reach; the byte add is the only spelling. */
-void* ef_pm_list_next(void* self, void* node) {
-    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42);
-}
-
-/* The particle's stored word at +0x3C. */
-u32 ef_pm_list_head(EfParticleState* self) {
-    return self->field_0x3C;
-}
-
-/* The particle's packed flags, bits 6-7. */
-s32 ef_draw_setting_flags_hi2(void* ctx, EfParticleState* particle) {
-    return particle->field_0xB2 & 0xC0;
-}
-
-/* 0x800B57E8 (0x1FC): the frame of one stripe particle: the side axis is the ahead vector crossed with the previous
- * particle's (or, in view-facing mode, the view's Z axis), the up axis completes the frame and becomes the particle's
- * new ahead vector, and the position is the translation. */
-void ef_stripe_draw_segment(MTX34* out, nw4r::ef::DrawStripeStrategy* self,
-                            nw4r::ef::DrawStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
-                            const VEC3* ahead, const VEC3* pos) {
-    if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_inline3_file_str, 174, ef_stripe_inline2_pp_str, p);
-    }
-    VEC3 side;
-    VEC3 up;
-    if (ef_flag_bit3(flags) == 0) {
-        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&p->ahead);
-    } else {
-        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&ctx->view_axis_z);
-    }
-    if (ef_vec3_normalize(&side) == 0) {
-        side = ctx->emitter_axis_x;
-    }
-    vec3_cross((f32*)&up, (const f32*)&side, (const f32*)ahead);
-    ef_vec3_normalize(&up);
-    p->ahead = up;
-    mtx34_set(out, side.x, ahead->x, up.x, pos->x, side.y, ahead->y, up.y, pos->y, side.z, ahead->z, up.z,
-                pos->z);
-}
-
-#pragma dont_inline on
-
-/* Returns the list's live particle count. */
-inline s32 EfDrawParticleList::GetNumActive() const {
-    return count;
-}
-
-/* 0x800B5B54 (0x8): the number of particles the manager holds. */
-s32 ef_stripe_draw_count(nw4r::ef::DrawStrategyImpl* self, EfDrawParticleManager* pm) {
-    return pm->particles.GetNumActive();
-}
-
-#pragma dont_inline off
-
 /* 0x800B5B64 (0x5C8): one ring of a tube: the particle's frame times its rotation-and-scale matrix, kept as a centre
  * and the X/Z axes, with texture coordinate `t`. */
 void ef_stripe_tube_ring(nw4r::ef::DrawStripeStrategy* self, EfStripeParam* out,
@@ -508,16 +637,16 @@ void ef_stripe_tube_ring(nw4r::ef::DrawStripeStrategy* self, EfStripeParam* out,
     f32 scale_y;
 
     if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_stripe_file_str, 395, ef_stripe_dst_assert_str, out);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 395, "NW4R:Pointer Error\ndst(=%p) is not valid pointer.", out);
     }
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 396, ef_stripe_context_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 396, "NW4R:Pointer Error\ncontext(=%p) is not valid pointer.", ctx);
     }
     if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_file_str, 397, ef_stripe_pp_assert_str, p);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 397, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", p);
     }
     if (!IsValidPointer((u32)calc_ahead)) {
-        nw4r::db::Panic(ef_stripe_file_str, 398, ef_stripe_calc_ahead_assert_str, calc_ahead);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 398, "NW4R:Pointer Error\ncalcAhead(=%p) is not valid pointer.", calc_ahead);
     }
     VEC3 ahead;
     calc_ahead(&ahead, ctx, p);
@@ -547,7 +676,7 @@ void ef_stripe_tube_strip(nw4r::ef::DrawStripeStrategy* self, const EfStripePara
     s32 i;
 
     if (!IsValidPointer((u32)trig)) {
-        nw4r::db::Panic(ef_stripe_file_str, 441, ef_stripe_trig_assert_str, trig);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 441, "NW4R:Pointer Error\ntrigonometric(=%p) is not valid pointer.", trig);
     }
     inv = math_reciprocal(divide);
     GXBegin(0x98, 0, divide * 2 + 2);
@@ -601,7 +730,7 @@ void ef_stripe_tube_open(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     EfDrawParticle* p;
 
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 493, ef_stripe_ahead_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 493, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
     }
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
@@ -609,11 +738,11 @@ void ef_stripe_tube_open(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
-    offset_x = ef_stripe_percent * ed->scale_a;
-    offset_y = ef_stripe_percent * ed->scale_b;
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
     if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
-        step = ef_stripe_one;
+        step = 1.0f;
     } else {
         step = math_reciprocal(count - 1);
     }
@@ -656,7 +785,7 @@ void ef_stripe_tube_loop(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     EfDrawParticle* p;
 
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 549, ef_stripe_ahead_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 549, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
     }
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
@@ -664,11 +793,11 @@ void ef_stripe_tube_loop(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
-    offset_x = ef_stripe_percent * ed->scale_a;
-    offset_y = ef_stripe_percent * ed->scale_b;
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
     if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
-        step = ef_stripe_one;
+        step = 1.0f;
     } else {
         step = math_reciprocal(count);
     }
@@ -716,7 +845,7 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
     EfDrawParticle* p;
 
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 609, ef_stripe_ahead_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 609, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
     }
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
@@ -724,11 +853,11 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
     order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
-    offset_x = ef_stripe_percent * ed->scale_a;
-    offset_y = ef_stripe_percent * ed->scale_b;
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
     if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
-        step = ef_stripe_one;
+        step = 1.0f;
     } else {
         step = math_reciprocal(count);
     }
@@ -749,7 +878,7 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
         ring[1].tex_t = step * index;
         youngest = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)pm);
         if (!youngest) {
-            nw4r::db::Panic(ef_stripe_file_str, 655, ef_stripe_youngest_assert_str);
+            nw4r::db::Panic("ef_drawstripestrategy.cpp", 655, "NW4R:Failed assertion youngest");
         }
         VEC3 offset = ctx->emitter_center - (const VEC3&)youngest->world_pos;
         ring[0].center += offset;
@@ -765,56 +894,61 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
     }
 }
 
-/* The Z unit vector. */
-const VEC3* ef_get_unit_z_vec(void) {
-    return &ef_unit_z_vec;
-}
+/* 0x800B71F0 (0x438): draws the stripe as a tube: builds the (sin, cos) table of its sides on the stack, then draws
+ * the back faces and the front faces through the connection type's builder. */
+void ef_stripe_draw_tube(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
+                         u32 flags, u32 flush) {
+    EfEmitterDrawSetting* ed;
+    s32 divide;
 
-/* The X unit vector. */
-const VEC3* ef_get_unit_x_vec(void) {
-    return &ef_unit_x_vec;
-}
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 679, "NW4R:Pointer Error\naheadContext(=%p) is not valid pointer.", ctx);
+    }
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(ctx->particle_manager->resource);
+    if (!(3 <= ef_draw_setting_tube_divide(self, (EfParticleState*)ed))) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 684, "NW4R:Failed assertion 3 <= GetTubeDivide(ed)");
+    }
+    divide = ef_draw_setting_tube_divide(self, (EfParticleState*)ed);
+    if (divide >= 3) {
+        f32* trig = (f32*)__alloca((divide + 1) * 8);
 
-/* Tests one bit of a status word. */
-int ef_flag_bit4(u32 value) {
-    return (value & 0x10) != 0;
-}
+        if (!IsValidPointer((u32)trig)) {
+            nw4r::db::Panic("ef_drawstripestrategy.cpp", 694, "NW4R:Pointer Error\ntrigonometric(=%p) is not valid pointer.", trig);
+        }
+        if (trig != NULL) {
+            f32 step = 360.0f / divide;
+            f32* pair;
+            s32 i;
 
-/* The particle's layer/parameter index byte. */
-s32 ef_draw_setting_tube_divide(void* ctx, EfParticleState* particle) {
-    return particle->field_0xB0;
-}
-
-/* Copies a stripe sample. */
-void ef_stripe_param_copy(EfStripeParam* dst, EfStripeParam* src) {
-    *(EfStripeParamImage*)dst = *(const EfStripeParamImage*)src;
-}
-
-}  // extern "C"
-
-/* 0x800B6954 (0x40): constructs a tube ring's three vectors. */
-EfStripeParam::EfStripeParam() {
-}
-
-extern "C" {
-
-/* The particle's state bit 0x800. */
-u32 ef_draw_setting_draw_order(void* ctx, EfParticleState* particle) {
-    return particle->flags_0x00 & 0x800;
-}
-
-/* Draws eight stripe steps at one scale when the flag is set. */
-void ef_stripe_begin_side(u32 cull_mode, u32 enabled, u32 flags) {
-    GXSetCullMode(cull_mode);
-    if (enabled != 0) {
-        GXBegin(0x98, 0, 8);
-        for (int i = 0; i < 8; i++) {
-            ef_gx_write_f32x3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
-            if (ef_flag_bit0(flags)) {
-                ef_gx_write_f32x2(ef_stripe_zero, ef_stripe_zero);
+            trig[1] = 1.0f;
+            trig[0] = 0.0f;
+            for (i = 1, pair = trig + 2; i < divide; pair += 2, i++) {
+                sin_cos_deg(&pair[0], &pair[1], step * i);
+            }
+            trig[divide * 2 + 1] = 1.0f;
+            trig[divide * 2] = 0.0f;
+            ctx->trig_table = trig;
+            switch (ef_draw_setting_connect_type(self, (EfParticleState*)ed)) {
+            default:
+                ef_stripe_begin_side(1, flush, flags);
+                ef_stripe_tube_open(self, ctx, flags);
+                ef_stripe_begin_side(2, flush, flags);
+                ef_stripe_tube_open(self, ctx, flags);
+                break;
+            case 1:
+                ef_stripe_begin_side(1, flush, flags);
+                ef_stripe_tube_loop(self, ctx, flags);
+                ef_stripe_begin_side(2, flush, flags);
+                ef_stripe_tube_loop(self, ctx, flags);
+                break;
+            case 2:
+                ef_stripe_begin_side(1, flush, flags);
+                ef_stripe_tube_to_emitter(self, ctx, flags);
+                ef_stripe_begin_side(2, flush, flags);
+                ef_stripe_tube_to_emitter(self, ctx, flags);
+                break;
             }
         }
-        ef_stripe_noop();
     }
 }
 
@@ -830,12 +964,12 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
     s32 count;
 
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_stripe_file_str, 738, ef_stripe_pm_assert_str, pm);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 738, "NW4R:Pointer Error\npm(=%p) is not valid pointer.", pm);
     }
-    EF_VALID_PTR_ASSERT(ef_stripe_file_str, 740, ef_stripe_resource_assert_str, pm->resource);
+    EF_VALID_PTR_ASSERT("ef_drawstripestrategy.cpp", 740, "NW4R:Pointer Error\npm->mResource(=%p) is not valid pointer.", pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(ef_stripe_file_str, 742, ef_stripe_ed_assert_str, ed);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 742, "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.", ed);
     }
     count = ef_stripe_draw_count(this, pm);
     if (count != 0) {
@@ -909,56 +1043,6 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
     }
 }
 
-/* 0x800B83CC (0x3BC): the ahead-vector builder the draw setting's direction type (and, for type 6, the stripe's
- * connection mode) selects. */
-DrawStrategyImpl::CalcAheadFunc DrawStripeStrategy::GetCalcAheadFunc(EfDrawParticleManager* pm) {
-    EfEmitterDrawSetting* ed;
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_stripe_file_str, 949, ef_stripe_pm_assert_str, pm);
-    }
-    EF_VALID_PTR_ASSERT(ef_stripe_file_str, 950, ef_stripe_resource_assert_str, pm->resource);
-    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
-    if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(ef_stripe_file_str, 953, ef_stripe_ed_assert_str, ed);
-    }
-    switch (ed->type_direction) {
-    case 0:
-        return (CalcAheadFunc)ef_ahead_move_dir;
-    case 1:
-        return (CalcAheadFunc)ef_ahead_from_emitter;
-    case 2:
-        return (CalcAheadFunc)ef_ahead_emitter_axis_y;
-    case 3:
-        return ef_stripe_ahead_type3;
-    case 5:
-    case 7:
-        return (CalcAheadFunc)ef_ahead_manager_axis_y;
-    case 6:
-        switch (ed->stripe_connect & 7) {
-        case 1:
-            return ef_stripe_ahead_type6_link1;
-        case 2:
-            return ef_stripe_ahead_type6_link2;
-        default:
-            return ef_stripe_ahead_type6;
-        }
-    default:
-        return (CalcAheadFunc)ef_ahead_move_dir;
-    }
-}
-
-/* 0x800B8888 (0x164): the base ahead context plus the emitter's X axis in manager space. */
-DrawStripeStrategy::AheadContext::AheadContext(const MTX34* view, EfDrawParticleManager* pm)
-    : DrawStrategyImpl::AheadContext(view, pm) {
-    trig_table = NULL;
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_stripe_file_str, 989, ef_stripe_pm_assert_str, pm);
-    }
-    VEC3 axis(emitter_mtx.m[0][0], emitter_mtx.m[1][0], emitter_mtx.m[2][0]);
-    mtx34_rotate_vec3(&emitter_axis_x, &manager_mtx_inv, &axis);
-}
-
 }  // namespace ef
 }  // namespace nw4r
 
@@ -968,7 +1052,7 @@ extern "C" {
  * and texcoord vertex format at the current matrix. */
 void ef_stripe_setup_gx(nw4r::ef::DrawStripeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_stripe_file_str, 849, ef_stripe_pm_assert_str, pm);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 849, "NW4R:Pointer Error\npm(=%p) is not valid pointer.", pm);
     }
     self->InitGraphics(pm, *(EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource), *info);
     GXEnableTexOffsets(0, 1, 1);
@@ -980,114 +1064,6 @@ void ef_stripe_setup_gx(nw4r::ef::DrawStripeStrategy* self, const EfDrawInfo* in
     GXSetVtxAttrFmt(0, 9, 1, 4, 0);
     GXSetVtxAttrFmt(0, 0xD, 1, 4, 0);
     GXSetCurrentMtx(0);
-}
-
-/* 0x800B7DB0 (0x1A8): copies the draw's view matrix into `result` and, for a nonzero depth offset, pushes it along
- * the view direction of the depth origin (perspective) or along view Z (orthographic). */
-MTX34* ef_draw_info_view_mtx(const EfDrawInfo* info, MTX34* result) {
-    if (result == NULL) {
-        nw4r::db::Panic(ef_drawinfo_file_str, 123, ef_drawinfo_null_result_str);
-    }
-    mtx34_copy(result, (MTX34*)&info->view_mtx);
-    if (0.0f != info->depth_offset) {
-        f32 proj[7];
-
-        GXGetProjectionv(proj);
-        switch ((s32)proj[0]) {
-        case 0: {
-            VEC3 dir;
-
-            ef_vec3_transform(&dir, &info->view_mtx, &info->depth_origin);
-            if (ef_vec3_normalize_to(&dir, &dir) != NULL) {
-                if (dir.z >= 0.0f) {
-                    result->m[0][3] += dir.x * info->depth_offset;
-                    result->m[1][3] += dir.y * info->depth_offset;
-                    result->m[2][3] += dir.z * info->depth_offset;
-                } else {
-                    result->m[0][3] -= dir.x * info->depth_offset;
-                    result->m[1][3] -= dir.y * info->depth_offset;
-                    result->m[2][3] -= dir.z * info->depth_offset;
-                }
-            } else {
-                result->m[2][3] += info->depth_offset;
-            }
-            break;
-        }
-        case 1:
-            result->m[2][3] += info->depth_offset;
-            break;
-        }
-    }
-    return result;
-}
-
-/* 0x800B71F0 (0x438): draws the stripe as a tube: builds the (sin, cos) table of its sides on the stack, then draws
- * the back faces and the front faces through the connection type's builder. */
-void ef_stripe_draw_tube(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
-                         u32 flags, u32 flush) {
-    EfEmitterDrawSetting* ed;
-    s32 divide;
-
-    if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 679, ef_stripe_ahead_assert_str, ctx);
-    }
-    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(ctx->particle_manager->resource);
-    if (!(3 <= ef_draw_setting_tube_divide(self, (EfParticleState*)ed))) {
-        nw4r::db::Panic(ef_stripe_file_str, 684, ef_stripe_tube_divide_assert_str);
-    }
-    divide = ef_draw_setting_tube_divide(self, (EfParticleState*)ed);
-    if (divide >= 3) {
-        f32* trig = (f32*)__alloca((divide + 1) * 8);
-
-        if (!IsValidPointer((u32)trig)) {
-            nw4r::db::Panic(ef_stripe_file_str, 694, ef_stripe_trig_assert_str, trig);
-        }
-        if (trig != NULL) {
-            f32 step = ef_stripe_full_circle / divide;
-            f32* pair;
-            s32 i;
-
-            trig[1] = ef_stripe_one;
-            trig[0] = ef_stripe_zero;
-            for (i = 1, pair = trig + 2; i < divide; pair += 2, i++) {
-                sin_cos_deg(&pair[0], &pair[1], step * i);
-            }
-            trig[divide * 2 + 1] = ef_stripe_one;
-            trig[divide * 2] = ef_stripe_zero;
-            ctx->trig_table = trig;
-            switch (ef_draw_setting_connect_type(self, (EfParticleState*)ed)) {
-            default:
-                ef_stripe_begin_side(1, flush, flags);
-                ef_stripe_tube_open(self, ctx, flags);
-                ef_stripe_begin_side(2, flush, flags);
-                ef_stripe_tube_open(self, ctx, flags);
-                break;
-            case 1:
-                ef_stripe_begin_side(1, flush, flags);
-                ef_stripe_tube_loop(self, ctx, flags);
-                ef_stripe_begin_side(2, flush, flags);
-                ef_stripe_tube_loop(self, ctx, flags);
-                break;
-            case 2:
-                ef_stripe_begin_side(1, flush, flags);
-                ef_stripe_tube_to_emitter(self, ctx, flags);
-                ef_stripe_begin_side(2, flush, flags);
-                ef_stripe_tube_to_emitter(self, ctx, flags);
-                break;
-            }
-        }
-    }
-}
-
-/* The particle's packed flags, bits 0-2. */
-s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle) {
-    return particle->field_0xB2 & 0x7;
-}
-
-/* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
-VEC3* ef_vec3_transform(VEC3* dst, const MTX34* m, const VEC3* v) {
-    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), vec3_to_const_vec((void*)v), vec3_to_vec(dst));
-    return dst;
 }
 
 /* 0x800B8184 (0x23C): the stripe's first ahead vector: for direction type 7 one manager axis (or their sum) by the
@@ -1128,7 +1104,7 @@ VEC3 ef_stripe_first_ahead(nw4r::ef::DrawStripeStrategy* self, EfEmitterDrawSett
             mtx34_rotate_vec3(&out, &ctx->manager_mtx_inv, &out);
             break;
         case 24:
-            VEC3 diagonal(ef_stripe_one, ef_stripe_one, ef_stripe_one);
+            VEC3 diagonal(1.0f, 1.0f, 1.0f);
             mtx34_rotate_vec3(&out, &ctx->emitter_mtx, &diagonal);
             mtx34_rotate_vec3(&out, &ctx->manager_mtx_inv, &out);
             break;
@@ -1140,37 +1116,65 @@ VEC3 ef_stripe_first_ahead(nw4r::ef::DrawStripeStrategy* self, EfEmitterDrawSett
     return out;
 }
 
-/* The particle's packed flags, bits 3-5. */
-s32 ef_draw_setting_flags_mid3(void* ctx, EfParticleState* particle) {
-    return particle->field_0xB2 & 0x38;
-}
+}  // extern "C"
 
-/* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
-void ef_ahead_manager_axis_y(nw4r::math::VEC3* dst, EfParticleState* particle) {
-    *dst = nw4r::math::VEC3(*(const nw4r::math::_VEC3*)&particle->field_0xB0);
-}
+namespace nw4r {
+namespace ef {
 
-/* Copies the particle's +0x98 block into `dst`. */
-void ef_ahead_emitter_axis_y(nw4r::math::VEC3* dst, EfParticleState* particle) {
-    *dst = *((const nw4r::math::VEC3*)&particle->field_0x98);
-}
+/* 0x800B83CC (0x3BC): the ahead-vector builder the draw setting's direction type (and, for type 6, the stripe's
+ * connection mode) selects. */
+DrawStrategyImpl::CalcAheadFunc DrawStripeStrategy::GetCalcAheadFunc(EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
 
-/* Subtracts the two ahead vectors and copies the reference block when the result is degenerate. */
-void ef_ahead_from_emitter(Vec* a, EfParticleState* particle, EfAheadItem* item) {
-    PSVECSubtract((f32*)a, (const f32*)&item->field_0xAC, (const f32*)&particle->field_0xA4);
-    if (ef_vec3_normalize(a) == 0) {
-        *(nw4r::math::VEC3*)a = *((const nw4r::math::VEC3*)&particle->field_0x98);
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 949, "NW4R:Pointer Error\npm(=%p) is not valid pointer.", pm);
+    }
+    EF_VALID_PTR_ASSERT("ef_drawstripestrategy.cpp", 950, "NW4R:Pointer Error\npm->mResource(=%p) is not valid pointer.", pm->resource);
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 953, "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.", ed);
+    }
+    switch (ed->type_direction) {
+    case 0:
+        return (CalcAheadFunc)ef_ahead_move_dir;
+    case 1:
+        return (CalcAheadFunc)ef_ahead_from_emitter;
+    case 2:
+        return (CalcAheadFunc)ef_ahead_emitter_axis_y;
+    case 3:
+        return ef_stripe_ahead_type3;
+    case 5:
+    case 7:
+        return (CalcAheadFunc)ef_ahead_manager_axis_y;
+    case 6:
+        switch (ed->stripe_connect & 7) {
+        case 1:
+            return ef_stripe_ahead_type6_link1;
+        case 2:
+            return ef_stripe_ahead_type6_link2;
+        default:
+            return ef_stripe_ahead_type6;
+        }
+    default:
+        return (CalcAheadFunc)ef_ahead_move_dir;
     }
 }
 
-/* Builds the ahead vector and copies the reference block when the result is degenerate. */
-/* untyped: opaque handle passed through to ef_particle_get_move_dir */
-void ef_ahead_move_dir(Vec* a, EfParticleState* particle, void* arg) {
-    ef_particle_get_move_dir(arg, a);
-    if (ef_vec3_normalize(a) == 0) {
-        *(nw4r::math::VEC3*)a = *((const nw4r::math::VEC3*)&particle->field_0x98);
+/* 0x800B8888 (0x164): the base ahead context plus the emitter's X axis in manager space. */
+DrawStripeStrategy::AheadContext::AheadContext(const MTX34* view, EfDrawParticleManager* pm)
+    : DrawStrategyImpl::AheadContext(view, pm) {
+    trig_table = NULL;
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 989, "NW4R:Pointer Error\npm(=%p) is not valid pointer.", pm);
     }
+    VEC3 axis(emitter_mtx.m[0][0], emitter_mtx.m[1][0], emitter_mtx.m[2][0]);
+    mtx34_rotate_vec3(&emitter_axis_x, &manager_mtx_inv, &axis);
 }
+
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
 
 /* 0x800B89EC (0x35C): the ahead vector toward the next elder particle (or, for the eldest, from the emitter origin),
  * normalised, falling back to the emitter's Y axis. */
@@ -1178,13 +1182,13 @@ void ef_stripe_ahead_type3(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* 
     EfDrawParticle* next;
 
     if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1002, ef_stripe_yaxis_assert_str, out);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1002, "NW4R:Pointer Error\nyAxis(=%p) is not valid pointer.", out);
     }
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1003, ef_stripe_context_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1003, "NW4R:Pointer Error\ncontext(=%p) is not valid pointer.", ctx);
     }
     if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1004, ef_stripe_particle_assert_str, p);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1004, "NW4R:Pointer Error\nparticle(=%p) is not valid pointer.", p);
     }
     next = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
     if (next != NULL) {
@@ -1204,28 +1208,28 @@ void ef_stripe_ahead_type6(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* 
     EfDrawParticle* elder;
 
     if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1030, ef_stripe_yaxis_assert_str, out);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1030, "NW4R:Pointer Error\nyAxis(=%p) is not valid pointer.", out);
     }
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1031, ef_stripe_context_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1031, "NW4R:Pointer Error\ncontext(=%p) is not valid pointer.", ctx);
     }
     if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1032, ef_stripe_particle_assert_str, p);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1032, "NW4R:Pointer Error\nparticle(=%p) is not valid pointer.", p);
     }
     younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
     elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
-    VEC3 to_younger(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+    VEC3 to_younger(0.0f, 0.0f, 0.0f);
     if (younger != NULL) {
         PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
         if (ef_vec3_normalize(&to_younger) == 0) {
-            to_younger = VEC3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+            to_younger = VEC3(0.0f, 0.0f, 0.0f);
         }
     }
-    VEC3 to_elder(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+    VEC3 to_elder(0.0f, 0.0f, 0.0f);
     if (elder != NULL) {
         PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
         if (ef_vec3_normalize(&to_elder) == 0) {
-            to_elder = VEC3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+            to_elder = VEC3(0.0f, 0.0f, 0.0f);
         }
     }
     PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
@@ -1240,13 +1244,13 @@ void ef_stripe_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     EfDrawParticle* elder;
 
     if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1069, ef_stripe_yaxis_assert_str, out);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1069, "NW4R:Pointer Error\nyAxis(=%p) is not valid pointer.", out);
     }
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1070, ef_stripe_context_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1070, "NW4R:Pointer Error\ncontext(=%p) is not valid pointer.", ctx);
     }
     if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1071, ef_stripe_particle_assert_str, p);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1071, "NW4R:Pointer Error\nparticle(=%p) is not valid pointer.", p);
     }
     younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
     if (younger == NULL) {
@@ -1259,12 +1263,12 @@ void ef_stripe_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     VEC3 to_younger;
     PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
     if (ef_vec3_normalize(&to_younger) == 0) {
-        to_younger = VEC3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+        to_younger = VEC3(0.0f, 0.0f, 0.0f);
     }
     VEC3 to_elder;
     PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
     if (ef_vec3_normalize(&to_elder) == 0) {
-        to_elder = VEC3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+        to_elder = VEC3(0.0f, 0.0f, 0.0f);
     }
     PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
     if (ef_vec3_normalize(out) == 0) {
@@ -1278,17 +1282,17 @@ void ef_stripe_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     EfDrawParticle* elder;
 
     if (!IsValidPointer((u32)out)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1110, ef_stripe_yaxis_assert_str, out);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1110, "NW4R:Pointer Error\nyAxis(=%p) is not valid pointer.", out);
     }
     if (!IsValidPointer((u32)ctx)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1111, ef_stripe_context_assert_str, ctx);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1111, "NW4R:Pointer Error\ncontext(=%p) is not valid pointer.", ctx);
     }
     if (!IsValidPointer((u32)p)) {
-        nw4r::db::Panic(ef_stripe_file_str, 1112, ef_stripe_particle_assert_str, p);
+        nw4r::db::Panic("ef_drawstripestrategy.cpp", 1112, "NW4R:Pointer Error\nparticle(=%p) is not valid pointer.", p);
     }
     younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
     elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
-    VEC3 to_younger(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+    VEC3 to_younger(0.0f, 0.0f, 0.0f);
     if (younger != NULL) {
         PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
         ef_vec3_normalize(&to_younger);
@@ -1306,42 +1310,7 @@ void ef_stripe_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     }
 }
 
-/* Walks a node chain through ef_pm_list_prev until the callback reports 1 (or the end). */
-void* ef_pm_prev_alive(void* self, void* node) {
-    void* next = ef_pm_list_prev(self, node);
-    while (next != 0 && ef_get_life_status(next) != 1) {
-        next = ef_pm_list_prev(self, next);
-    }
-    return next;
-}
-
-void* ef_pm_list_prev(void* self, void* node) {
-    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42 + 4);
-}
-
-/* Walks the +0x38 head through ef_pm_list_prev until the callback reports 1 (or the end). */
-void* ef_pm_last_alive(EfParticleState* self) {
-    void* next = (void*)ef_pm_list_tail(self);
-    while (next != 0 && ef_get_life_status(next) != 1) {
-        next = ef_pm_list_prev(self, next);
-    }
-    return next;
-}
-
-/* The particle's stored word at +0x38. */
-u32 ef_pm_list_tail(EfParticleState* self) {
-    return self->field_0x38;
-}
-
-#ifdef __cplusplus
-}
-#endif
-
-namespace nw4r {
-namespace ef {
-
-}  // namespace ef
-}  // namespace nw4r
+}  // extern "C"
 
 /* The destructors are the classes' inline ones, emitted at the end of this TU; retail calls each base destructor
  * out of line from them (`bl` + `extsh` of the delete flag), which a deferred inline body only gets with inlining
