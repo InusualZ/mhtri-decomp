@@ -95,7 +95,7 @@ void operator delete(void* block, void* place);
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle */
 #include "g3d/g3d_obj.h"         /* AnmScn, FrameCtrl */
-#include "g3d/g3d_anmclr.h"      /* color_ctor_white, the colours LightAnmResult constructs (rule 2) */
+#include "nw4r/ut_Color.h"       /* the colours LightAnmResult and FogAnmResult construct */
 
 namespace nw4r {
 namespace g3d {
@@ -126,21 +126,17 @@ struct LightAnmResult {
     /* +0x04 */ u32 flags;
     /* +0x08 */ math::VEC3 pos;
     /* +0x14 */ math::VEC3 aim;
-    /* +0x20 */ GXColor color;
+    /* +0x20 */ nw4r::ut::Color color;
     /* +0x24 */ s32 distFunc;
     /* +0x28 */ f32 refDistance;
     /* +0x2C */ f32 refBrightness;
     /* +0x30 */ s32 spotFunc;
     /* +0x34 */ f32 cutoff;
-    /* +0x38 */ GXColor specColor;
+    /* +0x38 */ nw4r::ut::Color specColor;
     /* +0x3C */ f32 shininess;
 
     /* 0x800677D8 (0x4C): retail's out-of-line constructor: the two vectors, then the two colours white. */
-    LightAnmResult() __attribute__((never_inline))
-    {
-        color_ctor_white((u32*)&color);
-        color_ctor_white((u32*)&specColor);
-    }
+    LightAnmResult() __attribute__((never_inline));
 };
 
 /* A fog's evaluated result: the fog type, the z range and the colour.  size: 0x10 */
@@ -148,7 +144,10 @@ struct FogAnmResult {
     /* +0x0 */ s32 type;
     /* +0x4 */ f32 startz;
     /* +0x8 */ f32 endz;
-    /* +0xC */ GXColor color;
+    /* +0xC */ nw4r::ut::Color color;
+
+    /* 0x80067B5C (0x34): retail's out-of-line constructor: the colour white. */
+    FogAnmResult() __attribute__((never_inline));
 };
 
 /* A camera's evaluated result: the camera-type and existence bits, the projection, the position, the aspect and

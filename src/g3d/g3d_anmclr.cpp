@@ -22,16 +22,12 @@
  *   filed).  The cross-unit declarations are `g3d/g3d_anmclr.h`.
  *   res_mat_get_id (0x8006405C, ResMat::GetID: the block's index word, read by AnmObjTexSrtRes::Bind) is a GUESS.
  *   The ut::Color members at 0x800646E8 (operator|), 0x80064730 (ToU32), 0x80064754 (ToU32ref const), 0x80064758
- *   (operator&) and 0x800647A0 (operator=(const GXColor&)) are the compiler's weak copies.  color_ctor_white
- *   (0x80064834) is Color's default constructor kept under the map's C stem: `g3d/g3d_anmscn.cpp`'s result
- *   constructors and `light/light.cpp` call it by that name and no C++ spelling of their sites keeps their bytes
- *   until math::VEC3 owns the constructor the map calls VEC3::VEC3() (request dat-anmclr#1).
+ *   (operator&) and 0x800647A0 (operator=(const GXColor&)) are the compiler's weak copies.  The Color
+ *   default constructor (0x80064834) is the weak copy apply_clr_anm_result's `ut::Color` local emits.
  *   anm_typename_AnmObjMatClr is the `.rodata` record by its string.  The six placing stubs (place_*) stand for
  *   the dead-stripped functions whose references ordered the copies.
  * RESIDUALS. The six placing stubs are 24 B of `.text` the link dead-strips (a tail call carries no unwind entry, so
- *   the extab names stay aligned).  color_ctor_white is a strong C definition placed after apply_clr_anm_result's
- *   deferred copies; apply_clr_anm_result constructs its colour through it on a GXColor local reached by reference,
- *   so no weak `__ct__Q34nw4r2ut5ColorFv` copy is emitted (the name a unit that constructs a `ut::Color` keeps).
+ *   the extab names stay aligned).
  *   The `.sdata` fragment is 0xC B of statics where the claim is 0x10 B: the last word is the link's 8-byte
  *   alignment pad before `g3d/g3d_anmobj.cpp`'s fragment; `.rodata` 0x11 and `.data` 0x12B B pad the same way.
  * SHAPES. `#pragma pool_data off` (each assert string its own `lis`/`addi`).  Everything after TestExistence compiles
@@ -252,13 +248,11 @@ extern "C" void apply_clr_anm_result(struct ResHandle chan, struct ResHandle tev
                                      const nw4r::g3d::ClrAnmResult* pResult)
 {
     nw4r::g3d::ResMatTevColor& tev = reinterpret_cast<nw4r::g3d::ResMatTevColor&>(tevColor);
-    GXColor colorStorage;
+    nw4r::ut::Color color;
     GXColor* pColor;
 /* The working colour: the storage read as a ut::Color at each use (a reference would hold its address in a
  * register; retail re-forms `addi r3, r1, 0x7C` at every use). */
-#define color (reinterpret_cast<nw4r::ut::Color&>(colorStorage))
 
-    color_ctor_white((u32*)&colorStorage);
     if (pResult->bRgbaExist & 0xF) {
         if (pResult->bRgbaExist & 0x1) {
             pColor = &reinterpret_cast<nw4r::g3d::ResMatChan&>(chan).ref().chan[0].matColor;
@@ -320,15 +314,6 @@ extern "C" void apply_clr_anm_result(struct ResHandle chan, struct ResHandle tev
         }
         res_mat_tev_color_dc_store(&tevColor, 0);
     }
-#undef color
-}
-
-/* 0x80064834 (0x34): nw4r::ut::Color's default constructor under the map's C stem: sets opaque white through the
- * word setter and returns `self`.  Defined here so it follows apply_clr_anm_result's deferred copies. */
-extern "C" u32 *color_ctor_white(u32 *self)
-{
-    *reinterpret_cast<nw4r::ut::Color *>(self) = 0xFFFFFFFF;
-    return self;
 }
 
 /* 0x80064868 (0x30): returns the AnmObjMatClr type. */

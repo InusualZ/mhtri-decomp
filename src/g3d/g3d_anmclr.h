@@ -26,9 +26,6 @@ u32 fn_80063FD0(void *p);
 /* 0x8006405C - the material's index in its model (the ResMat block's word at +0xC). */
 u32 res_mat_get_id(const struct ResHandle *p);
 
-/* 0x80064834 - nw4r::ut::Color's default constructor under the map's C stem (sets opaque white through the word
- * setter, returns `self`): the result constructors of `g3d/g3d_anmscn.cpp` and `light/light.cpp` call it. */
-u32 *color_ctor_white(u32 *self);
 
 #ifdef __cplusplus
 }

@@ -19,11 +19,7 @@
  * SHAPES. the constructor reaches its records through CONVERT_OFFS_TO_PTR (homebutton/hkb_material.h): the inline
  *   ConvertOffsToPtr calls recoloured the frame loop.
  * SHAPES. DrawSelf copies GetVtxPos's result out of a reference-bound temporary (retail's slot order).
- * RESIDUALS. flip blocked by a foreign map stem: our object's weak ut::Color default constructor (0xC B) survives the
- *   link because the first Color() copy in link order, 0x80064834 (owner g3d/g3d_anmclr.cpp), is named
- *   color_ctor_white in the map instead of its mangling __ct__Q34nw4r2ut5ColorFv, so no earlier link input defines
- *   the name; with that one row renamed (map only) flipcheck is READY and a trial Matching flip keeps the DOL hash.
- *   The weak Color destructor and Window::Content destructor copies are dead-stripped either way.
+ * RESIDUALS. the weak Color destructor and Window::Content destructor copies are dead-stripped by the link.
  */
 #include "homebutton/hkb_window.h"
 

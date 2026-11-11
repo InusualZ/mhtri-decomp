@@ -57,7 +57,6 @@
 #include "g3d/g3d_resanmfog.h"      /* res_anm_fog_get_anm_result (rule 2) */
 #include "g3d/g3d_anmscn.h"
 #include "g3d/light_obj_is_enable.h" /* this unit's light-object, light-setting and fog accessors */
-#include "g3d/g3d_anmclr.h"   /* color_ctor_white, owned by g3d/g3d_anmclr.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name, fn_8005DC60, GetAnmPlayPolicy, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
@@ -166,7 +165,6 @@ void fn_800670C8(u32 *dst, const u32 *src);
 void fog_set_color(Fog *self, GXColor color);
 void fog_range_set(Fog *self, f32 startz, f32 endz);
 void fog_type_set(Fog *self, s32 type);
-FogAnmResult *fn_80067B5C(FogAnmResult *self);
 u32 res_anm_light_get_id(const ResHandle *p);
 u32 res_anm_fog_get_id(const ResHandle *p);
 u32 res_anm_camera_get_id(const ResHandle *p);
@@ -1112,6 +1110,13 @@ void AnmScnRes::GetLight(LightObj *pDiff, LightObj *pSpec, u32 refNumber)
     }
 }
 
+#pragma dont_inline on
+/* 0x800677D8 (0x4C): the light result's constructor: its vectors, then its two colours white. */
+LightAnmResult::LightAnmResult()
+{
+}
+#pragma dont_inline reset
+
 /* 0x80067824 (0x1B0): sets the fog's type, range and colour from the fog `refNumber` names. */
 void AnmScnRes::GetFog(Fog fog, u32 refNumber)
 {
@@ -1119,7 +1124,6 @@ void AnmScnRes::GetFog(Fog fog, u32 refNumber)
     NW4R_ASSERT(fog_is_valid(&fog), ANMSCN_FILE, 1455, "NW4R:Failed assertion fog.IsValid()");
 
     FogAnmResult result;
-    fn_80067B5C(&result);
     const FogAnmResult *pResult = GetFogResult(&result, refNumber);
     fog_type_set(&fog, pResult->type);
     fog_range_set(&fog, pResult->startz, pResult->endz);
@@ -1170,12 +1174,12 @@ extern "C" void fog_type_set(Fog *self, s32 type)
         ((FogDataHead *)fog_ptr(self))->type = type;
 }
 
-/* The fog result's constructor: default-constructs its colour. */
-extern "C" FogAnmResult *fn_80067B5C(FogAnmResult *self)
+#pragma dont_inline on
+/* 0x80067B5C (0x34): the fog result's constructor: its colour white. */
+FogAnmResult::FogAnmResult()
 {
-    color_ctor_white((u32 *)&self->color);
-    return self;
 }
+#pragma dont_inline reset
 
 /* 0x80067B90 (0x2C4): sets the camera's projection, position and posture from the camera `refNumber` names;
  * false when the animation has no such camera. */

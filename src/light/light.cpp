@@ -276,14 +276,13 @@ extern "C" void light_id_reset(void)
  * directional light. */
 void light_init(void)
 {
-    GXColor color;
     g3d::LightObj* objs;
     LightPointWork* w;
     u32 num;
     u32 i;
 
     w = &light_point_work;
-    color_ctor_white((u32*)&color);
+    ut::Color color;
     math::VEC3 pos;
     root_light_setting_get((LightSceneRoot*)pRoot);
     GXColor amb = {0xFF, 0xFF, 0xFF, 0xFF};
