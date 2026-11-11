@@ -14,7 +14,11 @@
  * RESIDUALS. our object emits weak LinkList<...>, LinkListNode and ut::NonCopyable destructors the target lacks
  *   (unreferenced, dead-stripped by the link).
  * RESIDUALS. SetTagProcessor / SetTagProcessorImpl: the second inlined level walks the child list with `lwzu` where
- *   retail uses `lwz` + `addi` (retail's level-3 loop and our levels 1 and 3 do fuse). Tried at 98.08 %: `it++`
+ *   retail uses `lwz` + `addi`. Dump (Wii/1.3 stand-in, same instruction shape): backend-39 (before the final peephole)
+ *   already has `lwz r29,0x14(r25); addi r25,r25,0x14` - the allocator gave the level-2 pane and its end iterator one
+ *   register, and backend-40 (peephole) fuses them to `lwzu`; retail's end iterator has its own register. Six source
+ *   spellings of the loop (reference list, child local, while, cast first, `it++`, hoisted end) measure identically.
+ *   (retail's level-3 loop and our levels 1 and 3 do fuse). Tried at 98.08 %: `it++`
  *   (same), `end` hoisted into the for-init with `++it` / `it++` (97.94), the whole file under `#pragma peephole off`
  *   (91.3 unit-wide).
  */

@@ -24,7 +24,14 @@
  *   minLen in r30, the byte count in r31; ours folds the two into one in-place `addi r30,r30,1` (the `num` local gives
  *   retail's r30/r31 roles; an `minLen + 1U` argument alone swaps them: 92.35 against 96.84; 14 other spellings
  *   of the bytes, guard, store and count measured no better).
- * RESIDUALS. DrawSelf: float register colouring (retail keeps hMag in f30 and a later 0.0 in f31; ours swaps them;
+ *   Dump (Wii/1.3 stand-in; its AllocStringBuffer object is byte-identical to GC/3.0a5.2's): the inlined NewArray makes one
+ *   persistent parameter temporary for `minLen + 1U` (backend-03, vreg r35 `@3729`, copied again at the loop entry) and the
+ *   allocator colours the highest vreg first (bytes r34 -> r31, the temporary r35 -> r31 shared with minLen), so retail's
+ *   two separate `addi r0,r30,1` cannot come from a source spelling: 14 spellings, a hand-inlined NewArray (48.96) and a
+ *   `const u32` NewArray parameter all measure no better. This one missing instruction is also why flipcheck reports the
+ *   `.text` 4 B short and the `.ctors` word and two later relocations shifted by 4.
+ * RESIDUALS. DrawSelf: no dump (the Wii/1.3 stand-in compiles DrawSelf to a 448 B frame, GC/3.0a5.2 and retail 512 B);
+ *   float register colouring (retail keeps hMag in f30 and a later 0.0 in f31; ours swaps them;
  *   init-to-0, reversed-case and if-chain spellings of the alignment switch measure 98.90 / 96.33 / 97.07 against 99.80).
  * RESIDUALS. CharWriter::SetTextColor(Color, Color) is a file static here (src/nw4r/fn_80502828.h has no such
  *   member: request hkb-b#4); weak copies the target lacks (Color, Font, CharWriter record dtors).
