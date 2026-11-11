@@ -28,6 +28,11 @@ extern const f32 networkRequestTimerIdle;        /* 0x8079C748 = 0.0f */
 extern const f32 networkRequestTimerReset;       /* 0x8079C750 = 0.0f */
 extern const f32 networkSessionPatTimeOrigin;    /* 0x8079C754 = -3600.0f */
 
+/* the int-to-double conversion biases the band's code reads (GUESS on every name: the values 2^52+2^31 and 2^52) */
+extern const f64 networkS32ToF64Bias;          /* 0x8079C6D8 = 0x4330000080000000 */
+extern const f64 networkS32ToF64BiasAlt;       /* 0x8079C710 = 0x4330000080000000 */
+extern const f64 networkU32ToF64Bias;          /* 0x8079C720 = 0x4330000000000000 */
+
 /* the band's initialised `.sdata` words (GUESS on every name: each is read off the setter that writes it) */
 extern u32 networkSessionNotifyValue;         /* 0x80793910 = 1 */
 extern u32 networkSessionMaxHosts;            /* 0x80793914 = 0x10 */

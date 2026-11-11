@@ -23,7 +23,9 @@
  *  - `em024_act7_sub2`: `self` and `attack` swap callee-saved registers (r31/r30).  The allocator dump shows
  *    `self` (r32) with 28 neighbours, below the stall that colours it first (34 in `em024_act7_sub13`), so
  *    `attack` (r33) is coloured first; parameter copies, `!=` spellings, ternaries and declaration order do not
- *    add the missing interference;
+ *    add the missing interference.  `regsim verify` replays the dump exactly: `self` (degree 28) is pushed first in scan 1
+ *    so it is coloured last; a local copy of `self` through `(u8*)`, `(void*)`, a derived or a wrapper view type is
+ *    coalesced back into `self` (`fCoalesced`), so no new node appears;
  *  - `em024_tev_color_update`: the body alphas (255/220) land in r3 where retail has r9.  The allocator dump
  *    shows them interfering only with `out_rim` and `rim_*`; passing the scaled body inline makes them r9 but
  *    schedules the `r3..r8` argument setup above the conversion (47 bytes worse).  Declaration permutations,

@@ -26,8 +26,12 @@
  *   em015_se_alt_seq_<sub-state> (the sub-state that first plays each table) with their em015_se_rec/pos/ofs records,
  *   em015_demo_keys, em015_se_shift; the `Em015ProgTbl` slot names, `Em015SeShift`; `__sinit_\em015_prog_cpp` is the
  *   compiler's.
- * RESIDUALS. `em015_rest`: retail colours `self` r31 and `kind`/`limit` r30, ours the other way round (the local's
- *   declaration place, an `if`/`else` select and a `u8`/`s32` parameter all leave it).
+ * RESIDUALS. `em015_rest`: retail colours `self` r31 and `kind`/`limit` r30, ours the other way round.  The mwcc-debugger
+ *   dump (regalloc-gpr, `mt.py regsim verify`: exact) shows the limit's merged web r47 and `self` r32 both stalling in
+ *   scan 2 (degrees 12 and 13), pushed in ascending order, so r47 is coloured first and takes r31; retail needs `self`
+ *   pushed after it.  Not moved by: the local's declaration place (function level, block level), an `if`/`else` or
+ *   ternary or default-then-override select, `kind` reused as the limit, a `u8`/`s32` parameter, `opt_lifetimes off`,
+ *   `opt_propagation off`, `opt_common_subs off` (-13 B) or `optimization_level 4`.
  *   `.sdata2` is 0x374 against the 0x378 claim: the last word is the alignment pad before the next unit's pool.
  *   flipcheck: the `em015_rest` registers.
  * SHAPES. `Em015UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is

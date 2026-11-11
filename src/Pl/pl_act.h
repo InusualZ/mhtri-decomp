@@ -211,6 +211,9 @@ u32 pl_carry_light_ck(struct _PLW* self);
 s32 pl_equip_slot_count_get(struct _PLW* plw, u16 slot);
 /* 0x802829B4: the class-0 weapon act dispatcher */
 void pl_weapon0_act_dispatch(struct _PLW* self);
+/* 0x805C7A64 / 0x805C7C34: the attack-range step tables for weapon kind 0 (default, and kind_0x09 == 3) */
+extern u32 pl_steps_kind0[];
+extern u32 pl_steps_kind0_slot3[];
 #ifdef __cplusplus
 }
 #endif

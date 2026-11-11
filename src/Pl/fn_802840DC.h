@@ -167,6 +167,9 @@ void pl_weapon456_act_dispatch(struct _PLW* self);
 /* 0x805CB894 / 0x805CBA64: the two scan-row tables (`_PLW`+0x318) during which weapon kinds 4-6 guard any hit */
 extern u8 pl_scan_rows_guard_a[];
 extern u8 pl_scan_rows_guard_b[];
+/* 0x805CADA0 / 0x805CAF2C: the attack-range step tables for weapon kind 2 (default, and kind_0x09 == 3) */
+extern u32 pl_steps_kind2[];
+extern u32 pl_steps_kind2_slot3[];
 #ifdef __cplusplus
 }
 #endif

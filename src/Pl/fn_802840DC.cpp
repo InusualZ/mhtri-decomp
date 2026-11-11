@@ -23,7 +23,7 @@
  *  - Data: the tables are declared, not emitted (`.data` 0x37C of 0x2A58 - our jump tables only, `.sdata` none of
  *    0x28, `.sdata2` 0x80 of 0x98); the run spans the four TU pieces above, so it is claimed after the seam.
  *  - flipcheck: the 10 registry callees have no map row yet; `pl_flinch_steps_kind2`, `pl_scan_rows_guard_a/b`,
- *    `lbl_805CAD74`, `lbl_805CADA0`, `lbl_805CAF2C` are referenced by `Pl/pl_act_step.cpp` and not emitted here.
+ *    `lbl_805CAD74`, `pl_steps_kind2`, `pl_steps_kind2_slot3` are referenced by `Pl/pl_act_step.cpp` and not emitted here.
  *  - `pl_gun_reload_tier_get` is declared returning `u8` (its leaf header): the callers store the result with a raw
  *    `stb r3` and extend it before a compare, while `Pl/pl_act.cpp` defines it returning `s32`.
  * SHAPES. The `.sdata` id lists are sized extern arrays (an unsized one gives `lis`/`addi`, the target `@sda21`).

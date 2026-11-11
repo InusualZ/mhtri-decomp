@@ -2789,7 +2789,7 @@ extern "C" void fn_802498E0(_PLW* self) {
         Pl_act_set_motion(self, 0x8003, 0, 0);
         self->field_0x28 = 0x1E;
         if (self->field_0x018 == 0) {
-            Pl_act_set_step_table(self, (u32)lbl_805BE824, 0);
+            Pl_act_set_step_table(self, (u32)pl_steps_run_turn, 0);
             return;
         }
         fn_802771A0(self, 0);
@@ -3172,7 +3172,7 @@ extern "C" void fn_8024A640(_PLW* self) {
         self->field_0x018 = 0;
         Pl_chr_setX(self, 8, 4, 0);
         pl_act_set_frame_timer(self);
-        Pl_act_set_step_table(self, (u32)lbl_805BE5B8, 0);
+        Pl_act_set_step_table(self, (u32)pl_steps_stop, 0);
     }
 }
 
@@ -7183,7 +7183,7 @@ extern "C" void pl_act_dash(_PLW* self, s32 variant) {
         pl_act_set_flag(self, 0xC0);
         self->field_0x266 = 10;
         if (self->field_0x18 == 0) {
-            Pl_act_set_step_table(self, (u32)lbl_805BE824, 0);
+            Pl_act_set_step_table(self, (u32)pl_steps_run_turn, 0);
             if (variant == 0) {
                 if (Get_motion_no(self) != 0x65) {
                     Pl_chr_set_attr_default(self, 0x6D, 4, 0);
@@ -7375,12 +7375,12 @@ extern "C" void pl_act_stop(_PLW* self, s32 variant) {
         case 0:
             self->field_0x266 = 0;
             Pl_chr_set_attr_default(self, 0x25, 6, 0);
-            Pl_act_set_step_table(self, (u32)lbl_805BE5B8, 0);
+            Pl_act_set_step_table(self, (u32)pl_steps_stop, 0);
             break;
         case 1:
             self->field_0x266 = 10;
             Pl_chr_set_attr_default(self, 0xA, 6, 0);
-            Pl_act_set_step_table(self, (u32)lbl_805BE5B8, 0);
+            Pl_act_set_step_table(self, (u32)pl_steps_stop, 0);
             break;
         case 2:
             self->field_0x266 = 10;
@@ -7791,7 +7791,7 @@ extern "C" void pl_act_run_turn(_PLW* self) {
         pl_act_set_flag(self, 0x40);
         self->field_0x266 = 10;
         Pl_chr_set_attr_default(self, 0x6A, 6, 0);
-        Pl_act_set_step_table(self, (u32)lbl_805BE824, 0);
+        Pl_act_set_step_table(self, (u32)pl_steps_run_turn, 0);
         self->field_0x314 = self->field_0x266;
         break;
     case 1:

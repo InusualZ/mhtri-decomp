@@ -47,6 +47,9 @@ void vs_scene_main(struct _PL_ROOT* root);
 void vs_scene_end(struct _PL_ROOT* root);
 /* 0x8028F24C - the stage map kind of the root work's map (0 when there is no root work). */
 u32 pl_map_kind_get(void);
+/* 0x805CD6BC / 0x805CD8B8: the attack-range step tables for weapon kind 7 (default, and kind_0x09 == 3) */
+extern u32 pl_steps_kind7[];
+extern u32 pl_steps_kind7_slot3[];
 #ifdef __cplusplus
 }
 #endif

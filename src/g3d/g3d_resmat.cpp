@@ -11,10 +11,7 @@
  *   command into the GX FIFO); ResMatFur::GetLayerRatio and
  *   ResMat::GetResMatDLData are GUESSES (the fur layer ratio's two curves; the 0x180-byte block ResMat::Init
  *   stores).
- * RESIDUALS. ResTexPlttInfo::BindPltt: register colouring (retail keeps the record in r29 and the format in r31, ours
- *   the reverse; declaration orders, a block-local format, a record pointer, a u16 count and opt_lifetimes off
- *   change nothing; the mwcc debugger dies in _load_wii13 on the mangled name, also with --extract).
- *   The ResTlutObj range assertion is a literal where the map names it `resmat_tlut_id_range_assert_msg`.
+ * RESIDUALS. The ResTlutObj range assertion is a literal where the map names it `resmat_tlut_id_range_assert_msg`.
  * SHAPES. The weak `g3d_resmat_ac.h` copies are all defined ahead of the code, in retail's class order (vertex arrays,
  *   TLUT object, generation mode, misc, fur, pixel, tev colour, indirect matrix, texture coordinates, texture
  *   palette), which orders
@@ -1351,9 +1348,7 @@ void ResTexPlttInfo::BindTex(ResTex tex, ResTexObj texObj) {
 
 /* 0x8009792C (0xD8): binds `pltt` to the record's TLUT, initialising its TLUT object. */
 void ResTexPlttInfo::BindPltt(ResPltt pltt, ResTlutObj tlutObj) {
-    u32 numEntries;
     bool inRange;
-    u32 fmt;
     GXTlutObj* pTlut;
     ResTexPlttInfoData& r = ref();
     r.pPlttData = const_cast<ResPlttData*>(&static_cast<const ResPltt&>(pltt).ref());
@@ -1366,9 +1361,7 @@ void ResTexPlttInfo::BindPltt(ResPltt pltt, ResTlutObj tlutObj) {
                         r.mapID, 0, 7);
     }
     pTlut = tlutObj.GetTlut(static_cast<_GXTlut>(r.mapID));
-    numEntries = (u16)pltt.GetNumEntries();
-    fmt = pltt.GetFmt();
-    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), fmt, numEntries);
+    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), pltt.GetFmt(), (u16)pltt.GetNumEntries());
     tlutObj.Validate(static_cast<_GXTlut>(r.mapID));
 }
 

@@ -54,7 +54,8 @@
  * RESIDUALS. Every row is written; rows below 100 (`unitscore.py ef/system_core --threshold 100`):
  *  - `memory_layout_init`: the layout's size array is kept `volatile` to keep retail's stack stores; retail keeps the
  *    zero in r31 and `system_w` in r30, ours the other way round (declaration orders and a named zero do not move it);
- *  - `loading_disp_reset`: retail materialises `sys_tex_file_table` before the path buffer's address (one register);
+ *  - `loading_disp_reset`: two loads keep `0x18`/`0x14(r30)` where retail has `0x14`/`0x10` from the array's own address
+ *    (`sys_tex_file_table+4`); every spelling of the base (`entries`, `&entries[0]`) folds the member offset;
  *  - `loading_disp_draw`: the closing caption block is a `switch` (it scores best) and lowers to `subi`, where retail
  *    has `addi 0xFF` + `clrlwi` (4 bytes short); the `if` spelling `(u8)(mode + 0xFF)` reproduces both instructions but
  *    moves `disp` to r27 (-1.76 B); the bands' float registers;
@@ -1712,8 +1713,9 @@ extern "C" void loading_disp_reset(u8 mode) {
     disp->quad_0x34[3].z = 0.0f;
     if (disp->mode_0xA6 != 6) {
         disp->texture_0xD4 = 0x90F08000;
-        cnvt_eur_fname(path, (char*)sys_tex_file_table[2].name);
-        load_file(path, disp->texture_0xD4, sys_tex_file_table[2].size);
+        ResFileEntry* files = &sys_tex_file_table.entries[0];
+        cnvt_eur_fname(path, (char*)files[2].name);
+        load_file(path, disp->texture_0xD4, files[2].size);
         TPLtexLoad((void*)disp->texture_0xD4, &disp->tex_0xD8[0]);
     }
 }

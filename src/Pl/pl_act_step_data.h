@@ -1,6 +1,7 @@
 /* The player act-step data unit `Pl/pl_act_step_data.cpp`: the `.data` tables the act state machine
- * (`Pl/pl_act.cpp`) indexes by act number - skill-id and step tables, per-act timing words and effect-pair tables.
- * Declared, never defined: the bytes are the data unit's own.
+ * (`Pl/pl_act.cpp`) indexes - step tables (`pl_steps_*`), the per-weapon-kind step-table pickers, the gun and shell
+ * tables, the sharpness rows, the skill tables and the motion-number rows (`pl_motion_*`), and the `.bss` work rows
+ * those pointers lead to.  `pl_act_kind4_item_ids` and `gun_level_bonus_tbl` have their own leaf headers.
  */
 #ifndef MHTRI_PL_PL_ACT_STEP_DATA_H
 #define MHTRI_PL_PL_ACT_STEP_DATA_H
@@ -22,61 +23,89 @@ extern "C" {
 
 extern MealSkill meal_skill_tbl[52];
 
-extern u16 lbl_805C0198[];
-extern u16 lbl_805C01B8[];
-extern u8 lbl_805C01C8[];
-extern u8* pl_sharpness_tbl[];
-extern u32 lbl_805BF448[];
-extern u32 lbl_805BF46C[];
-extern u8 lbl_805BF5E0[];
-extern u8 lbl_805BF538[];
-extern u8 lbl_805BFCD8[];
-extern u8 lbl_805BFFCC[];
-/* 0x805BF648 - the gun clip table: one 0x2A-byte row of per-shell clip sizes per `PlWeaponRec::clip_row`
- * (`Pl/pl_act.cpp`'s `equip_gun_clip_get`). */
-extern u8 pl_gun_clip_table[][0x2A];
-
-/* 0x805BEBEC (0x152) - the step table pl_act_step_arm_table hands Pl_act_set_step_table. */
-extern u32 pl_act_step_table_247[];
-
-/* 0x805BDC48: the step table the rest act hands Pl_act_set_step_table */
+/* The motion-number rows: `pl_motion_rows[id / 100][id % 100]` for ids below 1000, and
+ * `pl_motion_kind_rows[kind][(id - 1000) / 100][(id - 1000) % 100]` above it (`kind` is `_PLW`+0x002; kinds 4-6 share a
+ * row set).  The `_row2` rows are `.bss`, filled at run time. */
+extern s16 pl_motion_kind0_row2[];
+extern s16 pl_motion_kind1_row1[];
+extern s16 pl_motion_kind1_row2[];
+extern s16 pl_motion_kind2_row2[];
+extern s16 pl_motion_kind3_row2[];
+extern s16 pl_motion_kind456_row1[];
+extern s16 pl_motion_kind456_row2[];
+extern s16 pl_motion_kind7_row1[];
+extern s16 pl_motion_kind7_row2[];
+extern s16 pl_motion_kind8_row2[];
 extern u32 pl_steps_idle[];
-/* 0x805BEFE4: the step table the crouch act's hide variant hands Pl_act_set_step_table */
-extern u32 pl_steps_crouch[];
-/* 0x805BDF78: the step table the turn acts hand Pl_act_set_step_table */
 extern u32 pl_steps_turn[];
-/* 0x805BEE14: the step table the walk act hands Pl_act_set_step_table */
-extern u32 pl_steps_walk[];
-/* 0x805BF278: the step table the stumble stop hands Pl_act_set_step_table */
-extern u32 pl_steps_stumble[];
-/* 0x805BEA60: the step table the dash acts hand Pl_act_set_step_table */
-extern u32 pl_steps_dash[];
-/* 0x805BE238: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
 extern u32 pl_steps_hit_light[];
-/* 0x805BE3F8: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_hit_heavy[];
-/* 0x805BE2D4: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_hit_light_bow[];
-/* 0x805BE494: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_hit_heavy_bow[];
-/* 0x805BE290: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
 extern u32 pl_steps_hit_light_drawn[];
-/* 0x805BE450: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_hit_heavy_drawn[];
-/* 0x805BE318: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
+extern u32 pl_steps_hit_light_bow[];
 extern u32 pl_steps_knockdown[];
-/* 0x805BE4D8: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_knockdown_heavy[];
-/* 0x805BE3B4: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_knockdown_bow[];
-/* 0x805BE574: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
-extern u32 pl_steps_knockdown_heavy_bow[];
-/* 0x805BE370: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
 extern u32 pl_steps_knockdown_drawn[];
-/* 0x805BE530: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
+extern u32 pl_steps_knockdown_bow[];
+extern u32 pl_steps_hit_heavy[];
+extern u32 pl_steps_hit_heavy_drawn[];
+extern u32 pl_steps_hit_heavy_bow[];
+extern u32 pl_steps_knockdown_heavy[];
 extern u32 pl_steps_knockdown_heavy_drawn[];
-/* 0x805BE7E0: a step table `Pl/pl_act_step.cpp` hands `Pl_act_set_step_table` */
+extern u32 pl_steps_knockdown_heavy_bow[];
+extern u32 pl_steps_stop[];
 extern u32 pl_steps_drop_in[];
+extern u32 pl_steps_run_turn[];
+extern u32 pl_steps_dash[];
+extern u32 pl_act_step_table_247[];
+extern u32 pl_act_step_table_247_tail[];
+extern u32 pl_steps_walk[];
+extern u32 pl_steps_walk_end[];
+extern u32 pl_steps_crouch[];
+extern u32 pl_steps_stumble[];
+extern u32 pl_steps_by_kind[];
+extern u32 pl_steps_slot3_by_kind[];
+extern u16 pl_item_icon_kind_tbl[];
+extern u8 pl_shell_info_tbl[];
+extern u8 pl_gun_ammo_entry_tbl[];
+extern u8 pl_gun_clip_table[][0x2A];
+extern u8 pl_shell_bure_tbl[];
+extern u16 pl_sharpness_row_0[];
+extern u16 pl_sharpness_row_1[];
+extern u16 pl_sharpness_row_2[];
+extern u16 pl_sharpness_row_3[];
+extern u16 pl_sharpness_row_4[];
+extern u8* pl_sharpness_tbl[];
+extern u8 pl_shell_id_tbl[];
+extern u16 pl_skill_valid_ids_a[];
+extern u16 pl_skill_valid_ids_b[];
+extern u8 pl_skill_rec_tbl[];
+extern s16 pl_motion_row_0[];
+extern s16 pl_motion_row_1[];
+extern s16 pl_motion_row_2[];
+extern s16 pl_motion_row_3[];
+extern s16 pl_motion_row_4[];
+extern s16 pl_motion_row_5[];
+extern s16 pl_motion_row_6[];
+extern s16 pl_motion_row_7[];
+extern s16* pl_motion_rows[];
+extern s16 pl_motion_kind0_row0[];
+extern s16 pl_motion_kind0_row1[];
+extern s16* pl_motion_kind0_rows[];
+extern s16 pl_motion_kind1_row0[];
+extern s16* pl_motion_kind1_rows[];
+extern s16 pl_motion_kind2_row0[];
+extern s16 pl_motion_kind2_row1[];
+extern s16* pl_motion_kind2_rows[];
+extern s16 pl_motion_kind3_row0[];
+extern s16 pl_motion_kind3_row1[];
+extern s16* pl_motion_kind3_rows[];
+extern s16 pl_motion_kind456_row0[];
+extern s16* pl_motion_kind456_rows[];
+extern s16 pl_motion_kind7_row0[];
+extern s16* pl_motion_kind7_rows[];
+extern s16 pl_motion_kind8_row0[];
+extern s16 pl_motion_kind8_row1[];
+extern s16* pl_motion_kind8_rows[];
+extern s16** pl_motion_kind_rows[];
+
 #ifdef __cplusplus
 }
 #endif

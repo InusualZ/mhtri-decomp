@@ -7,6 +7,7 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 
 import argparse
 import contextlib
+import itertools
 import json
 import os
 import re
@@ -90,12 +91,16 @@ def arm(main: str, count: int = 0, ttl: int = TOKEN_TTL, slot_numbers: list[int]
     return _write_tokens(main, count, ttl, bound)
 
 
+_SEQUENCE = itertools.count()
+
+
 def _write_tokens(main: str, count: int, ttl: int, slot_numbers: list[int]) -> list[str]:
     os.makedirs(armed_dir(main), exist_ok=True)
     stamp = int(time.time() * 1000)
+    seq = next(_SEQUENCE)  # the clock is coarse on Windows: two arm() calls in one tick must not share a name
     names = []
     for i, slot in enumerate([None] * count + list(slot_numbers or [])):
-        name = "%d-%02d-%d.token" % (stamp, i, os.getpid())
+        name = "%d-%02d-%d-%d.token" % (stamp, i, os.getpid(), seq)
         with open(os.path.join(armed_dir(main), name), "w", encoding="utf-8") as fh:
             json.dump({"expires": time.time() + ttl, "slot": slot}, fh)
         names.append(name)

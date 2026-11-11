@@ -78,7 +78,7 @@
  *  - flipcheck: the object emits no `.rodata` (0x40 claimed), `.sbss` (0x8) or `.sdata` (0x48); `.text` 0x1AD38,
  *    `.data` 0x27C, `.sdata2` 0x10, extab 0x930 and extabindex 0xD5C against the claims 0x1AD18, 0x2178, 0x1D8, 0x928 and
  *    0xD50; every compared section differs in bytes, and five symbols other units reference are not defined here
- *    (`lbl_805C7A64`, `lbl_805C7C34`, `pl_steps_guard_kind0`, `pl_steps_guard_walk_kind0`, `set_demo_equip_data_func`).
+ *    (`pl_steps_kind0`, `pl_steps_kind0_slot3`, `pl_steps_guard_kind0`, `pl_steps_guard_walk_kind0`, `set_demo_equip_data_func`).
  *  - compiler: the unit is built by the `Pl` library's Wii/1.0, but Wii/1.3 compiles this source to retail's bytes in
  *    four rows 1.0 cannot reach (`pl_net_slot_bind`'s single `clrlwi` after the fourth `ori`, `Get_equip_rare`,
  *    `pl_weapon_record_read`, `fn_8027B0BC`'s `stb`s into `q + 0x5E1` with no `clrlwi`) and loses none;
@@ -588,7 +588,7 @@ s32 fn_8026A00C(u16 id)
     if (id >= 1000) {
         return 0;
     }
-    return lbl_805C0C98[id / 100][id % 100];
+    return pl_motion_rows[id / 100][id % 100];
 }
 
 /* The motion-number table lookup for the 1000+ range: two levels, the first keyed by the work
@@ -597,7 +597,7 @@ s32 fn_8026A068(_PLW* self, u16 id)
 {
     u16 index = (u16)(id - 1000);
     u8 kind = self->field_0x002;
-    s16* row = lbl_805C1584[kind][index / 100];
+    s16* row = pl_motion_kind_rows[kind][index / 100];
 
     if (row == NULL) {
         return 0;
@@ -2941,7 +2941,7 @@ extern u8 lbl_80792148;
 } /* namespace s_80270018 */
 
 
-/* One record of the skill-id table at `lbl_805C01C8`. */
+/* One record of the skill-id table at `pl_skill_rec_tbl`. */
 /* size: 0x10 */
 struct _SKILLREC {
     /* 0x0 */ u16 id;
@@ -3399,9 +3399,9 @@ extern "C" u32 pl_skill_valid_ck(_PLW* plw, u8 kind) {
         u16* table;
 
         if (mode == 0) {
-            table = lbl_805C0198;
+            table = pl_skill_valid_ids_a;
         } else {
-            table = lbl_805C01B8;
+            table = pl_skill_valid_ids_b;
         }
         while (*table != 0xFFFF) {
             if (kind == *table++) {
@@ -3462,9 +3462,9 @@ extern "C" u32 pl_equip_skill_valid_ck(_PLW* plw, u8* p, u32 a, u8 kind) {
         u16* table;
 
         if (mode == 0) {
-            table = lbl_805C0198;
+            table = pl_skill_valid_ids_a;
         } else {
-            table = lbl_805C01B8;
+            table = pl_skill_valid_ids_b;
         }
         while (*table != 0xFFFF) {
             if (kind == *table++) {
@@ -3478,7 +3478,7 @@ extern "C" u32 pl_equip_skill_valid_ck(_PLW* plw, u8* p, u32 a, u8 kind) {
 
 /* Maps a display skill id to its internal id through the 16-byte record table, or 0 when absent. */
 extern "C" u8 pl_skill_tree_get(u16 skill) {
-    _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
+    _SKILLREC* rec = (_SKILLREC*)pl_skill_rec_tbl;
 
     if (skill == 0) {
         return 0;
@@ -3603,7 +3603,7 @@ extern "C" void fn_802724E8(u16* table, s8* a, u8* b, u8* count, u16 v, u8 bval,
 /* The saved-skill set behind pl_equip_refresh: looks each skill id up in the 16-byte record table, keeps the
  * rank the player's equipment reaches, converts it to a display value and sorts the eight entries. */
 extern "C" void equip_columns_skills_get(_EQUIP* equips, u16* table, s8* a, u8* b) {
-    _SKILLREC* rec = (_SKILLREC*)lbl_805C01C8;
+    _SKILLREC* rec = (_SKILLREC*)pl_skill_rec_tbl;
     s16 tv[8];
     u8 tb[8];
     u8 ta[8];
@@ -5071,7 +5071,7 @@ extern "C" s32 fn_80274AEC(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind
 /* Looks an id up in the 4-byte-stride id/value table at 0x805BF490. */
 extern "C" u8 pl_item_icon_kind_get(u16 id)
 {
-    const u16* row = lbl_805BF490;
+    const u16* row = pl_item_icon_kind_tbl;
     while (row[0] != 0) {
         if (id == row[0]) {
             return (u8)row[1];
@@ -6355,13 +6355,13 @@ extern "C" void fn_802771A0(_PLW* self, s32 arg1)
         if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
             Pl_act_set_step_table(self, (u32)pl_steps_kind8_guard, (s16)arg1);
         } else {
-            Pl_act_set_step_table(self, lbl_805BF448[self->field_0x002], (s16)arg1);
+            Pl_act_set_step_table(self, pl_steps_by_kind[self->field_0x002], (s16)arg1);
         }
     } else {
         if (self->field_0x002 == 8 && pl_mode8_free_ck() == 0) {
             Pl_act_set_step_table(self, (u32)pl_steps_kind8_slot3_guard, (s16)arg1);
         } else {
-            Pl_act_set_step_table(self, lbl_805BF46C[self->field_0x002], (s16)arg1);
+            Pl_act_set_step_table(self, pl_steps_slot3_by_kind[self->field_0x002], (s16)arg1);
         }
     }
 }
@@ -6995,7 +6995,7 @@ extern "C" u8* gun_ammo_entry_find(u8* self, u8 arg1)
         if (idx == 0) {
             break;
         }
-        u8* p = lbl_805BF5E0 + idx * 4;
+        u8* p = pl_gun_ammo_entry_tbl + idx * 4;
         if (p[0] == arg1) {
             return p;
         }
@@ -8523,7 +8523,7 @@ extern "C" s32 pl_gun_reload_tier_get(_PLW* self, u8 arg1)
     if ((s32)pl_item_page2_ck(self) == 0) {
         return 1;
     }
-    s32 a = *(u8*)(lbl_805BF538 + 1 + arg1 * 4);
+    s32 a = *(u8*)(pl_shell_info_tbl + 1 + arg1 * 4);
     s32 b = *(u8*)(equip_weapon_rec_get(&self->equipB) + 9);
     if (((u8*)&self->equipD)[0] == 0xD) {
         b += *(u8*)(equip_weapon_rec_get(&self->equipD) + 9);
@@ -8562,9 +8562,9 @@ extern "C" { extern u8 lbl_80792150; }
 u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
 {
     using s_80276B58::equip_weapon_rec_get; using s_80276B58::lbl_805C6100; using s_80276B58::lbl_80792150;
-    u8* t31 = lbl_805BFCD8 + *(u8*)(equip_weapon_rec_get(&self->equipB) + 0x10) * 2;
+    u8* t31 = pl_shell_bure_tbl + *(u8*)(equip_weapon_rec_get(&self->equipB) + 0x10) * 2;
     s32 v29 = t31[1];
-    v29 += *(s8*)(lbl_805BF538 + 3 + arg1 * 4);
+    v29 += *(s8*)(pl_shell_info_tbl + 3 + arg1 * 4);
     s32 r29;
     if (((u8*)&self->equipC)[0] == 0xC) {
         v29 -= (&lbl_80792150)[*(u8*)(equip_weapon_rec_get(&self->equipC) + 0x10)];
@@ -8608,7 +8608,7 @@ extern "C" s32 pl_shell_class_get(_PLW* self, u8 arg1)
     if ((s32)pl_item_page2_ck(self) == 0) {
         return 2;
     }
-    s32 a = *(u8*)(lbl_805BF538 + arg1 * 4);
+    s32 a = *(u8*)(pl_shell_info_tbl + arg1 * 4);
     u8* p = pl_gun_ammo_entry_get(self, arg1);
     if (p != 0) {
         return (s16)(*(u8*)(p + 3) + 3);
@@ -9498,7 +9498,7 @@ extern "C" void pl_shell_ids_set(_PLW* self, u8 arg1, u8 arg2)
 {
     if (arg1 == 0xFF) {
         u8 t = self->field_0x002;
-        *(u8*)((u8*)self + 0x568) = lbl_805BFFCC[t * 2];
+        *(u8*)((u8*)self + 0x568) = pl_shell_id_tbl[t * 2];
         if (t == 7 && Pl_condition_ck(self, 0x80000000) == 1U) {
             *(u8*)((u8*)self + 0x568) = 0x71;
         }
@@ -9507,7 +9507,7 @@ extern "C" void pl_shell_ids_set(_PLW* self, u8 arg1, u8 arg2)
     }
     if (arg2 == 0xFF) {
         u8 t = self->field_0x002;
-        *(u8*)((u8*)self + 0x569) = lbl_805BFFCC[t * 2 + 1];
+        *(u8*)((u8*)self + 0x569) = pl_shell_id_tbl[t * 2 + 1];
     } else {
         *(u8*)((u8*)self + 0x569) = arg2;
     }

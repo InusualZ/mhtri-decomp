@@ -7,6 +7,11 @@
 
 /* The system texture files and their byte sizes: `00/system.tpl`, `00/inittex.tpl`, `00/loading.tpl` (the loading
  * display's texture `ef/system_core.cpp` loads), then an empty row. */
-extern ResFileEntry sys_tex_file_table[4];
+typedef struct SysTexFileTable {
+    /* +0x00 */ u32 pad_0x00;
+    /* +0x04 */ ResFileEntry entries[4];
+} SysTexFileTable; /* size: 0x24 */
+
+extern SysTexFileTable sys_tex_file_table;
 
 #endif /* MHTRI_EF_SYS_TEX_FILE_TABLE_H */

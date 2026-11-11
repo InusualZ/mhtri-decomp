@@ -67,8 +67,6 @@ u32 fn_80276800(struct _PLW* self, s32 v);
 
 /* The unclaimed `.data` tables this unit's act handlers index (no registered `.data` range covers
  * them, so - like the band's code - this header is their rule-2 home). */
-extern u32 lbl_805BE824[]; /* 0x805BE824 - the per-act SE/motion table `Pl_act_set_step_table` is handed */
-extern u32 lbl_805BE5B8[]; /* 0x805BE5B8 - the sibling table `fn_8024A640` is handed */
 extern u32 pl_flinch_steps_kind1[]; /* 0x805C87F8 - the flinch act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` is its only referrer) */
 extern u32 pl_steps_guard_kind1[]; /* 0x805C887C - the guard act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
 extern u32 pl_steps_guard_walk_kind1[]; /* 0x805C8918 - the guard-walk act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
@@ -178,12 +176,6 @@ extern u8* lbl_807913D8[];
 extern const f32 pl_act_float_zero; /* 0.0f */
 extern const f32 pl_act_float_one; /* 1.0f */
 
-/* The `.data` lookup tables the motion-number helpers at 0x8026A00C/0x8026A068 index: ten row
- * pointers (one per hundred of the 0-999 range) and, for the 1000+ range, a two-level table keyed by
- * the actor's `_PLW`+0x002 byte.  Both are unclaimed. */
-extern s16* lbl_805C0C98[];
-extern s16** lbl_805C1584[];
-
 /* The four sibling motion banks `Pl/fn_80230FBC.cpp`'s kind byte dispatches to (kinds 3 and 7), and
 the motion bank that unit's range stops at.  All are unregistered, so this band header is their
 rule-2 home.  Each takes the player work and the SE part index the dispatcher read. */
@@ -213,7 +205,6 @@ u32 pl_note_near_ck(struct _PLW* self, s32 a);
  * consumer) - the band must not declare a symbol a registered unit owns. */
 
 /* The `.data` tables the same unit reads. */
-extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `pl_item_icon_kind_get` looks ids up */
 extern u8 lbl_805C5F30[];         /* the melee act-name table rows `pl_act_name_row_get` picks */
 extern u8 lbl_805C5F50[];
 extern u8 lbl_805C5F70[];
