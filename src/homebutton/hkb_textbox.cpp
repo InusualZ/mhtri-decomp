@@ -20,9 +20,12 @@
  * SHAPES. CalcLineRectImpl / CalcStringRectImpl are plain statics: retail emits them after their first user
  *   (DrawSelf, GetTextDrawRect), so they are defined there. SetFont(NULL) in the destructor keeps retail's dead
  *   GetWidth/GetHeight code.
- * RESIDUALS. AllocStringBuffer: retail recomputes `minLen + 1` for NewArray's loop count after the allocation; ours keeps
- *   it in r31 (an unsigned `minLen + 1U` argument recovers the recomputed size; an int, u16 or u32 local does not).
- * RESIDUALS. DrawSelf: float register colouring (retail keeps hMag in f30 and a later 0.0 in f31; ours swaps them).
+ * RESIDUALS. AllocStringBuffer: retail evaluates `minLen + 1` twice into r0 (alloc size, then NewArray's loop count) and keeps
+ *   minLen in r30, the byte count in r31; ours folds the two into one in-place `addi r30,r30,1` (the `num` local gives
+ *   retail's r30/r31 roles; an `minLen + 1U` argument alone swaps them: 92.35 against 96.84; 14 other spellings
+ *   of the bytes, guard, store and count measured no better).
+ * RESIDUALS. DrawSelf: float register colouring (retail keeps hMag in f30 and a later 0.0 in f31; ours swaps them;
+ *   init-to-0, reversed-case and if-chain spellings of the alignment switch measure 98.90 / 96.33 / 97.07 against 99.80).
  * RESIDUALS. CharWriter::SetTextColor(Color, Color) is a file static here (src/nw4r/fn_80502828.h has no such
  *   member: request hkb-b#4); weak copies the target lacks (Color, Font, CharWriter record dtors).
  */
@@ -342,7 +345,8 @@ void TextBox::AllocStringBuffer(u16 minLen) {
     }
 
     FreeStringBuffer();
-    mTextBuf = Layout::NewArray<wchar_t>(minLen + 1U);
+    const u32 num = minLen + 1U;
+    mTextBuf = Layout::NewArray<wchar_t>(num);
     if (mTextBuf) {
         mTextBufBytes = (u16)textBufBytes;
     }

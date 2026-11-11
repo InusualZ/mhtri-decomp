@@ -1,110 +1,35 @@
-/* homebutton/hkb_layout.cpp - the software keyboard layout engine's groups (nw4r::lyt::Group, GroupContainer), the
- *   layout (nw4r::lyt::Layout: it walks an `RLYT` resource's blocks and builds the pane tree, the groups and the
- *   animations) and the picture pane (nw4r::lyt::Picture).
- * RANGE. .text 0x8052B004-0x8052C880 (34 functions); .ctors 0x8056F3E4-0x8056F3E8; .data 0x8064A5E8-0x8064A6B0;
- *   .sbss 0x80795A20-0x80795A30; .sdata2 0x8079D570-0x8079D580.
- *   Edges: the left edge follows homebutton/hkb_pane.cpp's static initialiser 0x8052AFF8 (.ctors word 0x8056F3E0);
- *   the right edge is this unit's static initialiser 0x8052C874 (.ctors word 0x8056F3E4).
- *   The range is three retail objects: the class tables rise (Group 0x8064A5E8, Layout 0x8064A5F8, Picture
- *   0x8064A638 - one object emits its tables in descending order), the `.sdata2` pool holds 0.0 twice (0x8079D570
- *   for the layout, 0x8079D578 for the picture) and Layout::mspAllocator (0x80795A20, this unit's) sits between the
- *   pane's and the picture's run-time type records; the seams are 0x8052B344 (lyt_group | lyt_layout) and 0x8052C330
- *   (lyt_layout | lyt_picture).
+/* homebutton/hkb_layout.cpp - the software keyboard layout engine's layout (nw4r::lyt::Layout: it walks an `RLYT`
+ *   resource's blocks and builds the pane tree, the groups and the animations).
+ * RANGE. .text 0x8052B344-0x8052C330 (21 functions); .data 0x8064A5F8-0x8064A638 (Layout's class table);
+ *   .sbss 0x80795A20-0x80795A28 (Layout::mspAllocator); .sdata2 0x8079D570-0x8079D578 (0.0 and a second constant).
+ *   Edges: the left edge is homebutton/hkb_group.cpp's last function (0x8052B2C8..0x8052B344); the right edge is
+ *   homebutton/hkb_picture.cpp's first function (the Picture constructor) at 0x8052C330. The seam evidence is in
+ *   homebutton/hkb_group.cpp.
  * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS).
- * NAMES. GUESS: nw4r::lyt::Group, GroupContainer, Layout and Picture and their members, from the runtime dump
- *   (nw4hbm::lyt::GroupContainer::AppendGroup / FindGroupByName, Layout::UnbindAnimation, SetAnimationEnable,
- *   Animate, BuildPaneObj, Picture::DrawSelf at their addresses: the HOME Button copy of NintendoWare's layout
- *   library, spelt nw4r::lyt in this band after homebutton/hkb_material.cpp). SetTagProcessorImpl,
- *   IsIncludeAnimationGroupRef and SetMaterialTexCoordGen are GUESS names for the file's static helpers.
- * SHAPES. the list destructors copy the iterator with `it++` (a copy then `++it` keeps a second register); the
- *   GroupContainer destructor hands DeleteObj LinkList::GetPointerFromNode's pointer (see homebutton/hkb_pane.cpp).
- * SHAPES. BuildPaneObj casts the block in each case; Picture::Append sets the coordinate generator through a by-value
- *   helper (retail's Material::SetTexCoordGen, which homebutton/hkb_material.h does not declare: request hkb-b#4).
- * RESIDUALS. the range is three objects (seam request hkb-b#3): the class tables, the 0.0 pool word and the
- *   SetTagProcessorImpl position cannot match as one object; retail fills Layout::mspAllocator's `.sbss` slot to 8
- *   bytes (the end of the lyt_layout object), ours packs Picture::typeInfo at +0x4.
- * SHAPES. the Layout / Group / GroupContainer constructors keep LinkListNode's two zero stores before the list
- *   initialisation because LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
+ * NAMES. GUESS: nw4r::lyt::Layout and its members, from the runtime dump (nw4hbm::lyt::Layout::UnbindAnimation,
+ *   SetAnimationEnable, Animate, BuildPaneObj at their addresses). SetTagProcessorImpl and
+ *   IsIncludeAnimationGroupRef are GUESS names for the file's static helpers.
+ * SHAPES. the Layout constructor keeps LinkListNode's two zero stores before the list initialisation because
+ *   LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
  * RESIDUALS. our object emits weak LinkList<...>, LinkListNode and ut::NonCopyable destructors the target lacks
  *   (unreferenced, dead-stripped by the link).
  * RESIDUALS. SetTagProcessor / SetTagProcessorImpl: the second inlined level walks the child list with `lwzu` where
- *   retail uses `lwz` + `addi`.
+ *   retail uses `lwz` + `addi` (retail's level-3 loop and our levels 1 and 3 do fuse). Tried at 98.08 %: `it++`
+ *   (same), `end` hoisted into the for-init with `++it` / `it++` (97.94), the whole file under `#pragma peephole off`
+ *   (91.3 unit-wide).
  */
 #include "homebutton/hkb_layout.h"
 
 #include "homebutton/hkb_bounding.h"
 #include "homebutton/hkb_textbox.h"
 #include "homebutton/hkb_window.h"
-#include "MSL_C/string.h"
 
 namespace nw4r {
 namespace lyt {
 
 typedef ut::LinkList<Pane, 4> PaneList;
 typedef ut::LinkList<PaneLink, 0> PaneLinkList;
-typedef ut::LinkList<Group, 4> GroupList;
 typedef ut::LinkList<AnimTransform, 4> AnimTransformList;
-
-/* 0x8052B004 (0x11C): Builds a group from its `grp1` block: its name, then a link to each named pane found under
- * the root pane. */
-Group::Group(const res::Group* pResGroup, Pane* pRootPane) {
-    mbUserAllocated = false;
-
-    strncpy(mName, pResGroup->name, sizeof(mName) - 1);
-    mName[sizeof(mName) - 1] = '\0';
-
-    const char* paneNameBase = detail::ConvertOffsToPtr<char>(pResGroup, sizeof(res::Group));
-    for (int i = 0; i < pResGroup->paneNum; ++i) {
-        Pane* pFindPane = pRootPane->FindPaneByName(paneNameBase + i * 16, true);
-        if (pFindPane) {
-            AppendPane(pFindPane);
-        }
-    }
-}
-
-/* Links a pane into the group. */
-inline void Group::AppendPane(Pane* pPane) {
-    PaneLink* pPaneLink = Layout::NewObj<PaneLink>();
-    if (pPaneLink) {
-        pPaneLink->mTarget = pPane;
-        mPaneLinkList.PushBack(pPaneLink);
-    }
-}
-
-/* 0x8052B120 (0xAC): Unlinks and frees the group's pane links. */
-Group::~Group() {
-    for (PaneLinkList::Iterator it = mPaneLinkList.GetBeginIter(); it != mPaneLinkList.GetEndIter();) {
-        PaneLinkList::Iterator currIt = it++;
-        mPaneLinkList.Erase(currIt.mIterator);
-        Layout::DeleteObj(currIt.operator->());
-    }
-}
-
-/* 0x8052B1CC (0xC8): Unlinks the groups and destroys the ones the container allocated. */
-GroupContainer::~GroupContainer() {
-    for (GroupList::Iterator it = mGroupList.GetBeginIter(); it != mGroupList.GetEndIter();) {
-        GroupList::Iterator currIt = it++;
-        mGroupList.Erase(currIt.mIterator);
-        if (!currIt->IsUserAllocated()) {
-            Layout::DeleteObj(GroupList::GetPointerFromNode(currIt.mIterator.mPointer));
-        }
-    }
-}
-
-/* 0x8052B294 (0x34): Adds a group at the end of the container. */
-void GroupContainer::AppendGroup(Group* pGroup) {
-    mGroupList.PushBack(pGroup);
-}
-
-/* 0x8052B2C8 (0x7C): Returns the group named `findName`, or NULL. */
-Group* GroupContainer::FindGroupByName(const char* findName) {
-    for (GroupList::Iterator it = mGroupList.GetBeginIter(); it != mGroupList.GetEndIter(); ++it) {
-        if (detail::EqualsResName(it->GetName(), findName)) {
-            return it.operator->();
-        }
-    }
-    return NULL;
-}
 
 namespace {
 
@@ -145,11 +70,6 @@ bool IsIncludeAnimationGroupRef(GroupContainer* pGroupContainer, const res::Anim
     }
 
     return false;
-}
-
-/* Sets texture coordinate generator `idx` of a material. */
-inline void SetMaterialTexCoordGen(Material* pMaterial, u32 idx, TexCoordGen value) {
-    pMaterial->GetTexCoordGenAry()[idx] = value;
 }
 
 /* Returns whether a binary file's version is one the layout reads (0.8 to 0.10). */
@@ -461,106 +381,6 @@ Pane* Layout::BuildPaneObj(s32 kind, const void* dataPtr, const ResBlockSet& res
     default:
         return NULL;
     }
-}
-
-const ut::detail::RuntimeTypeInfo Picture::typeInfo(&Pane::typeInfo);
-
-/* 0x8052C330 (0x14C): Builds the picture from its `pic1` block: the corner colours, the texture coordinates and
- * the material. */
-Picture::Picture(const res::Picture* pResPic, const ResBlockSet& resBlockSet) : Pane(pResPic) {
-    u8 texCoordNum = ut::Min<u8>(pResPic->texCoordNum, 8);
-
-    if (texCoordNum > 0) {
-        mTexCoordAry.Reserve(texCoordNum);
-    }
-
-    for (int i = 0; i < 4; ++i) {
-        *reinterpret_cast<u32*>(&mVtxColors[i]) = pResPic->vtxCols[i];
-    }
-
-    if (texCoordNum > 0 && !mTexCoordAry.IsEmpty()) {
-        mTexCoordAry.Copy(&pResPic[1], texCoordNum);
-    }
-
-    const u32* matOffsTbl = detail::ConvertOffsToPtr<u32>(resBlockSet.pMaterialList, 0xC);
-    const res::Material* pResMaterial =
-        detail::ConvertOffsToPtr<res::Material>(resBlockSet.pMaterialList, matOffsTbl[pResPic->materialIdx]);
-    mpMaterial = Layout::NewObj<Material>(pResMaterial, resBlockSet);
-}
-
-/* 0x8052C47C (0xD8): Destroys the material and the texture coordinates. */
-Picture::~Picture() {
-    if (mpMaterial && !mpMaterial->mbUserAllocated) {
-        Layout::DeleteObj(mpMaterial);
-        mpMaterial = NULL;
-    }
-
-    mTexCoordAry.Free();
-}
-
-/* 0x8052C554 (0x1B4): Adds a texture to the material with its own coordinate generator; the first texture also
- * sizes a picture that has no size. */
-void Picture::Append(const TexMap& texMap) {
-    if (mpMaterial->GetTextureNum() >= mpMaterial->mGXMemCap.texMap ||
-        mpMaterial->GetTextureNum() >= mpMaterial->mGXMemCap.texCoordGen) {
-        return;
-    }
-
-    const u8 texMapIdx = mpMaterial->GetTextureNum();
-    mpMaterial->SetTextureNum((u8)(texMapIdx + 1));
-    mpMaterial->GetTexMapAry()[texMapIdx] = texMap;
-    mpMaterial->SetTexCoordGenNum(mpMaterial->GetTextureNum());
-    SetMaterialTexCoordGen(mpMaterial, texMapIdx, TexCoordGen());
-    mTexCoordAry.SetSize(mpMaterial->GetTextureNum());
-
-    const Size zeroSize(0.0f, 0.0f);
-    bool bZeroSize = false;
-    if (mSize.width == zeroSize.width && mSize.height == zeroSize.height) {
-        bZeroSize = true;
-    }
-
-    if (bZeroSize && mpMaterial->GetTextureNum() == 1) {
-        mSize = detail::GetTextureSize(mpMaterial, 0);
-    }
-}
-
-/* 0x8052C708 (0x2C): Returns the colour of corner `idx`. */
-ut::Color Picture::GetVtxColor(u32 idx) const {
-    return mVtxColors[idx];
-}
-
-/* 0x8052C734 (0x2C): Sets the colour of corner `idx`. */
-void Picture::SetVtxColor(u32 idx, ut::Color value) {
-    mVtxColors[idx] = value;
-}
-
-/* 0x8052C760 (0x18): Returns one channel of a corner colour. */
-u8 Picture::GetVtxColorElement(u32 idx) const {
-    return reinterpret_cast<const u8*>(&mVtxColors[idx / 4])[idx % 4];
-}
-
-/* 0x8052C778 (0x18): Sets one channel of a corner colour. */
-void Picture::SetVtxColorElement(u32 idx, u8 value) {
-    reinterpret_cast<u8*>(&mVtxColors[idx / 4])[idx % 4] = value;
-}
-
-/* 0x8052C790 (0xDC): Draws the picture's quad with its material and corner colours. */
-void Picture::DrawSelf(const DrawInfo& drawInfo) {
-    if (!mpMaterial) {
-        return;
-    }
-
-    LoadMtx(drawInfo);
-
-    bool bUseVtxCol = mpMaterial->SetupGX(detail::IsModulateVertexColor(mVtxColors, mGlbAlpha), mGlbAlpha);
-    detail::SetVertexFormat(bUseVtxCol, mTexCoordAry.GetSize());
-    detail::DrawQuad(AsVEC2(GetVtxPos()), mSize, mTexCoordAry.GetSize(), mTexCoordAry.GetArray(),
-                     bUseVtxCol ? mVtxColors : NULL, mGlbAlpha);
-}
-
-/* 0x8052C86C (0x8): Returns the class's run-time type record. */
-const ut::detail::RuntimeTypeInfo* Picture::GetRuntimeTypeInfo() const {
-    return &typeInfo;
 }
 
 }  // namespace lyt

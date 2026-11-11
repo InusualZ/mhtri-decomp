@@ -4112,12 +4112,22 @@ homebutton/hkb_pane.cpp:
 	.sbss       start:0x80795A18 end:0x80795A20
 	.sdata2     start:0x8079D550 end:0x8079D570
 
+homebutton/hkb_group.cpp:
+	.text       start:0x8052B004 end:0x8052B344
+	.data       start:0x8064A5E8 end:0x8064A5F8
+
 homebutton/hkb_layout.cpp:
-	.text       start:0x8052B004 end:0x8052C880
+	.text       start:0x8052B344 end:0x8052C330
+	.data       start:0x8064A5F8 end:0x8064A638
+	.sbss       start:0x80795A20 end:0x80795A28
+	.sdata2     start:0x8079D570 end:0x8079D578
+
+homebutton/hkb_picture.cpp:
+	.text       start:0x8052C330 end:0x8052C880
 	.ctors      start:0x8056F3E4 end:0x8056F3E8
-	.data       start:0x8064A5E8 end:0x8064A6B0
-	.sbss       start:0x80795A20 end:0x80795A30
-	.sdata2     start:0x8079D570 end:0x8079D580
+	.data       start:0x8064A638 end:0x8064A6B0
+	.sbss       start:0x80795A28 end:0x80795A30
+	.sdata2     start:0x8079D578 end:0x8079D580
 
 homebutton/hkb_textbox.cpp:
 	.text       start:0x8052C880 end:0x8052E0CC align:16
