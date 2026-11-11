@@ -191,7 +191,7 @@ typedef struct Eft050Slot {
     /* +0x02 */ s8 bite_0x02;           /* the base tug strength */
     /* +0x03 */ s8 nibbles_0x03;        /* the most nibbles before the bite */
     /* +0x04 */ u8 unused_0x04[0x04];
-    /* +0x08 */ VEC3 scale_0x08;        /* the adult scale */
+    /* +0x08 */ Vec scale_0x08;         /* the adult scale */
 } Eft050Slot;
 
 /* One roll of a spot's kind table: the weight and the fish kind; a weight of 0xFF ends the table. size: 0x8 */
@@ -934,7 +934,7 @@ extern "C" void eft050_fish_appear(_EFT* self)
             self->field_0x06 = 1;
             self->field_0x07 = 0;
             self->timer_0x0C = (ran_suu(0) & 0x1F) + 10;
-            work->scale_0x14 = VEC3(*(const Vec*)&slot->scale_0x08);
+            work->scale_0x14 = VEC3(slot->scale_0x08);
         }
         break;
     }

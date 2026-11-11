@@ -19,6 +19,8 @@
 #include "types.h"
 
 #ifdef __cplusplus
+struct Vec; /* the SDK vector (`MTX/mtx.h`) a `VEC3` can be built from */
+
 namespace nw4r {
 namespace math {
 
@@ -39,12 +41,13 @@ struct _VEC3 {
     /* +0x0 */ f32 x;
     /* +0x4 */ f32 y;
     /* +0x8 */ f32 z;
+
+    /* The same three floats as the SDK's `Vec`: the view `VEC3(const Vec&)` takes. */
+    const ::Vec& as_vec() const { return reinterpret_cast<const ::Vec&>(*this); }
 };
 
 }  // namespace math
 }  // namespace nw4r
-
-struct Vec; /* the SDK vector (`MTX/mtx.h`) a `VEC3` can be built from */
 
 /* `VEC3::operator=` calls `vec3_assign` (a free function, so that `_VEC3` itself stays trivially copyable).  Its body
  * is in `mh3_pad.cpp`, which emits the kept copy: the other units see only the declaration, so a call to

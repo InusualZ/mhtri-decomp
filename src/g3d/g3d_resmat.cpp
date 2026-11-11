@@ -1,30 +1,36 @@
 /* g3d/g3d_resmat - nw4r g3d material resources (texture/TLUT objects, texture SRT, gen mode, misc, fur, pixel, tev
  *   colour, indirect matrix and channel display lists, texture-palette binding) and the `ResMdl` model accessors.
- * RANGE. .text 0x800947A4-0x80098D5C (140 functions); extab, extabindex, .data 0x80590D78-0x80591280 (the asserts'
- *   strings), .sdata2 0x80795F10-0x80795F48.
+ * RANGE. .text 0x8009411C-0x80098D5C (171 functions; the left edge is res_mat_pix_dc_store); extab 0x80009450-0x80009850,
+ *   extabindex 0x80022254-0x80022854, .data 0x80590D78-0x805915C0 (the asserts' strings, then the weak copies'
+ *   strings), .sdata 0x80791280-0x807912B8 (the weak copies' "ref" statics), .sdata2 0x80795F10-0x80795F48.
  * FLAGS. cflags_g3d (docs/g3d.md).
- * NAMES. The classes and members are nw4r's (`g3d_resmat.h`, `g3d_resmdl.h`); ResMatFur::GetLayerRatio and
+ * NAMES. The classes and members are nw4r's (`g3d_resmat.h`, `g3d_resmdl.h`); res_mat_{pix,tev_color,ind_mtx,
+ *   tex_coord_gen}_{dc_store,copy_to} are GUESSES (nw4r's DCStore/CopyTo, by the block sizes 0x20/0x80/0x40/0xA0 and
+ *   the ScnMdl buffer refill's per-flag order), as are res_mat_ind_mtx_data and res_mat_tex_coord_gen_data (uncalled
+ *   one-call referencers the link strips) and GXFastCallDisplayList (the inline that writes the call-display-list
+ *   command into the GX FIFO); ResMatFur::GetLayerRatio and
  *   ResMat::GetResMatDLData are GUESSES (the fur layer ratio's two curves; the 0x180-byte block ResMat::Init
  *   stores).
- * RESIDUALS. seam: the retail TU opens at 0x8009411C (`g3d/g3d_resfile.cpp`'s tail res_mat_pix_dc_store..
- *   res_mat_tex_coord_gen_copy_to is this TU's code): its weak-copy strings 0x80591280-0x805915C0 and "ref"
- *   statics 0x80791280-0x807912B8 are this TU's `.data`/`.sdata` tail, cited from both sides of 0x800947A4.
- *   Under the current claim the object emits that tail (MatFur..TlutObj refs, the vertex-array constructors:
- *   `.data` 0x688 of 0x508, `.sdata` 0x18 unclaimed) where the target object names it as undefined labels.
- *   ResTexPlttInfo::BindPltt: register colouring (retail keeps the record in r29 and the format in r31, ours
+ * RESIDUALS. ResTexPlttInfo::BindPltt: register colouring (retail keeps the record in r29 and the format in r31, ours
  *   the reverse; declaration orders, a block-local format, a record pointer, a u16 count and opt_lifetimes off
  *   change nothing; the mwcc debugger dies in _load_wii13 on the mangled name, also with --extract).
  *   The ResTlutObj range assertion is a literal where the map names it `resmat_tlut_id_range_assert_msg`.
- * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
+ * SHAPES. The weak `g3d_resmat_ac.h` copies are all defined ahead of the code, in retail's class order (vertex arrays,
+ *   TLUT object, generation mode, misc, fur, pixel, tev colour, indirect matrix, texture coordinates, texture
+ *   palette), which orders
+ *   their strings in the `.data` tail and their "ref" statics in `.sdata`; each lands after its first caller, the
+ *   data assignments (ResGenModeData, ResMatMiscData) before the `ref()` they share a caller with.
+ *   every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
  *   this TU keeps are `__declspec(noinline) inline` weak copies: MWCC emits each after its first caller (several
  *   in one function: reverse reference order, each followed by its own callees) and puts its strings in the
  *   `.data` tail in reverse definition order and its "ref" static in `.sdata` in definition order, so the
  *   vertex-array constructors are defined first and the texture-palette accessors last.  An implicitly
  *   instantiated template is emitted before the inline copies, so ofs_to_ptr<ResTexPlttInfoData> is an
- *   explicit specialization under `#pragma dont_inline on`.  Four uncalled functions the link strips stand
+ *   explicit specialization under `#pragma dont_inline on`.  Uncalled functions the link strips stand
  *   where retail's stripped code did: res_mat_fur_data and res_vtx_*_construct place the ResMatFur::ref and
  *   vertex-array constructor copies (GUESS: retail's uncalled ResMdl/ResMatFur lookups), and
- *   res_mat_fur_ratio_clamp pools 0.0f and 1.0f ahead of GetLayerRatio's 0.6f, as `.sdata2` shows.
+ *   res_mat_fur_ratio_clamp pools 0.0f and 1.0f ahead of GetLayerRatio's 0.6f, as `.sdata2` shows; res_mat_ind_mtx_data
+ *   and res_mat_tex_coord_gen_data place the const `ref()` copies of the indirect matrix and texture coordinates.
  *   MakeColor and the GXColor copies (`__as__8_GXColorFRC8_GXColor`, whose kept copy is 0x8004C4F0) are
  *   called out of line under `#pragma dont_inline on`.
  *   ResMat::GetResTexPlttInfo is retail's `g3d_resmat_ac.h` inline: both of its asserts cite that header's name.
@@ -56,6 +62,7 @@
 #include "g3d/g3d_anmchr.h"  /* res_name_copy_ctor (rule 2) */
 #include "g3d/g3d_anmtexpat.h" /* res_tex_copy_ctor/res_pltt_copy_ctor (rule 2) */
 #include "g3d/g3d_resfile.h"
+#include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "g3d/g3d_resanmtexsrt.h"
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_calcview.h"
@@ -125,6 +132,236 @@ RESMAT_WEAK ResVtxFurPos::ResVtxFurPos(void* pData) : ResCommon<ResVtxFurPosData
 template <>
 /* untyped: opaque handle - the block address the handle wraps */
 RESMAT_WEAK ResCommon<ResVtxFurPosData>::ResCommon(void* pData) : mpData(static_cast<ResVtxFurPosData*>(pData)) {}
+
+/* The `g3d_resmat_ac.h` accessors of the texture-palette, generation-mode, misc and fur blocks: weak copies defined
+ * ahead of the display-list blocks' so their strings and "ref" statics precede them. */
+RESMAT_WEAK_REF_CONST(ResTlutObj, RESMAT_AC_FILE, 74)
+RESMAT_WEAK_CLASS_NAME(ResTlutObj)
+/* 0x80095718 (0x2C): copies the counts and the cull mode. */
+RESMAT_WEAK ResGenModeData& ResGenModeData::operator=(const ResGenModeData& rhs) {
+    nTexGens = rhs.nTexGens;
+    nChans = rhs.nChans;
+    nTevs = rhs.nTevs;
+    nInds = rhs.nInds;
+    cullMode = rhs.cullMode;
+    return *this;
+}
+
+RESMAT_WEAK_REF_CONST(ResGenMode, RESMAT_AC_FILE, 175)
+RESMAT_WEAK_CLASS_NAME(ResGenMode)
+/* 0x80095C44 (0x34): copies the four bytes and the two indirect tables. */
+#pragma peephole on
+RESMAT_WEAK ResMatMiscData& ResMatMiscData::operator=(const ResMatMiscData& rhs) {
+    zCompLoc = rhs.zCompLoc;
+    light_set_idx = rhs.light_set_idx;
+    fog_idx = rhs.fog_idx;
+    pad_0x3 = rhs.pad_0x3;
+    indirect_method_word = rhs.indirect_method_word;
+    normal_map_ref_word = rhs.normal_map_ref_word;
+    return *this;
+}
+#pragma peephole off
+
+RESMAT_WEAK_REF_CONST(ResMatMisc, RESMAT_AC_FILE, 243)
+RESMAT_WEAK_CLASS_NAME(ResMatMisc)
+RESMAT_WEAK_REF_CONST(ResMatFur, RESMAT_AC_FILE, 287)
+
+/* 0x80094464 (0x18): writes the call-display-list command (opcode 0x40, address, size) straight into the GX FIFO;
+ * a weak copy, emitted ahead of the `ref()` copy its first caller (`ResMatPix::CallDisplayList`) also references. */
+/* untyped: byte range */
+extern "C" RESMAT_WEAK void GXFastCallDisplayList(const void* pList, u32 size) {
+    GXWGFifo.u8 = 0x40;
+    GXWGFifo.u32 = (u32)pList;
+    GXWGFifo.u32 = size;
+}
+
+/* The `g3d_resmat_ac.h` accessors of the pixel, tev colour, indirect matrix and texture coordinate blocks: weak
+ * copies, each emitted after its first caller (the range stores and `CallDisplayList` below), their strings in the
+ * `.data` tail and their "ref" statics in `.sdata`. */
+RESMAT_WEAK const ResMatPixData& ResMatPix::ref() const {
+    static char sMember[] = "ref";
+    if (IsValid() == 0) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 340, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK ResMatPixData& ResMatPix::ref() {
+    static char sMember[] = "ref";
+    if (IsValid() == 0) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 340, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK_CLASS_NAME(ResMatPix)
+
+RESMAT_WEAK const ResMatTevColorData& ResMatTevColor::ref() const {
+    static char sMember[] = "ref";
+    if (!IsValid()) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 378, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK ResMatTevColorData& ResMatTevColor::ref() {
+    static char sMember[] = "ref";
+    if (!IsValid()) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 378, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK_CLASS_NAME(ResMatTevColor)
+
+RESMAT_WEAK const ResMatIndMtxAndScaleData& ResMatIndMtxAndScale::ref() const {
+    static char sMember[] = "ref";
+    if (IsValid() == 0) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 413, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK ResMatIndMtxAndScaleData& ResMatIndMtxAndScale::ref() {
+    static char sMember[] = "ref";
+    if (IsValid() == 0) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 413, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK_CLASS_NAME(ResMatIndMtxAndScale)
+
+RESMAT_WEAK const ResMatTexCoordGenData& ResMatTexCoordGen::ref() const {
+    static char sMember[] = "ref";
+    if (!IsValid()) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 513, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK ResMatTexCoordGenData& ResMatTexCoordGen::ref() {
+    static char sMember[] = "ref";
+    if (IsValid() == 0) {
+        nw4r::db::Panic(RESMAT_AC_FILE, 513, "%s::%s: Object not valid.", GetClassName(), sMember);
+    }
+    return *ptr();
+}
+
+RESMAT_WEAK_CLASS_NAME(ResMatTexCoordGen)
+
+RESMAT_WEAK ResMatPixData* ResMatPix::ptr() { return mpData; }
+RESMAT_WEAK const ResMatPixData* ResMatPix::ptr() const { return mpData; }
+RESMAT_WEAK ResMatTevColorData* ResMatTevColor::ptr() { return mpData; }
+RESMAT_WEAK const ResMatTevColorData* ResMatTevColor::ptr() const { return mpData; }
+RESMAT_WEAK ResMatIndMtxAndScaleData* ResMatIndMtxAndScale::ptr() { return mpData; }
+RESMAT_WEAK const ResMatIndMtxAndScaleData* ResMatIndMtxAndScale::ptr() const { return mpData; }
+RESMAT_WEAK ResMatTexCoordGenData* ResMatTexCoordGen::ptr() { return mpData; }
+RESMAT_WEAK const ResMatTexCoordGenData* ResMatTexCoordGen::ptr() const { return mpData; }
+
+/* 0x8009411C (0x48): stores the `ResMatPix` block's 0x20 bytes. */
+extern "C" void res_mat_pix_dc_store(ResHandle* pSelf, s32 flag) {
+    u32 data = (u32)&reinterpret_cast<ResMatPix*>(pSelf)->ref();
+
+    if (flag != 0) {
+        DC::StoreRange((void*)data, 0x20);
+    } else {
+        DC::StoreRangeNoSync((void*)data, 0x20);
+    }
+}
+
+/* 0x800941DC (0x48): stores the `ResMatTevColor` block's 0x80 bytes. */
+extern "C" void res_mat_tev_color_dc_store(ResHandle* pSelf, s32 flag) {
+    u32 data = (u32)&reinterpret_cast<ResMatTevColor*>(pSelf)->ref();
+
+    if (flag != 0) {
+        DC::StoreRange((void*)data, 0x80);
+    } else {
+        DC::StoreRangeNoSync((void*)data, 0x80);
+    }
+}
+
+/* 0x8009429C (0x48): stores the `ResMatIndMtxAndScale` block's 0x40 bytes. */
+extern "C" void res_mat_ind_mtx_dc_store(ResHandle* pSelf, s32 flag) {
+    u32 data = (u32)&reinterpret_cast<ResMatIndMtxAndScale*>(pSelf)->ref();
+
+    if (flag != 0) {
+        DC::StoreRange((void*)data, 0x40);
+    } else {
+        DC::StoreRangeNoSync((void*)data, 0x40);
+    }
+}
+
+/* 0x8009435C (0x48): stores the `ResMatTexCoordGen` block's 0xA0 bytes. */
+extern "C" void res_mat_tex_coord_gen_dc_store(ResHandle* pSelf, s32 flag) {
+    u32 data = (u32)&reinterpret_cast<ResMatTexCoordGen*>(pSelf)->ref();
+
+    if (flag != 0) {
+        DC::StoreRange((void*)data, 0xA0);
+    } else {
+        DC::StoreRangeNoSync((void*)data, 0xA0);
+    }
+}
+
+/* 0x8009441C (0x48): calls the pixel display list, through `GXCallDisplayList` when `bSync`. */
+void ResMatPix::CallDisplayList(bool bSync) const {
+    u32 data = (u32)&ref();
+
+    if (bSync != 0) {
+        GXCallDisplayList((void*)data, 0x20);
+    } else {
+        GXFastCallDisplayList((const void*)data, 0x20);
+    }
+}
+
+/* 0x800944E8 (0x48): calls the TEV colour display list, through the FIFO or the fast path. */
+void ResMatTevColor::CallDisplayList(bool bSync) const {
+    u32 data = (u32)&ref();
+
+    if (bSync) {
+        GXCallDisplayList((void*)data, 0x80);
+    } else {
+        GXFastCallDisplayList((const void*)data, 0x80);
+    }
+}
+
+/* Return the indirect-matrix and texture-coordinate blocks; nothing calls them, so the link strips them, and the
+ * const `ref()` copies follow them. */
+const ResMatIndMtxAndScaleData& res_mat_ind_mtx_data(const ResMatIndMtxAndScale& ind) {
+    return ind.ref();
+}
+
+const ResMatTexCoordGenData& res_mat_tex_coord_gen_data(const ResMatTexCoordGen& tex) {
+    return tex.ref();
+}
+
+/* 0x80094674 (0x4C): copies the `ResMatPix` block's 0x20 bytes to `pDst`; returns the aligned handle. */
+extern "C" u32 res_mat_pix_copy_to(ResHandle* pSelf, u32 pDst) {
+    detail::Copy32ByteBlocks((void*)pDst, (void*)reinterpret_cast<const ResMatPix*>(pSelf)->ptr(), 0x20);
+
+    return (u32)ResMatPix((void*)pDst).mpData;
+}
+
+/* 0x800946C0 (0x4C): copies the `ResMatTevColor` block's 0x80 bytes to `pDst`; returns the aligned handle. */
+extern "C" u32 res_mat_tev_color_copy_to(ResHandle* pSelf, u32 pDst) {
+    detail::Copy32ByteBlocks((void*)pDst, (void*)reinterpret_cast<const ResMatTevColor*>(pSelf)->ptr(), 0x80);
+
+    return (u32)ResMatTevColor((void*)pDst).mpData;
+}
+
+/* 0x8009470C (0x4C): copies the `ResMatIndMtxAndScale` block's 0x40 bytes to `pDst`; returns the aligned handle. */
+extern "C" u32 res_mat_ind_mtx_copy_to(ResHandle* pSelf, u32 pDst) {
+    detail::Copy32ByteBlocks((void*)pDst, (void*)reinterpret_cast<const ResMatIndMtxAndScale*>(pSelf)->ptr(), 0x40);
+
+    return (u32)ResMatIndMtxAndScale((void*)pDst).mpData;
+}
+
+/* 0x80094758 (0x4C): copies the `ResMatTexCoordGen` block's 0xA0 bytes to `pDst`; returns the aligned handle. */
+extern "C" u32 res_mat_tex_coord_gen_copy_to(ResHandle* pSelf, u32 pDst) {
+    detail::Copy32ByteBlocks((void*)pDst, (void*)reinterpret_cast<const ResMatTexCoordGen*>(pSelf)->ptr(), 0xA0);
+
+    return (u32)ResMatTexCoordGen((void*)pDst).mpData;
+}
 
 /* 0x800947A4 (0xC4): returns texture map `id`'s object, or NULL. */
 const GXTexObj* ResTexObj::GetTexObj(_GXTexMapID id) const {
@@ -273,8 +510,6 @@ ResTlutObj ResTlutObj::CopyTo(void* pDst) const {
     return ResTlutObj(pDst);
 }
 
-RESMAT_WEAK_REF_CONST(ResTlutObj, RESMAT_AC_FILE, 74)
-RESMAT_WEAK_CLASS_NAME(ResTlutObj)
 
 /* 0x80095228 (0x11C): copies the transforms and effects of the coordinates in use to `pDst`. */
 /* untyped: byte range */
@@ -389,18 +624,6 @@ ResGenMode ResGenMode::CopyTo(void* pDst) const {
     return ResGenMode(pDst);
 }
 
-/* 0x80095718 (0x2C): copies the counts and the cull mode. */
-ResGenModeData& ResGenModeData::operator=(const ResGenModeData& rhs) {
-    nTexGens = rhs.nTexGens;
-    nChans = rhs.nChans;
-    nTevs = rhs.nTevs;
-    nInds = rhs.nInds;
-    cullMode = rhs.cullMode;
-    return *this;
-}
-
-RESMAT_WEAK_REF_CONST(ResGenMode, RESMAT_AC_FILE, 175)
-RESMAT_WEAK_CLASS_NAME(ResGenMode)
 NW4R_G3D_RESOURCE_PTR(ResMatMisc)
 
 /* 0x800957BC (0x74): returns the z-compare location, false when the handle is NULL. */
@@ -487,22 +710,7 @@ ResMatMisc ResMatMisc::CopyTo(void* pDst) const {
     return ResMatMisc(pDst);
 }
 
-/* 0x80095C44 (0x34): copies the four bytes and the two indirect tables. */
-#pragma peephole on
-ResMatMiscData& ResMatMiscData::operator=(const ResMatMiscData& rhs) {
-    zCompLoc = rhs.zCompLoc;
-    light_set_idx = rhs.light_set_idx;
-    fog_idx = rhs.fog_idx;
-    pad_0x3 = rhs.pad_0x3;
-    indirect_method_word = rhs.indirect_method_word;
-    normal_map_ref_word = rhs.normal_map_ref_word;
-    return *this;
-}
-#pragma peephole off
 
-RESMAT_WEAK_REF_CONST(ResMatMisc, RESMAT_AC_FILE, 243)
-RESMAT_WEAK_CLASS_NAME(ResMatMisc)
-RESMAT_WEAK_REF_CONST(ResMatFur, RESMAT_AC_FILE, 287)
 
 /* Returns the fur block; nothing calls it, so the link strips it, and ResMatFur::ref's weak copy follows it. */
 const ResMatFurData& res_mat_fur_data(const ResMatFur& fur) {

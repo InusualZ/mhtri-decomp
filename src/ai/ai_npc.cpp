@@ -7,6 +7,11 @@
  * RANGE. .text 0x802C2700-0x802D9EA4 (357 functions, every one with a body); extab, extabindex, .ctors 0x8056F388
  *   (`__sinit`, which runs `_AINPC_W`'s constructor), .data 0x805D3A88-0x805D54A0, .bss 0x806BD360-0x806BD808
  *   (`ainpc_w`), .sdata, .sbss, .sdata2.  `jumptable_805D5428` is the 14-entry table MWCC emits for `ai_npc_level_rank_get`.
+ *   `__sinit` (0x802D9E14) and the constructor copy it references (0x802D9E20, the last extabindex record before
+ *   `hud/cockpit.cpp`'s 0x802D9EB4) close the range: MWCC emits a TU's static initialiser after its functions and the
+ *   weak copies it references after it, so it is not a seam.  The double 2^52 pooled at 0x8079A788 (last reader
+ *   0x802D8DB4) recurs at 0x8079A888 (first reader 0x802D9EEC, `hud/cockpit.cpp`), which puts the unit edge between them;
+ *   `.ctors` 0x8056F388 is this range's only entry.
  * FLAGS. `cflags_main` (configure.py) with a file-wide `#pragma optimization_level 4` (the switch-range lowering
  *   `subi; cmplwi` of `ai_npc_step20_arm`; no row regresses).  `#pragma peephole off` from 0x802C2700 to the end of
  *   0x802D44F4's band, with `peephole on` wrapped around fn_802D1954, fn_802D2024, fn_802D29B8, fn_802D29CC,

@@ -7,14 +7,14 @@
  * FLAGS. `cflags_main`, as `ef/eft026_fx.cpp`; `#pragma peephole off` over the bodies, as there.
  * NAMES. `eft028_set_koware` is the runtime dump's own name (C++ linkage, the map row carries the mangling); the rest
  *   are plain `extern "C"`.  GUESS: the file name `eft028_set` (from the family's setters; no `__FILE__` string);
- *   GUESS (from its body and its caller): eft028_set_scaled.
- * RESIDUALS. The unreferenced 0.0f at 0x80796B24 is not in the linked object: a dead store `param.radius = 0.0f` pools it
- *   (object 0x8) and an unreferenced `return 0.0f` function under `exceptions off` too, but the link strips the
- *   unreferenced entry either way (flipcheck NOT READY; the stripped-function trial flip fails the DOL hash).
- *   Open: whether this TU also holds `ef/fn_80119C44.c` (its pool 0x80796B2C = 1.0f follows with no duplicate), and the eft028 data
- *   (`eft028_alpha_by_id` .data 0x805A0730, `eft028_capsule_ends` .bss 0x806A4548) sitting in `ef/eft029.cpp`'s
- *   ranges, whose pool restarts with 0.0f at 0x80796B30.
- * SHAPES. `eft028_set_capsule` returns nothing.
+ *   GUESS (from its body and its caller): eft028_set_scaled;
+ *   GUESS (a retail global nothing reads): eft028_unused_zero.
+ * RESIDUALS. None in `.text`/`.sdata2`; open: whether this TU also holds `ef/fn_80119C44.c` (its pool 0x80796B2C = 1.0f
+ *   follows with no duplicate), and the eft028 data (`eft028_alpha_by_id` .data 0x805A0730, `eft028_capsule_ends` .bss
+ *   0x806A4548) sitting in `ef/eft029.cpp`'s ranges, whose pool restarts with 0.0f at 0x80796B30.
+ * SHAPES. The unreferenced 0.0f at 0x80796B24 is a retail global (force-active, `eft028_unused_zero`): an exported const
+ *   defined ahead of the setters, which the link keeps although nothing reads it (a pooled literal is local and stripped).
+ *   `eft028_set_capsule` returns nothing.
  */
 
 #include "ef/eft028_alpha_by_id.h" /* eft028_alpha_by_id (rule 2: the owner's header) */
@@ -61,6 +61,8 @@ void fn_80119D9C(_EFT* self);
 }
 
 #pragma peephole off
+
+__declspec(export) extern const f32 eft028_unused_zero = 0.0f;
 
 /* Spawns an eft028 record of `kind` for `variant` 0 or 1 and seeds its colour keys from the map. */
 extern "C" void eft028_set(u8 kind, u8 variant, u8 id)

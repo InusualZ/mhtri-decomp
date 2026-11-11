@@ -180,7 +180,7 @@ extern "C" void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f3
  * size: 0x10 */
 struct EmDataEntry {
     /* +0x00 */ s32 joint;
-    /* +0x04 */ nw4r::math::VEC3 vec;
+    /* +0x04 */ Vec vec;
 };
 
 /* This unit's view of the `get_enemy_data` record's +0x2C effect-table pointer (`EnemyData` pads it).
@@ -4249,7 +4249,7 @@ void em025_motion_events(_ENEMY_WORK* self) {
                 if (idx != 0xFF) {
                     e = &table[idx];
                     get_joint_wmat_em(self, e->joint, &mtx);
-                    v2C = nw4r::math::VEC3(*(const Vec*)&e->vec);
+                    v2C = nw4r::math::VEC3(e->vec);
                     mulVecMatAddTrans(&v2C, &mtx);
                     em_roster_record_pos_set(blk->handles_0x328[i], &v2C, self->area_no);
                 }

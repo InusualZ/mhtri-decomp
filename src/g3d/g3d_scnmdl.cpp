@@ -73,7 +73,6 @@
 #include "g3d/g3d_resnode.h"
 #include "g3d/g3d_scnmdlsmpl.h"   /* nw4r::g3d::ScnMdlSimple (rule 2) */
 #include "g3d/g3d_scnmdl.h"
-#include "g3d/g3d_resfile.h"     /* res_mat_*_dc_store, res_mat_*_copy_to (rule 2) */
 #include "g3d/g3d_resshp.h"      /* res_tev_dc_store, res_tev_copy_to (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* res_*_end_edit (rule 2) */
 #include "g3d/g3d_anmtexsrt.h"   /* nw4r::g3d::AnmObjTexSrt (rule 1) */

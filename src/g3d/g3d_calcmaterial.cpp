@@ -30,7 +30,6 @@
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h"
-#include "g3d/g3d_resfile.h"       /* res_mat_*_dc_store (rule 2) */
 #include "nw4r/g3d/res_common.h"   /* ResHandle (rule 1) */
 #include "g3d/g3d_anmclr.h"        /* res_mat_copy_ctor, apply_clr_anm_result (rule 2) */
 #include "g3d/g3d_anmtexpat.h"     /* apply_tex_pat_anm_result (rule 2) */

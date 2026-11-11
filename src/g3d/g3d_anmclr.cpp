@@ -55,9 +55,8 @@
 #include "nw4r/db_assert.h"   /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_anmclr.h"
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name_anmchr and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
-#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan, res_mat_tev_color_dc_store (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
-#include "g3d/g3d_resfile.h"   /* res_mat_tev_color_dc_store (rule 2) */
 #include "nw4r/ut_Color.h"       /* nw4r::ut::Color */
 
 #pragma pool_data off

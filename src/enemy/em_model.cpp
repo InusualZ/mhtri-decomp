@@ -42,7 +42,12 @@
  *    and this unit truncates it (`clrlwi` before the store), so its leaf header returns s32 (request enemy-em-model#1);
  *  - the out-of-line nw4r copies `dont_inline` produces (ResMat/ResMatChan copy ctors, the ResMat/ResMdl assignments,
  *    ICalcWorldCallback's dtor) are weak definitions in this object that the target's object does not carry.
- * SHAPES. `#pragma fp_contract off` and `#pragma pool_data off` file-wide (retail has no fused multiply-adds and
+ * SHAPES. `em_roster_spare_draw` hands `VEC3::operator=` the spare placement's `_VEC3` as a `static_cast<const VEC3&>`
+ *   (a record that adds no data to its base): the other spellings measure worse - `VEC3(place->pos_0x04)` builds a
+ *   temporary through the converting constructor (93.34 %, +24 B), a `VEC3`-typed `EmPopSparePlace::pos_0x04` makes
+ *   the spare copy of `em_roster_record_copy` assign member by member (100 % to 0 %), and `_VEC3::as_vec3()` /
+ *   a local reference reorder the `this`/argument `addi` pair (95.77 %, 92.61 % against 95.79 %).
+ *   `#pragma fp_contract off` and `#pragma pool_data off` file-wide (retail has no fused multiply-adds and
  *   addresses each table by its own symbol); `#pragma dont_inline on` around the callback class's ctor/dtor, the tint
  *   and the entry-add functions makes the inline nw4r handle members out-of-line calls as retail has them, and off
  *   elsewhere (on, the spare copy becomes a call).  A `switch` whose `default:` is listed first gives retail's

@@ -156,7 +156,10 @@
  *    0x2178, 0x1D8, 0x928 and 0xD50; every compared section differs in bytes.
  *  - `equip_color_table`/`armor_color_table` (0x805C6238/0x805C6278) are this unit's `.data`, read through `extern`
  *    declarations until the section is emitted.
- * SHAPES. `switch` with `default:` written first lays the default arm first (`fn_80275C34`, `Pl_act_set_motion`); a
+ * SHAPES. `pl_impact_pos_get` builds the pose vector as `VEC3(*(const Vec*)(pl_rig_pose_drawn + weapon * 0x18 + 0xC))`
+ *   over the byte table: a `_VEC3::as_vec()` call on a typed `PlSeVecPair` row computes the temporary's address after
+ *   the table offset where retail computes it first (97.90 %), so the cast stays.
+ *   `switch` with `default:` written first lays the default arm first (`fn_80275C34`, `Pl_act_set_motion`); a
  *   case list whose bodies retail places shared puts the second body first (`fn_80277FF8`'s case 3: 1/8 then 5/6/9);
  *  - a pad record reached through a local `PlayerPad*` (`rec = &Psw[pad]`) forms `Psw + pad * 0x350` index first
  *    (`pl_input_pause_flag_set`, `pl_input_refresh`); a `u32` frame counter divided signed is `(s32)frame % 5`;

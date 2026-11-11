@@ -1664,7 +1664,7 @@ s32 fn_801FFE44(_LB_NPC* self)
         lb_npc_motion_restart(self, entry->motion_0x0C);
         if ((entry->count_0x10 == -1 || entry->count_0x10 == -2 || entry->motion_0x0C == 0) &&
             entry->pos_0x00.y > -10000.0f) {
-            self->target_0x1EC = VEC3(*(const Vec*)&entry->pos_0x00);
+            self->target_0x1EC = VEC3(entry->pos_0x00.as_vec());
             fn_801FDD9C(self, 8.0f);
         }
     }
