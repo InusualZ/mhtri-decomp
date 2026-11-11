@@ -103,46 +103,26 @@
  *  - the callees `fn_8025E298` and `cockpit_ticket_acquire` are called through per-call-site views (`<name>_viewN` cast macros,
  *    the same direct call), and the header declarations of `fn_8025E298`, `get_move_work_adrs`,
  *    `get_move_work_max` and `em_land_data_init` that disagree with a view are renamed away around their `#include`;
- *  - a case that branches forward into a later case's code puts that case's label inside an `if (0) { ... }`
- *    (playbook 241): `pl_gather_item_take` (results 0-2 skip result 3's SE), `pl_act_fishing` (grade 1 into the 2/3
- *    grade's tail), `pl_item_use_act_pick` (items 380/384 into 583's search), `pl_scan_act_select` (rows 3/24 over
- *    rows 37..15 into row 16; key 248 into 247's tail), `pl_act_net_hook_main` (items 0x168/0xD into 0x2C's effect,
- *    0xA7/0xA6 into 0x1A's stamina, 0x14B into 0x14C's effect); a case that lands on a loop head past the head's
- *    prefix is the `if (0) { case X: ... } else { prefix }` form (items 0x177 and 0x1B);
- *  - `pl_act_net_hook_main`'s two motion tails head `for (;;)` loops (playbook 252): the use motion (`0x162`/`0x133`
- *    + `fn_8024CA50`) after item 0x2C's effect and, nested in it, the drink motion (`0x162`/`0x12E`) after item 0x1A's
- *    stamina; a later item re-enters the inner head with `continue` and the outer head with `break` (the inner loop's
- *    exit is the outer loop's back edge), and item 0xD0's effect heads a third loop so item 0xD6's bonus path
- *    re-enters it; the switch has no code after it, so `default` is the epilogue; its bonus-item result is one
- *    `switch` whose `case 0: case 1: case 2:` run lowers to the unsigned `cmplwi r0,2; ble` range test;
- *  - `pl_act_step_offhand_gesture` writes each follow-up arm out in full: the two constants each arm hands
- *    `Pl_frame_check` differ only per gesture;
- *  - `#pragma optimization_level 4` (playbook 108) brackets `pl_weapon_record_rearm`, `pl_act_knockback`,
- *    `pl_act_fishing`, `pl_act_paralysis`, `pl_scan_act_select`, `pl_condition_tick`, `pl_hit_react`,
- *    `pl_wide_area_effect_step`, `pl_act_carted`, `pl_act_carted_drawn`, `pl_act_weapon_swing`, `fn_8025FA00` and
- *    `fn_8025FF0C`: their
- *    switches are retail's level-4 linear `subi`/`cmplwi` range chains;
- *  - `#pragma opt_common_subs off` (playbook 208) brackets `pl_act_item_throw`, `pl_act_net_hook_a`/`_b`/`_c`,
- *    `pl_act_slinger_fire`, `pl_act_kill_cut_throw`, `pl_act_carry_break`, `fn_80264A84` and `pl_act_net_hook_main`:
- *    retail loads `shell_set_func_ptr` after the call arguments and re-reads what the pass would keep, and the bonus
- *    weight loop re-reads the row's weight in its body;
- *  - `do { switch ... } while (0)` with `continue` (playbook 183) gives `pl_hit_react`'s cases that skip the hold
- *    notify, `pl_act_status_step`'s area gate that skips the regeneration and `fn_8025FA00`'s one surface clamp;
- *  - `(u8)(x + 250) > 2` is retail's `addi r0,r3,0xFA; clrlwi; cmplwi` range test (`(u8)(x - 6)` emits `subi`);
- *  - `fn_80265748` returns 0, then 2 below 0x8001, else 1: the one-expression return folds into `subfc`/`subfe`;
- *  - `pl_hit_react` reuses its `hp` local for the knockback motion, as retail's register reuse shows;
- *  - a ground-check result copied into a register local (`height = value`) is not re-read after the stores through
- *    `self` (`fn_8025FA00`, `fn_8025F588`); `(u32)` table indices (`pl_act_item_throw`) keep retail's unfolded
- *    `slwi`/`addi`/`slwi` index; an `(s32)` read of an `s16` table entry keeps retail's `lha`+`clrlwi` for a `u16`
- *    parameter.
- *  - a two-valued constant is an `if`/`else` (`fn_8025A7FC`, `pl_act_fishing`, `pl_act_slinger_aim`, `fn_802602A0`):
- *    retail schedules the default `li` between the compare and its branch, which `x = a; if (c) x = b;` hoists above
- *    the load;
+ *  - a case that retail enters by branching forward into a later case's code is written case-label-free: the
+ *    shared tail is duplicated (`pl_act_fishing` grade 1 into the 2/3 grade's tail, `pl_act_net_hook_main` items
+ *    0x168/0xD/0x2C and 0x14B/0x14C, `fn_8025E448` roster cases 8/6/10 into the default clear, `pl_act_net_hook_b` arm
+ *    0x17F), merged under one label with a field test (`pl_gather_item_take` results 0-3, `pl_item_use_act_pick` items
+ *    380/384/583, `pl_scan_act_select` keys 247/248) or reordered so the first case falls into the second (rows 37..15
+ *    before rows 3/24 and row 16 in `pl_scan_act_select`).  Each is measured below the `if (0)` form it replaces
+ *    (retail keeps one copy and jumps; `pl_gather_item_take` 97.2 %, `pl_act_fishing` 90.2 %, `fn_8025E448` 98.0 %,
+ *    `pl_act_net_hook_b` 97.1 %, `pl_scan_act_select` 97.8 %, `pl_item_use_act_pick` 99.7 %: the duplicated or
+ *    re-ordered code shifts the later branches);
+ *  - `pl_act_net_hook_main` ends every item in the use motion (`0x162`/`0x133` + `fn_8024CA50`), which retail lays out
+ *    after item 0x2C's effect and re-enters from each later item; here the cases `break` to one copy after the switch
+ *    and `default` returns, so the tail sits last instead of in the middle.  The stamina items that end in the drink
+ *    motion (`0x162`/`0x12E`) set a `drink` flag the tail tests (the flag takes a callee-saved register retail does
+ *    not use: `_savegpr_27` for retail's four `stw`; an inline helper per site grows the function by 8 copies instead);
+ *    item 0xD6's bonus path repeats item 0xD0's effect, and its bonus-item result is one `switch` whose
+ *    `case 0: case 1: case 2:` run lowers to the unsigned `cmplwi r0,2; ble` range test;
  *  - a stepped field takes a typed constant through a compound assignment (`field -= (u16)0x300`), which stores the
  *    value raw where `field = local - 0x300` adds a `clrlwi` (playbook 38);
  *  - blocked tests that share one clear leave a `do { } while (0)` with `continue` from inside the switch
- *    (`fn_8025E0C8`, playbook 183); roster cases 8/6/10 of `fn_8025E448` and arm 0x17F of `pl_act_net_hook_b` sit in
- *    nested `if (0)` blocks so a failed test falls into the default clear or the shared arm (playbook 241); the small
+ *    (`fn_8025E0C8`, playbook 183); the small
  *    `field_0x00A` dispatch of `fn_8025ED00` is an `if` chain (each compare sits before its body);
  *  - the ground probe's out word is an `f32` (`pl_ground_probe_ahead` writes only `out->x`) and the land record is
  *    `LandData`: both set the frame retail allocates (`pl_act_stroke_forward`, `fn_8025E448`,
@@ -3475,18 +3455,34 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
                 }
                 return;
             }
-            /* the skill's grade-2 catch skips the 2/3 grade's item and lands it */
-            if (0) {
+            big = fn_8024AA04(self->field_0x306) == 2;
+            if (self->field_0x007 == 0) {
+                pl_fish_se_result(self->field_0x5BA | 0x80, &self->vec_0x03C, big);
+                pl_act_enter(self, 0, 0x24, 0);
+            } else {
+                pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, big);
+                if (variant == 1 || variant == 3) {
+                    if (self->field_0x007 == 1) {
+                        pl_act_enter(self, 0, 0x73, 0);
+                    } else {
+                        pl_act_enter(self, 0, 0xA2, 0);
+                    }
+                } else if (self->field_0x007 == 1) {
+                    pl_act_enter(self, 0, 0x74, 0);
+                } else {
+                    pl_act_enter(self, 0, 0xA3, 0);
+                }
+            }
+            return;
         case 2:
         case 3:
-                pl_item_add(self, 0x1D, -1);
-                if (Pl_master_ck(self) == 1) {
-                    lb_event_request(7);
-                }
-                if ((u32)item_get_with_msg(self, 0x1A, self->field_0x598, 9, 1) > 1) {
-                    if (self->field_0x007 != 0) {
-                        self->field_0x007++;
-                    }
+            pl_item_add(self, 0x1D, -1);
+            if (Pl_master_ck(self) == 1) {
+                lb_event_request(7);
+            }
+            if ((u32)item_get_with_msg(self, 0x1A, self->field_0x598, 9, 1) > 1) {
+                if (self->field_0x007 != 0) {
+                    self->field_0x007++;
                 }
             }
             big = fn_8024AA04(self->field_0x306) == 2;
@@ -3837,10 +3833,10 @@ extern "C" void pl_gather_item_take(_PLW* self, s32 variant, s32 unused, u16 ite
         case 0:
         case 1:
         case 2:
-            se_item_pickup_play(item);
-            /* a taken item skips the failure SE and checks the bonus */
-            if (0) {
         case 3:
+            if (result != 3) {
+                se_item_pickup_play(item);
+            } else {
                 snd_item_fail_play();
             }
             if (item_bonus_class_get(item) != 0 && Pl_item_timer_get(self, item) > 0) {
@@ -4323,13 +4319,7 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
             }
             break;
         }
-        /* a cat-skill actor ends in the 0x246/0x34 arm, past the 0x17F one */
-        if (0) {
-    case 0x17F:
-            shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
-            break;
-        }
-        /* fallthrough */
+        /* fallthrough: a cat-skill actor ends in the 0x246/0x34 arm */
     case 0x246:
     case 0x34:
         if (!in_act) {
@@ -4337,6 +4327,9 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
         } else {
             shell_set_func_ptr->method_0x34(self, 6, shell_set_func_ptr);
         }
+        break;
+    case 0x17F:
+        shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
         break;
     case 0x1:
         if (Pl_cat_skill_ck(self, 5) != 1) {
@@ -4527,6 +4520,15 @@ extern "C" u32 fn_8024D5AC(_PLW* self, _PLW* other) {
 }
 
 #pragma opt_common_subs off
+/* Starts the drink motion the stamina items end in. */
+static inline void pl_item_drink_motion(_PLW* self) {
+    if (self->kind_0x09 == 3) {
+        Pl_chr_set_attr_default(self, 0x162, 4, 0);
+    } else {
+        Pl_chr_set_attr_default(self, 0x12E, 4, 0);
+    }
+}
+
 /* Applies the item the actor just used (`_PLW`+0x306): spends it, then runs the item's effect - healing, buffs,
  * the party-wide variants a cat skill shares with the partner or the local player, the bombs and traps - and
  * arms the matching use motion. */
@@ -4538,6 +4540,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
     u16* entry;
     u16 roll;
     s16 result;
+    s32 drink = 0;
 
     me = my_player_work_get();
     self->field_0x65F = 0xF;
@@ -4560,403 +4563,475 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             pl_health_recover(me, 0x32, 1);
             ef_inst_spawn(me, 0);
         }
-        /* item 0x177 ends in the use motion; items 0x168 and 0xD end in item 0x2C's own effect */
-        if (0) {
+        ef_inst_spawn(self, 0);
+        break;
     case 0x177:
-            pl_act_clear_wait(self, 0);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 5);
-        } else {
-            if (0) {
+        pl_act_clear_wait(self, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 5);
+        break;
     case 0xD:
-                pl_health_recover(self, 0x1E, 0);
-                fn_8024D3C8(self);
-                if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                    if (Pl_Skill_ck(self, 0x5B) == 1) {
-                        ainpc_area_buff_apply(4);
-                    } else {
-                        ainpc_area_buff_apply(5);
-                    }
-                    if (Pl_Skill_ck(self, 0x5B) == 1) {
-                        level = 0xF;
-                    }
-                    if (Pl_Skill_ck(self, 0x5C) == 1) {
-                        level = 0x1E;
-                    }
-                    if (fn_8024D5AC(self, partner) == 1) {
-                        ef_inst_spawn(partner, 0);
-                        pl_health_recover(partner, level, 1);
-                    } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                        ef_inst_spawn(me, 0);
-                        pl_health_recover(me, level, 1);
-                    }
-                }
-                if (0) {
-    case 0x2C:
-                    pl_health_recover(self, 0x1E, 0);
-                    fn_8024D3C8(self);
-                }
+        pl_health_recover(self, 0x1E, 0);
+        fn_8024D3C8(self);
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                ainpc_area_buff_apply(4);
+            } else {
+                ainpc_area_buff_apply(5);
             }
-            ef_inst_spawn(self, 0);
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                level = 0xF;
+            }
+            if (Pl_Skill_ck(self, 0x5C) == 1) {
+                level = 0x1E;
+            }
+            if (fn_8024D5AC(self, partner) == 1) {
+                ef_inst_spawn(partner, 0);
+                pl_health_recover(partner, level, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                ef_inst_spawn(me, 0);
+                pl_health_recover(me, level, 1);
+            }
         }
-        /* the use motion heads the loop; every later item that ends in it re-enters with `continue` */
-        for (;;) {
+        ef_inst_spawn(self, 0);
+        break;
+    case 0x2C:
+        pl_health_recover(self, 0x1E, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 0);
+        break;
+    case 0xE:
+        pl_health_recover(self, 0x32, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 0);
+        break;
+    case 0x7B:
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                ainpc_area_buff_apply(0);
+            } else {
+                ainpc_area_buff_apply(4);
+            }
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                level = 0xA;
+            }
+            if (Pl_Skill_ck(self, 0x5C) == 1) {
+                level = 0x14;
+            }
+            if (fn_8024D5AC(self, partner) == 1) {
+                ef_inst_spawn(partner, 0);
+                pl_health_recover(partner, level, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                ef_inst_spawn(me, 0);
+                pl_health_recover(me, level, 1);
+            }
+        }
+        pl_health_recover(self, 0x14, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 0);
+        break;
+    case 0x111:
+        pl_health_recover(self, 0xA, 0);
+        /* fallthrough */
+    case 0x11:
+        fn_8024D3C8(self);
+        self->field_0x3EA = 0;
+        ef_inst_spawn(self, 4);
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0 && self->field_0x306 == 0x11) {
+            ainpc_area_buff_apply(3);
+            if (fn_8024D5AC(self, partner) == 1) {
+                partner->field_0x3EA = 0;
+                ef_inst_spawn(partner, 4);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                me->field_0x3EA = 0;
+                ef_inst_spawn(me, 4);
+            }
+        }
+        break;
+    case 0x74:
+        pl_act_add_hold_gauge(self, -0xA);
+        if ((s16)self->health <= 0) {
+            self->health = 1;
+        }
+        /* fallthrough */
+    case 0x7C:
+        if ((self->field_0x0B6 & 1) != 0 || Pl_cat_skill_ck(self, 3) == 1) {
+            self->field_0x3EA = 0;
             if (self->kind_0x09 == 3) {
                 Pl_chr_set_attr_default(self, 0x162, 4, 0);
             } else {
                 Pl_chr_set_attr_default(self, 0x133, 4, 0);
             }
             fn_8024CA50(self, 0);
-            return;
-    case 0xE:
-            pl_health_recover(self, 0x32, 0);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 0);
-            continue;
-    case 0x7B:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    ainpc_area_buff_apply(0);
-                } else {
-                    ainpc_area_buff_apply(4);
-                }
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    level = 0xA;
-                }
-                if (Pl_Skill_ck(self, 0x5C) == 1) {
-                    level = 0x14;
-                }
-                if (fn_8024D5AC(self, partner) == 1) {
-                    ef_inst_spawn(partner, 0);
-                    pl_health_recover(partner, level, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    ef_inst_spawn(me, 0);
-                    pl_health_recover(me, level, 1);
-                }
-            }
-            pl_health_recover(self, 0x14, 0);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 0);
-            continue;
-    case 0x111:
-            pl_health_recover(self, 0xA, 0);
-            /* fallthrough */
-    case 0x11:
-            fn_8024D3C8(self);
-            self->field_0x3EA = 0;
             ef_inst_spawn(self, 4);
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0 && self->field_0x306 == 0x11) {
-                ainpc_area_buff_apply(3);
-                if (fn_8024D5AC(self, partner) == 1) {
-                    partner->field_0x3EA = 0;
-                    ef_inst_spawn(partner, 4);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    me->field_0x3EA = 0;
-                    ef_inst_spawn(me, 4);
-                }
-            }
-            continue;
-    case 0x74:
-            pl_act_add_hold_gauge(self, -0xA);
-            if ((s16)self->health <= 0) {
-                self->health = 1;
-            }
-            /* fallthrough */
-    case 0x7C:
-            if ((self->field_0x0B6 & 1) != 0 || Pl_cat_skill_ck(self, 3) == 1) {
-                self->field_0x3EA = 0;
-                if (self->kind_0x09 == 3) {
-                    Pl_chr_set_attr_default(self, 0x162, 4, 0);
-                } else {
-                    Pl_chr_set_attr_default(self, 0x133, 4, 0);
-                }
-                fn_8024CA50(self, 0);
-                ef_inst_spawn(self, 4);
-                fn_8024D3C8(self);
-            } else if (self->kind_0x09 == 3) {
-                Pl_chr_set_attr_default(self, 0x163, 4, 0);
-            } else {
-                Pl_chr_set_attr_default(self, 0x134, 4, 0);
-            }
-            return;
+            fn_8024D3C8(self);
+        } else if (self->kind_0x09 == 3) {
+            Pl_chr_set_attr_default(self, 0x163, 4, 0);
+        } else {
+            Pl_chr_set_attr_default(self, 0x134, 4, 0);
+        }
+        return;
     case 0x187:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (fn_8024D5AC(self, partner) == 1) {
-                    pl_resist_item_apply(partner, self, 0x187, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    pl_resist_item_apply(me, self, 0x187, 1);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (fn_8024D5AC(self, partner) == 1) {
+                pl_resist_item_apply(partner, self, 0x187, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                pl_resist_item_apply(me, self, 0x187, 1);
             }
-            pl_resist_item_apply(self, self, 0x187, 0);
-            fn_8024D3C8(self);
-            continue;
+        }
+        pl_resist_item_apply(self, self, 0x187, 0);
+        fn_8024D3C8(self);
+        break;
     case 0x188:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (fn_8024D5AC(self, partner) == 1) {
-                    pl_resist_item_apply(partner, self, 0x188, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    pl_resist_item_apply(me, self, 0x188, 1);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (fn_8024D5AC(self, partner) == 1) {
+                pl_resist_item_apply(partner, self, 0x188, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                pl_resist_item_apply(me, self, 0x188, 1);
             }
-            pl_resist_item_apply(self, self, 0x188, 0);
-            fn_8024D3C8(self);
-            continue;
+        }
+        pl_resist_item_apply(self, self, 0x188, 0);
+        fn_8024D3C8(self);
+        break;
     case 0x189:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (fn_8024D5AC(self, partner) == 1) {
-                    pl_resist_item_apply(partner, self, 0x189, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    pl_resist_item_apply(me, self, 0x189, 1);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (fn_8024D5AC(self, partner) == 1) {
+                pl_resist_item_apply(partner, self, 0x189, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                pl_resist_item_apply(me, self, 0x189, 1);
             }
-            pl_resist_item_apply(self, self, 0x189, 0);
-            fn_8024D3C8(self);
-            continue;
+        }
+        pl_resist_item_apply(self, self, 0x189, 0);
+        fn_8024D3C8(self);
+        break;
     case 0x18A:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (fn_8024D5AC(self, partner) == 1) {
-                    pl_resist_item_apply(partner, self, 0x18A, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    pl_resist_item_apply(me, self, 0x18A, 1);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (fn_8024D5AC(self, partner) == 1) {
+                pl_resist_item_apply(partner, self, 0x18A, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                pl_resist_item_apply(me, self, 0x18A, 1);
             }
-            pl_resist_item_apply(self, self, 0x18A, 0);
-            fn_8024D3C8(self);
-            continue;
+        }
+        pl_resist_item_apply(self, self, 0x18A, 0);
+        fn_8024D3C8(self);
+        break;
     case 0x170:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (fn_8024D5AC(self, partner) == 1) {
-                    pl_resist_item_apply(partner, self, 0x170, 1);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    pl_resist_item_apply(me, self, 0x170, 1);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (fn_8024D5AC(self, partner) == 1) {
+                pl_resist_item_apply(partner, self, 0x170, 1);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                pl_resist_item_apply(me, self, 0x170, 1);
             }
-            pl_resist_item_apply(self, self, 0x170, 0);
-            fn_8024D3C8(self);
-            continue;
+        }
+        pl_resist_item_apply(self, self, 0x170, 0);
+        fn_8024D3C8(self);
+        break;
     case 0x17A:
-            self->field_0x460 = fn_8024CD8C(self, 0x384);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 8);
-            continue;
+        self->field_0x460 = fn_8024CD8C(self, 0x384);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 8);
+        break;
     case 0x179:
-            fn_80276CE8(self, 0x384);
-            /* fallthrough */
+        fn_80276CE8(self, 0x384);
+        /* fallthrough */
     case 0x33:
-            pl_gauge_ceiling_grow(self, 0x96, 0);
-            pl_health_recover(self, 0x96, 0);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 0);
-            continue;
+        pl_gauge_ceiling_grow(self, 0x96, 0);
+        pl_health_recover(self, 0x96, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 0);
+        break;
     case 0x8A:
-            pl_act_add_stagger(self, 0x32);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 3);
-            continue;
+        pl_act_add_stagger(self, 0x32);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 3);
+        break;
     case 0x6:
     case 0x2E:
-            pl_act_add_stagger(self, 0x96);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 3);
-            continue;
+        pl_act_add_stagger(self, 0x96);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 3);
+        break;
     case 0x18E:
-            pl_stagger_budget_add(self, 0x19);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 3);
-            continue;
+        pl_stagger_budget_add(self, 0x19);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 3);
+        break;
     case 0x18F:
-            pl_stagger_budget_add(self, 0x96);
-            fn_8024D3C8(self);
-            ef_inst_spawn(self, 3);
-            continue;
+        pl_stagger_budget_add(self, 0x96);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 3);
+        break;
     case 0x12:
     case 0x13:
-            if (Pl_master_ck(self) == 1) {
-                if (self->field_0x306 == 0x12) {
-                    pl_attack_up_set(self, 0, 3);
-                } else {
-                    pl_attack_up_set(self, 0, 5);
-                }
-                fn_8024D3C8(self);
+        if (Pl_master_ck(self) == 1) {
+            if (self->field_0x306 == 0x12) {
+                pl_attack_up_set(self, 0, 3);
+            } else {
+                pl_attack_up_set(self, 0, 5);
             }
-            ef_inst_spawn(self, 1);
-            continue;
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 1);
+        break;
     case 0x86:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    ainpc_area_buff_apply(1);
-                } else {
-                    ainpc_area_buff_apply(6);
-                }
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    level = 5;
-                }
-                if (Pl_Skill_ck(self, 0x5C) == 1) {
-                    level = 0xA;
-                }
-                if (fn_8024D5AC(self, partner) == 1) {
-                    ef_inst_spawn(partner, 1);
-                    partner->field_0x44A = fn_8024CD8C(self, 0x1518);
-                    pl_attack_up_set(partner, 1, level);
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    ef_inst_spawn(me, 1);
-                    me->field_0x44A = fn_8024CD8C(self, 0x1518);
-                    pl_attack_up_set(me, 1, level);
-                }
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                ainpc_area_buff_apply(1);
+            } else {
+                ainpc_area_buff_apply(6);
             }
-            fn_8024D3C8(self);
-            if (Pl_master_ck(self) == 1) {
-                pl_attack_up_set(self, 1, 0xA);
-                self->field_0x44A = fn_8024CD8C(self, 0x1518);
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                level = 5;
             }
-            ef_inst_spawn(self, 1);
-            continue;
+            if (Pl_Skill_ck(self, 0x5C) == 1) {
+                level = 0xA;
+            }
+            if (fn_8024D5AC(self, partner) == 1) {
+                ef_inst_spawn(partner, 1);
+                partner->field_0x44A = fn_8024CD8C(self, 0x1518);
+                pl_attack_up_set(partner, 1, level);
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                ef_inst_spawn(me, 1);
+                me->field_0x44A = fn_8024CD8C(self, 0x1518);
+                pl_attack_up_set(me, 1, level);
+            }
+        }
+        fn_8024D3C8(self);
+        if (Pl_master_ck(self) == 1) {
+            pl_attack_up_set(self, 1, 0xA);
+            self->field_0x44A = fn_8024CD8C(self, 0x1518);
+        }
+        ef_inst_spawn(self, 1);
+        break;
     case 0x87:
-            if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    ainpc_area_buff_apply(2);
-                } else {
-                    ainpc_area_buff_apply(7);
+        if (Pl_Skill_slot_item_get(self, 0x26) != 0) {
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                ainpc_area_buff_apply(2);
+            } else {
+                ainpc_area_buff_apply(7);
+            }
+            if (Pl_Skill_ck(self, 0x5B) == 1) {
+                level = 0xA;
+            }
+            if (Pl_Skill_ck(self, 0x5C) == 1) {
+                level = 0x14;
+            }
+            if (fn_8024D5AC(self, partner) == 1) {
+                ef_inst_spawn(partner, 2);
+                if (pl_defense_up_set(partner, 1, level) == 1) {
+                    partner->field_0x44E = fn_8024CD8C(self, 0x1518);
                 }
-                if (Pl_Skill_ck(self, 0x5B) == 1) {
-                    level = 0xA;
-                }
-                if (Pl_Skill_ck(self, 0x5C) == 1) {
-                    level = 0x14;
-                }
-                if (fn_8024D5AC(self, partner) == 1) {
-                    ef_inst_spawn(partner, 2);
-                    if (pl_defense_up_set(partner, 1, level) == 1) {
-                        partner->field_0x44E = fn_8024CD8C(self, 0x1518);
-                    }
-                } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
-                    ef_inst_spawn(me, 2);
-                    if (pl_defense_up_set(me, 1, level) == 1) {
-                        me->field_0x44E = fn_8024CD8C(self, 0x1518);
-                    }
+            } else if (Pl_master_ck(self) == 0 && self->area_0x16 == me->area_0x16) {
+                ef_inst_spawn(me, 2);
+                if (pl_defense_up_set(me, 1, level) == 1) {
+                    me->field_0x44E = fn_8024CD8C(self, 0x1518);
                 }
             }
-            fn_8024D3C8(self);
-            if (Pl_master_ck(self) == 1 && pl_defense_up_set(self, 1, 0x14) == 1) {
-                self->field_0x44E = fn_8024CD8C(self, 0x1518);
-            }
-            ef_inst_spawn(self, 2);
-            continue;
+        }
+        fn_8024D3C8(self);
+        if (Pl_master_ck(self) == 1 && pl_defense_up_set(self, 1, 0x14) == 1) {
+            self->field_0x44E = fn_8024CD8C(self, 0x1518);
+        }
+        ef_inst_spawn(self, 2);
+        break;
     case 0x14E:
-            self->field_0x45E = fn_8024CD8C(self, 0x2328);
-            ef_inst_spawn(self, 5);
-            if (Pl_master_ck(self) == 1) {
-                pl_model_state_set(self, 1, 0x20, 0);
-                fn_8024D3C8(self);
-            }
-            continue;
+        self->field_0x45E = fn_8024CD8C(self, 0x2328);
+        ef_inst_spawn(self, 5);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x20, 0);
+            fn_8024D3C8(self);
+        }
+        break;
     case 0x15:
     case 0x16:
-            if (Pl_master_ck(self) == 1) {
-                if (self->field_0x306 == 0x15) {
-                    pl_defense_up_set(self, 0, 7);
-                } else {
-                    pl_defense_up_set(self, 0, 0xF);
-                }
-                fn_8024D3C8(self);
+        if (Pl_master_ck(self) == 1) {
+            if (self->field_0x306 == 0x15) {
+                pl_defense_up_set(self, 0, 7);
+            } else {
+                pl_defense_up_set(self, 0, 0xF);
             }
-            ef_inst_spawn(self, 2);
-            continue;
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 2);
+        break;
     case 0x14:
-            if (Pl_master_ck(self) == 1) {
-                pl_attack_up_set(self, 1, 0x19);
-                self->field_0x44A = fn_8024CD8C(self, 0x276);
-                fn_8024D3C8(self);
-            }
-            ef_inst_spawn(self, 1);
-            self->field_0x354 = pl_float_1_5;
-            continue;
+        if (Pl_master_ck(self) == 1) {
+            pl_attack_up_set(self, 1, 0x19);
+            self->field_0x44A = fn_8024CD8C(self, 0x276);
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 1);
+        self->field_0x354 = pl_float_1_5;
+        break;
     case 0x17:
-            if (Pl_master_ck(self) == 1) {
-                if (pl_defense_up_set(self, 1, 0x19) == 1) {
-                    self->field_0x44E = fn_8024CD8C(self, 0x276);
-                }
-                self->field_0x45C = self->field_0x44E;
-                fn_8024D3C8(self);
+        if (Pl_master_ck(self) == 1) {
+            if (pl_defense_up_set(self, 1, 0x19) == 1) {
+                self->field_0x44E = fn_8024CD8C(self, 0x276);
             }
-            ef_inst_spawn(self, 2);
-            self->field_0x354 = pl_float_1_5;
-            continue;
+            self->field_0x45C = self->field_0x44E;
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 2);
+        self->field_0x354 = pl_float_1_5;
+        break;
     case 0x19:
-            self->field_0x466 = fn_8024CD8C(self, 0x4650);
-            ef_inst_spawn(self, 7);
-            if (Pl_master_ck(self) == 1) {
-                pl_model_state_set(self, 1, 0x22, 0);
-                fn_8024D3C8(self);
-            }
-            continue;
+        self->field_0x466 = fn_8024CD8C(self, 0x4650);
+        ef_inst_spawn(self, 7);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x22, 0);
+            fn_8024D3C8(self);
+        }
+        break;
     case 0x18:
-            self->field_0x464 = fn_8024CD8C(self, 0x4650);
-            ef_inst_spawn(self, 6);
-            if (Pl_master_ck(self) == 1) {
-                pl_model_state_set(self, 1, 0x21, 0);
-                fn_8024D3C8(self);
-            }
-            continue;
+        self->field_0x464 = fn_8024CD8C(self, 0x4650);
+        ef_inst_spawn(self, 6);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x21, 0);
+            fn_8024D3C8(self);
+        }
+        break;
     case 0x14B:
-            pl_gauge_ceiling_grow(self, 0xA, 0);
-            fn_8024D3C8(self);
-            /* item 0x14B shares item 0x14C's effect */
-            if (0) {
+        pl_gauge_ceiling_grow(self, 0xA, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 5);
+        break;
     case 0x14C:
-                pl_gauge_ceiling_grow(self, 0x14, 0);
-                fn_8024D3C8(self);
-            }
-            ef_inst_spawn(self, 5);
-            continue;
+        pl_gauge_ceiling_grow(self, 0x14, 0);
+        fn_8024D3C8(self);
+        ef_inst_spawn(self, 5);
+        break;
     case 0x176:
-            fn_80276CE8(self, 0x96);
-            fn_8024D3C8(self);
-            self->field_0x3F4 = 0;
-            ef_inst_spawn(self, 5);
-            continue;
+        fn_80276CE8(self, 0x96);
+        fn_8024D3C8(self);
+        self->field_0x3F4 = 0;
+        ef_inst_spawn(self, 5);
+        break;
     case 0x2D:
-            pl_stamina_add(self, 0x96);
-            ef_inst_spawn(self, 5);
-            continue;
+        pl_stamina_add(self, 0x96);
+        ef_inst_spawn(self, 5);
+        break;
     case 0x1B:
+        pl_stamina_add(self, 0x96);
+        ef_inst_spawn(self, 5);
+        drink = 1;
+        break;
+    case 0xA7:
+        self->field_0x466 = fn_8024CD8C(self, 0x4650);
+        ef_inst_spawn(self, 7);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x22, 0);
+        }
+        pl_stamina_add(self, 0x12C);
+        drink = 1;
+        break;
+    case 0xA6:
+        self->field_0x464 = fn_8024CD8C(self, 0x4650);
+        ef_inst_spawn(self, 6);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x21, 0);
+        }
+        pl_stamina_add(self, 0x12C);
+        drink = 1;
+        break;
+    case 0x1A:
+        ef_inst_spawn(self, 5);
+        pl_stamina_add(self, 0x12C);
+        drink = 1;
+        break;
+    case 0x1C:
+        if ((self->field_0x0B6 & 1) != 0) {
             pl_stamina_add(self, 0x96);
             ef_inst_spawn(self, 5);
-            /* item 0x1B ends in item 0x1A's motion; items 0xA7 and 0xA6 share its stamina gain */
-            if (0) {
-    case 0xA7:
-                self->field_0x466 = fn_8024CD8C(self, 0x4650);
-                ef_inst_spawn(self, 7);
-                if (Pl_master_ck(self) == 1) {
-                    pl_model_state_set(self, 1, 0x22, 0);
+            drink = 1;
+            break;
+        }
+        fn_80276CE8(self, -0x96);
+        if (self->kind_0x09 == 3) {
+            Pl_chr_set_attr_default(self, 0x163, 4, 0);
+        } else {
+            Pl_chr_set_attr_default(self, 0x134, 4, 0);
+        }
+        return;
+    case 0xF:
+        fn_80276CE8(self, 0x96);
+        self->field_0x412 = fn_8024CD8C(self, 0x1518);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x17, 0);
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 5);
+        break;
+    case 0x10:
+        fn_80276CE8(self, 0x12C);
+        self->field_0x412 = fn_8024CD8C(self, 0x2A30);
+        if (Pl_master_ck(self) == 1) {
+            pl_model_state_set(self, 1, 0x17, 0);
+            fn_8024D3C8(self);
+        }
+        ef_inst_spawn(self, 5);
+        break;
+    case 0xD0:
+        pl_health_recover(self, 0x14, 0);
+        ef_inst_spawn(self, 0);
+        fn_8024D3C8(self);
+        drink = 1;
+        break;
+    case 0xD6:
+        if (Pl_master_ck(self) == 1) {
+            pl_item_add(self, self->field_0x306, -1);
+        }
+        if ((self->field_0x0B6 & 0x8000) != 0) {
+            pl_health_recover(self, 0x14, 0);
+            ef_inst_spawn(self, 0);
+            fn_8024D3C8(self);
+            drink = 1;
+            break;
+        }
+        if (Pl_master_ck(self) == 1) {
+            item = 0xC3;
+            entry = pl_bonus_item_weights;
+            roll = self->field_0x0B6 % 100;
+            while (entry[0] != 0xFFFF) {
+                u16 weight = entry[0];
+                if (roll < weight) {
+                    item = entry[1];
+                    break;
                 }
-                if (0) {
-    case 0xA6:
-                    self->field_0x464 = fn_8024CD8C(self, 0x4650);
-                    ef_inst_spawn(self, 6);
-                    if (Pl_master_ck(self) == 1) {
-                        pl_model_state_set(self, 1, 0x21, 0);
-                    }
-                }
-                if (0) {
-    case 0x1A:
-                    ef_inst_spawn(self, 5);
-                }
-                pl_stamina_add(self, 0x12C);
+                entry += 2;
+                roll -= weight;
             }
-            /* the drink motion heads the inner loop: `continue` re-enters it, `break` re-enters the use motion */
-            for (;;) {
-                if (self->kind_0x09 == 3) {
-                    Pl_chr_set_attr_default(self, 0x162, 4, 0);
-                } else {
-                    Pl_chr_set_attr_default(self, 0x12E, 4, 0);
-                }
-                return;
-    case 0x1C:
-                if ((self->field_0x0B6 & 1) != 0) {
-                    pl_stamina_add(self, 0x96);
-                    ef_inst_spawn(self, 5);
-                    continue;
+            result = item_get_with_msg(self, item, self->field_0x598, 3, 1);
+            switch (result) {
+            case 0:
+            case 1:
+            case 2:
+                se_item_pickup_play(item);
+                break;
+            case 3:
+                snd_item_fail_play();
+                break;
+            case 5:
+                snd_item_fail_play();
+                break;
+            default:
+                se_item_pickup_play(item);
+                break;
+            }
+        }
+        Pl_chr_set_attr_default(self, 0x134, 4, 0);
+        return;
+    case 0x91:
+        roll = self->field_0x0B6 % 100;
+        if (roll < 30) {
+            if (roll < 15) {
+                if (roll < 1) {
+                    if (self->kind_0x09 == 3) {
+                        pl_act_enter_raw(self, 6, 0x21, 0xC);
+                    } else {
+                        pl_act_enter_raw(self, 6, 0x1F, 0xC);
+                    }
+                    drink = 1;
+                    break;
                 }
                 fn_80276CE8(self, -0x96);
                 if (self->kind_0x09 == 3) {
@@ -4965,7 +5040,13 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
                     Pl_chr_set_attr_default(self, 0x134, 4, 0);
                 }
                 return;
-    case 0xF:
+            }
+            if (roll < 20) {
+                pl_gauge_ceiling_grow(self, 0x96, 0);
+                pl_health_recover(self, 0x96, 0);
+                fn_8024D3C8(self);
+                ef_inst_spawn(self, 0);
+            } else {
                 fn_80276CE8(self, 0x96);
                 self->field_0x412 = fn_8024CD8C(self, 0x1518);
                 if (Pl_master_ck(self) == 1) {
@@ -4973,133 +5054,51 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
                     fn_8024D3C8(self);
                 }
                 ef_inst_spawn(self, 5);
-                break;
-    case 0x10:
-                fn_80276CE8(self, 0x12C);
-                self->field_0x412 = fn_8024CD8C(self, 0x2A30);
-                if (Pl_master_ck(self) == 1) {
-                    pl_model_state_set(self, 1, 0x17, 0);
-                    fn_8024D3C8(self);
-                }
-                ef_inst_spawn(self, 5);
-                break;
-    case 0xD0:
-                /* item 0xD0's effect heads a loop so that item 0xD6's bonus path re-enters it */
-                for (;;) {
-                    pl_health_recover(self, 0x14, 0);
-                    ef_inst_spawn(self, 0);
-                    fn_8024D3C8(self);
-                    break;
-    case 0xD6:
-                    if (Pl_master_ck(self) == 1) {
-                        pl_item_add(self, self->field_0x306, -1);
-                    }
-                    if ((self->field_0x0B6 & 0x8000) != 0) {
-                        continue;
-                    }
-                    if (Pl_master_ck(self) == 1) {
-                        item = 0xC3;
-                        entry = pl_bonus_item_weights;
-                        roll = self->field_0x0B6 % 100;
-                        while (entry[0] != 0xFFFF) {
-                            u16 weight = entry[0];
-                            if (roll < weight) {
-                                item = entry[1];
-                                break;
-                            }
-                            entry += 2;
-                            roll -= weight;
-                        }
-                        result = item_get_with_msg(self, item, self->field_0x598, 3, 1);
-                        switch (result) {
-                        case 0:
-                        case 1:
-                        case 2:
-                            se_item_pickup_play(item);
-                            break;
-                        case 3:
-                            snd_item_fail_play();
-                            break;
-                        case 5:
-                            snd_item_fail_play();
-                            break;
-                        default:
-                            se_item_pickup_play(item);
-                            break;
-                        }
-                    }
-                    Pl_chr_set_attr_default(self, 0x134, 4, 0);
-                    return;
-                }
-                continue;
-    case 0x91:
-                roll = self->field_0x0B6 % 100;
-                if (roll < 30) {
-                    if (roll < 15) {
-                        if (roll < 1) {
-                            if (self->kind_0x09 == 3) {
-                                pl_act_enter_raw(self, 6, 0x21, 0xC);
-                            } else {
-                                pl_act_enter_raw(self, 6, 0x1F, 0xC);
-                            }
-                            continue;
-                        }
-                        fn_80276CE8(self, -0x96);
-                        if (self->kind_0x09 == 3) {
-                            Pl_chr_set_attr_default(self, 0x163, 4, 0);
-                        } else {
-                            Pl_chr_set_attr_default(self, 0x134, 4, 0);
-                        }
-                        return;
-                    }
-                    if (roll < 20) {
-                        pl_gauge_ceiling_grow(self, 0x96, 0);
-                        pl_health_recover(self, 0x96, 0);
-                        fn_8024D3C8(self);
-                        ef_inst_spawn(self, 0);
-                    } else {
-                        fn_80276CE8(self, 0x96);
-                        self->field_0x412 = fn_8024CD8C(self, 0x1518);
-                        if (Pl_master_ck(self) == 1) {
-                            pl_model_state_set(self, 1, 0x17, 0);
-                            fn_8024D3C8(self);
-                        }
-                        ef_inst_spawn(self, 5);
-                    }
-                } else if (roll < 70) {
-                    if (roll < 50) {
-                        if (pl_defense_up_set(self, 1, 0x28) == 1) {
-                            self->field_0x44E = fn_8024CD8C(self, 0x1518);
-                        }
-                        fn_8024D3C8(self);
-                        ef_inst_spawn(self, 2);
-                    } else {
-                        pl_attack_up_set(self, 1, 0xA);
-                        self->field_0x44A = fn_8024CD8C(self, 0x1518);
-                        fn_8024D3C8(self);
-                        ef_inst_spawn(self, 1);
-                    }
-                } else {
-                    pl_health_recover(self, 0x28, 0);
-                    fn_8024D3C8(self);
-                    ef_inst_spawn(self, 0);
-                }
-                break;
-    case 0x158:
-                fn_8024D3C8(self);
-                fn_80264274(self, 0xA);
-                if ((self->field_0x0B6 & 1) != 0) {
-                    pl_gauge_ceiling_grow(self, 0xA, 0);
-                }
-                if (self->kind_0x09 == 3) {
-                    Pl_chr_set_attr_default(self, 0x163, 4, 0);
-                } else {
-                    Pl_chr_set_attr_default(self, 0x134, 4, 0);
-                }
-                return;
             }
+        } else if (roll < 70) {
+            if (roll < 50) {
+                if (pl_defense_up_set(self, 1, 0x28) == 1) {
+                    self->field_0x44E = fn_8024CD8C(self, 0x1518);
+                }
+                fn_8024D3C8(self);
+                ef_inst_spawn(self, 2);
+            } else {
+                pl_attack_up_set(self, 1, 0xA);
+                self->field_0x44A = fn_8024CD8C(self, 0x1518);
+                fn_8024D3C8(self);
+                ef_inst_spawn(self, 1);
+            }
+        } else {
+            pl_health_recover(self, 0x28, 0);
+            fn_8024D3C8(self);
+            ef_inst_spawn(self, 0);
         }
+        break;
+    case 0x158:
+        fn_8024D3C8(self);
+        fn_80264274(self, 0xA);
+        if ((self->field_0x0B6 & 1) != 0) {
+            pl_gauge_ceiling_grow(self, 0xA, 0);
+        }
+        if (self->kind_0x09 == 3) {
+            Pl_chr_set_attr_default(self, 0x163, 4, 0);
+        } else {
+            Pl_chr_set_attr_default(self, 0x134, 4, 0);
+        }
+        return;
+    default:
+        return;
     }
+    if (drink != 0) {
+        pl_item_drink_motion(self);
+        return;
+    }
+    if (self->kind_0x09 == 3) {
+        Pl_chr_set_attr_default(self, 0x162, 4, 0);
+    } else {
+        Pl_chr_set_attr_default(self, 0x133, 4, 0);
+    }
+    fn_8024CA50(self, 0);
 }
 #pragma opt_common_subs reset
 
@@ -12789,45 +12788,47 @@ extern "C" void fn_8025E448(_PLW* self) {
                 }
                 break;
             }
-            if (0) {
+            prompt = 0;
+            icon = 0;
+            break;
         case 6:
-                if (PlayMode_ck() != 2 && pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
-                    prompt = 5;
-                    if (fn_8025E298(self, 0x80, 0xFE) == 1) {
-                        icon = 5;
-                    }
-                    break;
+            if (PlayMode_ck() != 2 && pl_item_menu_open_ck(self) != 1 && Pl_act_ck(self, 0, 0x57) != 1) {
+                prompt = 5;
+                if (fn_8025E298(self, 0x80, 0xFE) == 1) {
+                    icon = 5;
                 }
-                if (0) {
-        case 10:
-                    if (pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 &&
-                        Pl_act_ck(self, 0, 0x58) != 1 && Pl_act_ck(self, 0xC, 0xA) != 1) {
-                        prompt = 9;
-                        if (fn_8025E298(self, 0x80, 0xFE) == 1) {
-                            icon = 9;
-                        }
-                        if (fn_8025E298(self, 0xC, 0xA) == 1) {
-                            icon = 9;
-                        }
-                        break;
-                    }
-                    if (0) {
-        case 16:
-                        prompt = 0xB;
-                        icon = 0xB;
-                        break;
-        case 17:
-                        prompt = 0xC;
-                        icon = 0xC;
-                        break;
-        case 7:
-                        prompt = 0xD;
-                        icon = 0xD;
-                        break;
-                    }
-                }
+                break;
             }
-            /* fallthrough */
+            prompt = 0;
+            icon = 0;
+            break;
+        case 10:
+            if (pl_item_menu_open_ck(self) != 1 && Pl_motion_input_ck(0) != 1 &&
+                Pl_act_ck(self, 0, 0x58) != 1 && Pl_act_ck(self, 0xC, 0xA) != 1) {
+                prompt = 9;
+                if (fn_8025E298(self, 0x80, 0xFE) == 1) {
+                    icon = 9;
+                }
+                if (fn_8025E298(self, 0xC, 0xA) == 1) {
+                    icon = 9;
+                }
+                break;
+            }
+            prompt = 0;
+            icon = 0;
+            break;
+        case 16:
+            prompt = 0xB;
+            icon = 0xB;
+            break;
+        case 17:
+            prompt = 0xC;
+            icon = 0xC;
+            break;
+        case 7:
+            prompt = 0xD;
+            icon = 0xD;
+            break;
         case 1:
         case 9:
         case 11:
@@ -14522,12 +14523,9 @@ s32 pl_item_use_act_pick(_PLW* self, u8* kind, u16* act, u16* arg, s32* word, u1
         break;
     case 380:
     case 384:
-        want = 1;
-        /* the 380/384 pickers share item 583's search with their own kind */
-        if (0) {
     case 583:
-            want = 5;
-        }
+        /* the 380/384 pickers share item 583's search with their own kind */
+        want = self->slot_id[slot].item_id == 583 ? 5 : 1;
         if (want == pl_stg_weapon_near_find(self, &pos, &near_id, &near_word)) {
             *word = near_id;
             static_cast<_VEC3&>(self->target_pos_0x090) = pos;
@@ -15070,6 +15068,79 @@ s32 pl_scan_act_select(_PLW* self) {
                     }
                 }
                 break;
+            case 37:
+                if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x180) != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 4:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (pl_stagger_budget_ck(self, 150) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (Pl_act_ck(self, row->id_0x00, row->key_0x02) == 1) {
+                    no_act = 1;
+                }
+                break;
+            case 5:
+                if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_frame_window_120, (VEC3*)&probe) == 0) {
+                    continue;
+                }
+                break;
+            case 6:
+                if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&probe) == 0) {
+                    continue;
+                }
+                break;
+            case 7:
+                if (pl_ground_probe_ahead(self, pl_frame_window_210, pl_frame_window_90, (VEC3*)&probe) == 0) {
+                    continue;
+                }
+                break;
+            case 10:
+                if (self->field_0x369 != 1) {
+                    continue;
+                }
+                break;
+            case 12:
+                if (pl_call_answer_ck(self) == 0) {
+                    continue;
+                }
+                break;
+            case 13:
+                if (row->id_0x00 & 0x80) {
+                    continue;
+                }
+                if (pl_stagger_budget_ck(self, 150) == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                if (self->field_0x00A == 1) {
+                    if ((u32)(self->act_no - 16) <= 1) {
+                        break;
+                    }
+                    *fired = 0;
+                    continue;
+                }
+                *fired = 0;
+                continue;
+            case 14:
+            case 26:
+                if (self->field_0x269 == 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
+            case 15:
+                if (self->field_0x269 != 0) {
+                    *fired = 0;
+                    continue;
+                }
+                break;
             case 3:
             case 24:
                 if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x180) == 0) {
@@ -15079,82 +15150,7 @@ s32 pl_scan_act_select(_PLW* self) {
                 if (row->flags_0x0E != 24) {
                     break;
                 }
-                /* row 24 shares row 16's reload test */
-                if (0) {
-                case 37:
-                    if (pl_status_bit_ck((_ENEMY_WORK*)self, 0x180) != 0) {
-                        *fired = 0;
-                        continue;
-                    }
-                    break;
-                case 4:
-                    if (row->id_0x00 & 0x80) {
-                        continue;
-                    }
-                    if (pl_stagger_budget_ck(self, 150) == 0) {
-                        *fired = 0;
-                        continue;
-                    }
-                    if (Pl_act_ck(self, row->id_0x00, row->key_0x02) == 1) {
-                        no_act = 1;
-                    }
-                    break;
-                case 5:
-                    if (pl_ground_probe_ahead(self, pl_frame_window_60, pl_frame_window_120, (VEC3*)&probe) == 0) {
-                        continue;
-                    }
-                    break;
-                case 6:
-                    if (pl_ground_probe_ahead(self, pl_frame_window_180, pl_frame_window_30, (VEC3*)&probe) == 0) {
-                        continue;
-                    }
-                    break;
-                case 7:
-                    if (pl_ground_probe_ahead(self, pl_frame_window_210, pl_frame_window_90, (VEC3*)&probe) == 0) {
-                        continue;
-                    }
-                    break;
-                case 10:
-                    if (self->field_0x369 != 1) {
-                        continue;
-                    }
-                    break;
-                case 12:
-                    if (pl_call_answer_ck(self) == 0) {
-                        continue;
-                    }
-                    break;
-                case 13:
-                    if (row->id_0x00 & 0x80) {
-                        continue;
-                    }
-                    if (pl_stagger_budget_ck(self, 150) == 0) {
-                        *fired = 0;
-                        continue;
-                    }
-                    if (self->field_0x00A == 1) {
-                        if ((u32)(self->act_no - 16) <= 1) {
-                            break;
-                        }
-                        *fired = 0;
-                        continue;
-                    }
-                    *fired = 0;
-                    continue;
-                case 14:
-                case 26:
-                    if (self->field_0x269 == 0) {
-                        *fired = 0;
-                        continue;
-                    }
-                    break;
-                case 15:
-                    if (self->field_0x269 != 0) {
-                        *fired = 0;
-                        continue;
-                    }
-                    break;
-                }
+                /* fallthrough: row 24 shares row 16 reload test */
             case 16:
                 if (pl_item_page2_ck(self) != 0 && pl_reload_needed_ck(self) == 0) {
                     *fired = 0;
@@ -15640,11 +15636,12 @@ s32 pl_scan_act_select(_PLW* self) {
                 }
                 break;
             case 248:
-                probe = pl_float_zero;
-                /* key 248 skips key 247's probe and shares its quest-result tail */
-                if (0) {
             case 247:
+                /* key 247 probes with 1.0, key 248 with 0.0; both share the quest-result tail */
+                if (row->key_0x02 == 247) {
                     probe = pl_frame_window_1;
+                } else {
+                    probe = pl_float_zero;
                 }
                 if (quest == NULL) {
                     *fired = 0;

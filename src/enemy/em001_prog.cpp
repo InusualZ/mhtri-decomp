@@ -3092,19 +3092,20 @@ void em001_act7_1F(_ENEMY_WORK *self) {
         temp_r0 = self->state_0x006;
         switch ((s32) temp_r0) {
         case 0:
-            if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                self->state_0x006++;
-            case 1:
-                if (em_busy_ck(self) == 1U) {
-                    u8 target = fn_8012D3E0_c1(self, 0);
+            if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) != 1U) {
+                break;
+            }
+            self->state_0x006++;
+        case 1:
+            if (em_busy_ck(self) == 1U) {
+                u8 target = fn_8012D3E0_c1(self, 0);
 
-                    if (target != 0xFF) {
-                        em_reaction_req_view1(self, 1, 2, target);
-                        em_state_set(self, 8, 0);
-                        break;
-                    }
-                    em_state_set(self, 1, 3);
+                if (target != 0xFF) {
+                    em_reaction_req_view1(self, 1, 2, target);
+                    em_state_set(self, 8, 0);
+                    break;
                 }
+                em_state_set(self, 1, 3);
             }
             break;
         }
@@ -3295,32 +3296,31 @@ void em001_act9_0(_ENEMY_WORK *self) {
         temp_r0 = self->state_0x006;
         switch ((s32) temp_r0) {
         case 0:
-            if (em_mot_end_ck(self) == 1U) {
-                self->state_0x006++;
-            case 1:
-                if (em_busy_ck(self) == 1U) {
-                    if ((em_team_mate_state_ck_c1(self, 1, self->field_0x382) == 1U) && (em001_area_player_near_ck(self, self->field_0x382) == 1U)) {
-                        if (--self->field_0x1E7 == 0) {
-                            if ((u8) self->team == 2) {
-                                if (em_eft_active_ck_c1(self) == 1U) {
-                                    em_state_set(self, 9, 4);
-                                    return;
-                                }
-                                em_state_set(self, 9, 3);
+            if (em_mot_end_ck(self) != 1U) {
+                return;
+            }
+            self->state_0x006++;
+        case 1:
+            if (em_busy_ck(self) == 1U) {
+                if ((em_team_mate_state_ck_c1(self, 1, self->field_0x382) == 1U) && (em001_area_player_near_ck(self, self->field_0x382) == 1U)) {
+                    if (--self->field_0x1E7 == 0) {
+                        if ((u8) self->team == 2) {
+                            if (em_eft_active_ck_c1(self) == 1U) {
+                                em_state_set(self, 9, 4);
                                 return;
                             }
-                            em_state_set(self, 9, 2);
+                            em_state_set(self, 9, 3);
                             return;
                         }
-                        em_stamina_add(self, 0x96);
-                        em_gauge_period_step_c1(self, lbl_80796E20, (s32) (lbl_80796F9C * (f32) (s32) self->field_0x7A4), 1);
-                        em_state_set(self, 9, 1);
+                        em_state_set(self, 9, 2);
                         return;
                     }
-                    em_state_set(self, 2, 6);
+                    em_stamina_add(self, 0x96);
+                    em_gauge_period_step_c1(self, lbl_80796E20, (s32) (lbl_80796F9C * (f32) (s32) self->field_0x7A4), 1);
+                    em_state_set(self, 9, 1);
+                    return;
                 }
-            } else {
-                return;
+                em_state_set(self, 2, 6);
             }
             break;
         }
@@ -3358,19 +3358,18 @@ void em001_act9_1(_ENEMY_WORK *self) {
         temp_r0_2 = self->state_0x006;
         switch ((s32) temp_r0_2) {
         case 0:
-            if (em_mot_end_ck(self) == 1U) {
-                self->state_0x006++;
-                em_mot_set(self, 0xCA, 4, 0);
-            case 1:
-                if (em_busy_ck(self) == 1U) {
-                    if ((em_team_mate_state_ck_c1(self, 1, self->field_0x382) == 1U) && (em001_area_player_near_ck(self, self->field_0x382) == 1U)) {
-                        em_state_set(self, 9, 0);
-                        return;
-                    }
-                    em_state_set(self, 2, 6);
-                }
-            } else {
+            if (em_mot_end_ck(self) != 1U) {
                 return;
+            }
+            self->state_0x006++;
+            em_mot_set(self, 0xCA, 4, 0);
+        case 1:
+            if (em_busy_ck(self) == 1U) {
+                if ((em_team_mate_state_ck_c1(self, 1, self->field_0x382) == 1U) && (em001_area_player_near_ck(self, self->field_0x382) == 1U)) {
+                    em_state_set(self, 9, 0);
+                    return;
+                }
+                em_state_set(self, 2, 6);
             }
             break;
         }
@@ -3583,16 +3582,17 @@ void em001_act13_2(_ENEMY_WORK *self) {
         temp_r0 = self->state_0x006;
         switch ((s32) temp_r0) {
         case 0:
-            if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                self->state_0x006++;
-            case 1:
-                if (em_busy_ck(self) == 1U) {
-                    if (em001_target_range_ck(self, 0) == 1U) {
-                        em_state_set(self, 0xD, 3);
-                        break;
-                    }
-                    em_state_set(self, 1, 3);
+            if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) != 1U) {
+                break;
+            }
+            self->state_0x006++;
+        case 1:
+            if (em_busy_ck(self) == 1U) {
+                if (em001_target_range_ck(self, 0) == 1U) {
+                    em_state_set(self, 0xD, 3);
+                    break;
                 }
+                em_state_set(self, 1, 3);
             }
             break;
         }

@@ -56,9 +56,11 @@
  *   the file checksums walk a `bytes` pointer (`bytes = ctl->buffer; sum = 0; bytes += 8;` then `sum += *bytes;
  *   bytes++`); the file steps reach `save_ctl` through a `ctl` pointer but read `step` directly.  The draws pass the
  *   anchor `pos` by value to `put_lsp_anchor_offset` and index a `rows` table local; their colour flags are `bool`.
- *   `plsearch_page19_step`'s step 40 shares its profile-resend and command-18 tails by putting sub-steps 1 and 2's case
- *   labels inside `if (0) { ... }` blocks after sub-step 0's body (playbook 241); `save_nand_read_step` breaks out of
- *   its result switch into the one failure report after it.
+ *   `plsearch_page19_step`'s step 40 writes the profile-resend and command-18 tails out in each sub-step that
+ *   reaches them (retail shares them: sub-steps 0 and 1 branch forward into the resend, 0, 1 and 2 into the
+ *   request): 92.9 % at 2268 B against 2140 B; one `do { switch } while (0)` holding both tails after the switch
+ *   measures 90.9 % at 2148 B (the tails land after sub-step 4 where retail has them between sub-steps 2 and 3);
+ *   `save_nand_read_step` breaks out of its result switch into the one failure report after it.
  */
 
 #include "types.h"
@@ -3099,29 +3101,42 @@ s32 plsearch_page19_step(MenuSlot* slot) {
                 requestFriendSync(&slot->net_result_0x320);
                 break;
             }
-            /* The friend sync is not needed: straight on to the profile resend below. */
-            if (0) {
+            slot->field_0x002 = 2;
+            if (menu_work.slot[0].field_0x31E != 0) {
+                resendProfileRecord(&slot->net_result_0x320);
+                break;
+            }
+            args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
+            if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
+                ret = 3;
+            } else {
+                slot->field_0x002 = 3;
+            }
+            break;
         case 1:
-                if (slot->net_result_0x320 == 0) {
-                    break;
-                }
-                if (slot->net_result_0x320 != 1) {
-                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
-                }
+            if (slot->net_result_0x320 == 0) {
+                break;
+            }
+            if (slot->net_result_0x320 != 1) {
+                set_option_cfg(27, menu_work.slot[0].field_0x31F);
             }
             slot->field_0x002 = 2;
             if (menu_work.slot[0].field_0x31E != 0) {
                 resendProfileRecord(&slot->net_result_0x320);
                 break;
             }
-            /* No profile to resend: straight on to the command 18 request below. */
-            if (0) {
-        case 2:
-                if (slot->net_result_0x320 == 0) {
-                    break;
-                }
-                menu_work.slot[0].field_0x31E = 0;
+            args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
+            if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
+                ret = 3;
+            } else {
+                slot->field_0x002 = 3;
             }
+            break;
+        case 2:
+            if (slot->net_result_0x320 == 0) {
+                break;
+            }
+            menu_work.slot[0].field_0x31E = 0;
             args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
             if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
                 ret = 3;

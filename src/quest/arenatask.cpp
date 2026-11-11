@@ -87,11 +87,17 @@
  *     swapped (r19/r23 against retail's r23/r19) and the network picker loop's counter, slot and pad
  *     pointers one register off; no declaration order reaches more (`regsim search --no-edits`: the current
  *     order is best, 12/23 callee-saved), and the stage index loads its operands into r3/r0 swapped.
- *   - `arena_task`: the Vs start (`arena_vs_mode_enter`) is one block in retail that step 0's online re-entry
- *     jumps forward into and step 1's won result falls into, and step 1's other results (-1, 2) are laid out
- *     after it.  Goto-free, steps 0 and 1 share one `do { } while (0)` (step 1's label inside it) whose
- *     `break` reaches the Vs start after the loop; the result -1/2 chain then sits inside the loop ahead of
- *     the Vs start (44 B moved; no goto-free construct jumps from inside the loop past the code after it).
+ *   - `arena_task`: the Vs start (`arena_vs_mode_enter`, inline) is one block in retail that step 0's online
+ *     re-entry jumps forward into and step 1's won result falls into, and step 1's other results (-1, 2) are
+ *     laid out after it.  Case-label-free, steps 0 and 1 re-dispatch to a pseudo-step 6 (`step = 6; continue;`
+ *     in a `for (;;)` around the switch) that holds the one Vs start between step 1 and step 2: 86.6 %, 1488 B
+ *     against 1484 B.  The dump (`mwcc_debugger.py`, dump 09 after-loop-code-motion) shows the loop making a
+ *     preheader (B128) that hoists the `arena_draw_func`, `system_w` and zero constants into callee-saved
+ *     registers, so the prologue saves `_savegpr_24` where retail stores r29-r31, and the dispatcher gains a
+ *     `cmpwi 6`; `opt_loop_invariants`/`opt_common_subs`/`opt_propagation`/`opt_dead_code`/
+ *     `opt_strength_reduction off` and `optimization_level 1/2` measure the same or worse.  A `do { switch }
+ *     while (0)` whose tail follows the switch measures 66.7 % (the tail lands after step 5); duplicating the
+ *     inline Vs start in steps 0 and 1 measures 83.2 % (1732 B).
  *     The other residual: `player_count_set`'s owner parameter is `u8`, so ours narrows the `s8` count
  *     (`clrlwi`) and tests it in r0 where retail passes the `extsb` result in r3 (u8/s32 locals score the same).
  *   - `arena_result_next`: compiled at `optimization_level 4` (the unroller's `li 2` for the item loop's
@@ -771,19 +777,21 @@ static inline void arena_vs_mode_enter(ArenaWork* work) {
 extern "C" void arena_task(TaskSlot* task) {
     ArenaWork* work = &arena_work;
     s32 result;
+    s32 step = task->step_0x08;
 
-    switch (task->step_0x08) {
+    for (;;) {
+    switch (step) {
     case 0:
         if (file_loading_ck(NULL, NULL) == 1) {
             break;
         }
-        /* the online Vs re-entry and a won result both leave through the Vs start after the loop */
-        do {
+        {
             if (system_w.net_session_0x90f == 0) {
                 system_w.vs_mode_0x8b0 = 1;
                 if (system_w.online_0x8ae == 1 && work->sub_mode_0x4E == 3) {
                     arena_cfg_apply(0);
-                    break;
+                    step = 6;
+                    continue;
                 }
             } else {
                 s8 server = (s8)NetCtrlWk::getSelectedServer();
@@ -825,6 +833,7 @@ extern "C" void arena_task(TaskSlot* task) {
             set_com_motion_type(3);
             title_se_load();
             return;
+        }
     case 1:
             nwMoveStart();
             prim_init_all();
@@ -857,7 +866,8 @@ extern "C" void arena_task(TaskSlot* task) {
                     GameModeExec();
                     return;
                 }
-                break;
+                step = 6;
+                continue;
             } else if (result == -1) {
                 task->step_0x08 = 3;
                 bgm_stop_all();
@@ -865,7 +875,7 @@ extern "C" void arena_task(TaskSlot* task) {
                 task->step_0x08 = 2;
             }
             return;
-        } while (0);
+    case 6:
         arena_vs_mode_enter(work);
         break;
     case 2:
@@ -928,6 +938,8 @@ extern "C" void arena_task(TaskSlot* task) {
         PlayMode_set(4);
         GameModeExec();
         break;
+    }
+    break;
     }
 }
 

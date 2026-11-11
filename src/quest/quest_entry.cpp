@@ -61,9 +61,12 @@
  *    backwards from the failed and goal -1 tests.  The first two share it through one `||` condition (one extra `b`,
  *    the tail after the second test); the goal -1 site keeps its own copy, because the first check's false exits
  *    would have to jump into the middle of a loop headed by the tail (a one-case switch materialises the `&&`
- *    chain's value).  The clear tail is the head of a loop in a one-case `switch (goal)` whose `default:` is the
- *    rest of the hunt step (the window clear `continue`s to it), and arena id 2's item wait `continue`s to the
- *    area hand-off the same way; id 4's test ends `bne`+`b` where retail has `beq`+`b`.
+ *    chain's value).  Retail's clear tail is the head of a loop whose body is the rest of the hunt step (the window
+ *    clear and the goal 1 case jump back to it), and arena id 2's item wait jumps back to the area hand-off the same
+ *    way; case-label-free, both are `do { switch } while (0)` blocks with the shared call after the switch and
+ *    `continue` skipping it, so the clear and the hand-off sit after the hunt body instead of before it (86.7 %,
+ *    2940 B against 2832 B; a single call per site duplicates the inline clear, 86.3 % at 3148 B); id 4's test ends
+ *    `bne`+`b` where retail has `beq`+`b`.
  *  - quest_intruder_step, quest_successive_step: retail re-tests the variant rank after its scan as `clrlwi` of
  *    the kept byte; ours reloads the byte (`lbz`); a u8/u16/s32/u32 `rank`, a `(u8)` re-test and a separate found
  *    byte do not reproduce it.
@@ -3510,129 +3513,127 @@ void quest_main_step(void) {
                 item->entry_send_0x6A3A[3] = 4;
             }
         }
-        /* goal 1 clears the quest; the time-out's window clear comes back to the same tail (the loop's head) */
+        /* goal 1 clears the quest; the time-out's window clear shares the clear after the switch */
+        do {
         switch (goal) {
         case 1:
-            for (;;) {
-                quest_main_step_clear(item, work);
-                break;
-            default:
-                quest_clock_step(1);
-                if (item->time_warned_0x6A39 == 0) {
-                    mark = item->time_total_0x1C;
-                    if (mark - 10 >= item->time_limit_0x24) {
-                        sprintf(text, quest_str_tbl_35_get(7), (s32)((f32)mark / (60.0f * Screen_w.frame_scale)));
-                        hud_msg_push(0, text);
-                        item->time_warned_0x6A39 = 1;
-                    }
+            break;
+        default:
+            quest_clock_step(1);
+            if (item->time_warned_0x6A39 == 0) {
+                mark = item->time_total_0x1C;
+                if (mark - 10 >= item->time_limit_0x24) {
+                    sprintf(text, quest_str_tbl_35_get(7), (s32)((f32)mark / (60.0f * Screen_w.frame_scale)));
+                    hud_msg_push(0, text);
+                    item->time_warned_0x6A39 = 1;
                 }
-                left = quest_time_elapsed_get();
-                if (left <= 0) {
-                    if (quest_element_window_check((QuestWork*)item) == 1) {
-                        item->entry_send_0x6A3A[0] = 1;
-                        item->entry_send_0x6A3A[2] = 3;
-                        item->entry_send_0x6A3A[3] = 4;
-                        system_copy_filter_request();
-                        continue;
-                    }
-                    quest_work_ptr->entry_send_0x6A3A[2] = 5;
-                    if (isServerSelectState() == 0) {
-                        quest_result_enter(item, work, 1);
-                    } else {
-                        lb_entry_start_default((struct LbCompanionWork*)item, 1, item->time_limit_0x24);
-                    }
+            }
+            left = quest_time_elapsed_get();
+            if (left <= 0) {
+                if (quest_element_window_check((QuestWork*)item) == 1) {
+                    item->entry_send_0x6A3A[0] = 1;
+                    item->entry_send_0x6A3A[2] = 3;
+                    item->entry_send_0x6A3A[3] = 4;
+                    system_copy_filter_request();
                     break;
                 }
-                if ((quest_flag_8_ck(NULL) != 1 || (work->field_0xFB != 6 && work->field_0xFB != 4)) && item->time_class_0x6A38 > 0) {
-                    mark = quest_time_class_tbl[item->time_class_0x6A38];
-                    if ((f32)left <= 60.0f * Screen_w.frame_scale * (f32)mark) {
-                        sprintf(text, quest_str_tbl_35_get(6), mark);
-                        hud_msg_push(0, text);
-                        item->time_class_0x6A38--;
-                    }
+                quest_work_ptr->entry_send_0x6A3A[2] = 5;
+                if (isServerSelectState() == 0) {
+                    quest_result_enter(item, work, 1);
+                } else {
+                    lb_entry_start_default((struct LbCompanionWork*)item, 1, item->time_limit_0x24);
                 }
-                quest_supply_drop_step();
-                switch ((s8)item->area_state_0x6A28) {
-                case 0:
-                    if (item->count_0x6A2A == 2) {
-                        break;
-                    }
+                continue;
+            }
+            if ((quest_flag_8_ck(NULL) != 1 || (work->field_0xFB != 6 && work->field_0xFB != 4)) && item->time_class_0x6A38 > 0) {
+                mark = quest_time_class_tbl[item->time_class_0x6A38];
+                if ((f32)left <= 60.0f * Screen_w.frame_scale * (f32)mark) {
+                    sprintf(text, quest_str_tbl_35_get(6), mark);
+                    hud_msg_push(0, text);
+                    item->time_class_0x6A38--;
+                }
+            }
+            quest_supply_drop_step();
+            switch ((s8)item->area_state_0x6A28) {
+            case 0:
+                if (item->count_0x6A2A == 2) {
+                    break;
+                }
+                do {
                     switch (item->arena_items_0x6A2C[item->count_0x6A2A].id) {
                     case 3:
                         if ((quest_row394_get(1) & 2) && quest_element_pick_ck((QuestWork*)item, 1, 1) == 1) {
-                            /* monster 1 is picked: on to the area hand-off past the other ids' tests */
-                            if (0) {
+                            break;
+                        }
+                        continue;
                     case 4:
-                                if (!((quest_row394_get(2) & 2) && quest_element_pick_ck((QuestWork*)item, 2, 1) == 1)) {
-                                    break;
-                                }
-                            }
-                            /* monster 2 is picked: on to the area hand-off past id 1's test */
-                            if (0) {
+                        if ((quest_row394_get(2) & 2) && quest_element_pick_ck((QuestWork*)item, 2, 1) == 1) {
+                            break;
+                        }
+                        continue;
                     case 1:
-                                if (item->arena_items_0x6A2C[item->count_0x6A2A].remaining != 0) {
-                                    break;
-                                }
-                            }
-                            /* the hand-off is the loop's head, so id 2's item wait comes back to it */
-                            for (;;) {
-                                quest_main_step_area_next(item);
-                                break;
+                        if (item->arena_items_0x6A2C[item->count_0x6A2A].remaining == 0) {
+                            break;
+                        }
+                        continue;
                     case 2:
-                                switch ((s8)item->flag_0x6A29) {
-                                case 0:
-                                    players = (struct _PLW*)get_move_work_adrs(2);
-                                    if (players == NULL) {
-                                        break;
-                                    }
-                                    {
-                                        u16 timer = Pl_item_timer_get(&players[(s8)my_player_no()],
-                                                                      item->arena_items_0x6A2C[item->count_0x6A2A].count);
-                                        if (timer == 0 || item->arena_items_0x6A2C[item->count_0x6A2A].remaining < timer) {
-                                            break;
-                                        }
-                                    }
-                                    lb_sub14_send(item->count_0x6A2A);
-                                    item->flag_0x6A29 = 1;
-                                case 1:
-                                    item->flag_0x6A29 = 0;
+                        switch ((s8)item->flag_0x6A29) {
+                        case 0:
+                            players = (struct _PLW*)get_move_work_adrs(2);
+                            if (players == NULL) {
+                                continue;
+                            }
+                            {
+                                u16 timer = Pl_item_timer_get(&players[(s8)my_player_no()],
+                                                              item->arena_items_0x6A2C[item->count_0x6A2A].count);
+                                if (timer == 0 || item->arena_items_0x6A2C[item->count_0x6A2A].remaining < timer) {
                                     continue;
                                 }
-                                break;
                             }
+                            lb_sub14_send(item->count_0x6A2A);
+                            item->flag_0x6A29 = 1;
+                        case 1:
+                            item->flag_0x6A29 = 0;
+                            break;
+                        default:
+                            continue;
                         }
                         break;
+                    default:
+                        continue;
                     }
-                    break;
-                case 2:
-                    item->area_state_0x6A28++;
-                    break;
-                case 3:
-                    if (file_loading_ck(NULL, NULL) != 1) {
-                        quest_area_spawn_setup(work, item->area_0x69A8, item->area_count_0x69A5, item->count_0x6A2A);
-                        item->area_state_0x6A28 = 0;
-                        item->flag_0x6A29 = 0;
-                    }
-                    break;
-                }
-                quest_finish_step();
-                if (quest_flag_4000000_ck(NULL) == 1) {
-                    quest_successive_step(work);
-                } else if ((u8)quest_field32C_ck(NULL) == 1 || quest_flag_100_ck(NULL) == 1) {
-                    quest_intruder_step();
-                }
-                item->frame_count_0x28++;
-                if ((item->frame_count_0x28 & 0x1F) == 0) {
-                    for (i = 0; i < 3; i++) {
-                        if (quest_element_pick_ck((QuestWork*)item, i, 0) == 1 && quest_element_pick_ck((QuestWork*)item, i, 1) == 0) {
-                            lb_sub16_send(0x20, i);
-                        }
-                    }
+                    quest_main_step_area_next(item);
+                } while (0);
+                break;
+            case 2:
+                item->area_state_0x6A28++;
+                break;
+            case 3:
+                if (file_loading_ck(NULL, NULL) != 1) {
+                    quest_area_spawn_setup(work, item->area_0x69A8, item->area_count_0x69A5, item->count_0x6A2A);
+                    item->area_state_0x6A28 = 0;
+                    item->flag_0x6A29 = 0;
                 }
                 break;
             }
-            break;
+            quest_finish_step();
+            if (quest_flag_4000000_ck(NULL) == 1) {
+                quest_successive_step(work);
+            } else if ((u8)quest_field32C_ck(NULL) == 1 || quest_flag_100_ck(NULL) == 1) {
+                quest_intruder_step();
+            }
+            item->frame_count_0x28++;
+            if ((item->frame_count_0x28 & 0x1F) == 0) {
+                for (i = 0; i < 3; i++) {
+                    if (quest_element_pick_ck((QuestWork*)item, i, 0) == 1 && quest_element_pick_ck((QuestWork*)item, i, 1) == 0) {
+                        lb_sub16_send(0x20, i);
+                    }
+                }
+            }
+            continue;
         }
+        quest_main_step_clear(item, work);
+        } while (0);
         break;
     case 2:
         quest_clock_step(1);

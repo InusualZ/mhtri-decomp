@@ -26,12 +26,15 @@
  * RESIDUALS.
  *  - `pl_rig_kind2/4_pose` reach their shared pose blocks goto-free (idea 183's `do { switch } while (0)`, kind4's
  *    keyed-pose exit as an inline helper's `return`, idea 219).  `pl_rig_kind8_pose`: cases 0x462 (leaning) and 0x465
- *    reach case 0x463's lowered grip through an `if (0)` block holding cases 0x464/0x465 (idea 241); case 0x464's
- *    branch into the middle of case 0x463 (the turned-back head) crosses that interval, so its copy stays inlined
+ *    reach case 0x463's lowered grip by falling through case 0x465's test (false while leaning, so 2 redundant
+ *    instructions) with case 0x464 moved ahead of them (92.2 %, 1616 B against 1584 B; the block-duplicating
+ *    spelling measures 85.2 %); case 0x464's branch into the middle of case 0x463 (the turned-back head)
+ *    crosses that interval, so its copy stays inlined
  *    (9 instructions, and case 0x463 reuses `0.0f` in a register where retail reloads it at the join); the default's
  *    stage test sits before the resting pose instead of after it (the resting pose is the switch's break target).
- *    `pl_rig_kind0_pose` reaches case 0x44D's charge stretch from cases 0x468/0x46F/0x48E through nested `if (0)`
- *    blocks (idea 241);
+ *    `pl_rig_kind0_pose` reaches case 0x44D's charge stretch from cases 0x468/0x46F/0x48E/0x494 through one merged
+ *    case whose frame-check constant is a ternary on `motion` (95.3 %, 1400 B against 1452 B; retail tests each
+ *    case with its own `Pl_frame_check_alt` call, and an inner `switch` of four calls measures 93.1 % at 1452 B);
  *  - `lb_ship_holds_fill`: retail reloads the seed for the second roll test as well as recomputing `% 100` (the
  *    `(s32)` cast on the first test stops only the `% 100` reuse), and colours its counters one register apart;
  *    retail does not sign-extend `weight_table_index`'s result (an `s32` return in the declaration measures +4 B
@@ -4307,27 +4310,15 @@ extern "C" void pl_rig_kind0_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
             }
             break;
         case 0x468:
-            if (leaning == 0 && Pl_frame_check_alt(plw, 2, 50.0f, 0.0f) != 1) {
-                break;
-            }
-            /* each frame-checked motion below skips the later checks to the charge stretch */
-            if (0) {
         case 0x46F:
-                if (leaning == 0 && Pl_frame_check_alt(plw, 2, 56.0f, 0.0f) != 1) {
-                    break;
-                }
-                if (0) {
         case 0x48E:
-                    if (leaning == 0 && Pl_frame_check_alt(plw, 2, 54.0f, 0.0f) != 1) {
-                        break;
-                    }
-                    if (0) {
         case 0x494:
-                        if (leaning == 0 && Pl_frame_check_alt(plw, 2, 70.0f, 0.0f) != 1) {
-                            break;
-                        }
-                    }
-                }
+            /* each frame-checked motion waits for its own frame before the charge stretch */
+            if (leaning == 0 &&
+                Pl_frame_check_alt(plw, 2,
+                                   motion == 0x468 ? 50.0f : motion == 0x46F ? 56.0f : motion == 0x48E ? 54.0f : 70.0f,
+                                   0.0f) != 1) {
+                break;
             }
         case 0x492:
         case 0x47E:
@@ -4771,31 +4762,28 @@ extern "C" void pl_rig_kind8_pose(PlSeRig* rig, _PLW* plw, PlSeAttach* attach, u
                 pl_rig_key_tilt_lerp(plw, pl_rig_k8_458_head, head);
                 attach->adj_0x014[2].trans_0x0C.z = pl_rig_key_get(plw, pl_rig_k8_458_lift);
                 return;
+            case 0x496:
+            case 0x464:
+                pl_rig_key_scale_lerp(plw, pl_rig_k8_464_grip, grip);
+                pl_rig_head_back_set(attach, head);
+                return;
             case 0x494:
             case 0x462:
-                if (leaning != 0) {
-                    if (Pl_act_ck(plw, 4, 25) != 1 && Pl_act_ck(plw, 4, 75) != 1) {
-                        continue;
-                    }
-                } else {
+                if (leaning == 0) {
                     pl_rig_key_scale_lerp(plw, pl_rig_k8_462_grip, grip);
                     pl_rig_head_back_set(attach, head);
                     return;
                 }
-                /* the leaning, grip-checked pose skips the next two motions to the lowered grip */
-                if (0) {
-            case 0x496:
-            case 0x464:
-                    pl_rig_key_scale_lerp(plw, pl_rig_k8_464_grip, grip);
-                    pl_rig_head_back_set(attach, head);
-                    return;
+                if (Pl_act_ck(plw, 4, 25) != 1 && Pl_act_ck(plw, 4, 75) != 1) {
+                    continue;
+                }
+                /* a leaning grip-checked pose falls through the 0x465 test (false while leaning) to the lowered grip */
             case 0x497:
             case 0x465:
-                    if (leaning == 0) {
-                        pl_rig_key_scale_lerp(plw, pl_rig_k8_465_grip, grip);
-                        pl_rig_key_tilt_lerp(plw, pl_rig_k8_465_head, head);
-                        return;
-                    }
+                if (leaning == 0) {
+                    pl_rig_key_scale_lerp(plw, pl_rig_k8_465_grip, grip);
+                    pl_rig_key_tilt_lerp(plw, pl_rig_k8_465_head, head);
+                    return;
                 }
             case 0x495:
             case 0x463:
