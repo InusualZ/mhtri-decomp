@@ -46,11 +46,20 @@
  *    loop's saved registers differently (declaration order searched), which also lets ours reuse a row word retail
  *    reloads (`lhz r0,0(r5)`, 4 B short);
  *  - `pl_act_fishing`: `count` and `bite` take each other's registers (declaration order searched);
- *  - `pl_act_net_hook_main`: item 0x91's three fortune arms branch into the middle of item 0x1C's else arm, to item
- *    0xF's start and to item 0x179's start (walls, playbook 213: from inside the drink-motion loop only `continue`
- *    and `break` exist, so a third head loses more sites than it gains - measured 96.13 % with a loop headed at 0x179
- *    around the drink loop and 0x91 outside it, equal to the kept shape); ours repeats the three bodies (5816 B vs
- *    5600);
+ *  - `pl_act_net_hook_main` (5952 B vs 5600): retail lays the use motion after item 0x2C's effect and the drink motion
+ *    after item 0x1A's stamina and jumps to them from every later item (walls, playbook 213: no loop holds the heads
+ *    without case labels inside it); ours puts the use motion after the switch and tests a flag for the drink
+ *    motion.  mwcc-debugger (Wii/1.3 stand-in, `regalloc-gpr-pass-1-assigned`): the flag keeps `level` live across the
+ *    whole switch, so the shared `li 0` that stores 0 to `+0x3EA` (retail reads it from `level`'s register r29, the
+ *    web being provably 0 there) becomes a separate callee-saved temp that conflicts with self/me/partner/level and
+ *    takes r27: `_savegpr_27` for retail's four `stw`, and every later register one lower.  A separate `drink`
+ *    local measures 88.2 %, a `volatile` one 89.0 %, an inline helper per drink site 84.9 % (6316 B), `item` merged
+ *    into `level` 88.8 %;
+ *  - `pl_act_net_hook_b`: case 0x17F sits between case 2 and the 0x246/0x34 arm as in retail; case 2's fall-through
+ *    skips it through a `field_0x306 == 0x17F` test (3 instructions, 12 B over);
+ *  - `pl_gather_item_take`: retail dispatches `cmplwi 2; ble` then `cmpwi 3` and `cmpwi 5` (0-2 pickup, 3 fail, each
+ *    jumping to the bonus check); results 0-3 under one label dispatch as `cmplwi 3; ble`.  Separate `case 3:` with a
+ *    result test 89.6 %, the bonus check after the switch 72.6 %;
  *  - `pl_guard_ck`: the allocator gives the scan-row pointer and the weapon kind other registers;
  *  - `pl_act_step_offhand_gesture`: `.text`, extab and extabindex are byte-identical; the target's extabindex
  *    `R_PPC_ADDR32` names dtk's `@etb_80011EFC` where MWCC writes its own local, which no source reaches;
@@ -106,17 +115,18 @@
  *  - a case that retail enters by branching forward into a later case's code is written case-label-free: the
  *    shared tail is duplicated (`pl_act_fishing` grade 1 into the 2/3 grade's tail, `pl_act_net_hook_main` items
  *    0x168/0xD/0x2C and 0x14B/0x14C, `fn_8025E448` roster cases 8/6/10 into the default clear, `pl_act_net_hook_b` arm
- *    0x17F), merged under one label with a field test (`pl_gather_item_take` results 0-3, `pl_item_use_act_pick` items
- *    380/384/583, `pl_scan_act_select` keys 247/248) or reordered so the first case falls into the second (rows 37..15
+ *    0x17F, now a fall-through guard), merged under one label with a field test (`pl_gather_item_take` results 0-3,
+ *    `pl_item_use_act_pick` items 380/384/583, `pl_scan_act_select` keys 247/248), kept in retail's order with a guard on
+ *    a local that is live anyway (`pl_act_fishing`: `item` is 0 on the direct entry to the 2/3 grade, 0x1A when grade 1
+ *    falls in, so the 2/3 prefix tests `item != 0x1A`: 12 B over) or reordered so the first case falls into the second (rows 37..15
  *    before rows 3/24 and row 16 in `pl_scan_act_select`).  Each is measured below the `if (0)` form it replaces
- *    (retail keeps one copy and jumps; `pl_gather_item_take` 97.2 %, `pl_act_fishing` 90.2 %, `fn_8025E448` 98.0 %,
- *    `pl_act_net_hook_b` 97.1 %, `pl_scan_act_select` 97.8 %, `pl_item_use_act_pick` 99.7 %: the duplicated or
+ *    (retail keeps one copy and jumps; `pl_gather_item_take` 97.2 %, `pl_act_fishing` 99.4 %, `fn_8025E448` 98.0 %,
+ *    `pl_act_net_hook_b` 97.9 %, `pl_scan_act_select` 97.8 %, `pl_item_use_act_pick` 99.7 %: the duplicated or
  *    re-ordered code shifts the later branches);
  *  - `pl_act_net_hook_main` ends every item in the use motion (`0x162`/`0x133` + `fn_8024CA50`), which retail lays out
  *    after item 0x2C's effect and re-enters from each later item; here the cases `break` to one copy after the switch
  *    and `default` returns, so the tail sits last instead of in the middle.  The stamina items that end in the drink
- *    motion (`0x162`/`0x12E`) set a `drink` flag the tail tests (the flag takes a callee-saved register retail does
- *    not use: `_savegpr_27` for retail's four `stw`; an inline helper per site grows the function by 8 copies instead);
+ *    motion (`0x162`/`0x12E`) set `level = 1`, which the tail tests (`level` is a recovery amount in the other items);
  *    item 0xD6's bonus path repeats item 0xD0's effect, and its bonus-item result is one `switch` whose
  *    `case 0: case 1: case 2:` run lowers to the unsigned `cmplwi r0,2; ble` range test;
  *  - a stepped field takes a typed constant through a compound assignment (`field -= (u16)0x300`), which stores the
@@ -3413,6 +3423,7 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
         if (pl_part_flag_ck(self, 9) != 1 && self->field_0x5B8 < limit) {
             break;
         }
+        item = 0;
         switch (self->field_0x5BA) {
         case 0:
             pl_model_state_set(self, 1, 0xD, 0);
@@ -3455,34 +3466,17 @@ extern "C" void pl_act_fishing(_PLW* self, s32 variant) {
                 }
                 return;
             }
-            big = fn_8024AA04(self->field_0x306) == 2;
-            if (self->field_0x007 == 0) {
-                pl_fish_se_result(self->field_0x5BA | 0x80, &self->vec_0x03C, big);
-                pl_act_enter(self, 0, 0x24, 0);
-            } else {
-                pl_fish_se_result(self->field_0x5BA, &self->vec_0x03C, big);
-                if (variant == 1 || variant == 3) {
-                    if (self->field_0x007 == 1) {
-                        pl_act_enter(self, 0, 0x73, 0);
-                    } else {
-                        pl_act_enter(self, 0, 0xA2, 0);
-                    }
-                } else if (self->field_0x007 == 1) {
-                    pl_act_enter(self, 0, 0x74, 0);
-                } else {
-                    pl_act_enter(self, 0, 0xA3, 0);
-                }
-            }
-            return;
         case 2:
         case 3:
-            pl_item_add(self, 0x1D, -1);
-            if (Pl_master_ck(self) == 1) {
-                lb_event_request(7);
-            }
-            if ((u32)item_get_with_msg(self, 0x1A, self->field_0x598, 9, 1) > 1) {
-                if (self->field_0x007 != 0) {
-                    self->field_0x007++;
+            if (item != 0x1A) {
+                pl_item_add(self, 0x1D, -1);
+                if (Pl_master_ck(self) == 1) {
+                    lb_event_request(7);
+                }
+                if ((u32)item_get_with_msg(self, 0x1A, self->field_0x598, 9, 1) > 1) {
+                    if (self->field_0x007 != 0) {
+                        self->field_0x007++;
+                    }
                 }
             }
             big = fn_8024AA04(self->field_0x306) == 2;
@@ -4320,6 +4314,11 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
             break;
         }
         /* fallthrough: a cat-skill actor ends in the 0x246/0x34 arm */
+    case 0x17F:
+        if (self->field_0x306 == 0x17F) {
+            shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
+            break;
+        }
     case 0x246:
     case 0x34:
         if (!in_act) {
@@ -4327,9 +4326,6 @@ extern "C" void pl_act_net_hook_b(_PLW* self) {
         } else {
             shell_set_func_ptr->method_0x34(self, 6, shell_set_func_ptr);
         }
-        break;
-    case 0x17F:
-        shell_set_func_ptr->method_0x34(self, 0x10, shell_set_func_ptr);
         break;
     case 0x1:
         if (Pl_cat_skill_ck(self, 5) != 1) {
@@ -4540,7 +4536,6 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
     u16* entry;
     u16 roll;
     s16 result;
-    s32 drink = 0;
 
     me = my_player_work_get();
     self->field_0x65F = 0xF;
@@ -4913,7 +4908,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
     case 0x1B:
         pl_stamina_add(self, 0x96);
         ef_inst_spawn(self, 5);
-        drink = 1;
+        level = 1;
         break;
     case 0xA7:
         self->field_0x466 = fn_8024CD8C(self, 0x4650);
@@ -4922,7 +4917,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             pl_model_state_set(self, 1, 0x22, 0);
         }
         pl_stamina_add(self, 0x12C);
-        drink = 1;
+        level = 1;
         break;
     case 0xA6:
         self->field_0x464 = fn_8024CD8C(self, 0x4650);
@@ -4931,18 +4926,18 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             pl_model_state_set(self, 1, 0x21, 0);
         }
         pl_stamina_add(self, 0x12C);
-        drink = 1;
+        level = 1;
         break;
     case 0x1A:
         ef_inst_spawn(self, 5);
         pl_stamina_add(self, 0x12C);
-        drink = 1;
+        level = 1;
         break;
     case 0x1C:
         if ((self->field_0x0B6 & 1) != 0) {
             pl_stamina_add(self, 0x96);
             ef_inst_spawn(self, 5);
-            drink = 1;
+            level = 1;
             break;
         }
         fn_80276CE8(self, -0x96);
@@ -4974,7 +4969,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
         pl_health_recover(self, 0x14, 0);
         ef_inst_spawn(self, 0);
         fn_8024D3C8(self);
-        drink = 1;
+        level = 1;
         break;
     case 0xD6:
         if (Pl_master_ck(self) == 1) {
@@ -4984,7 +4979,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
             pl_health_recover(self, 0x14, 0);
             ef_inst_spawn(self, 0);
             fn_8024D3C8(self);
-            drink = 1;
+            level = 1;
             break;
         }
         if (Pl_master_ck(self) == 1) {
@@ -5030,7 +5025,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
                     } else {
                         pl_act_enter_raw(self, 6, 0x1F, 0xC);
                     }
-                    drink = 1;
+                    level = 1;
                     break;
                 }
                 fn_80276CE8(self, -0x96);
@@ -5089,7 +5084,7 @@ extern "C" void pl_act_net_hook_main(_PLW* self) {
     default:
         return;
     }
-    if (drink != 0) {
+    if (level == 1) {
         pl_item_drink_motion(self);
         return;
     }

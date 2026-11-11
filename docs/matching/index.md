@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (296)
+## Ideas that work (297)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -305,6 +305,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 317 | [Level 4 forward-substitutes a variable's last single-use definitions - an extra one moves the window](317-level4-last-single-use-substitution.md) | works | source-shape, pragma | Under optimization_level 4 one XOR chain comes out reassociated, `(a ^ b) ^ c` where retail keeps `t = b ^ c; a ^ t`, and anchoring that group only moves the reassociation to another group. |
 | 318 | [An 8-aligned string inside a TU's inline tail: the tail's strings are globals defined after the last function](318-8-aligned-string-inside.md) | works | data, sections, source-shape | Every `.text` row is at 100 and `.data` differs only by a 4-byte zero hole before one string in the middle of the `_ac.h` inline tail; a function-local `static ... aligned(8)` fixes the hole but moves the string ahead... |
 | 319 | [pragma pool_data off before the constructed globals keeps __sinit addressing each object by symbol](319-pragma-pool-data-off.md) | works | source-shape, sections | A compiler-generated __sinit loads one `...bss.0` base and adds offsets where retail does a lis/addi per object |
+| 320 | [A forward jump into a later case is a fall-through guarded by a local that is live anyway](320-forward-jump-into-a.md) | works | source-shape, allocator | Retail's case A branches over case B's leading test into case C's body; with no goto and no case label inside a block the duplicated tail or the reordered cases cost 5-10 points of score. |
 
 ## Ruled out - tried and it did not work, do not re-run (14)
 

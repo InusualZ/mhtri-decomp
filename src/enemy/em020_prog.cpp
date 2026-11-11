@@ -47,8 +47,10 @@
  *   em020_profile_send, releaseRemotePlayerParts, sendMemberJoinNotice, handleLobbyNetMessage, dropLobbyMail,
  *   addFriendNotice.  Foreign callees named by this unit are GUESS names too.
  * RESIDUALS.
- *  - `lobby_net_update`: 3140 B vs 3008 B; case 0 and case 1 each start the roster fetch (retail's case 0 branches
- *    into case 1's fetch; the duplicated 4 instructions and the case 1 test order move the later branches); the
+ *  - `lobby_net_update`: 3044 B vs 3008 B; case 0 falls into case 1 with `i == -1` (the pre-switch value) selecting
+ *    case 1's own roster-state tests, so case 0 skips them as retail's branch does: one extra compare and branch,
+ *    and the tests keep their if-chain order (a separate `resume` local took a callee-saved register and shifted
+ *    every later one: 95.9 %; case 0 and case 1 each starting the fetch 93.2 %); the
  *    refresh switch's hold tail sits after the switch where retail keeps it
  *    inside case 0 and cases 1/2 branch back to it (a backward jump: wall; case 2 inside an `if (0)` measured
  *    worse).  The sub-error and refresh tails are shared through `do { switch } while (0)` + `continue` (idea 183).
@@ -3605,6 +3607,7 @@ void lobby_net_update(void)
     if (isNetCityMode() != 0) {
         block = &lobby_state_block;
         peers = (NetPeerList*)&block->peer_count_0x0004;
+        i = -1; /* -1 on a direct entry to case 1; case 0 leaves a loop counter >= 0 */
         switch (block->step_0x0000) {
         case 0:
             buf = work_mem_alloc(0x2C);
@@ -3659,16 +3662,16 @@ void lobby_net_update(void)
             block->step_0x0000++;
             if ((s8)lobby_w.field_0x176 == 2)
                 break;
-            lb_roster_fetch_start(block);
-            break;
         case 1:
-            if ((s8)lobby_w.field_0x176 == 2 || (s8)lobby_w.field_0x176 == 0)
-                break;
-            if ((s8)lobby_w.field_0x176 == 1) {
-                lb_roster_fetch_start(block);
-                break;
+            if (i == -1) {
+                if ((s8)lobby_w.field_0x176 == 2 || (s8)lobby_w.field_0x176 == 0)
+                    break;
+                if ((s8)lobby_w.field_0x176 != 1) {
+                    setErrorCode(5);
+                    break;
+                }
             }
-            setErrorCode(5);
+            lb_roster_fetch_start(block);
             break;
         case 2:
             if (block->request_0x1696 != 0) {

@@ -56,10 +56,11 @@
  *   the file checksums walk a `bytes` pointer (`bytes = ctl->buffer; sum = 0; bytes += 8;` then `sum += *bytes;
  *   bytes++`); the file steps reach `save_ctl` through a `ctl` pointer but read `step` directly.  The draws pass the
  *   anchor `pos` by value to `put_lsp_anchor_offset` and index a `rows` table local; their colour flags are `bool`.
- *   `plsearch_page19_step`'s step 40 writes the profile-resend and command-18 tails out in each sub-step that
- *   reaches them (retail shares them: sub-steps 0 and 1 branch forward into the resend, 0, 1 and 2 into the
- *   request): 92.9 % at 2268 B against 2140 B; one `do { switch } while (0)` holding both tails after the switch
- *   measures 90.9 % at 2148 B (the tails land after sub-step 4 where retail has them between sub-steps 2 and 3);
+ *   `plsearch_page19_step`'s step 40 keeps retail's layout (sub-step 0, then 1, then the shared resend, 2, then the
+ *   shared request) and reaches the shared parts by falling through: sub-step 0 sets `resume` and falls into
+ *   sub-step 1, whose and sub-step 2's own leading tests are skipped when `resume` is set (98.1 % at 2172 B against
+ *   2140 B: `resume` takes r31 and moves `ret` and the pointers one register; writing the tails out per sub-step
+ *   92.9 % at 2268 B, one `do { switch } while (0)` holding both tails after the switch 90.9 %);
  *   `save_nand_read_step` breaks out of its result switch into the one failure report after it.
  */
 
@@ -2873,6 +2874,7 @@ s32 plsearch_page19_step(MenuSlot* slot) {
     u16 input = slot->buttons_trig | (slot->field_0x008 & 0xF);
     NetPeerCard* card;
     const s32* args;
+    s32 resume = 0;
 
     slot->move_result_0x238 = 0;
     switch (slot->field_0x001) {
@@ -3101,42 +3103,29 @@ s32 plsearch_page19_step(MenuSlot* slot) {
                 requestFriendSync(&slot->net_result_0x320);
                 break;
             }
-            slot->field_0x002 = 2;
-            if (menu_work.slot[0].field_0x31E != 0) {
-                resendProfileRecord(&slot->net_result_0x320);
-                break;
-            }
-            args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
-            if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
-                ret = 3;
-            } else {
-                slot->field_0x002 = 3;
-            }
-            break;
+            resume = 1;
         case 1:
-            if (slot->net_result_0x320 == 0) {
-                break;
+            if (!resume) {
+                if (slot->net_result_0x320 == 0) {
+                    break;
+                }
+                if (slot->net_result_0x320 != 1) {
+                    set_option_cfg(27, menu_work.slot[0].field_0x31F);
+                }
             }
-            if (slot->net_result_0x320 != 1) {
-                set_option_cfg(27, menu_work.slot[0].field_0x31F);
-            }
+            resume = 1;
             slot->field_0x002 = 2;
             if (menu_work.slot[0].field_0x31E != 0) {
                 resendProfileRecord(&slot->net_result_0x320);
                 break;
             }
-            args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
-            if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
-                ret = 3;
-            } else {
-                slot->field_0x002 = 3;
-            }
-            break;
         case 2:
-            if (slot->net_result_0x320 == 0) {
-                break;
+            if (!resume) {
+                if (slot->net_result_0x320 == 0) {
+                    break;
+                }
+                menu_work.slot[0].field_0x31E = 0;
             }
-            menu_work.slot[0].field_0x31E = 0;
             args = (const s32*)&lobby_state_block.block_0x11D4[0x14];
             if (NetCtrlWk::requestCommand18((const s32*)&args, &slot->net_result_0x320) == 0) {
                 ret = 3;
