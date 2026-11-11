@@ -59,7 +59,8 @@
  *    re-dispatch (`state = 7; continue;`: `li`, and `cmplwi 7`/`beq`/`b` in the dispatch where retail has `cmplwi 2`/
  *    `bne`), and the loop it forms is reducible, so the backend `loop-code-motion` pass (dump 09) hoists
  *    `addis r15,r18,1` to its preheader and shifts the pool loop's constant colours (retail's back edges make the region
- *    irreducible, so retail has no preheader there); sharing one check copy with step 1 through a second re-dispatch
+ *    irreducible, so retail has no preheader there; no `#pragma opt_*` gates that pass, dump 09 hoists with `opt_loop_invariants off`);
+ *    `opt_propagation off` and `opt_lifetimes off` over the function score +0.2; sharing one check copy with step 1 through a second re-dispatch
  *    state measures lower (the dispatch grows and the check moves past commands 0x17/0x18); the rest is colouring:
  *    retail colours `i`/`work`/`entry`/`command` into r31..r28 before the ten loop-hoisted constants, ours colours
  *    the constants first (the mwcc-debugger dump: the eighteen callee-saved candidates form a clique at degree 29 = K,
@@ -1133,6 +1134,9 @@ static inline void sendFirstChatEntry(NetCtrlWk* work, s32& command)
         break;
     }
 }
+#pragma push
+#pragma opt_propagation off
+#pragma opt_lifetimes off
 
 /* 0x80425790 (0x1580): the per-frame message pump: posts the member join/leave notices, sends the first queued chat
  * entry, hands the arena blocks to the lobby, then steps every queued command - it sends the layer request, waits for
@@ -1858,6 +1862,7 @@ void updateMessagePool(void)
     }
     refreshServerScreen(work);
 }
+#pragma pop
 
 /*
  * Reset the work record's stall counter.
