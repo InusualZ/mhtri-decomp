@@ -1041,7 +1041,7 @@ config.libs = [
         "objects": [
             Object(Matching, "font/dbg_drawgraph.cpp"),
             Object(NonMatching, "font/flfnt.cpp"),
-            Object(NonMatching, "g3d/g3d_anmchr.cpp"),
+            Object(Matching, "g3d/g3d_anmchr.cpp"),
             Object(Matching, "g3d/g3d_anmshp.cpp"),
             Object(Matching, "g3d/g3d_anmtexpat.cpp"),
             Object(Matching, "g3d/g3d_anmtexsrt.cpp"),
