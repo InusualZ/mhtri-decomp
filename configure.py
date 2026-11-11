@@ -792,7 +792,7 @@ config.libs = [
             Object(Matching, "ef/ef_effect.cpp"),
             # Flags: unit header of src/ef/ef_effectsystem.cpp (`-pool off`: one `lis`/`addi` per static).
             Object(Matching, "ef/ef_effectsystem.cpp", extra_cflags=["-pool off"]),
-                        Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
+                        Object(Matching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             Object(Matching, "ef/ef_postfield.cpp"),
             Object(Matching, "ef/ef_resource.cpp"),
