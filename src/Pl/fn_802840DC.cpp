@@ -1,9 +1,9 @@
 /*
- * Pl/fn_802840DC.cpp - the player's weapon act handlers for weapon classes 2 and 4-6, their dispatchers, the weapon-1
- *   dispatcher and the class-7 attack-set/motion-row pair.
- * RANGE. .text 0x802840DC-0x80288CEC (54 functions); .data 0x805C9568-0x805CBFC0, .sdata 0x80792188-0x807921B0,
+ * Pl/fn_802840DC.cpp - the player's weapon act handlers for weapon classes 2 and 4-6, their dispatchers
+ *   and the class-7 attack-set/motion-row pair.
+ * RANGE. .text 0x80284204-0x80288CEC (53 functions); .data 0x805C9568-0x805CBFC0, .sdata 0x80792188-0x807921B0,
  *   .sdata2 0x8079A1D8-0x8079A270, extab, extabindex.  The range is four TU pieces (seam request pl-802840dc#1):
- *   0x802840DC-0x80284204 ends the weapon-1 TU, 0x80284204-0x80287244 is the weapon-2 TU, 0x80287244-0x80288B98 the
+ *   0x80284204-0x80287244 is the weapon-2 TU, 0x80287244-0x80288B98 the
  *   weapon-4/5/6 TU and 0x80288B98-0x80288CEC opens the class-7 TU (`Pl/pl_motion.cpp`).
  * FLAGS. The unit's `cflags`; the weapon-4/5/6 piece is under `#pragma optimization_level 4` (its switches test case
  *   ranges with `subi`+`cmplwi`, playbook 108; every row of that piece is 100 % with it, the weapon-2 rows at -O3).
@@ -72,119 +72,6 @@
 #include "camera/camera_pl_quake2_req.h"
 
 extern "C" {
-
-/* The actor's current shell act (`_PLW::act_no`, 0-34) dispatched to its per-act handler; an act
- * number outside the table does nothing. */
-void pl_weapon1_act_dispatch(_PLW* self)
-{
-    switch (self->act_no) {
-    case 0:
-        pl_weapon1_act_combo(self, 0);
-        return;
-    case 1:
-        pl_weapon1_act_combo(self, 1);
-        return;
-    case 2:
-        pl_weapon1_act_combo(self, 2);
-        return;
-    case 3:
-        pl_weapon1_act_combo(self, 3);
-        return;
-    case 4:
-        pl_weapon1_act_shell_swing(self, 0);
-        return;
-    case 5:
-        pl_weapon1_act_shell_swing(self, 1);
-        return;
-    case 6:
-        pl_weapon1_act_double(self, 0);
-        return;
-    case 7:
-        pl_weapon1_act_double(self, 1);
-        return;
-    case 8:
-        pl_weapon1_act_double(self, 2);
-        return;
-    case 9:
-        pl_weapon1_act_turn_swing(self, 0);
-        return;
-    case 10:
-        pl_weapon1_act_turn_swing(self, 1);
-        return;
-    case 11:
-        pl_weapon1_act_turn_swing(self, 2);
-        return;
-    case 12:
-        pl_weapon1_act_swing2(self, 0);
-        return;
-    case 13:
-        pl_weapon1_act_swing2(self, 1);
-        return;
-    case 14:
-        pl_weapon1_act_chain(self);
-        return;
-    case 15:
-        pl_weapon1_act_single(self);
-        return;
-    case 16:
-        pl_weapon1_act_combo3(self, 0);
-        return;
-    case 17:
-        pl_weapon1_act_combo3(self, 1);
-        return;
-    case 18:
-        pl_weapon1_act_combo3(self, 2);
-        return;
-    case 19:
-        pl_weapon1_act_rise(self, 1);
-        return;
-    case 20:
-        pl_weapon1_act_rise(self, 0);
-        return;
-    case 21:
-        pl_weapon1_act_double3(self, 0);
-        return;
-    case 22:
-        pl_weapon1_act_double3(self, 1);
-        return;
-    case 23:
-        pl_weapon1_act_single3(self);
-        return;
-    case 24:
-        pl_weapon1_act_finisher3(self, 0);
-        return;
-    case 25:
-        pl_weapon1_act_chain3(self);
-        return;
-    case 26:
-        pl_weapon1_act_kick3(self);
-        return;
-    case 27:
-        pl_weapon1_act_kick(self);
-        return;
-    case 28:
-        pl_weapon1_act_turn_swing(self, 3);
-        return;
-    case 29:
-        pl_weapon1_act_turn_swing(self, 4);
-        return;
-    case 30:
-        pl_weapon1_act_turn3(self, 0);
-        return;
-    case 31:
-        pl_weapon1_act_turn3(self, 1);
-        return;
-    case 32:
-        pl_weapon1_act_turn3(self, 2);
-        return;
-    case 33:
-        pl_weapon1_act_double3(self, 2);
-        return;
-    case 34:
-        pl_weapon1_act_finisher3(self, 1);
-        return;
-    }
-}
 
 /* Builds the actor's weapon-2 attack entry from a signed attack value: the magnitude is the attack index, the sign,
  * the attack-flag predicate and the caller's flag pick the entry's flag bits; then runs the shared set-up. */

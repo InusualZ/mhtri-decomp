@@ -22,8 +22,10 @@
  *   records, em025_se_height, em025_se_next_act, `Em025UserData`.
  *   Foreign GUESS names proposed in the registry (lane enemy-em025) and declared in leaf headers:
  *   em_busy_net_notify, world_mtx_attr_scale_set, camera_quake_pos_req, camera_mode_req, eft_em_model_pair_attach, bgm_event_flag_set, bgm_track15_req, anim_key_curve_eval.
- * RESIDUALS. `em025_head_track` - the block pointer's induction register is set up before the joint/limit table
- *   pointers, and the turn angle lands in r4 with the `i == 0` compare scheduled after the subtraction.
+ * RESIDUALS. `em025_head_track` - the block pointer's `addi` is emitted before the `&head`/`&target` addresses in the
+ *   loop preheader (retail last), and the `i == 0` compare is scheduled after the subtraction (retail before it); both
+ *   are scheduling-order differences (the pre-schedule PCode, dump 18, holds the same blocks); declaring `rel` before
+ *   `turn` fixed the rel/turn register pair (r3/r4).
  *   flipcheck: the 8 foreign names above are registry proposals, not map names yet.
  * SHAPES. `Em025UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
@@ -4467,6 +4469,7 @@ void em025_head_track(struct _ENEMY_WORK* self) {
     get_joint_wmat_em(self, 20, &mtx);
     base = calcMtxAng3(&mtx);
     for (i = 0; i < 2; i++) {
+        u32 rel;
         _PLW* pl;
         u32 count;
         s32 j;
@@ -4503,7 +4506,7 @@ void em025_head_track(struct _ENEMY_WORK* self) {
             }
         }
         if (best > 0.0f) {
-            u32 rel = calcVecAng2(&head, &target) - base;
+            rel = calcVecAng2(&head, &target) - base;
             turn = (u16)(rel + 0x4000);
             if (i == 0) {
                 turn = (u16)(rel + 0xC000);

@@ -67,39 +67,11 @@ u32 fn_80276800(struct _PLW* self, s32 v);
 
 /* The unclaimed `.data` tables this unit's act handlers index (no registered `.data` range covers
  * them, so - like the band's code - this header is their rule-2 home). */
-extern u32 pl_flinch_steps_kind1[]; /* 0x805C87F8 - the flinch act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` is its only referrer) */
-extern u32 pl_steps_guard_kind1[]; /* 0x805C887C - the guard act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
-extern u32 pl_steps_guard_walk_kind1[]; /* 0x805C8918 - the guard-walk act's step table for weapon kind 1 (unclaimed .data; `Pl/pl_act_step.cpp` reads it) */
 extern u16 lbl_805C4A54[]; /* 0x805C4A54 - 3 rows of {u16 motion, u16 param} `fn_8024A8EC` reads */
 extern u16 lbl_805C4A60[]; /* 0x805C4A60 - the sibling motion row table `fn_8024B35C` indexes */
 extern u16 lbl_805C4A6C[]; /* 0x805C4A6C - the sibling motion row table `fn_8024B46C` indexes */
-extern u32 lbl_805C9118[]; /* 0x805C9118 - an effect/motion table `Pl_act_set_step_table` is handed */
 extern u32 lbl_805CAD74[]; /* 0x805CAD74 - the sibling table for the other actor kind */
 extern u32 pl_flinch_steps_kind8_guard[]; /* 0x805E2048 - the sibling table for the third actor kind */
-/* The weapon-1 act handlers' step tables (`Pl/pl_act.cpp`, 0x80282BDC-0x802840DC), handed to
- * `Pl_act_set_step_table`; the `.data` run 0x805C80A8-0x805C9568 is unclaimed. */
-extern u8 pl_weapon1_steps_combo_a[]; /* 0x805C8134 */
-extern u8 pl_weapon1_steps_combo_b[]; /* 0x805C8228 */
-extern u8 pl_weapon1_steps_combo_c[]; /* 0x805C831C */
-extern u8 pl_weapon1_steps_shell_a[]; /* 0x805C8410 */
-extern u8 pl_weapon1_steps_shell_b[]; /* 0x805C8494 */
-extern u8 pl_weapon1_steps_double[]; /* 0x805C8518 */
-extern u8 pl_weapon1_steps_chain[]; /* 0x805C859C */
-extern u8 pl_weapon1_steps_turn[]; /* 0x805C85C8 */
-extern u8 pl_weapon1_steps_swing2_a[]; /* 0x805C864C */
-extern u8 pl_weapon1_steps_swing2_b[]; /* 0x805C86E8 */
-extern u8 pl_weapon1_steps_single[]; /* 0x805C8784 */
-extern u8 pl_weapon1_steps_kick[]; /* 0x805C8850 */
-extern u8 pl_weapon1_steps_combo3_a[]; /* 0x805C89B8 */
-extern u8 pl_weapon1_steps_combo3_b[]; /* 0x805C8AC0 */
-extern u8 pl_weapon1_steps_combo3_c[]; /* 0x805C8BC8 */
-extern u8 pl_weapon1_steps_double3[]; /* 0x805C8CC0 */
-extern u8 pl_weapon1_steps_rise[]; /* 0x805C8DC8 */
-extern u8 pl_weapon1_steps_single3[]; /* 0x805C8E64 */
-extern u8 pl_weapon1_steps_finisher3_a[]; /* 0x805C8F2C */
-extern u8 pl_weapon1_steps_finisher3_b[]; /* 0x805C8FF4 */
-extern u8 pl_weapon1_steps_kick3[]; /* 0x805C90BC */
-extern u8 pl_weapon1_steps_chain3[]; /* 0x805C90E8 */
 /* The `.sdata2` frame windows and float constants this band's frame checks gate on are owned by the
  * data-only unit `Pl/pl_frame_data.cpp` (`.sdata2` 0x80799E00-0x80799F98): a consumer includes
  * `Pl/pl_frame_data.h` and declares none of them here (rule 2). */

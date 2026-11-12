@@ -23,7 +23,9 @@
  * RESIDUALS. 1 row short of the target, every data section byte-identical (the `.sdata2` object ends 4 bytes short
  *   of the claim's alignment pad): `em027_init` - retail keeps an unreachable `b` to the switch end after each
  *   variant switch's dispatch (the empty `case 0:` block), ours drops both (8 B); an empty statement, a block, a
- *   `*= 1.0f` and an `if (0)` in that case measured the same.
+ *   `*= 1.0f`, an `if (0)`, a dead local store (`variant = 0`),
+ *   `do {} while (0)`, `for (;;) break;` and a nested `switch (0)` in that case measured the same (+0 B). The
+ *   mwcc-debugger dumps (dump 03 on) hold 78 blocks with no case-0 block at any pass, so the frontend never builds it.
  *   flipcheck: the callee `em_area_engaged_ck` (registry proposal for 0x801B0010, `enemy/em030_prog.cpp`) is not
  *   a map name yet, so a flip links `undefined` until that rename lands.
  * SHAPES. A case-level `return` at the end of a state switch costs a `b`: the steps `break`.  One-case signed

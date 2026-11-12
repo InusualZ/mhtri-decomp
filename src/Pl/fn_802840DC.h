@@ -159,7 +159,6 @@ u32 pl_scan_rows_id252_ck(struct _PLW* self);
 
 /* 0x805CAD48: the step table the guard-break act hands Pl_act_set_step_table for weapon kind 2 */
 extern u32 pl_flinch_steps_kind2[];
-void pl_weapon1_act_dispatch(struct _PLW* self);
 /* 0x80286DF8: the class-2 weapon act dispatcher */
 void pl_weapon2_act_dispatch(struct _PLW* self);
 /* 0x80288848: the class-4-6 weapon act dispatcher */

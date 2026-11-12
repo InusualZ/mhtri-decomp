@@ -214,6 +214,38 @@ void pl_weapon0_act_dispatch(struct _PLW* self);
 /* 0x805C7A64 / 0x805C7C34: the attack-range step tables for weapon kind 0 (default, and kind_0x09 == 3) */
 extern u32 pl_steps_kind0[];
 extern u32 pl_steps_kind0_slot3[];
+/* 0x802840DC: the class-1 weapon act dispatcher */
+void pl_weapon1_act_dispatch(struct _PLW* self);
+/* The weapon-1 TU's step tables (`.data` 0x805C8134-0x805C9568, defined in `Pl/pl_act.cpp`): the act handlers',
+ * the flinch/guard/evade acts' and the attack-range tables for weapon kind 1 (`pl_steps_kind1`, `_slot3`). */
+extern u32 pl_weapon1_steps_combo_a[]; /* 0x805C8134 */
+extern u32 pl_weapon1_steps_combo_b[]; /* 0x805C8228 */
+extern u32 pl_weapon1_steps_combo_c[]; /* 0x805C831C */
+extern u32 pl_weapon1_steps_shell_a[]; /* 0x805C8410 */
+extern u32 pl_weapon1_steps_shell_b[]; /* 0x805C8494 */
+extern u32 pl_weapon1_steps_double[]; /* 0x805C8518 */
+extern u32 pl_weapon1_steps_chain[]; /* 0x805C859C */
+extern u32 pl_weapon1_steps_turn[]; /* 0x805C85C8 */
+extern u32 pl_weapon1_steps_swing2_a[]; /* 0x805C864C */
+extern u32 pl_weapon1_steps_swing2_b[]; /* 0x805C86E8 */
+extern u32 pl_weapon1_steps_single[]; /* 0x805C8784 */
+extern u32 pl_flinch_steps_kind1[]; /* 0x805C87F8 */
+extern u32 pl_weapon1_steps_kick[]; /* 0x805C8850 */
+extern u32 pl_steps_guard_kind1[]; /* 0x805C887C */
+extern u32 pl_steps_guard_walk_kind1[]; /* 0x805C8918 */
+extern u32 pl_weapon1_steps_combo3_a[]; /* 0x805C89B8 */
+extern u32 pl_weapon1_steps_combo3_b[]; /* 0x805C8AC0 */
+extern u32 pl_weapon1_steps_combo3_c[]; /* 0x805C8BC8 */
+extern u32 pl_weapon1_steps_double3[]; /* 0x805C8CC0 */
+extern u32 pl_weapon1_steps_rise[]; /* 0x805C8DC8 */
+extern u32 pl_weapon1_steps_single3[]; /* 0x805C8E64 */
+extern u32 pl_weapon1_steps_finisher3_a[]; /* 0x805C8F2C */
+extern u32 pl_weapon1_steps_finisher3_b[]; /* 0x805C8FF4 */
+extern u32 pl_weapon1_steps_kick3[]; /* 0x805C90BC */
+extern u32 pl_weapon1_steps_chain3[]; /* 0x805C90E8 */
+extern u32 pl_evade_steps_kind1[]; /* 0x805C9118 */
+extern u32 pl_steps_kind1[]; /* 0x805C9170 */
+extern u32 pl_steps_kind1_slot3[]; /* 0x805C93C4 */
 #ifdef __cplusplus
 }
 #endif

@@ -2922,7 +2922,7 @@ extern "C" void pl_act_evade(_PLW* self, s32 variant, s32 level, u8 alt) {
                 break;
             case 1:
                 if (variant == 0 || variant == 1 || (u32)(variant - 6) <= 1) {
-                    Pl_act_set_step_table(self, (u32)lbl_805C9118, 0);
+                    Pl_act_set_step_table(self, (u32)pl_evade_steps_kind1, 0);
                 }
                 break;
             case 2:
@@ -3083,7 +3083,7 @@ extern "C" void fn_8024A248(_PLW* self, s32 arg1) {
         }
         switch (self->field_0x002) {
         case 1:
-            Pl_act_set_step_table(self, (u32)lbl_805C9118, 0);
+            Pl_act_set_step_table(self, (u32)pl_evade_steps_kind1, 0);
             return;
         case 2:
             Pl_act_set_step_table(self, (u32)lbl_805CAD74, 0);

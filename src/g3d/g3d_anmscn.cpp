@@ -19,7 +19,9 @@
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
  * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
  *   the map row at 0x800651BC: the copy the link keeps for every TU that converts a Color).
- *   light_setting_get_light_set: retail's ternary join branch.
+ *   light_setting_get_light_set: retail's ternary join branch (result in r5, an `add`/`b`/`li`/`b` chain whose last `b`
+ *   targets the next instruction); a ternary, an if/else store pair, a two-return inline pointer helper and a
+ *   by-value two-return `LightSet` helper measured -16 B, -15 B, +0 B and -51 B.
  *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
  *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
  *   weak `ut::Color` constructor/destructor copies MWCC emits here are retail's dead copies (linker-folded).

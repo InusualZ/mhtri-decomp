@@ -13,9 +13,8 @@
  * RESIDUALS. flipcheck: `.data` differs in 73 bytes (23 step-table words) and relocation targets until `config.yml`
  *   blocks the relocations dtk reads into them: the step tables' words that look like code addresses (`0x8016....`,
  *   `0x800103E7`, `0x8001FFEC`) are record data, and `.data` 0x805BDC48-0x805BF448 is byte-coded records (as the weapon-3
- *   tables are); the two `pl_steps_by_kind` words 0x805C9170/0x805C93C4 (weapon kind 1's tables, no registered range
- *   covers them) are emitted as plain words and need `block_relocations` for 0x805BF44C and 0x805BF470.  The unit emits
- *   all of them as plain words.
+ *   tables are); the two `pl_steps_by_kind` words 0x805C9170/0x805C93C4 (weapon kind 1's tables, in the unclaimed
+ *   weapon-1 data 0x805C80A8-0x805C9568: request flip-999b#1) are real pointers and are spelled as externs.
  * SHAPES. MWCC aligns every array to 4 and every array whose size is a multiple of 8 to 8, so the map's rows are cut where
  *   an array can sit: `pl_act_step_table_247` (0x14C) and `pl_act_step_table_247_tail` (0xDC) split the 0x228-byte run
  *   at a 4-aligned seam, and `pl_steps_walk` (0x1B4) / `pl_steps_walk_end` (0x1C) split a 0x1D0 table that retail keeps at
@@ -389,13 +388,13 @@ u32 pl_steps_stumble[116] = {
 };
 
 u32 pl_steps_by_kind[9] = {
-    (u32)pl_steps_kind0, 0x805C9170, (u32)pl_steps_kind2,
+    (u32)pl_steps_kind0, (u32)pl_steps_kind1, (u32)pl_steps_kind2,
     (u32)pl_weapon3_steps_shared_a, (u32)pl_scan_rows_guard_a, (u32)pl_scan_rows_guard_a,
     (u32)pl_scan_rows_guard_a, (u32)pl_steps_kind7, (u32)pl_steps_kind8,
 };
 
 u32 pl_steps_slot3_by_kind[9] = {
-    (u32)pl_steps_kind0_slot3, 0x805C93C4, (u32)pl_steps_kind2_slot3,
+    (u32)pl_steps_kind0_slot3, (u32)pl_steps_kind1_slot3, (u32)pl_steps_kind2_slot3,
     (u32)pl_weapon3_steps_shared_b, (u32)pl_scan_rows_guard_b, (u32)pl_scan_rows_guard_b,
     (u32)pl_scan_rows_guard_b, (u32)pl_steps_kind7_slot3, (u32)pl_steps_kind8_slot3,
 };

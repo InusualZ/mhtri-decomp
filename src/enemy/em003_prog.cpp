@@ -35,8 +35,9 @@
  * RESIDUALS. `em003_act7_3`: retail narrows the approach rate after the `0x80`/`0x40` merge (`clrlwi r5,r5,16`,
  *   4 bytes); a `(u16)` cast, u16/int locals, a switch, a u16-parameter view and an inline helper all fold it.
  *   Register allocation only: `em003_call_group_pick` (each loop has its own index/pair, retail colours them
- *   r28/r22 and r31/r28), `em003_color_update` (retail keeps `b` in r30, ours r28; every declaration order and
- *   reusing the first block's variables were measured).
+ *   r28/r22 and r31/r28; the mwcc-debugger dump + `regsim search` find no plan that reproduces every callee-saved
+ *   target, the best is 12/14 with `pair`/`self` swapped (r22/r23); a named `u16` loop limit measured -4.8 B).
+ *   `em003_color_update`'s locals follow `regsim`'s EXACT plan (g2, b2, g, b, a2, keys).
  *   .sdata2: the target's 4-byte tail pad after `lbl_80797328` (620 of 624 bytes emitted).
  *   flipcheck: the rows above.
  * SHAPES. `Em003UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
@@ -4556,10 +4557,10 @@ void em003_color_update(_ENEMY_WORK* self) {
     u8 g2;
     u8 r;
     u8 b2;
+    u8 g;
+    u8 b;
     u8 a2;
     f32* keys;
-    u8 b;
-    u8 g;
 
     if (em_alt_mode_ck(self) == 1) {
         r = 0xCF;
