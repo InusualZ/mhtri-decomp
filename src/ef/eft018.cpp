@@ -28,10 +28,15 @@
  *    retail (a separate pitch local, a `u32` yaw, the declaration orders and an early `angle` declaration do not
  *    reach it);
  *  - `eft_light_beam_aim_job`: `angle = (u16)(yaw + 0xC000)` builds its `addis`/`subi` in `r3`/`r0` where retail
- *    builds it in `r30` (peephole off, `- 0x4000` and a `(u16)` constant do not reach it);
+ *    builds it in `r30` (peephole off, `- 0x4000` and a `(u16)` constant do not reach it; dump 03 shows `addis r47`/`addi r48`
+ *    as separate virtual registers coloured r3/r0 where retail's chain lives in `angle`'s r30; `regsim search` reaches
+ *    8/9 callee-saved at best; `u16`/`s32` `angle` and `angle += 0xC000` measured worse or equal; same shape in
+ *    `eft_light_lantern_update`);
  *  - `eft_light_dispatch`: retail keeps a `b` stub as case 0's body (the compare branches to it, it jumps to the
  *    type switch after the outer exit); ours branches straight to the type switch (the type switch inside case 0,
- *    an inline init helper and `break` exits measure worse).
+ *    an inline init helper and `break` exits measure worse; `default` first, `do { break; } while (0)` and
+ *    `optimization_level` 1/2/4 or `opt_common_subs off` around it measured worse or equal; the dump's first PCode
+ *    already retargets case 0's branch to the type switch, so the stub is not in ours' CFG).
  *   flipcheck: `.text` differs (the rows above).
  * SHAPES. `eft_area_effect_create`'s colour split uses explicit `(color & mask) >> shift` terms: `(color >> shift) &
  *   0xFF` folds into one `rlwinm`.  A one-case compare on a `u8`/`u16` value is a `switch` with the other path as

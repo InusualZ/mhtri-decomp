@@ -19,13 +19,14 @@
  *   GUESS (data): em012_turn_seq_0..2, em012_pick_tbl, em012_demo_keys, em012_se_seq_<sub-state>,
  *   em012_se_seq_alt_<sub-state>, em012_se_rec_<seq>[_a..], em012_se_pos_0, em012_vec_pair_0/1, the
  *   `Em012ProgTbl` slot names, `Em012VecPair`; `__sinit_\em012_prog_cpp` is the compiler's; `EmAreaEntry::kind_0x08`/`entry_0x09`.
- * RESIDUALS. 4 rows short of the target, every data section byte-identical:
- *   `em012_state_ck` - the pack count's `count <= 1U` gives `subfic`/`orc` with swapped operands where retail
- *   has `li r3,2; subi; orc` (`count < 2` forms are worse), and self/count take r31/r30 swapped.
+ * RESIDUALS. 2 rows short of the target, every data section byte-identical:
+ *   `em012_state_ck` - the pack count's `!(count > 1U)` gives `li r3,1; subfic; orc` where retail has
+ *   `li r3,2; subi r0,r31,2; orc r3,r31,r3` (`count < 2U`, `2U > count`, `(u32)` casts and `count <= 1U` all measure
+ *   worse or equal; regsim plan fixed the r29/r30/r31 colouring via declaration order work, max, i, j, count).
  *   `em012_tev_color_update` - the rim/body constants are staged in r0/r3 where retail loads them straight into
- *   r6/r9.  `em012_act7_1` - `fmuls f0,f31,f0` operand order of the scale product.  `em012_action_select` -
- *   the first area selector lands in r0 where retail uses r4.
- *   flipcheck: the `em012_state_ck`, `em012_tev_color_update` and `em012_act7_1` registers.  `em_mot_window_base_get`
+ *   r6/r9 and reuses them for the converted values (reusing rim/body for the outputs measures equal; regsim reaches
+ *   4/6 volatile targets).
+ *   flipcheck: the `em012_state_ck` compare and `em012_tev_color_update` registers.  `em_mot_window_base_get`
  *   (0x8012EC74, `enemy/em_common.cpp`) is declared here under STOPGAP `enemy-em012#1` until its owner's header carries it.
  * SHAPES. A one-case test retail compares signed (`cmpwi`) is a `switch` (`em012_motion_events`,
  *   `em012_act2_27`).  A case-level `return` at the end of a state switch costs a `b`: the steps `break`.
@@ -1291,7 +1292,8 @@ void em012_act7_1(_ENEMY_WORK *self) {
         em_hit_window_set_default(self, 0, 1);
         em_move_vec2_clr(self);
         temp_f31 = get_em_chg_scale(self);
-        self->field_0x318 = 8.0f * get_em_base_scale(self) * temp_f31;
+        f32 base = get_em_base_scale(self);
+        self->field_0x318 = 8.0f * base * temp_f31;
         self->field_0x324 = 0.0f;
         rotVecY(&self->offset_0x30C.vec_0x310, self->field_0x1C0);
         rotVecY(&self->vec_0x31C, self->field_0x1C0);
@@ -2888,12 +2890,16 @@ u32 em012_state_ck(_ENEMY_WORK *self, u8 arg1) {
     case 0:
         return (u8)(self->field_0x1E4 == 1) & 0xFF;
     case 1: {
-        u8 count = 0;
-        _ENEMY_WORK *work = (_ENEMY_WORK *)get_move_work_adrs(3);
-        u32 max = get_move_work_max(3);
-        EmAreaEntry *entry;
+        _ENEMY_WORK *work;
+        u32 max;
         u16 i;
         u16 j;
+        u8 count;
+        EmAreaEntry *entry;
+
+        count = 0;
+        work = (_ENEMY_WORK *)get_move_work_adrs(3);
+        max = get_move_work_max(3);
 
         if (work != 0) {
             for (i = 0; i < (u16)max; i++, work++) {
@@ -2910,7 +2916,7 @@ u32 em012_state_ck(_ENEMY_WORK *self, u8 arg1) {
                 count++;
             }
         }
-        return count <= 1U;
+        return !(count > 1U);
     }
     case 2: {
         s32 blocked = 0;

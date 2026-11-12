@@ -19,13 +19,13 @@
  *   its dispatcher case or the data that points at it; `em004_act<N>_*` steps are named by the action id
  *   `em004_action_run` dispatches on.
  * RESIDUALS. Partial rows:
- *  - `em004_route_points_get` (8 B long): retail keeps the entry offset `i * 8` of the loop test in r5 across the
- *    match block, ours recomputes it (`clrlwi`/`slwi`) and colours `i`/`j` the other way round (the `break` and
- *    every loop/declaration spelling measured);
+ *  - `em004_route_points_get`: `e = &em004_route_tbl[i]` shares the loop test's `i * 8` like retail; the two frontend temporaries
+ *    for the record key and the offset take r5/r4 where retail has r4/r5 (regsim: volatile 16/18; key/compare-order spellings measured);
  *  - `em004_state_act_arm` (4 B short): retail branches over a `b` to the epilogue after `em_die_ck` (`bne`+`b`),
- *    ours folds it into one `beq` (early return, empty-then, success-first and `else return` all measured);
- *  - `em004_act8_call`: the max/targets and pending/bit register pairs swap (declaration hill-climb, local optimum);
- *  - `em004_act3_dive_turn2`: the turn flag's `and` result lands in r0, retail's in r7.
+ *    ours folds it into one `beq` (early return, empty-then, success-first, `else return`, `switch` and
+ *    `do { } while (0)` all measured);
+ *  - `em004_act3_dive_turn2`: the turn flag's `and` result lands in r0, retail's in r7 (regsim: no declaration
+ *    order reaches it, the volatile temporary is a backend one; `(u16)` ternary spellings and a `u16` local measured).
  *   Data: `.ctors` is not emitted (`em004_offset_init` is a plain function: `VEC3(x, y, z)`/`VEC3::operator=` are C-linkage
  *   helpers, not a constructor pair), so the unit cannot flip.
  * SHAPES. The `ShellSetFuncs` +0x14/+0x3C/+0x54/+0x64 calls go through spellings without the trailing table
@@ -2605,14 +2605,14 @@ void em004_act8_call(struct _ENEMY_WORK* self) {
             self->timer_0x020--;
         }
         if (em_busy_ck(self) == 1) {
-            s32 pending;
-            u8* work;
-            u8 targets;
-            u8 i;
-            u16 max;
-            u8 found;
-            f32 range;
             s32 bit;
+            u8* work;
+            u16 max;
+            u8 i;
+            u8 targets;
+            u8 found;
+            s32 pending;
+            f32 range;
             get_joint_wpos_em(self, 0x1C, &head);
             work = (u8*)get_move_work_adrs(2);
             max = get_move_work_max(2);
@@ -3914,8 +3914,9 @@ u32 em004_route_points_get(struct _ENEMY_WORK* self, u8 key, u8** out) {
         if ((u8)self->area_no == em004_route_tbl[i].key) {
             u8 j;
             const EmLookupSub* sub;
-            sub = em004_route_tbl[i].subs;
-            for (j = 0; j < em004_route_tbl[i].count; j++, sub++) {
+            const EmLookupEntry* e = &em004_route_tbl[i];
+            sub = e->subs;
+            for (j = 0; j < e->count; j++, sub++) {
                 if (sub->key == key) {
                     *out = sub->points;
                     return sub->count;
