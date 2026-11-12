@@ -104,18 +104,19 @@ def linkage_stem(name: str) -> str:
     return name[:m.start()] if m else name
 
 
-def owner_stem(name: str) -> str:
-    """The identifier and its owner qualifier without the argument list: `setTevKColor__6MHchar` for
-    `setTevKColor__6MHcharFUl...`, `fn` for `fn__Fv`, `get__Q24nw4r2db` for `get__Q24nw4r2dbCFv`; a name with no
-    argument list is itself. Two spellings with one owner stem are one function mangled two ways (or once in C)."""
+def _owner_walk(name: str) -> tuple[int, int, tuple[str, ...]] | None:
+    """`(i, k, scope)` of a mangled `name`: `name[:i]` is the identifier, `name[i + 2:k]` its owner qualifier, `scope`
+    the qualifier's components (outermost first; `()` for a free function), `name[k:]` the argument list. None when
+    `name` is not a mangling this reads."""
     i = name.find("__", 1)
     while i > 0:
         j = i + 2
         rest = name[j:]
         if rest[:1] == "F":
-            return name[:i]
+            return i, i, ()
         m = re.match(r"Q(\d)", rest)
         k = None
+        parts: list[str] = []
         if m:
             k, count = j + 2, int(m.group(1))
             for _ in range(count):
@@ -123,15 +124,37 @@ def owner_stem(name: str) -> str:
                 if not d:
                     k = None
                     break
-                k += len(d.group()) + int(d.group())
+                k += len(d.group())
+                parts.append(name[k:k + int(d.group())])
+                k += int(d.group())
         else:
             d = re.match(r"\d+", rest)
             if d:
                 k = j + len(d.group()) + int(d.group())
+                parts.append(name[j + len(d.group()):k])
         if k is not None and k <= len(name) and name[k:k + 1] in ("F", "C"):
-            return name[:k]
+            return i, k, tuple(parts)
         i = name.find("__", i + 1)
-    return name
+    return None
+
+
+def owner_stem(name: str) -> str:
+    """The identifier and its owner qualifier without the argument list: `setTevKColor__6MHchar` for
+    `setTevKColor__6MHcharFUl...`, `fn` for `fn__Fv`, `get__Q24nw4r2db` for `get__Q24nw4r2dbCFv`; a name with no
+    argument list is itself. Two spellings with one owner stem are one function mangled two ways (or once in C)."""
+    walk = _owner_walk(name)
+    if walk is None:
+        return name
+    i, k, scope = walk
+    return name[:i] if k == i else name[:k]
+
+
+def split_member(name: str) -> tuple[str, tuple[str, ...]] | None:
+    """`(identifier, owner scope)` of a mangled name (`ExecCallbackC__13ResUserDataAcFv...` -> `("ExecCallbackC",
+    ("ResUserDataAc",))`, `BindPltt__Q34nw4r3g3d14ResTexPlttInfoF...` -> `("BindPltt", ("nw4r", "g3d", "ResTexPlttInfo"))`,
+    `fn__Fv` -> `("fn", ())`, `__ct__5FooFv` -> `("__ct", ("Foo",))`), or None when it is not a mangling this reads."""
+    walk = _owner_walk(name)
+    return None if walk is None else (name[:walk[0]], walk[2])
 
 
 def peel_tokens(name: str) -> set[str]:

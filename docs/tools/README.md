@@ -29,6 +29,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
 | a one-function TU from a C/C++ file | `lib/cextract.py` | `spec/lib-cextract.md` | mwcc-debugger (`--extract`, `extract.py`) |
+| which function the mwcc debugger dumps (name, mangled, `Class::method`, address) | `lib/funcspec.py` | `spec/lib-funcspec.md` | mwcc-debugger (`FUNC`, `--symbol`, `--size`) |
 | MWCC's GPR colouring: the regalloc dump, the replay, the renumbering search | `lib/regsim.py` | `spec/lib-regsim.md` | regsim (`mt.py regsim`) |
 | a function's declaration block (leading run or `--lines A-B`), its orders and one-move neighbours | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `--hill`, `mt.py permdecl`/`hill`), unittry (`--permute`) |
 | pending map edits (renames, row splits) applied to a copy of a split target | `lib/pendingmap.py` | `spec/lib-pendingmap.md` | measure, tryvar (`--rename-map`) |

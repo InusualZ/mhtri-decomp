@@ -3,6 +3,7 @@ the gate's snapshot rows. Spec: docs/tools/spec/dataclosure.md. CLI: none (a mod
 from __future__ import annotations
 
 import os
+import re
 
 from tools.lib import objcompare
 from tools.lib import refs as _refs  # the census over target objects
@@ -121,6 +122,41 @@ def orphan_keys(records: list[dict], units: list[str] | None = None) -> dict[str
     want = set(units) if units is not None else None
     return {orphan_key(r["unit"], r["section"], r["address"]): r
             for r in records if r["status"] == "orphan" and (want is None or r["unit"] in want)}
+
+
+def claim_aligns(text: str) -> dict[tuple[str, int], int]:
+    """`{(section, start): N}` for every `splits.txt` range that carries `align:N` (decimal or `0x` hex). Pure."""
+    from tools.lib import project  # noqa: PLC0415 - only this reader needs the range attributes
+
+    out: dict[tuple[str, int], int] = {}
+    for r in project.Splits.parse(text).ranges:
+        m = re.search(r"(?:^|\s)align:(\S+)", r.attrs or "")
+        if m:
+            try:
+                out[(r.section, r.start)] = int(m.group(1), 0)
+            except ValueError:
+                continue
+    return out
+
+
+def alignment_fill_shrinks(shrinks, aligns: dict, now: dict, read) -> tuple[list, list]:
+    """`(kept, excused)`: a shrink is excused when it is only the link's alignment fill before an aligned successor.
+
+    All three must hold: `read(start, size)` returns bytes that are all zero; the dropped range ends exactly at the
+    start of a range claimed in `now` (a `claimed_bytes`-shaped set); and that range carries `align:N` in `aligns`
+    (`claim_aligns`) with the dropped start rounded up to N equal to that start. Any other shrink is kept. Pure
+    given `read` (None, or a short read, never excuses).
+    """
+    kept, excused = [], []
+    for section, start, end in shrinks:
+        n = aligns.get((section, end), 0)
+        ok = (n > 0 and any(a == end for a, _b in now.get(section, ()))
+              and -(-start // n) * n == end)
+        if ok:
+            blob = read(start, end - start)
+            ok = blob is not None and len(blob) == end - start and not any(blob)
+        (excused if ok else kept).append((section, start, end))
+    return kept, excused
 
 
 def orphan_verdict(base_keys, after: dict, shrinks, allowed=()) -> dict:
@@ -1279,6 +1315,20 @@ def tree_claim_exposed(root: str, records: list[dict], symbols: dict | None = No
     return _runs(pairs, section_rows(symbols))
 
 
+def _splits_aligns(root: str) -> dict:
+    with open(os.path.join(root, "config", GAME_DIR, "splits.txt"), encoding="utf-8", errors="replace") as fh:
+        return claim_aligns(fh.read())
+
+
+def _dol_reader(root: str):
+    """`read(address, size)` over the original DOL (`orig/RMHE08/sys/main.dol`); always None when it is missing."""
+    from tools.lib.binary.dol import Dol  # noqa: PLC0415
+
+    path = os.path.join(root, "orig", GAME_DIR, "sys", "main.dol")
+    dol = Dol.read(path) if os.path.exists(path) else None
+    return (lambda address, size: dol.bytes_at(address, size)) if dol else (lambda address, size: None)
+
+
 def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=(), strict=True,
                   query="lazy", touched=None, unit_map=None, git_renames=None) -> dict:
     """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`).
@@ -1303,6 +1353,10 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
         unit_map_lines = render_unit_map(absorbs, explicit)
     base_claims = {sec: [tuple(r) for r in rows] for sec, rows in (snap.get("claims") or {}).items()}
     shrinks = shrunk_claims(base_claims, claimed_bytes(ranges)) if base_claims else []
+    fill: list = []
+    if shrinks:
+        shrinks, fill = alignment_fill_shrinks(shrinks, _splits_aligns(root), claimed_bytes(ranges),
+                                               _dol_reader(root))
     base_keys = set(snap.get("keys") or [])
     # STRICT (owner, 2026-09-29): a unit the batch REALLY changes must claim the data only it references - the
     # pre-existing pairs too. `strict_report` decides per block (refuse, or deferred with a named class) and
@@ -1330,6 +1384,8 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
     verdict["claim_exposed_pairs"] = [{"unit": c["pair"]["unit"], "name": c["pair"]["name"],
                                        "section": c["pair"]["section"], "address": c["pair"]["address"],
                                        "reason": c["reason"]} for c in exposed.values()]
+    verdict["alignment_fill"] = ["%s 0x%08X-0x%08X: all-zero link alignment fill before an aligned claim, not refused" % f
+                                 for f in fill]
     verdict["have_base"] = "keys" in snap and "claims" in snap
     verdict["unit_map_lines"] = unit_map_lines
     verdict["base_keys"] = list(snap.get("keys") or [])       # the FOLDED keys: what `explain_added` must compare
@@ -1565,6 +1621,26 @@ def selftest_census(eq) -> None:
     eq(len(orphan_verdict([], after, [], ["0x80500044"])["added"]), 1, "an allowance that matches nothing refuses")
     eq(len(orphan_verdict([key], {}, [(".rodata", 0x80500008, 0x8050000C)])["added"]), 1,
        "a shrunk claim is refused")
+
+    # alignment fill: the dropped bytes are zero, end at an aligned successor's start and round up to it
+    fz = {(".data", 0x8064E760): 32}
+    now_d = {".data": [(0x8064DE88, 0x8064E748), (0x8064E760, 0x8064F360)]}
+    zero, dirty = (lambda a, n: bytes(n)), (lambda a, n: bytes(n - 1) + b"")
+    cut_d = [(".data", 0x8064E748, 0x8064E760)]
+    eq(alignment_fill_shrinks(cut_d, fz, now_d, zero), ([], cut_d), "zero fill before an align:32 successor is excused")
+    eq(alignment_fill_shrinks(cut_d, fz, now_d, dirty), (cut_d, []), "a non-zero dropped byte is still refused")
+    eq(alignment_fill_shrinks(cut_d, fz, now_d, lambda a, n: None), (cut_d, []), "an unreadable DOL never excuses")
+    eq(alignment_fill_shrinks(cut_d, {}, now_d, zero), (cut_d, []), "no align on the successor refuses")
+    eq(alignment_fill_shrinks(cut_d, {(".data", 0x8064E760): 16}, now_d, zero), (cut_d, []),
+       "dropped start rounded up to a smaller N does not reach the successor: refused")
+    gap = [(".data", 0x8064E740, 0x8064E760)]
+    eq(alignment_fill_shrinks(gap, fz, now_d, zero), (gap, []), "a drop that rounds up to the start from before it by a whole N is refused")
+    mid = [(".data", 0x8064E748, 0x8064E75C)]
+    eq(alignment_fill_shrinks(mid, fz, now_d, zero), (mid, []), "a drop that does not end at the successor is refused")
+    eq(alignment_fill_shrinks(cut_d, fz, {".data": [(0x8064DE88, 0x8064E748)]}, zero), (cut_d, []),
+       "a successor that is no longer claimed is refused")
+    eq(claim_aligns("A/a.cpp:\n\t.data start:0x80500000 end:0x80500010 align:32\n\t.rodata start:0x1 end:0x2\n"),
+       {(".data", 0x80500000): 32}, "claim_aligns reads align:N per range")
 
     with tempfile.TemporaryDirectory() as tmp:
         def write(rel, text=None):

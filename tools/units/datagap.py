@@ -319,6 +319,8 @@ def main(argv=None) -> int:
             print("deferred (claim-exposed) " + line)
         if len(verdict["claim_exposed"]) > 6:
             print("deferred (claim-exposed) ... %d more" % (len(verdict["claim_exposed"]) - 6))
+        for line in verdict["alignment_fill"]:
+            print("excused  " + line)
         for line in verdict["added"]:
             print("REFUSED  " + line)
         if verdict["added"] and os.path.abspath(base_root) != os.path.abspath(args.root):

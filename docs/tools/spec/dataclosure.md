@@ -30,6 +30,10 @@ verdicts and snapshots as dicts; it writes nothing.
 ## Invariants and rules
 
 * A claim is a `splits.txt` range: an address is covered exactly when some registered block's range contains it.
+* **A shrunk claim is refused** (bytes claimed at the base, claimed by no unit now) **except alignment fill**
+  (`alignment_fill_shrinks`): the dropped range is all zero in `orig/RMHE08/sys/main.dol`, ends exactly at the start of a
+  claimed range that carries `align:N` (`claim_aligns`), and the dropped start rounded up to N is that start. The gate row
+  reports it as `alignment_fill` (`datagap.py --row` prints `excused`); an unreadable DOL excuses nothing.
 * **STRICT** (owner, 2026-09-29): a unit the batch really changes must claim the data only it references, pre-existing pairs
   too; a deferred pair names its class: `pool-synth`, `ambiguous-owner`, `span-blocked`, `isolated-run` (`STRICT_CLASSES`).
 * **TOUCHED** (owner, 2026-09-29: "only real changes"): registered, recut, or a compiled object whose

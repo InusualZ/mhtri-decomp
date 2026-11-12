@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tools.lib import cextract, cscan, declperm, ppc
+from tools.lib import cextract, cscan, declperm, names, ppc
 
 #: allocatable GPRs: r0, r3-r12 (volatile) and r14-r31 (callee-saved); r1, r2 and r13 are reserved
 K_GPR = 29
@@ -529,11 +529,24 @@ class SourceLocal:
 _FOR_DECL = re.compile(r"\bfor\s*\(\s*(?:const\s+)?[A-Za-z_][\w:]*(?:\s*\*)*\s+\**\s*(\w+)\s*=")
 
 
+def _qualifier(code: str, pos: int) -> tuple[str, ...]:
+    """The `A::B::` written before the name at `pos` of `code`, as `("A", "B")` (`()` for an unqualified name)."""
+    m = re.search(r"((?:[A-Za-z_]\w*\s*::\s*)+)$", code[:pos])
+    return tuple(re.findall(r"[A-Za-z_]\w*", m.group(1))) if m else ()
+
+
 def find_definition(text: str, function: str) -> "cscan.Declaration | None":
     """The definition of `function` (plain or mangled: lib.cextract's identifiers) in `text`, or None."""
-    names = cextract.target_identifiers(function)
+    idents = {function.split("::")[-1]} if "::" in function else cextract.target_identifiers(function)
     t = cscan.Text(text)
-    found = [d for d in cscan.function_declarations(t) if d.body and d.name.split("::")[-1] in names]
+    found = [d for d in cscan.function_declarations(t) if d.body and d.name.split("::")[-1] in idents]
+    if len(found) > 1:
+        # several definitions of one identifier (`create` of two classes): the owner scope of a mangled or
+        # `A::f` name picks the one defined as `A::f`
+        member = names.split_member(function)
+        scope = member[1] if member else tuple(function.split("::")[:-1])
+        if scope:
+            found = [d for d in found if _qualifier(t.code, d.pos)[-len(scope):] == scope]
     return found[0] if len(found) == 1 else None
 
 

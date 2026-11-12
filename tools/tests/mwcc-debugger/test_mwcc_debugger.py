@@ -98,6 +98,36 @@ def _zst_tar(path, members):
     path.write_bytes(zstandard.ZstdCompressor().compress(raw.getvalue()))
 
 
+def test_selector_cli(c):
+    """The launcher resolves the function selector before it needs a compiler or gdb, and refuses a bad one in words."""
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        sym = td / "symbols.txt"
+        sym.write_text("create__3FooFv = .text:0x80001000; // type:function size:0x10 scope:global\n"
+                       "create__3BarFv = .text:0x80002000; // type:function size:0x20 scope:global\n"
+                       "create__3BarFi = .text:0x80003000; // type:function size:0x30 scope:global\n", encoding="utf-8")
+
+        def run(*argv):
+            proc = subprocess.run([sys.executable, str(TOOL / "mwcc_debugger.py"), "-a", str(td / "no-such.exe"),
+                                   "--symbols", str(sym), *argv], cwd=td, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace")
+            return proc.returncode, proc.stdout + proc.stderr
+
+        code, text = run("0x80009999")
+        c.check("an address with no row is refused before any compiler is needed", code != 0, True)
+        c.contains("... naming the address", text, "no function row at 0x80009999")
+        code, text = run("Bar::create")
+        c.contains("two overloads of Class::method are listed, not guessed", text, "Bar::create names 2 functions")
+        code, text = run("Foo::create")
+        c.contains("a resolved selector reaches the compiler check (and names the link name it chose)", text,
+                   "Selecting create__3FooFv")
+        c.contains("... which then fails on the missing compiler", text, "no-such.exe")
+        code, text = run("--symbol", "Foo::create", "out_a", "out_b")
+        c.contains("--symbol takes one positional (OUTPUT_DIR), two is an error", text, "only positional is OUTPUT_DIR")
+        code, text = run()
+        c.contains("no function at all is an error that says so", text, "name the function")
+
+
 def test_fetch_gdb_cache_under_dest(c):
     """`fetch_gdb.py --dest X` keeps its package cache under X, never in the current directory."""
     fg = load_fetch_gdb()

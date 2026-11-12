@@ -293,6 +293,30 @@ REORDER = """void f(int a)
 """
 
 
+TWO_OWNERS = """struct A { int create(int a); };
+struct B { int create(int a, int b); };
+
+int A::create(int a)
+{
+    return a;
+}
+
+int B::create(int a, int b)
+{
+    return a + b;
+}
+"""
+
+
+def test_find_definition_by_owner(c):
+    params = lambda text, fn: (lambda d: None if d is None else regsim.param_count(d))(regsim.find_definition(text, fn))
+    c.check("a plain name two classes share names no definition", params(TWO_OWNERS, "create"), None)
+    c.check("a mangled name picks its class's definition", params(TWO_OWNERS, "create__1AFi"), 1)
+    c.check("... and the other class's", params(TWO_OWNERS, "create__1BFii"), 2)
+    c.check("Class::method picks the same", params(TWO_OWNERS, "B::create"), 2)
+    c.check("a class that defines none finds none", params(TWO_OWNERS, "create__1CFi"), None)
+
+
 def test_tryvar_spelling(c):
     nodes = {32: regsim.Node(32, 31, "a"), 33: regsim.Node(33, 30, "y"), 34: regsim.Node(34, 29, "x")}
     g = regsim.Graph(nodes)

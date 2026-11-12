@@ -12,7 +12,8 @@ no caller in the tracked tree
 
 ## CLI
 
-Flags: `--args`, `--emulator`, `--exe`, `--gdb`, `--gdb-port`, `--timeout`, `--extract`, `--no-fallback`.
+Flags: `--args`, `--emulator`, `--exe`, `--gdb`, `--gdb-port`, `--timeout`, `--extract`, `--no-fallback`, `--symbol FUNC` (or the positional FUNC),
+`--size N`, `--symbols MAP`. FUNC is a mangled name, `Class::method`, an address (`0x8009792C`) or a plain name (first match).
 `extract.py SOURCE FUNCTION [-o OUT] [--json]` builds the one-function TU on its own.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
@@ -42,6 +43,18 @@ Inputs -> outputs: source + flags -> build/mwcc-debug dumps.
   out-of-class member definitions, blanks what it removes (line numbers and preprocessor lines kept) and puts the
   unit's directory first on the include path.
 
+* **Function selection** (`lib/funcspec.py`, `spec/lib-funcspec.md`, pure, no gdb): the launcher parses FUNC into a `Selector` (source name, owner
+  scope, link name, `symbols.txt` row) and sends it through the session parameters; the gdb side compares every function
+  the compiler generates by source name + owner scope (the object record's `+0x08` scope record: parent `+0x00`, name node
+  `+0x04`, text at `+0x0A`; verified 2026-11-12 on `ResUserDataAc` and `nw4r::g3d::*`) and by the link name when the
+  compiler has cached one (`+0x48`, set only for some functions). A plain name keeps the first-match meaning and notes
+  every `symbols.txt` row that shares it; `Class::method`/address/`--size` that name 0 or >1 rows are refused or listed.
+  The owner-scope parse is `lib.names.split_member` (one walk shared with `owner_stem`).
+* A compile that ends without the function ends the session with exit 3 and a message naming the functions of that name
+  that were generated (it used to read the dead process's current-function global: `gdb.MemoryError` at 0x2); the launcher
+  does not take the one-function-TU retry for exit 3. Measured on `enemy/fn_80138074` (`ExecCallbackC__13ResUserDataAc...`:
+  426 instructions = the object's) and `g3d/g3d_resmat` (`BindPltt__Q34nw4r3g3d14ResTexPlttInfo...`: `verify_pcode` MATCH, 54 = 54).
+
 ## Lib dependencies
 
 proc (the gdb session, `lib_proc.run`), binary (`pe`: `versions.detect`/`build`/`_verify_symbols`, `locate/dissect.py`,
@@ -60,7 +73,9 @@ tree: `versions.detect` over the 30 `build/compilers/*/*/mwcceppc.exe`, `dissect
 identical to the old port's. `tools/tests/mwcc-debugger/test_extract.py`: the one-function TU of a fixture unit keeps
 the target, every line number and preprocessor line, stubs the free functions, keeps inline/template definitions,
 drops an out-of-class member, and resolves mangled targets (`send__16NetworkSingleTcpFPCUcl` -> `send`,
-`__ct__3BoxFv` -> `Box`).
+`__ct__3BoxFv` -> `Box`). `test_funcspec.py` (41 checks): mangled/`Class::method`/address/size selectors, the ambiguity refusals,
+`Selector.matches` on class chains, the scope-record walk and the `symbols.txt` rows; `test_selector_cli` (in `test_mwcc_debugger.py`) drives the
+launcher's refusals without a compiler; `test_regsim.py::test_find_definition_by_owner` picks the right `create` of two classes.
 
 ## Known gaps
 
