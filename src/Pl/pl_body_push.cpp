@@ -16,10 +16,11 @@
  *   `pl_push_capsule_get`, `npc_push_capsule_get`, `em_push_sphere_get`, `push_vec_finish`, `push_accum`,
  *   `coll_push_out_em`, `body_shape_get`, `pl_push_vertical_ck`, `npc_push_vertical_ck`.  `hit_lists_init` (the pass's
  *   entry, called by `Pl/pl_motion.cpp`) and `coll_push_out` (the camera's) are earlier GUESSes kept as they are.
- * RESIDUALS. Every row is written.  `body_push_reset`, `body_push_em_pass`, `body_push_pl_pass`: register permutations
- *   of the loop pointers and counters (permdecl tried every declaration order).  The pool is declared by literal, not
- *   claimed by name (`.sdata2` 0x8079A380-0x8079A398 is emitted by the literals); the hit parts' callers keep the
- *   other units' views (`ai/ai_npc.h`'s `_AINPC_W`, a local view of `_PLW::physics_0x13C`).
+ * RESIDUALS. None in .text (flipcheck READY).  The pool is declared by literal, not claimed by name (`.sdata2`
+ *   0x8079A380-0x8079A398 is emitted by the literals); the hit parts' callers keep the other units' views
+ *   (`ai/ai_npc.h`'s `_AINPC_W`, a local view of `_PLW::physics_0x13C`).  The loop pointers/counters follow regsim's
+ *   declaration plans (a second counter `j` for the enemy loop in `body_push_reset`, `last` for the bound in
+ *   `body_push_em_pass`, `em` at function scope in `body_push_pl_pass`).
  * SHAPES. The move-type test is `(u8)(type + 0xFF) <= 1` (retail `addi 0xff` + `clrlwi`; `- 1` gives `subi`, a
  *   `switch` a jump); a part-list skip advances the pointer before `continue`, and the body-list skips in
  *   `body_push_pl_pass` also leave the loop on a null link (retail repeats `lwz`/`cmpwi`/`beq` per skip); the shape
@@ -110,9 +111,10 @@ extern "C" u32 npc_push_vertical_ck(_AINPC_W* npc)
 /* 0x80297E88 (0x11C): clears the drift of every live player, enemy and the NPC. */
 extern "C" void body_push_reset(void)
 {
-    u16 count;
     _PLW* plw;
+    u16 count;
     u32 i;
+    u32 j;
     _ENEMY_WORK* em;
     _AINPC_W* npc;
 
@@ -126,7 +128,7 @@ extern "C" void body_push_reset(void)
     }
     count = get_move_work_max(3);
     em = (_ENEMY_WORK*)get_move_work_adrs(3);
-    for (i = 0; i < count; i++, em++) {
+    for (j = 0; j < count; j++, em++) {
         if (em->active != 0) {
             setVector3(&em->drift_vel_0x8B4, 0.0f, 0.0f, 0.0f);
             em->drift_on_0x8C0 = 0;
@@ -143,19 +145,20 @@ extern "C" void body_push_reset(void)
 extern "C" void body_push_pl_pass(void)
 {
     _PLW* plw;
-    u32 i;
+    _ENEMY_WORK* em;
     u16 pl_count;
     u16 em_count;
+    u32 i;
 
     pl_count = get_move_work_max(2);
     em_count = get_move_work_max(3);
     plw = (_PLW*)get_move_work_adrs(2);
     for (i = 0; i < pl_count; i++, plw++) {
         if (plw->slot_active != 0 && plw->field_0x580 <= 0) {
-            _ENEMY_WORK* em = (_ENEMY_WORK*)get_move_work_adrs(3);
             u32 j;
             _BODY_W* body;
 
+            em = (_ENEMY_WORK*)get_move_work_adrs(3);
             for (j = 0; j < em_count; j++, em++) {
                 if (em->active != 0 && em->fx_timer_0x8C2 <= 0 && plw->area_0x16 == em->area_no) {
                     body_push_pl_em(plw, em);
@@ -198,18 +201,18 @@ extern "C" void body_push_pl_pass(void)
 /* 0x80298108 (0x168): pushes every pair of live enemies in one area apart (two flying kind-9 enemies never). */
 extern "C" void body_push_em_pass(void)
 {
+    _ENEMY_WORK* b;
     _ENEMY_WORK* a;
     _ENEMY_WORK* base;
     u16 count;
     s32 i;
+    s32 j;
+    s32 last;
 
     count = get_move_work_max(3);
     base = (_ENEMY_WORK*)get_move_work_adrs(3);
-    for (i = 0, a = base; i < count - 1; a++, i++) {
+    for (i = 0, a = base, last = count - 1; i < last; a++, i++) {
         if (a->active != 0 && a->fx_timer_0x8C2 <= 0 && a->fx_timer_0x8C4 <= 0) {
-            s32 j;
-            _ENEMY_WORK* b;
-
             for (j = i + 1, b = base + j; j < count; b++, j++) {
                 if (b->active != 0 && b->fx_timer_0x8C2 <= 0 && b->fx_timer_0x8C4 <= 0 && a->area_no == b->area_no
                     && (em_data_kind_get(a) != 9 || em_data_kind_get(b) != 9)

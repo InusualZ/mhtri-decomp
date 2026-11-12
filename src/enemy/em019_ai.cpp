@@ -19,9 +19,10 @@
  *   signature than retail's call, the call goes through a cast view (`_c1`/`_c2`).
  * RESIDUALS. Partial rows:
  *  - `em019_motion_next`: retail tests the 31..32 cases as `subi` + `cmplwi 1`; ours as `cmpwi 31`/`blt` +
- *    `cmpwi 32`/`ble` (every case order measured);
- *  - `em019_act7_rush`: retail keeps the side-step angle in r31 and multiplies `ratio * scale` as (f0, f31); ours
- *    r29 and (f31, f0);
+ *    `cmpwi 32`/`ble` (every case order measured; a scoped `peephole on` changes nothing; the switch value is r4 in
+ *    retail, a scratch r0 in ours);
+ *  - `em019_act7_rush`: retail multiplies `ratio * scale` as (f0, f31); ours (f31, f0) (an operand swap and a `ratio`
+ *    local were measured; regsim's declaration plan, two function-scope angles, closed the register half);
  *  - `em019_act7_jump`: retail loads +0x1C0 after the angle conversion in the `+=`; ours before it;
  *  - `em019_spawn_point_pick`: retail narrows `first` before the loop and colours i/first r28/r30, ours r30/r28
  *    (every declaration order measured);
@@ -1751,6 +1752,8 @@ void em019_act7_roar(_ENEMY_WORK* self, u8 kind)
 void em019_act7_rush(_ENEMY_WORK* self, u8 kind)
 {
     nw4r::math::VEC3 pos;
+    u32 angle_a;
+    u32 angle_b;
     u16 speed;
     u32 turn;
 
@@ -1781,21 +1784,21 @@ void em019_act7_rush(_ENEMY_WORK* self, u8 kind)
             em_approach_start(self, 1200.0f, 0);
             break;
         case 11: {
-            u32 angle = calcVecAng2(&self->pos, &self->vec_0x36C) + 0x4000;
+            angle_a = calcVecAng2(&self->pos, &self->vec_0x36C) + 0x4000;
             f32 scale = 2.0f / get_em_base_scale(self);
 
             setVector3(&pos, 0.0f, 0.0f, 1650.0f * em_target_dist_ratio_get(self, 3.0f, 0.3f, 2000.0f) * scale);
-            rotVecY(&pos, angle);
+            rotVecY(&pos, angle_a);
             self->vec_0x36C += pos;
             em_approach_start(self, 200.0f, 0);
             break;
         }
         case 12: {
-            u32 angle = calcVecAng2(&self->pos, &self->vec_0x36C) - 0x4000;
+            angle_b = calcVecAng2(&self->pos, &self->vec_0x36C) - 0x4000;
             f32 scale = 2.0f / get_em_base_scale(self);
 
             setVector3(&pos, 0.0f, 0.0f, 1650.0f * em_target_dist_ratio_get(self, 3.0f, 0.3f, 2000.0f) * scale);
-            rotVecY(&pos, angle);
+            rotVecY(&pos, angle_b);
             self->vec_0x36C += pos;
             em_approach_start(self, 200.0f, 0);
             break;

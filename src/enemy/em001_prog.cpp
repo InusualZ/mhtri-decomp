@@ -24,11 +24,13 @@
  *   whose call sites disagree with the owner's header are called through `<name>_viewN`/`<name>_cN` cast macros (the
  *   same direct call); the shell slots go through `Em001Shell*Fn` (the table base is only the dispatch register).
  *   The `.bss` record names (`vec_pair_801502C8_*`) are GUESSes.
- * RESIDUALS. Every row is written; 8 rows short of 100:
- *  - `em001_spawn_step`, `em001_effect_spawn`, `em001_target_range_ck`, `em001_action_select`,
- *    `em001_tev_color_update`: register or stack-slot colouring only (the instructions match);
- *  - `em001_alt_effect_update`: retail recomputes `angle + 0x8000` for the second window test where MWCC keeps the
- *    first sum live across the call;
+ * RESIDUALS. Every row is written; 5 rows short of 100:
+ *  - `em001_spawn_step`: retail lowers the two `switch ((u8)arg2)` windows as `subi`/`cmplwi` ranges off the shared
+ *    `arg2 - 1` (r30) and colours arg1..arg3 r30/r28/r29; ours tests each window with `cmpwi`/`blt` pairs (16 B
+ *    larger) and colours them r28/r29/r30;
+ *  - `em001_target_range_ck`: float colouring only (f30/f31 swap; the instructions match);
+ *  - `em001_tev_color_update`: the 0xFF/0xDC colour constants take r3 where retail uses r9 (regsim: no declaration
+ *    order moves a volatile);
  *  - `em001_act7_6`: retail narrows the approach step's `0x80` argument (`clrlwi r5,r5,16`), no tried spelling keeps it;
  *  - `em001_act7_25`: one `fmuls` operand order.
  *   flipcheck: the functions are not in address order (extabindex pairs them by position), `.data`/`.rodata`/`.sdata`
@@ -4954,9 +4956,10 @@ void em001_action_dispatch(struct _ENEMY_WORK* self) {
 
 /* 0x8015111C (0x158) - the effect arming helper: only when the enemy faces a valid angle does it
  * spawn the per-motion effect. */
+#pragma opt_common_subs off
 void em001_alt_effect_update(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
-    u16 angle;
+    u32 angle;
     u16 motion;
     u32 kind;
 
@@ -4984,6 +4987,8 @@ void em001_alt_effect_update(struct _ENEMY_WORK* self) {
     }
 }
 
+#pragma opt_common_subs reset
+
 /* 0x80151274 (0x74) - arms the one-shot effect when the action timer (+0x354) is idle. */
 void em001_ground_impact_idle(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
@@ -5006,8 +5011,8 @@ void em001_effect_spawn(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s3
     case 1:
         get_joint_wpos_em(self, arg3, &pos);
         pos.y = self->field_0x20C;
-        eft_spawn_pos_in_area(&pos, self->area_no, arg2, self->field_0x1C0 + arg4,
-                    farg0 * get_em_chg_scale(self));
+        farg0 *= get_em_chg_scale(self);
+        eft_spawn_pos_in_area(&pos, self->area_no, arg2, self->field_0x1C0 + arg4, farg0);
         return;
     case 2:
         pos.x = self->pos.x;
@@ -5908,13 +5913,13 @@ s32 em001_action_select(struct _ENEMY_WORK* self, u16 arg1) {
     }
     if (armed == 0) {
         switch (kind) {
+        case 1:
+            arg3 = 0xA;
+            break;
         case 2:
         case 3:
         case 5:
             arg3 = 3;
-            break;
-        case 1:
-            arg3 = 0xA;
             break;
         default:
             arg3 = 0xFF;

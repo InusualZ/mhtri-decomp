@@ -20,13 +20,19 @@
  * RESIDUALS. Every row has a body.
  *  - `networkSessionReflect1`: callee-saved colouring in the 0x8044 (retail stores the notice slot into +0x536 with no
  *    `extsb`), 0x8045/0x804E member loops and one later case (r22/r23, r29-r31 permuted; the Wii/1.3 debugger's
- *    regalloc dump colours `slot` first, retail last; declaration orders and a block-local slot change nothing);
+ *    regalloc dump colours `slot` first, retail last; declaration orders and a block-local slot change nothing; regsim's best plan reaches 19 of 23 callee-saved targets
+ *    by folding one temp into `value`, none is exact);
  *  - `networkSessionReflect0`: retail sets r3 for `postEvent` before the code select and selects into r4 after the
  *    compare; the debugger dump shows our `code` precoloured r4 at initpcode, and every `if`/`else`/ternary/inline-helper
- *    spelling either keeps that order or becomes MWCC's branchless `subf`/`nor`/`srawi` select;
+ *    spelling either keeps that order or becomes MWCC's branchless `subf`/`nor`/`srawi` select; the pre-allocation
+ *    block holds `li code` ahead of the `lbz 0x536`, so the `(s8)player` temp interferes with `code` and takes r5 (regsim:
+ *    r93 r5, retail r4); a local `s8`/`s32`/`bool` for the compare, `s8 code`, a `code++` form and the `else` form
+ *    (-16 B) all measured no better;
  *  - `updatePlayerRecord`: one instruction either way.  The debugger shows both peephole passes on one flag (0x77DD4D):
  *    the pre-regalloc pass removes the store's `clrlwi` and the post-prologue pass folds `addi r3,r31,0x540` +
  *    `lwz r12,0(r3)` into `lwz r12,0x540(r31)`; retail has neither.  `u8`/`bool` state and pragma sweeps measure lower;
+ *    peephole off for the function leaves only the store's `clrlwi` (98.58, 300 B), and a `peephole off` placed inside
+ *    the body acts as the function-end state (identical object);
  *  - extab: 2 bytes differ (the open rows' saved-register records);
  *  - `.sdata2`: the pool entries pair by address, not by name (anonymous `@NNN` against the map's `lbl_8079C758`;
  *    naming one would claim a symbol the original did not have, playbook 58);

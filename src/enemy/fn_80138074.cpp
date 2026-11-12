@@ -25,12 +25,11 @@
  *   Its six hooks are GUESS names from the dispatch: Attach (+0x18, run by `em_res_user_data_set`), CalcAnmItem /
  *   CalcAnmItemEx (+0x1C/+0x20, ExecCallbackA's items), CalcMtxItem / CalcMtxItemEx (+0x24/+0x28, ExecCallbackB's),
  *   CalcWorldEnd (+0x2C, run at the end of ExecCallbackC).
- * RESIDUALS. Every row is written; 70 of 73 rows match.
+ * RESIDUALS. Every row is written; 72 of 73 rows match.
  *  - `ExecCallbackC`: the TYPE-name loop reuses the test's `lwz r4,0(name)` in the body where retail reloads it
- *    (`lwz r0` in the test, `lwz r4` in the body; `opt_common_subs`, `opt_propagation`, `opt_loop_invariants` off
- *    and a `while` form do not change it), and `kind`/`type` swap r21/r23;
- *  - `em_turn_joint_update`: `best` takes r28 where retail gives it r26 (every declaration order measured);
- *  - `fn_8013823C`: the `field_0x88C` slot test loads into r0 where retail loads r3.
+ *    (`lwz r0` in the bottom test, `lwz r4` in the body; the Wii/1.3 debugger's CSE merges the two loads; `opt_common_subs`,
+ *    `opt_propagation`, `opt_loop_invariants` off, a `while` form, an indexed form and a moved `name++` do not change it), so
+ *    ours is 4 B short and `kind`/`type` swap r21/r23;
  *  - flipcheck: `.data` and `.sdata` claimed, not emitted as retail's: the accessor strings (0x805A1398..0x805A1530)
  *    the panics name through `lbl_805A13xx` externs, and the `.sdata` literals merge under `-str reuse` (one `"ref"`
  *    where retail keeps three, so the order and size differ);
@@ -257,7 +256,7 @@ extern f32 stg_area_ceiling_get(u8 area);
 extern u8 stage_map_kind_get(u8 arg0);
 extern void em_roster_record_release(s32 arg0);
 extern s32 em_roster_record_slot_id_get(s32 arg0);
-extern s32 em_roster_record_alive_ck(void);
+extern s32 em_roster_record_alive_ck(s32 arg0);
 
 /* --------------------------------------------------------------------------------------------- */
 /* reconstructed types                                                                            */
@@ -596,7 +595,7 @@ void fn_8013823C(EnemyWork* self) {
         {
             s32* record = &self->field_0x88C[i];
             if (*record != -1) {
-                if (em_roster_record_alive_ck() == 0) {
+                if (em_roster_record_alive_ck(*record) == 0) {
                     if (em_roster_record_slot_id_get(*record) > 0) {
                         self->field_0x89E++;
                     }
@@ -1045,6 +1044,9 @@ s32 em_res_user_data_ck(EnemyWork* self) {
 void em_turn_joint_update(EnemyWork* self) {
     f32 v;
     Vec3 pos;
+    u16 current;
+    u16 target;
+    u16* slot;
     u32 best;
     u32 total;
     UserDataItem* item;
@@ -1083,9 +1085,8 @@ void em_turn_joint_update(EnemyWork* self) {
     if (item != NULL) {
         while (item->field_0x00 != (u32)-1) {
             if (item->field_0x04 == 1) {
-                u16 current;
-                u16 target = (s32)(v * ((f32)item->field_0x0C / (f32)(u16)total));
-                u16* slot = &self->field_0x742[item->field_0x08];
+                target = (s32)(v * ((f32)item->field_0x0C / (f32)(u16)total));
+                slot = &self->field_0x742[item->field_0x08];
                 current = *slot;
                 if ((s16)(target - current) < 0) {
                     u32 down = current - (u32)(0.03f * (f32)item->field_0x0C);
