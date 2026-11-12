@@ -1022,7 +1022,7 @@ config.libs = [
             Object(NonMatching, "Pl/player_control.cpp"),
             Object(NonMatching, "Pl/pl_act_step.cpp"),
             Object(NonMatching, "Pl/pl_coll.cpp"),
-            Object(NonMatching, "Pl/pl_body_push.cpp"),
+            Object(Matching, "Pl/pl_body_push.cpp"),
             Object(NonMatching, "Pl/pl_hit.cpp"),
             Object(NonMatching, "Pl/pl_act.cpp"),
             Object(Matching, "Pl/pl_act_step_data.cpp"),
