@@ -3,7 +3,9 @@
  * confirm and cancel buttons and its QWERTY/cellphone key-layout switch, its pane handler and its button parts.
  *
  * RANGE.     .text 0x805546B4..0x80555B0C (37 functions), .ctors 0x8056F404..0x8056F408, .rodata 0x8057B668..0x8057B848,
- *            .data 0x80650160..0x80650500, .sdata 0x80794608..0x80794620.
+ *            .data 0x80650160..0x806504E8 (the 0x18 bytes to 0x80650500 are the link's alignment fill
+ *            before homebutton/hbm_kb_child.cpp's 32-aligned .data; the three class tables are
+ *            __vt__20HbmKbListPaneHandler, __vt__9HbmKbList and __vt__13HbmKbListBase), .sdata 0x80794608..0x80794620.
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (configure.py); the retail object has no extab/extabindex, so `#pragma exceptions off`.
  * NAMES.     GUESS file name: the band's `hbm_` prefix + the list widget; no `__FILE__` string, no runtime-dump name.
  *            The animation resources the unit loads are `fs_VK_toolbar_a_*.brlan`, so the widget is the toolbar.

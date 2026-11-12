@@ -34,8 +34,10 @@
  * RESIDUALS. Partial rows (register colouring, scheduling or stack slots only): `em007_act7_8` (the angle's
  *   u16 result is coloured r3, retail keeps it in r27 with the s32 term; the shell call loads its table before the
  *   arguments, retail after), `em007_act9_1` (retail loads the 1.0f gauge argument after `mr r3,r30`, ours before),
- *   `em007_model_eft_create` (two extra `clrlwi`: the res-id argument and the made-flag store; its extab record is
- *   0x18, retail 0x8 - the new-expression's landing pad), `em007_model_copy_bind_nodes` (the two node temporaries'
+ *   `em007_model_eft_create` (one extra `clrlwi`: the res-id argument is narrowed to u16 by the frontend (PCode
+ *   dump `backend-02-after-initpcode`: `rlwinm r4,r43,0,16,31` after the `lhzx`), no cast or local removes it; the
+ *   made-flag is `bool`, so its store is raw like retail's; its extab record is 0x18, retail 0x8 - the
+ *   new-expression's landing pad), `em007_model_copy_bind_nodes` (the two node temporaries'
  *   stack slots swap), `em007_action_select` (retail keeps the first switch's answer in r28, ours r30),
  *   `em007_act7_10` (the `fn_8012D3E0` answer is narrowed into r0, retail r6).
  *   Data: `Em007UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table
@@ -77,6 +79,7 @@
 #include "g3d/g3d_calcview.h"
 #include "ef.h"
 #include "ef/eft_res.h"
+#include "ef/res_eft_model_create_light.h"
 #include "ef/effect.h"
 #include "lobby/lb_npc.h"
 #include "enemy/fn_80138074.h"
@@ -4155,7 +4158,7 @@ void em007_model_eft_create(_EFT* self) {
     u32 light;
     _AINPC_W* npc;
     struct _LB_NPC* lb_npc;
-    u8 made;
+    bool made;
     struct Em007EftWork* work;
     u32 i;
 
@@ -4168,7 +4171,7 @@ void em007_model_eft_create(_EFT* self) {
         } else {
             light = 0;
         }
-        made = (u32)res_eft_model_create_light(work->models_0x08[i], em007_model_res_ids[work->kind_0x2A], 0x2C, light);
+        made = res_eft_model_create_light(work->models_0x08[i], em007_model_res_ids[work->kind_0x2A], 0x2C, light);
         if (made == 0) {
             em007_model_eft_retire(self);
             return;

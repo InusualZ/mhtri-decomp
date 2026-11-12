@@ -60,6 +60,7 @@
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
 #include "unsplit/unknown.h"
 #include "enemy/em_pop.h"   /* the band's unnamed callees */
+#include "ef/res_eft_model_create_light.h"
 #include "ef/eft_res.h"        /* eft_res_slot_get/eft_res_model_get/eft_res_models_release (the effect pool) */
 #include "ef/effect.h"         /* eft_state_flags_set (the effect's two state bytes) */
 #include "ef/eft019.h"         /* eft019_set_core (the family's shared placement entry) */

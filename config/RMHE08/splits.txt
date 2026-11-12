@@ -4196,7 +4196,7 @@ homebutton/hkb_cellphone.cpp:
 	.text       start:0x8053E808 end:0x805425E4
 	.ctors      start:0x8056F3F8 end:0x8056F3FC
 	.rodata     start:0x8057AB98 end:0x8057B098
-	.data       start:0x8064DE88 end:0x8064E760
+	.data       start:0x8064DE88 end:0x8064E748
 	.sdata      start:0x80794568 end:0x807945C8
 	.sdata2     start:0x8079D620 end:0x8079D628
 
@@ -4204,7 +4204,7 @@ homebutton/hbm_text_panel.cpp:
 	.text       start:0x805425E4 end:0x8054F7BC
 	.ctors      start:0x8056F3FC end:0x8056F400
 	.rodata     start:0x8057B098 end:0x8057B2F0
-	.data       start:0x8064E760 end:0x8064F360
+	.data       start:0x8064E760 end:0x8064F360 align:32
 	.bss        start:0x807901F0 end:0x80790250
 	.sdata      start:0x807945C8 end:0x807945E8
 	.sbss       start:0x80795A50 end:0x80795A70
@@ -4222,14 +4222,14 @@ homebutton/hbm_kb_list.cpp:
 	.text       start:0x805546B4 end:0x80555B0C
 	.ctors      start:0x8056F404 end:0x8056F408
 	.rodata     start:0x8057B668 end:0x8057B848
-	.data       start:0x80650160 end:0x80650500
+	.data       start:0x80650160 end:0x806504E8
 	.sdata      start:0x80794608 end:0x80794620
 
 homebutton/hbm_kb_child.cpp:
 	.text       start:0x80555B0C end:0x80556FC4
 	.ctors      start:0x8056F408 end:0x8056F40C
 	.rodata     start:0x8057B848 end:0x8057BAB0
-	.data       start:0x80650500 end:0x80650B40
+	.data       start:0x80650500 end:0x80650B40 align:32
 	.sdata      start:0x80794620 end:0x80794628
 
 homebutton/hbm_anim_record.cpp:

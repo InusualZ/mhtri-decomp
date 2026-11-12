@@ -80,6 +80,7 @@
 #include "ef/eft028_set.h"   /* eft028_set, eft028_set_capsule */
 #include "ef/RetireParticleAll.h"
 #include "ef/eft_res_file_load.h"
+#include "ef/res_eft_model_create_light.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the control block, the slot table and the model records
@@ -308,7 +309,6 @@ void push_g3d_wk(struct _g3d_work* work);
 
 /* g3d's root node (the map spells it `pRoot`; ef/eft007.cpp declares the same) */
 
-u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
 /* untyped: opaque handle - the UV animation record the caller stores */
 void* res_eft_UV_model_create_name(MHchar* model, char* name, u32 arg, long light, struct _g3d_work** list, long count,
                                    u8 flag);
@@ -1893,12 +1893,12 @@ extern "C" void eft_instances_release(void) {
 
 /* 0x800F8E5C - create a model on an actor (no light argument). */
 void* res_eft_model_create(MHchar* model, u16 id, u32 arg) {
-    return (void*)res_eft_model_create_light(model, id, arg, 0);
+    return (void*)(u32)res_eft_model_create_light(model, id, arg, 0);
 }
 
 /* 0x800F8E68 (0xF4): binds the effect model resource `id` (the model-name table entry) to `model` with the light
  * set `light`; returns 1, or 0 without a model, past the table's 0xAD names or when the file is not loaded. */
-u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light) {
+bool res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light) {
     u32 res;
     u32 file;
     ResEntry* entry;

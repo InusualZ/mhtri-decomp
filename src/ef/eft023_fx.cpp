@@ -34,6 +34,7 @@
 #include "nw4r/math.h"
 #include "gx.h"
 #include "unsplit/unknown.h"
+#include "ef/res_eft_model_create_light.h"
 #include "unsplit/enemy.h"
 #include "enemy/fn_8012BDF4.h"
 #include "sys_mem.h"

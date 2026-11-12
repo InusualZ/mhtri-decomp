@@ -42,6 +42,7 @@
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "ef.h"
+#include "ef/res_eft_model_create_light.h"
 #include "ef/eft_res.h"
 #include "ef/effect.h"
 #include "menu/menu_item.h"

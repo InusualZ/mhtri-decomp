@@ -8,6 +8,6 @@
 struct MHchar;
 
 /* Binds the light resource `id` to `model` at joint `light`; returns 0 when the resource is missing. */
-u32 res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
+bool res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
 
 #endif

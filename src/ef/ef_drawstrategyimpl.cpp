@@ -10,6 +10,11 @@
  *   (.sbss 0x80794930-0x80794937) and its vtable (.data 0x80594840, between this unit's and
  *   `ef/ef_drawsmoothstripestrategy.cpp`'s claims) are one TU of their own in nw4r (`ef_drawstrategybuilder.cpp`): no
  *   assert of this file's is cited before 0x800C5F74.
+ *   One TU for .text 0x800C5F74-0x800C9540: the zigzag `.data` seam 0x80594A30 (`DrawStrategyImpl` table -> `DrawStrategy`
+ *   table) follows from the base constructor being an inline emitted after the derived one, and the V->S seam
+ *   0x80594A40 (the `layer`/`particle.h` assert strings after the tables) from the `ef_particle_*` header inlines'
+ *   deferred emission; the `.sdata2` pool word 0x807961E4 is read from 0x800C5FDC through 0x800C9488 (`ef_particle_*`
+ *   0x800C8680-0x800C89D0 lie between its readers) and there is one `__sinit`/`.ctors` word.
  * FLAGS. `cflags_main` plus `-pool off` (configure.py: each `.bss` object of `Create` and the static initializer gets
  *   its own `lis`/`addi`, playbook 43); `#pragma peephole off` before the includes (the unfused `clrlwi`/`extsh`/
  *   `extsb` of the GX FIFO writers and guard tests, playbook 39) and `#pragma fp_contract off` (the texture matrix
@@ -38,6 +43,10 @@
  *  - `SetupGPTexture` (0x800C7CE0): the texture pointer (read through the inline `ef_particle_texture`) lives in r28
  *    where retail has r30, after the file and texture-assert string bases (r28/r29 in retail), and the hoisted LOD
  *    0.0f in f22 where retail has f26; the LOD's `max_lod`/`min_lod` locals give retail's constant load order.
+ *  - `SetupGPColor` (100 %) and the two `GXColor` copies of the TEV colour caches call the unmapped
+ *    `color_rgba_copy` (fn_80047398.h); retail calls `__as__8_GXColorFRC8_GXColor` (0x8004C4F0) there as in
+ *    `ef_draw_info_get_fog`, but the call needs function-wide `dont_inline on`, which un-inlines `IsValidPointer`/
+ *    `MulColorComponent` (measured 71.98 %; the plain assignment inlines the copy, 94.14 %).
  *   flipcheck: `.ctors` and `.data` claimed, not emitted (the strings are declared by their map names).
  *   `DrawStrategyImpl` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
@@ -231,6 +240,7 @@ void DrawStrategyImpl::InitTexture(const EfEmitterDrawSetting& setting) {
 
 extern "C" {
 
+#pragma dont_inline on
 /* 0x800C64AC (0x38): reads the fog record out of the view state. */
 void ef_draw_info_get_fog(const EfDrawInfo* self, s32* type, f32* start_z, f32* end_z, f32* near_z, f32* far_z,
                  GXColor* color) {
@@ -239,8 +249,9 @@ void ef_draw_info_get_fog(const EfDrawInfo* self, s32* type, f32* start_z, f32* 
     *end_z = self->fog_end_z;
     *near_z = self->fog_near_z;
     *far_z = self->fog_far_z;
-    color_rgba_copy((u8*)color, (const u8*)&self->fog_color);
+    *color = self->fog_color;
 }
+#pragma dont_inline reset
 
 }  // extern "C"
 

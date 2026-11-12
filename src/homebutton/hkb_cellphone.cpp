@@ -3,7 +3,8 @@
  *   tag buttons and its pane listener, with the pane-name, window and animation tables they walk; the static
  *   initialiser writes the radio-group names into the window tables.
  * RANGE. .text 0x8053E808-0x805425E4 (79 functions); .ctors 0x8056F3F8-0x8056F3FC; .rodata 0x8057AB98-0x8057B098;
- *   .data 0x8064DE88-0x8064E760; .sdata 0x80794568-0x807945C8; .sdata2 0x8079D620-0x8079D628.
+ *   .data 0x8064DE88-0x8064E748 (the 0x18 bytes to 0x8064E760 are the link's alignment fill
+ *   before homebutton/hbm_text_panel.cpp's 32-aligned .data); .sdata 0x80794568-0x807945C8; .sdata2 0x8079D620-0x8079D628.
  *   Edges: the left edge follows the seven 8-byte slots 0x8053E7D0..0x8053E800 of homebutton/hkb_keyboard.cpp's class
  *   table .data 0x8064DC30; the right edge is the static initialiser 0x8054254C (.ctors word 0x8056F3F8) and its
  *   thunks to 0x805425E4.
