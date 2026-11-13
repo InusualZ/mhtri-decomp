@@ -22,6 +22,8 @@
  *   get_lsp_anim; every table name (button_icon_uvs, uv_rect_uvs, equip_kind_icon_tex, weapon_type_icon_tex,
  *   monster_icon_cells, window_*, title_*, prompt_frame_*, window_box_uvs, window_frame_presets, lsp_arena_id_remap),
  *   lsp_data_adrs / sub_lsp_data_adrs (after the dump's `arena_lsp_data_adrs`, which the arena branch reads).
+ * RESIDUALS. note_box_size: dump 03 narrows the negated height twice (`extsh r34,r41` ... `extsh r35,r42`); retail keeps only the first; `-height`,
+ *   one-expression and `s32` temp spellings measure equal.
  * RESIDUALS. note_box_size: one extra `extsh` after the `neg` (four source shapes reproduce it).
  * RESIDUALS. note_line_draw / note_text_draw: retail narrows the centre into a temporary, ours updates `x` in place.
  * RESIDUALS. draw_spin_icon: `li r4,0x4000` is scheduled before the `fmr f1` (retail after).

@@ -21,7 +21,6 @@
  *  - `fn_8013CAA0`: retail re-narrows the table byte it passes to `fn_8013AB74` (`clrlwi`);
  *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013D054`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
  *    `fn_80140E48`, `fn_80140FB0`, `em_kind_release`: register allocation only;
- *  - `fn_80140B10`: its bytes match; the map's row is 16 B because it covers `em_prog_trace2`'s `blr` too.
  *   flipcheck: `.text` +4 B (`fn_8013BE60`), and `pl_act6_52_54_61_62_ck`/`pl_act6_class_ck` stay undefined until the
  *   registry names land in the map.
  *   `em_snd_proc_tbl` (.bss 0x806A7734) is not this unit's: it sits after `enemy/enemy_control.cpp`'s `.bss` and

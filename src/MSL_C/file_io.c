@@ -9,6 +9,8 @@
  * EVIDENCE. contiguous run with no data of its own; `__fwrite` calls `__prep_buffer`, `__flush_buffer` and
  *    `_fseek`, `fflush` calls `__flush_all` / `__flush_buffer`; the next function reads the locale character table
  *    (a different TU).
+ * RESIDUALS. __prep_buffer: instruction order equals retail's after scheduling; only the colouring differs (regsim: r34 position r5 vs retail r4,
+ *   r35/r36 r4 vs r0, r37 r0 vs r5); statement orders and `pos`/`len`/`off` locals measure equal or lower.
  * RESIDUALS. COARSE: probably several MSL files (arith, buffer_io, direct_io, file_io, FILE_POS), merged because
  *    nothing in the data proves the seams.
  * SHAPES. the stream record is a bitfield pair (`FileModes`, `FileState`) read through 32-bit loads; `__fwrite`

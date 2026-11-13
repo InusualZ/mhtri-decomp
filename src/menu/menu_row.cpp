@@ -18,6 +18,7 @@
  *   bodies, in the band's scheme (`get_note_item_slot`, `item_page_option_row_index`).
  *   GUESS (from each body and its callers): `place_rec_alloc_spr`, `place_rec_alloc_idx`, `menu_row_rec_init`,
  *   `place_list_highlight_draw`, `menu_row_monster_index_get`.
+ * RESIDUALS. menu_row_clear: dump 03 materialises the zero (`li r35,0`) before the index shifts; retail loads it after `slwi` (scheduler order).
  * RESIDUALS. Three rows short, all register allocation with the instruction stream otherwise equal:
  *  - `place_list_overlap_find`: retail keeps `menu_work` in r9 and the record pointer in r7 (ours r8/r7), so the
  *    half-extent temporaries and the loop counter take other registers; no declaration order reaches it;

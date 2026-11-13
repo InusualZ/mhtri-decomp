@@ -23,8 +23,7 @@
  *   `put_message_window`, `menu_select_window_draw`, `menu_choice_window_draw`, `menu_entry_window_draw`,
  *   `menu_pad_map_set`, `menu_yes_no_draw`, `draw_sprite_blink` (alpha scaled by `cockpit_blink_get`),
  *   `menu_item_pages_resort` (re-sorts the pages and re-points the pick and the selected slot), `MenuRowLayout`.
- * RESIDUALS. 10 rows below 100 %, register allocation or branch layout only:
- *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B);
+ * RESIDUALS. 9 rows below 100 %, register allocation or branch layout only:
  *  - `menu_list_fill`: `self` and the record pointer in r29/r30 swapped, each `id` extension before the record test;
  *  - `menu_scroll_init`: retail `blt`+`b` around the `rows` copy, ours one `bge` (116 vs 120 B; if, ternary and
  *    empty-then forms measured the same);
@@ -1299,10 +1298,10 @@ extern "C" s16 menu_page_count(s16 a, s16 b)
         return 1;
     }
     q = a / b;
-    if (a % b == 0) {
-        return q;
+    if (a % b != 0) {
+        q++;
     }
-    return q + 1;
+    return q;
 }
 
 /* Steps a two-state selector (`*state` is 0 or 1) from the pad word `keys`: 0x10 confirms (1 when the state was

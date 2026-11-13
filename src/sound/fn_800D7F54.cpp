@@ -7,6 +7,8 @@
  * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
  *
  * NAMES. GUESS (from each body and its callers): se_entry_request
+ * RESIDUALS. se_slot_kind_dispatch: dump 03 builds `cmpi 3; blt; cmpi 4; ble` for the 3..4 arms and no `subi; cmplwi` range test;
+ *   all 24 case/default orders and `kind` locals (u8/s32/u32) measure equal or lower.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 141 functions. This is the game's sound-effect request layer: a request names a sound id plus a world

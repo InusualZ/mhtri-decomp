@@ -17,6 +17,8 @@
  *   obj_delete_flagged (the LightSet view's destructor), fog_set_color, res_anm_light_config_test_flag8,
  *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
  *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
+ * RESIDUALS. light_setting_get_light_set: dump 03 joins the two arms through one vreg (`r35`) which colours r0; retail's null arm branches to the
+ *   store (`b`) and the product takes r5.
  * RESIDUALS. The ambient colours convert through ut::Color's `operator u32` weak copy (`__opUl__Q34nw4r2ut5ColorCFv`,
  *   the map row at 0x800651BC: the copy the link keeps for every TU that converts a Color).
  *   light_setting_get_light_set: retail's ternary join branch (result in r5, an `add`/`b`/`li`/`b` chain whose last `b`

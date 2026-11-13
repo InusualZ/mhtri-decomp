@@ -23,6 +23,8 @@
  *     a class with a `ResMdl` member (lb_npc's `mhchar_construct`, request lobby-npc#4) waits on that move.
  *   - `__ct__14MHcharBankFileFv` (0x800E3AE8): retail's array thunk tail-calls `res_file_ctor` (the C-named
  *     `ResFile(void* = NULL)` constructor, a draw_shape row); a C++ constructor returns `this`, so ours saves it.
+ *     A member (`MHcharResHandle(void* = 0)`) or base-class constructor spelling keeps the same frame and `bl`: MWCC never turns a
+ *     constructor's last constructor call into a tail call.
  *   - .data: retail emits the base `ICalcWorldCallback` table (0x80597CC0) here and the two callback tables
  *     before the assert strings; the g3d header defines the base slots out of line, so this object emits
  *     neither the base table nor that order.

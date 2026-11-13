@@ -51,7 +51,7 @@ void cockpitShowNewMail(void);
 /* 0x802E0468 - stores player slot `slot`'s transfer-mode icon (0 none, 1..3) in the cockpit state's per-slot byte
  * +0x7C.  NAME (a GUESS): its one caller is the network control's `updateTransferMode`, which sets it for the four
  * slots from the friend list and the layer's transfer state. */
-void setCockpitTransferMode(u8 slot, s32 mode);
+void setCockpitTransferMode(u8 slot, s8 mode);
 
 /* 0x802DE224 - holds the AI NPC page for this frame (its +0x25 byte).  GUESS name. */
 void ainpc_page_hold_set(void);

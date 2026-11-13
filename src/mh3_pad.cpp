@@ -28,6 +28,10 @@
  *   `rso_path_table`, `stage_map_rso_table`, `rso_boot_name`) and `game_mode_nop` (an empty game-mode entry
  *   between `field_game_task_start` and `ArenaSelExec`).  Registry proposal for the
  *   foreign callee `face_buf_reset` (0x8004882C).  `SystemWork.language_0x01`, `pause_0x10` and `pad_lock_ck_0x8d8` are GUESS field names.
+ * RESIDUALS. lang_index_set: the frontend emits `add base, idx*2` (dump 03 `add r38,r37,r35`, base first) where retail adds the index first;
+ *   `+`, `(u32)` integer and index-first spellings compile to the same object.  kpad_obj_copy: the copy of `center` goes through
+ *   `u32` words (retail's lwz/lwz/stw/stw); retail loads both words before the stores, this unit's dump has no scheduling pass
+ *   and `#pragma scheduling on` lowers the row (-25 B).
  * RESIDUALS. `pad_records_construct`/`player_pad_construct`/`pad_fs_block_construct` are byte-identical plain
  *   functions standing for MWCC's static initialiser and the PlayerPad / Nunchuk-block constructors (a class
  *   `PlayerPad` whose +0xFC block holds 32 constructed VEC3s cannot be expressed in the flat header layout its 150
@@ -2404,7 +2408,8 @@ extern "C" s8 kpad_select_2obj_continue(KpadWork* kp)
 /* Copies the pointer object `src` into `dst`. */
 extern "C" void kpad_obj_copy(KPADObj* dst, const KPADObj* src)
 {
-    dst->center = src->center;
+    ((u32*)&dst->center)[0] = ((const u32*)&src->center)[0];
+    ((u32*)&dst->center)[1] = ((const u32*)&src->center)[1];
     dst->error_fg = src->error_fg;
     dst->state_fg = src->state_fg;
     dst->pad_0x0A[0] = src->pad_0x0A[0];

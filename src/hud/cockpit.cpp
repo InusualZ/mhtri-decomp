@@ -20,10 +20,7 @@
  *   `atlas_icon_uv_get`, `pointer_reset`, `kpad_pointer_read`, `pointer_update`, `pointer_dpd_state`,
  *   `se_req_page_toggle`, `se_item_get_play`, `place_rec_copy`, `word_read`, `em_hit_parts_get`, `em_tall_ck`,
  *   `em_part_sphere_get`, `place_list_highlight_draw`, `pl_root_lock_ck`, `item_bonus_class_get`, `chara_icon_tex_tbl`.
- * RESIDUALS. `setCockpitTransferMode` 82.5: retail stores the s32 `mode` raw after narrowing only `slot`; peephole off
- *   adds an `extsb`, the scoped `peephole on` drops both (an s8 parameter matches but clashes with the s32 declaration
- *   `unsplit/menu.h` and `hud/lobby_hud.cpp` carry).
- *   `cockpit_notice_show` 89.8: the `1 << kind` mask is shifted into r0 and narrowed into r5; retail shifts and
+ * RESIDUALS. `cockpit_notice_show` 89.8: the `1 << kind` mask is shifted into r0 and narrowed into r5; retail shifts and
  *   narrows in r5.
  *   `cockpit_notice_update` 97.8: retail sets `ofs` after the loop's pointer induction (`li r8` after `mr r7`).
  *   `ainpc_page_select_button_ck` 96.6: the inversion needs `else if (down == 0)` to stay branched (a plain `else`
@@ -3650,9 +3647,7 @@ void chara_icon_pos_get(_PLW* plw, u8 kind, VEC3* out)
 }
 
 /* 0x802E0468 (0x18): sets player slot `slot`'s transfer-mode icon. */
-#pragma peephole on
-void setCockpitTransferMode(u8 slot, s32 mode)
+extern "C" void setCockpitTransferMode(u8 slot, s8 mode)
 {
     cockpit_state.transfer_mode_0x07C[slot] = mode;
 }
-#pragma peephole off

@@ -20,6 +20,8 @@
  *   `lb_rand_pick_take`'s guarded unroll, `lb_farm_panel_draw`), back at 3 for `lb_farm_grow_marks_update` and
  *   `lb_farm_box_page_draw` (both lose a few bytes at 4); `#pragma opt_unroll_loops off` around `lb_daily_menu_roll`
  *   (retail keeps its 17-row clear as a `mtctr` loop).
+ * RESIDUALS. lb_count_add_cap99: dump 03 adds into its own vreg (`add r34,r35,r36`, coloured r0) where retail adds back into r3; ternary, `u16` and
+ *   in-place spellings lower the row.
  * RESIDUALS. Every row is written.
  *  - `lb_daily_menu_roll`: retail clears the point rows with three zero registers copied from the row offset and adds
  *    the offset to the base each pass; ours stores one zero through a strength-reduced pointer (struct copy, inline

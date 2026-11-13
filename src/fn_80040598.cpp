@@ -46,18 +46,10 @@
  *
  * Residuals (measured against the target object, symbol by symbol and byte by byte; the unit is
  * `Object(NonMatching)`, so none of it reaches the link):
- *   - ten of the twelve functions are byte-identical to the target's bytes for the same range, four of
- *     them after the merge above; the two misses are the masks below.
- *   - `kbd_init` (32 B vs 36, 88.9 %) and `kbd_open` (40 B vs 40, 80.0 %) each lose the retail object's
- *     `clrlwi r3,r3,24` in front of the indirect call; ours has the tail-call epilogue `blr` where the
- *     target has that mask.  MWCC emits the mask only when narrowing a value whose type is wider than a
- *     byte (`u16`/`u32`/`s8` parameter, or a byte load) - verified against all nine installed compilers
- *     and ~20 source shapes; a plain `u8` parameter, a `(u8)`/`(u16)`/`(u32)` cast, `a & 0xFF` and
- *     `-char signed|unsigned` never produce it.  The dump's signature for `kbd_init` is `uchar`
- *     (`needs_type` already set from the demangled `kbd_init__FUc`, as it is for the sibling
- *     `set_kbd_param__FPcUl`'s `char *`/`ulong`), so the map's name is authoritative and the two
- *     residuals are left as the compiler-build difference they are (the retail DOL's `.comment` is
- *     version 14, ours 15).
+ *   - eleven of the twelve functions are byte-identical to the target's bytes for the same range, four of
+ *     them after the merge above.  `kbd_init` and `kbd_open` need `#pragma peephole off` (scoped around the
+ *     two): the dump's peephole-forward pass turns the entry `rlwinm r,r3,0,24,31` of the `u8` parameter into
+ *     `mr`, which drops the mask retail keeps in front of the indirect call.
  *   - `fn_80040598` (276 B target / 280 B ours): one extra `b`.  The target compares 0xFF, 3, 4, reaches
  *     its default body by fall-through and places case 3 then case 0xFF after it; MWCC lays the bodies
  *     out in case-label order, so the default body needs a jump (default-first source order flips the
@@ -172,6 +164,7 @@ extern "C" void* CntSdRsoTerminate(const char* path, void* buffer)
     return buffer;
 }
 
+#pragma peephole off
 void kbd_init(u8 a)
 {
     if (system_w.kbd_init != NULL) {
@@ -179,6 +172,7 @@ void kbd_init(u8 a)
     }
 }
 
+#pragma peephole on
 int kbd_move(void)
 {
     if (system_w.kbd_move == NULL) {
@@ -188,6 +182,7 @@ int kbd_move(void)
     return system_w.kbd_move();
 }
 
+#pragma peephole off
 int kbd_open(u8 a)
 {
     if (system_w.kbd_open == NULL) {
@@ -197,6 +192,7 @@ int kbd_open(u8 a)
     return system_w.kbd_open(a);
 }
 
+#pragma peephole on
 void set_kbd_param(char* param, u32 value)
 {
     if (system_w.set_kbd_param != NULL) {

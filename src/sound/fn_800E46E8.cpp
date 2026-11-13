@@ -3,6 +3,8 @@
  * `.text` 0x800E46E8..0x800E5430, 65 functions written (the rest of the range is not decompiled yet).
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  * NAMES. GUESS (from each body and its callers): `stream_volume_slot_set`.
+ * RESIDUALS. fn_800E4FB4: dump 03 takes `addi r34,r32,0x10` as the base of every access; retail reads the first word through r3
+ *   and adds 0x10 on the other path (the `cond_negate` shapes measure equal).
  */
 
 /* Retired header of `sound/fn_800E46E8.cpp` (kept for its notes and residuals): */

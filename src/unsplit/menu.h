@@ -29,7 +29,7 @@ extern "C" {
 void cockpit_notice_init(void);                 /* 0x802DFCD4 */
 void cockpit_notice_update(void);                 /* 0x802DFD38 */
 void draw_lsp_element(void*, u8, u8, u16);   /* 0x802E00A4 */
-void setCockpitTransferMode(u8, s32);              /* 0x802E0468 */
+void setCockpitTransferMode(u8, s8);               /* 0x802E0468 */
 /* The five symbols below moved to their owner's header when proposal `803A3A50_fn_803A3A50`
  * registered `src/lobby/lb_quest_screen.cpp` over them (docs/plan.md 6.5 rule 2); this include
  * re-exports them for the units that already take this header. */

@@ -23,6 +23,8 @@
  *   Registry names for the band callees: snd_exp_heap, snd_heap_allocator, snd_heap_alloc, snd_heap_free,
  *   snd_chunk_install (quest_snd), snd_stream_buffers_init (fn_800E46E8), snd_audio_init, snd_fx_hooks_set,
  *   snd_output_mode_set (snd_stream_reloc).
+ * RESIDUALS. snd_area_bank_load: dump 03 `lwzx r34,r38,r36` then `add r34,r34,r40` reuses r34 for the table entry and the pointer (coloured r5);
+ *   retail loads into r3 and adds into r4 (colouring).
  * RESIDUALS. fn_800F0F9C (692 B): retail's shared load tail sits between the `kind == 1` and `kind == 2` bodies,
  *   case 1 falling into it and case 2 branching back - a `goto` layout; rule 8 forbids it and the conformant shapes
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.

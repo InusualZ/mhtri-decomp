@@ -88,6 +88,9 @@
  *   vec3_segment_offset, vec3_segment_offset2, stg_area_ceiling_get, pl_box_point_dist_sq, pl_condition_ck_20000,
  *   em_break_part_data_get, mhchar_mat_hide_set, ef_inst_spawn_joint, em_user_data_items_get, em_char_pose_sync,
  *   eft_em_slot_attach, eft_em_model_fx_spawn (registry proposals)
+ * RESIDUALS. em_mot_speed_set: dump 03 `fmuls f1,f33,f32` multiplies the f32 parameter directly; retail's `frsp` + swapped operands is an `f64`
+ *   parameter, which the 29-unit prototype (`enemy/em_mot_speed_set.h`) does not allow.  em_delay_act_tick: dump 03 folds the zero index
+ *   into `addi r33,r32,0xaf0`; retail keeps `li; mulli` and adds 0xaf0 separately; a one-slot loop and direct indexing measure equal or lower.
  * RESIDUALS. Every row is written.
  *  - `em_act_advance`: the recover-band pointer and the stat level take each other's register (r3/r4);
  *    `em_ambient_color_update`: the point-light blend converts the channel before the half difference (the

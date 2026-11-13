@@ -24,6 +24,9 @@
  *            a text-field key handler leaves on one `v_0x054() || !v_0x0CC()` return (playbook 160); a local whose
  *            Rect is zeroed is declared after the code retail runs first (playbook 199); slot 0x23C takes one
  *            argument and the scroll view's slot 0x10 returns f64; the caret phase goes through hbmSinDeg.
+ * RESIDUALS. fn_8054F178: (Wii/1.3 stand-in dump; the unit builds with GC/3.0a5.2) the two loads and stores stay in source order after the
+ *   scheduling pass; retail loads both first (`lbz r4,0(r4)` reusing the argument register); local-first spellings and
+ *   `scheduling off`/`optimization_level 3` measure equal or lower.
  * RESIDUALS. hbmPanelHandleMessage (0x8054358C): retail keeps message 0's two HbmInputModeState records in memory
  *            (0x90/0x98: every field stored and reloaded) where ours promotes them to registers (an array, a
  *            constructor, an inline member, reference-taking inline helpers and function-scope declarations all leave

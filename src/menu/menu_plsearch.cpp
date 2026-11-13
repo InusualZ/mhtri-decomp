@@ -32,6 +32,9 @@
  *   GUESS (P-Mic): `patTermsPmicCallback`, `setPatTermsResult`, `patTermsEndThread`, `clearPatTerms`,
  *   `resetPatTermsState`.  `plsearch_page11_*`/`plsearch_page19_*`/`plsearch_page22_*` are the map's names (the
  *   page-table entries `menu/menu_item.cpp` calls through their leaf headers).
+ * RESIDUALS. resetPatTermsState: dump 03/16 place `li r33,0` first in the block before `lbz`/`cmpli`; retail has `li r0,0` after the compare
+ *   (scheduler order inside the block); ternary and if/else spellings lower the row.  initPatTerms: retail's `bne; blr` against our
+ *   `beqlr` (dump 03 has the same `bf`/`bt` block pair; the cause is not isolated); nested `if` spellings are measured equal.
  * RESIDUALS. The range is at least four TUs (`.data` evidence), so the unit cannot flip until it is re-cut: the save
  *   code (0x80448404-0x8044BDE8, strings 0x806073F0-0x80607678), `menu_plsearch.cpp` (0x8044BDE8-0x8044E2CC, its
  *   `__FILE__` at 0x80607678), `menu_message.cpp` (0x8044E2CC-0x804504A0, its `__FILE__` at 0x80607870) and the P-Mic

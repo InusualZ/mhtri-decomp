@@ -22,6 +22,10 @@
  *   classes HkbContextView, HkbTextSink, HbmKeyView, HbmSoundPlayer and HbmComponent name only the slots this
  *   file calls.  getMode and isHalfWidth of HkbKeyboardBase are inline; their kept copies sit in
  *   menu/menu_sysmsg.cpp's range (0x804534B0, 0x80452C08).
+ * RESIDUALS. 0x8053658C/0x805365D4/0x805365DC/0x80536DB8: weak out-of-line copies of inline virtual accessors that the vtables of
+ *   homebutton/hbm_text_panel.cpp (0x8064EE00, 0x8064F044), hbm_kb_widget.cpp, hbm_kb_event.cpp, hbm_kb_list.cpp, hbm_value.cpp and
+ *   hbm_kb_cursor.cpp point at; this object holds no relocation to them (callers.py --pointers), so the link order, not a use here,
+ *   gives them this range; they need the owners' class models first.
  * RESIDUALS. unwritten: 0x8053658C, 0x805365D4, 0x805365DC, 0x80536DB8 (88 bytes): inline accessors of band classes
  *   (homebutton/hbm_text_panel.cpp's panel and three widget classes) emitted here first; their classes are not modelled.
  * RESIDUALS. HkbKeyboardBase::updateView (0x805366D0): retail merges the two lamp notifications of each switch into one

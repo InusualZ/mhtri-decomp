@@ -25,6 +25,8 @@
  *   `hud_msg_step`, `hud_msg_update`, `hud_msg_open`, `hud_msg_draw`, `hud_msg_push`, `hud_msg_push_two_line`,
  *   `hud_item_msg_push`, `hud_msg_sub_set`, `hud_msg_shown_id_get`, `hud_msg_work`) and `eft_area_se_req`; the data
  *   `eft052_hold_frame_sprites`, `eft052_hold_row_sprites`, `eft052_hold_arrow_sprites`.
+ * RESIDUALS. eft052_item_half_get: dump 03 gives the shift result its own vreg (`srawi r33,r35,1`) coloured r0, retail reuses r3 (`u32`/`s32` value
+ *   spellings measure equal).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
  *  - `eft052_page_take`: retail's parameters start at `r4` (a leading parameter ours lacks), and the `s16`
  *    sign-extensions sit at other points;
