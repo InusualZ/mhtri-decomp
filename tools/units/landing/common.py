@@ -28,7 +28,9 @@ ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".claude/", ".github.
 # Root documents and repo-config files a docs/tooling batch legitimately edits (commit categories
 # `repo/readme`, `repo/license`, `repo/gitignore`, `repo/ci`): README.md, LICENSE, `.gitattributes` (line-ending
 # policy) and `.flake8` (the tools' lint config). Deliberately absent: `.gitmodules` and `Add-Exclusion.ps1`.
+# `remaining_functions.csv` is the owner's work list: a lane drops a row in the commit that matches it.
 ALLOWED_FILES = ("configure.py", "CLAUDE.md", ".gitignore", "README.md", "LICENSE", ".gitattributes", ".flake8",
+                 "remaining_functions.csv",
                  "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt", "config/RMHE08/name_registry.jsonl")
 
 

@@ -15,8 +15,7 @@
  *   `root_light_setting_get`), the record types `LightPoint`, `LightSpot`, `LightFlare`, `LightPointWork` (their
  *   never_inline constructors are the map's `__ct__` rows after `__sinit`), the copy view `LightPointCopy`, and the
  *   record views `LightSceneRoot`, `LightPlayerView`, `LightNpcView`.
- * RESIDUALS. light_id_advance: retail materialises the counter's address once (`addi r4,r13,...`) and stores the
- *   wrap through it. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
+ * RESIDUALS. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
  *   `mhchar_construct` (retail calls only that, which is MHchar's own constructor; request vec3-world#3).
  *   light_update, light_em_slot_alloc, light_em_slot_find_free, light_point_nearest_get, light_set_default_select,
  *   light_flare_setup: register allocation only. light_init: the light-setting/object registers and one `addi`
@@ -428,9 +427,10 @@ extern "C" LightPoint* light_point_find(LightPointWork* w, u16 id)
 /* 0x802BF7E8 (0x2C): advances the point-light id counter, wrapping it past 60000. */
 extern "C" u16 light_id_advance(void)
 {
+    u16* counter = &light_id_counter;
     light_id_counter++;
     if (light_id_counter > 60000) {
-        light_id_counter = 0;
+        *counter = 0;
     }
     return light_id_counter;
 }

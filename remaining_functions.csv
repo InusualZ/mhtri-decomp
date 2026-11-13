@@ -15,16 +15,12 @@ size_bytes,unit,function,match_percent,address
 32,lobby/fn_801E7530,lb_count_add_cap99,97.5,0x801E936C
 36,fn_80040598,kbd_init__FUc,88.8889,0x8004074C
 36,homebutton/hkb_widget_tail,hkbKbdInputConstruct,0.0,0x8056D814
-36,lobby/lb_companion_ui,lb_act_value_apply,99.8889,0x803395EC
 36,userdata_item,__as__8_GXColorFRC8_GXColor,0.0,0x8004C4F0
 40,MSL_C/file_io,__prep_buffer,95.5,0x8045AB58
 40,ai/ai_npc,fn_802D6690,99.0,0x802D6690
 40,ai/ai_npc,fn_802D77DC,78.8,0x802D77DC
 40,mh3_pad,lang_index_set,99.0,0x80041304
 44,fn_80040598,kbd_open__FUc,90.9091,0x80040798
-44,light/light,light_id_advance,85.4545,0x802BF7E8
-44,lobby/lb_companion_ui,lb_triplet_value1_get,99.0909,0x8033AA78
-44,lobby/lb_companion_ui,lb_triplet_value2_get,99.0909,0x8033AA24
 48,hud/layout,note_box_size,91.6667,0x802E45D4
 48,menu/menu_item_sub,menu_item_sub_page14_draw,90.0,0x8036BB1C
 52,homebutton/hkb_keyboard,__ct__12HkbKeyButtonFUlP11HkbKeyboardP16HbmSoundListener,98.1539,0x8053E1B4

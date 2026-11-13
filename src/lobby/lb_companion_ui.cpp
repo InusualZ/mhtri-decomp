@@ -41,7 +41,7 @@
  * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local does not change it);
- *  - `lb_act_value_apply`, `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
+ *  - `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
  *    reads +0x8 (+0x7);
  *  - `lb_act_row_apply`: retail loads +0x6 with `lhz`, ours `lbz` + `clrlwi` (a field width);
  *  - `lb_act_award_handover`, `lb_act_slot_write`: ours emits a `clrlwi` or `extsb` retail does not;
@@ -57,7 +57,7 @@
  *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
  *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
  *    callee-saved colours (the best declaration orders are applied);
- *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`, `lb_triplet_value2_get`, `lb_triplet_value1_get`,
+ *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`,
  *    `lb_page_bits_set`, `lb_tutorial_note_draw`, `lb_dance_list_step`, `lb_s13_slot_list_draw`: register colouring.
  *  - `lb_deli_cost_draw`'s `"%d"` (retail `lbl_80793018`) merges with `lb_combo_rate_sprintf`'s (`lbl_80793008`) in
  *    ours, so `.sdata` carries one copy where retail has two;
@@ -849,7 +849,7 @@ void lb_sub13_send(s16 first, s16 second, u8 value) {
 
 /* Act 19: with the request's word clear, hands its three bytes to the value writer `quest_arena_data_step`. */
 void lb_act_value_apply(u8 unused, LbActReq* req) {
-    if (req->mask_0x08.word_0x00 == 0) {
+    if (req->sel_0x04.word_0x00 == 0) {
         quest_arena_data_step(req->mask_0x0C.byte_0x00, req->mask_0x08.halves.low_0x00,
                     req->mask_0x08.halves.high_0x02);
     }
@@ -1527,7 +1527,9 @@ s8* lb_tutorial_page_text_get(u8 kind, u8 set, u8 page) {
 
 /* The third byte of the 12-byte `LbTriplet` row at `tutorial_page_sets[a][b]`. */
 u8 lb_triplet_value2_get(u8 a, u8 b) {
-    return tutorial_page_sets[a][b].value_0x02;
+    LbTriplet* row = tutorial_page_sets[a];
+    row += b;
+    return row->value_0x02;
 }
 
 /* The first byte of that row. */
@@ -1537,7 +1539,9 @@ u8 lb_triplet_value0_get(u8 a, u8 b) {
 
 /* The second byte of that row. */
 u8 lb_triplet_value1_get(u8 a, u8 b) {
-    return tutorial_page_sets[a][b].value_0x01;
+    LbTriplet* row = tutorial_page_sets[a];
+    row += b;
+    return row->value_0x01;
 }
 
 /* The tutorial quest's name pointer (`*tutorial_quest_name`). */
