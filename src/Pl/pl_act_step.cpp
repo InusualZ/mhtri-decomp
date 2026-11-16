@@ -145,6 +145,8 @@
  *    `pl_ground_height_probe`, `fn_8025F478`);
  *  - `!(vel < 0)` keeps retail's `bge` where `vel >= 0` emits `cror` (`pl_act_jump`, `pl_act_carry_jump`,
  *    `pl_act_wind_launched`).
+ * RESIDUALS. fn_80260198: regsim finds no plan for the saved set (r44 r0 vs retail r30); the `add r0,r31,r0` operand
+ *            pair is swapped.
  */
 
 #include "types.h"

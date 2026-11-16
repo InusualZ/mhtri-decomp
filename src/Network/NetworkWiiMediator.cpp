@@ -67,6 +67,8 @@
  *  - each terms leaf accessor sits right after its first caller, the layout MWCC gives an uninlined inline function;
  *  - `getNASToken` returns the token inside `DWCSvlResult` (`DWCi/dwc_nasfunc.h`);
  *  - `NetworkPool::isECStarted` (0x8041793C) is defined here: retail emits the pool's accessor in this range.
+ * RESIDUALS. updateServerTime: regsim EXACT; retail returns the empty path as `li r4,0; mr r3,r4` (a zero u64 kept in
+ *            a register), ours `li r3,0`; a `result` local (80.69) and an else assignment (98.46) do not produce it.
  */
 
 #include "types.h"

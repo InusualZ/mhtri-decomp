@@ -887,8 +887,10 @@ extern "C" s32 eft052_box_value_get(Eft052ItemBox* box)
     s32 sum = 0;
     s32 i;
 
-    for (i = 0; i < box->cell_count_0x2C; i++)
-        sum += GetItemData(box->cells_0x24[i].item_0x00)->field_0x010 * box->cells_0x24[i].count_0x02;
+    for (i = 0; i < box->cell_count_0x2C; i++) {
+        s32 value = GetItemData(box->cells_0x24[i].item_0x00)->field_0x010;
+        sum += value * box->cells_0x24[i].count_0x02;
+    }
     return sum;
 }
 

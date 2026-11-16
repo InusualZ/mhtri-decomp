@@ -500,7 +500,7 @@ u32 lb_scroll_gun_set_ok(LbScrollWork* self, u8 page, u8 group) {
         stock = &self->base_0x5C[2];
     }
 
-    if ((self->flags_0x10 & 3) != 0 && (u8)(self->kind_0x00 - 5) <= 1 && group == 2) {
+    if ((self->flags_0x10 & 3) != 0 && (u8)(self->kind_0x00 + 251) <= 1 && group == 2) {
         if (frame->kind != 11 || barrel->kind != 12 || stock->kind != 13 || frame->item_id == 0
             || barrel->item_id == 0 || stock->item_id == 0) {
             return 0;
@@ -1205,11 +1205,10 @@ void lb_award_flag_runs_ck(LbSaveView* save, s16 award, u16 table) {
 
     while (run->count_0x00 != -1) {
         flag = run->flag_0x02;
-        for (i = 0; i < run->count_0x00; i++) {
+        for (i = 0; i < run->count_0x00; i++, flag++) {
             if (userdata_flag_ck(flag) == 0) {
                 return;
             }
-            flag++;
         }
         run++;
     }

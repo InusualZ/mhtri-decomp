@@ -106,6 +106,8 @@
  *    flag parameters of the older bodies are `u32` tested `(flag & 0xFF)`.
  *  - The four motion tables (`lbl_805D4784`..`lbl_805D48D8`) and the step tables are `s16`/`u16` word arrays indexed
  *    `arg * N`: a row struct folds the index into one `mulli`.
+ * RESIDUALS. fn_802D66B8: operand order of one `add` (`add r3,r0,r3` against ours `add r3,r3,r0`); regsim EXACT, the
+ *            r35 temp (r0/r3) is not a target.
  */
 
 #pragma optimization_level 4

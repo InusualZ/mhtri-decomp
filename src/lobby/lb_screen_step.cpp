@@ -39,6 +39,9 @@
  *   and are ORed in.  The goods-window loops index the rows and the layout table by the loop counter.  A centred text
  *   sums `base + spr.pos + (size >> 1)` and subtracts the line offset in a second statement.  Retail's `addi 0xFE`
  *   range tests are `(u8)(x + 0xFE) <= 1`.  The upgrade recipe is `kakou_data[kind]` then `+= item`.
+ * RESIDUALS. lb_smith_pl_turn_step: retail's `lobby_net_busy_ck() == 1` return is `bne body; b end` (a block that
+ *            only jumps), ours a single `beq end`; nested ifs, an empty-then/else and early-return spellings give the
+ *            same bytes (regsim EXACT).
  */
 #include "types.h"
 

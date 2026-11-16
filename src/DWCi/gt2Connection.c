@@ -15,6 +15,9 @@
  * SHAPES. `gti2ConnectionClosed`'s body is a static inline its earlier callers expand (retail folds it into
  *   `gti2CheckTimeout` and `gti2CloseConnection`); the think step's keep-alive, resend and ack checks are 0/1 static
  *   inlines.
+ * RESIDUALS. gti2AcceptConnection: retail copies the 16-byte callback struct as two load pairs stored in reverse
+ *            (`lwz r3,0; lwz r0,4; stw r0,0x2c; stw r3,0x28`), ours loads four words and then stores four;
+ *            `optimization_level 0` scores 91.02 but is 4 B longer, so it is not applied.
  */
 #include "DWCi/gt2Connection.h"
 #include "DWCi/dwc_nasfunc.h"

@@ -34,6 +34,8 @@
  *   checks of `enemy/em_common.cpp` return `u32` (retail compares them `cmplwi`); `em_get_part_limit`,
  *   `em_roster_slot_effect_set`, `em_ground_ck`, `UpdateValue` and `se_em_snore_req` are called through casts where
  *   the owner's declared parameters differ from the registers retail passes.
+ * RESIDUALS. em_parts_break: `li r0,1` and the group mask swap registers (r35 r5 vs retail r0, r36 r0 vs r5), so
+ *            retail's `slw r31,r0,r5` reads in the other operand order; regsim has no cost-0 source plan.
  */
 
 #include "types.h"

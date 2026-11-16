@@ -30,6 +30,12 @@
  *   exit rule 8 forbids); the loop-then-test form keeps the counter live (+32 B / +12 B).
  *   Flip blockers: the 11 registry callees resolve only once their names land in the map; retail force-actives
  *   userdata_item_room_get, userdata_equip_box_free_index and userdata_equip_box_rec_get (.comment), ours does not.
+ * FLAGS. scoped `#pragma optimization_level 4` around userdata_equip_box_add_new; `(u16)userdata_box_capacity(...)`
+ *        casts on the capacity argument (item_box_store) drop the `mr r0,r3` temp.
+ * RESIDUALS. item_room_get: retail returns the match path through the shared `mr r3,r31` tail (`subf r31,...`), ours
+ *            returns `subf r3` directly; `room = ...; return room` is unchanged and a flag with `break` scores 89.35.
+ * RESIDUALS. userdata_equip_box_add: regsim's EXACT plan folds the `user + i * 12` intermediate (r40) into `rec`;
+ *            retail adds in place (`add r31,r28,r0; addi r31,r31,3584`); a block-local `rec` scores 98.66.
  */
 
 #pragma peephole off
@@ -1810,7 +1816,7 @@ extern "C" u32 item_box_store(u16 id, u32 count, u16* slot)
     if (item_id_excluded_ck(id) == 1) {
         return 0;
     }
-    return item_slots_store(user->box_0x180, userdata_box_capacity(user), id, count, slot);
+    return item_slots_store(user->box_0x180, (u16)userdata_box_capacity(user), id, count, slot);
 }
 
 /* Merges the partial stacks of a table: each record below 99 takes from the later records of the same item. */
@@ -1988,6 +1994,8 @@ extern "C" void color_rgba_copy(u8* dst, const u8* src)
 
 /* Files a new record of `kind`/`item_id` in the first empty equipment-box record; its index, or 0xFFFF when the box
  * is full. */
+#pragma push
+#pragma optimization_level 4
 extern "C" u16 userdata_equip_box_add_new(Q_UserData* user, u8 kind, u16 item_id)
 {
     u16 cap = userdata_box_capacity(user);
@@ -2006,6 +2014,7 @@ extern "C" u16 userdata_equip_box_add_new(Q_UserData* user, u8 kind, u16 item_id
     }
     return 0xFFFF;
 }
+#pragma pop
 
 /* Files a copy of `equip` in the first empty equipment-box record; its index, or 0xFFFF when the box is full. */
 extern "C" u16 userdata_equip_box_add(Q_UserData* user, const _EQUIP* equip)

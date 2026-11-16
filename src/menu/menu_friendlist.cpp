@@ -1683,22 +1683,15 @@ static void option_value_sprite_draw(u16 id, u32 color, _mh_ivec2_* pos) {
 /* 0x804421E4 (0xB0): draws the row cursor and, while a value is being changed, its blinking arrows. */
 static void option_cursor_draw(MenuSlot* slot, MenuEntry* row, _mh_ivec2_* pos) {
     s16 state;
-    u16 left;
-    u16 right;
 
     if (chk_pointer() == 0) {
         put_menu_cursor((u16*)get_menu_lsp_tbl(0xDD), 0, pos);
         if (slot->field_0x001 == 1) {
+            u16 left;
+
             state = row->field_0x06;
-            left = 0xFFFF;
-            if (state != 1) {
-                left = 0x776;
-            }
-            right = 0xFFFF;
-            if (state != 2) {
-                right = 0x777;
-            }
-            draw_sprite_blink_idx(left, right, 0xFFFFC8FF, slot->option_move_0x236, pos);
+            left = (state != 1) ? 0x776 : 0xFFFF;
+            draw_sprite_blink_idx(left, (state != 2) ? 0x777 : 0xFFFF, 0xFFFFC8FF, slot->option_move_0x236, pos);
         }
     }
 }

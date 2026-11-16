@@ -64,6 +64,11 @@
  *   g3d header defines it inline; retail references it), one extab/extabindex entry more than retail.
  *   `pl_rig_hair_style_tbls`/`pl_rig_face_style_tbls` (.sdata 0x807922B0/0x807922B8) lie outside every registered
  *   range (`unsplit/pl_rig_style.h`).
+ * RESIDUALS. lb_ship_order_commit: regsim EXACT for the saved set; the mullw result vreg (r37) is r0 in ours and r3
+ *            in retail and is not a regsim target.
+ * RESIDUALS. pl_rig_model_color_set: regsim's EXACT plan gives the `slot * 2` index temp (@5396) its own local, kept
+ *            in saved r30 across the first setMatColor; the 2-D `color_mat_0x9CD[slot]` indexing has no source
+ *            spelling that names it.
  */
 #include "types.h"
 #include "nw4r/math.h"

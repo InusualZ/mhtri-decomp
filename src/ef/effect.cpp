@@ -32,6 +32,8 @@
  *   already has it), so each case assigns `result` instead.
  *   The two static name arrays at the foot of the file are emitted with their `__sinit` and the element
  *   constructor (`EftNameArrayElem`, whose capsule is `nw4r::math::CAPSULE`).
+ * RESIDUALS. effect_layer_reset: one temp (r40 r4 vs retail r12): retail loads the table pointer into r12 and calls
+ *            through it, ours reuses r4 for the first load.
  */
 
 #include "ef/eft_name_tbl_ptr.h" /* eft_name_tbl_ptr (rule 2: the owner's header) */

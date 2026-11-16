@@ -19,6 +19,12 @@
  *     reciprocal, no shift-subtract); no spelling, local, inline divisor or `optimization_level` reproduces it.
  *   - `NHTTPi_containsString`, `NHTTPi_uintToStr`, `NHTTPi_compareToken`, `NHTTPi_strtonum`: register colouring
  *     or scheduling.
+ * FLAGS. scoped `#pragma peephole off` around NHTTPi_strtonum and NHTTPi_containsString (containsString 85.81 ->
+ *        93.72).
+ * RESIDUALS. NHTTPi_strtonum: retail materialises `li r12,0` before `li r11,0`, ours the reverse (regsim with the
+ *            Wii/1.3 stand-in is EXACT for the order).
+ * RESIDUALS. NHTTPi_containsString: the Wii/1.3 stand-in dump differs on the loop-bound temp @1094 (r8 vs retail r10)
+ *            and four volatile temps (r42/r43/r46/r47).
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -294,6 +300,8 @@ s32 NHTTPi_strtonum(const char* s, s32 n) {
 
 /* 0x8051738C (0xAC): find `needle` inside the first `haystackLen` characters of `haystack`.
  * Answers 0 on a hit and -1 on a miss, or when the needle is the longer of the two. */
+#pragma push
+#pragma peephole off
 s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* needle, s32 needleLen) {
     const char* p;
     s32 i;
@@ -318,6 +326,7 @@ s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* nee
     }
     return -1;
 }
+#pragma pop
 
 /* Base64-encode the NUL-terminated `src` into `dst` (with '=' padding and a terminator).  Answers the
  * encoded length. */

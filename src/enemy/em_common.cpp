@@ -163,6 +163,11 @@
  *   job's +0x28 slot takes five arguments (the table pointer is only the base register); `em_target_pos_set` hands
  *   `VEC3::operator=` the address of `get_worldworld_pos`'s returned temporary (MWCC warns 10142; a named copy costs a
  *   struct copy and 0x10 bytes of frame).
+ * RESIDUALS. fn_8012D3E0: regsim EXACT; retail keeps `clrlwi r31,r3,16` (max) before `li r30,0`, the scheduler swaps
+ *            them inside block B2 (dump 06 has retail's order); declaration order and init placement do not move it.
+ * RESIDUALS. em_delay_act_set (148 B, ours 140 B): retail keeps `li r0,0; mulli r0,r0,20; add r31,r3,r0` and
+ *            addresses the fields with 0xAF0 displacements; ours folds index 0 into `addi r31,r3,0xAF0`. Direct
+ *            indexing, `global_optimizer off` (+0.1 %) and optimization levels 0/1 do not reproduce it.
  */
 
 /* Names the included headers declare with the callers' older signatures, hidden while they are read. */
@@ -9621,14 +9626,15 @@ extern "C" void em_break_part_motion_step(EmBreakPart* part)
 /* 0x80135BC4 (0x98): 1 when a breakable part is active (with `any` 0: only one in the current area). */
 extern "C" u32 em_break_part_active_ck(_ENEMY_WORK* self, u8 any)
 {
+    EmBreakPart* part;
     s32 i;
 
-    for (i = 0; i < 2; i++) {
+    for (i = 0, part = self->break_parts_0x488; i < 2; part++, i++) {
         if (any == 0) {
-            if (self->break_parts_0x488[i].area == get_now_areano() && self->break_parts_0x488[i].active != 0) {
+            if (part->area == get_now_areano() && part->active != 0) {
                 return 1;
             }
-        } else if (self->break_parts_0x488[i].active != 0) {
+        } else if (part->active != 0) {
             return 1;
         }
     }

@@ -49,6 +49,9 @@
  *  - The draw helpers' default colours are `if (c == 0) c = ...;` on the parameter; a value `x = a ? b : c` is a
  *    ternary where retail loads the else value first (`menu_frame_row_draw`); a `switch` on `flags & 3` needs the
  *    `u32` parameter for its `cmplwi` chain (`menu_frame_draw_blocks`); `put_message` keeps the text y in `size`.
+ * RESIDUALS. draw_sprite_blink: retail keeps the colour word in r3 (`lwz r3,28(r29)`) and masks `clrlwi r0,r3,24`
+ *            first; ours loads into r0 and clears the high byte first (dump: r35 @3681 r0 vs r3, r38 r3 vs r0);
+ *            operand-order and temp spellings give the same bytes.
  */
 
 #include "types.h"

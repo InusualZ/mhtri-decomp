@@ -23,6 +23,8 @@
  *     scan loop, a two-level exit rule 8 forbids; plus register colouring.
  *   - `NHTTPi_findHeaderField` (prologue copy order), `NHTTPi_SocSend` (the `sslHandle` load scheduled above the
  *     `r31` save): register colouring or scheduling.
+ * RESIDUALS. NHTTPi_SocSend: regsim EXACT; retail loads `lwz r0,172(r3)` before saving r31 (`stw r31,12(r1)`), ours
+ *            after it (prologue scheduling of the sslHandle load); a hoisted `ssl` local scores the same.
  */
 
 #include "NHTTP/d_nhttp.h"

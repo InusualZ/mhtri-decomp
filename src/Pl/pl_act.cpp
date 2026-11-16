@@ -237,6 +237,17 @@
  *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
  *    `pl_step_se_kind_get` declares its loop index before `v` (the r8/r9 order); `pl_item_icon_kind_get` is `while (row[0] != 0)` with
  *    `id == row[0]` (the rotated loop); `equip_gun_bonus_ck` opens with the `return 0` guard for non-gun kinds.
+ * FLAGS. scoped `#pragma optimization_level 2` around equip_deco_slots_get (retail keeps the u8 mask `clrlwi
+ *        r0,r3,24` before the `> 3` test).
+ * RESIDUALS. pl_parts_set: the table pointer load is in r7 (r39) where ours reuses r6, and ours hoists `li r5,0`;
+ *            dropping the `g` local or holding the rig in a local changes nothing.
+ * RESIDUALS. Pl_motion_input_ck: retail's `return 1` block is shared by the range test and `case 4` (`ble` to the
+ *            tail) and `return 0` falls out last; the natural switch measures 94.47 and a 4/6/7/8 case group 93.68,
+ *            so the loop form stays at 99.24.
+ * RESIDUALS. pl_kind_item_equip_find: regsim aims `slot` at r5 and the @14193 temp at r6, ours the reverse; no
+ *            declaration order reaches both. fn_802693C4: `work` (r35) is r3 in ours and r4 in retail.
+ * RESIDUALS. Pl_chr_set_attr / fn_8026A178: the `mr r9,r31` argument copy is scheduled before the motion-id call in
+ *            ours and after it in retail (regsim EXACT).
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -10512,7 +10523,7 @@ u32 pl_alive_act_ck(_PLW* self)
     case 9:
         return 0;
     case 0:
-        if (self->act_no == 19 || self->act_no == 110) {
+        if ((s32)self->act_no == 19 || (s32)self->act_no == 110) {
             return 0;
         }
         break;
@@ -10750,6 +10761,8 @@ s32 equip_gun_clip_get(_EQUIP* equip, u8 shell)
 
 /* 0x8027F11C (0x9C): the decoration slots of a piece (0-3), out of the row its kind reads; a talisman keeps them
  * in its own +0x01 byte. */
+#pragma push
+#pragma optimization_level 2
 u8 equip_deco_slots_get(_EQUIP* equip)
 {
     u8 slots;
@@ -10787,6 +10800,7 @@ u8 equip_deco_slots_get(_EQUIP* equip)
     }
     return slots;
 }
+#pragma pop
 
 /* 0x8027F1B8 (0x64): how many of the piece's decoration slots hold a decoration. */
 s32 equip_deco_count(_EQUIP* equip)
@@ -11110,8 +11124,8 @@ void equip_deco_pack(_EQUIP* equip)
  * a decoration fills (`by_slot` 0), or one per decoration. */
 void equip_deco_ids_get(_EQUIP* equip, u16* ids, s32 by_slot)
 {
-    s32 slots;
     s32 i;
+    s32 slots;
     s32 j;
     ItemSpeciesRecord* data;
 

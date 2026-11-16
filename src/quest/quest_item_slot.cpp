@@ -24,6 +24,9 @@
  * SHAPES: the zone objects are defined after every function body under `#pragma pool_data off`, so the
  * `__sinit` loads each object's own address (pooled, MWCC addresses them from one `r30` section base); `quest_item_slots_use` is one `switch` with `default:` first and an inner `switch
  * (result)` over 0-2 / 3; `quest_id_head_ck`/`_tail_ck` compare `(u16)(id + 0xFFFF)` against 2 / 3.
+ * RESIDUALS. quest_item_slot_find: regsim has no retail target; in dump 14 the id mask (r36) is coloured after the
+ *            five loads, retail colours it first (mask in r0, loads in r4). `id == slots[n].id` is the 99.09
+ *            spelling; `peephole on` drops the mask (128 B, 94.70).
  */
 
 #include "quest/quest_item_slot.h"
@@ -232,19 +235,19 @@ void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col) {
 
 /* The count of the five-slot list's entry for `id`, or 0 when the list has none. */
 s16 quest_item_slot_find(Q_ItemCount* slots, u16 id) {
-    if (slots[0].id == id) {
+    if (id == slots[0].id) {
         return (s8)slots[0].num;
     }
-    if (slots[1].id == id) {
+    if (id == slots[1].id) {
         return (s8)slots[1].num;
     }
-    if (slots[2].id == id) {
+    if (id == slots[2].id) {
         return (s8)slots[2].num;
     }
-    if (slots[3].id == id) {
+    if (id == slots[3].id) {
         return (s8)slots[3].num;
     }
-    if (slots[4].id == id) {
+    if (id == slots[4].id) {
         return (s8)slots[4].num;
     }
     return 0;

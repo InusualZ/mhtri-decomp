@@ -114,6 +114,8 @@
  *   - `StageMapView` (`unsplit/stage.h`) duplicates `StageRuntime`'s +0xBC5/+0xBC6 bytes: `stage/fn_802B2AA0.h`
  *     cannot be included beside `pl.h` (both redefine `_GXChannelID` and `MHchar`, verified by compiling both).
  * NAMES. GUESS (from each body and its callers): arena_lsp_data_get
+ * RESIDUALS. arena_light_init: retail loads through a hoisted base register (`lwz r0,0(r30)`), ours folds the table
+ *            symbol into the displacement (`arena_light_colors@l(r3)`); regsim EXACT.
  */
 
 #include "types.h"

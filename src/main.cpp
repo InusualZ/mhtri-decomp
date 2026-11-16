@@ -25,7 +25,6 @@
  * `screen_size_float_get`, which a per-TU literal pool cannot be split across. The runtime dump names the untitled
  * ones: `fn_8003F620` = create_memory_heaps, `fn_8003F728` = mem_create_exp_heap, `fn_8003F730` = render
  * init, `render_mode_copy` = GXRenderModeObj copy, `fn_8003F9E4` = TV-mode re-init, `fn_8003FCCC` = GX/VI setup,
- * `fn_804E7110` = AIRegisterDMACallback.
  *
  * Identified but **not claimed** yet: the unit's remaining data fragments (`.sbss`, `.sdata`, `.data`,
  * `.bss`). A split has to be section-aligned
@@ -114,10 +113,8 @@
  *   * `fn_8003F620`'s second framebuffer is written as `lbl_80794770[1] = (u32)lbl_80794770[0] + 0xA5000;`
  *     - reading the base back through the global keeps it in a register and gives retail's
  *     `addis`+`addi` delta pair; folding the two literals costs 4 ARG rows (98.92 -> 100.00 %).
- *   * `OSSetPeriodicAlarm` takes 7 register arguments in this SDK (the dump's own body reads `alarm[6]`,
- *     `alarm[7]` and a 64-bit time from the middle pair), so it is declared here as
- *     `(void* alarm, u32 unk, u64 time, u32 arg5, u32 arg6, void* handler)`; the retail call is
- *     `(&alarm, 0xF0000, OSGetTime(), 0, 0xF7314, fn_8003F52C)`.
+ *   * `OSSetPeriodicAlarm(alarm, s64 start, s64 period, handler)` passes each 64-bit value in an odd/even pair
+ *     (r5:r6, r7:r8; r4 stays unused), so the retail call is `(&alarm, OSGetTime(), 0xF7314, fn_8003F52C)`.
  *
  * All 47 functions are written (address order, .text 0x8003F200-0x80040478): F200, F20C, F218(main), F4D8,
  * F50C, F524, F52C, F554, F564, F58C, F620, F728, F730, F940, F9E4, FBE8, FBFC, FC04, FC48, FC50, FC58,
@@ -138,8 +135,9 @@
  *   * `main` 99.91 % - 704 B, one `lis` left: retail `lis r3, system_w@ha; addi r31, r3, system_w@l`, ours
  *     `lis r31, system_w@ha; addi r31, r31, system_w@l` - the same scratch-vs-coalesced tie-break as
  *     `fn_8003FC64`.
- *   * `fn_8003F58C` 90.81 % - 148 B both. Two argument-setup order swaps (`mr r5,r3` before `mr r6,r4`;
- *     `addi r8,r4,0x7314` before `li r7,0`) and one coalesced `lis r9` where retail uses a scratch `r4`.
+ *   * `fn_8003F58C` 94.05 % - 148 B both. One argument-setup order swap (`mr r5,r3` before `mr r6,r4`) and one
+ *     coalesced `lis r9` where retail uses a scratch `r4`; the PCode after peephole-forward already has our
+ *     order (mwcc-debugger dump 16), so the spelling of the call does not reach it.
  *   * `fn_8003F730` 96.25 % - 528 B both, 8 ARG rows and nothing else. All of them are the r30/r31 split
  *     between the `arg` parameter and the `_f_bss` base in the `arg != 0` body: retail keeps the argument in
  *     r30 and the base in r31, we do it the other way round (`mr r30,r3` vs `mr r31,r3`). Tried: a
@@ -530,26 +528,28 @@ extern "C" void fn_8003F564(void)
 
 /* ---- 0x8003F58C-0x8003F730: the periodic alarm and the memory arenas ---- */
 
-/* The map has no name for 0x804E7110; the shared runtime dump calls it AIRegisterDMACallback (it swaps
-the single DMA-callback pointer at 0x80795654). The relocation has to carry the map's name. */
-extern "C" void* fn_804E7110(void* callback);
+/* owned by VI/vi.cpp; its header cannot be included here (it redefines GXRenderModeObj). */
+typedef void (*VIRetraceCallback)(u32 retraceCount);
+extern "C" VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback callback);
 extern "C" void OSCancelAlarm(OSAlarm* alarm);
-extern "C" u64 OSGetTime(void);
-extern "C" void OSSetPeriodicAlarm(OSAlarm* alarm, u32 unk, u64 time, u32 arg5, u32 arg6, void* handler);
+extern "C" s64 OSGetTime(void);
+struct OSContext;
+typedef void (*OSAlarmHandler)(OSAlarm* alarm, OSContext* context);
+extern "C" void OSSetPeriodicAlarm(OSAlarm* alarm, s64 start, s64 period, OSAlarmHandler handler);
 extern "C" void* MEMCreateExpHeapEx(void* startAddress, u32 size, u16 option);
 
 /* Arms or disarms the periodic alarm that keeps the VI-clock request counter running, and swaps the
  * audio DMA callback that services it. */
 extern "C" void fn_8003F58C(u8 arg)
 {
-    fn_804E7110(0);
+    VISetPostRetraceCallback(NULL);
     OSCancelAlarm(&vi_clock_alarm);
     if (arg == 0) {
-        fn_804E7110((void*)fn_8003F564);
+        VISetPostRetraceCallback((VIRetraceCallback)fn_8003F564);
         OSCancelAlarm(&vi_clock_alarm);
     } else {
-        fn_804E7110(0);
-        OSSetPeriodicAlarm(&vi_clock_alarm, 0xF0000, OSGetTime(), 0, 0xF7314, (void*)fn_8003F52C);
+        VISetPostRetraceCallback(NULL);
+        OSSetPeriodicAlarm(&vi_clock_alarm, OSGetTime(), 0xF7314, (OSAlarmHandler)fn_8003F52C);
     }
 }
 

@@ -1349,13 +1349,13 @@ u32 lb_part_slot_open_ck(u8 slot)
         return 0;
     }
     switch (slot) {
-    case 1:
-        if (userdata_progress_flag_ck(0x21) == 0) {
+    case 2:
+        if (userdata_progress_flag_ck(0x26) == 0) {
             return 0;
         }
         break;
-    case 2:
-        if (userdata_progress_flag_ck(0x26) == 0) {
+    case 1:
+        if (userdata_progress_flag_ck(0x21) == 0) {
             return 0;
         }
         break;

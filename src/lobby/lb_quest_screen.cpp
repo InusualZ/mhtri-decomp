@@ -76,6 +76,13 @@
  *   loop compares it unmasked, and `enemy/em_pop.cpp`'s caller passes the s32 field unmasked); `note_trade_full_draw`'s
  *   frame is an s16 (the caller loads it with `lha`).  The `quest_enemy_kill_record`/`quest_area_spawn_setup` locals
  *   are declared in the order of the retail register assignment (the first declared colours first).
+ * RESIDUALS. quest_arena_need_add: regsim differs on one temp (r40 r0 vs retail r4); retail adds the row address as
+ *            `value + (work + id * 8)` (`add r5,r4,r0`), ours `(work + id * 8) + value`; the `value[row]` spelling
+ *            gives the same bytes.
+ * RESIDUALS. note_trade_route_draw: retail's switch tests `cmplwi r0,1; ble` and then a signed `cmpwi r0,2`; the
+ *            (u32) selector keeps the size (98.54), an (s32) selector and an if-chain score 93.66 and 87.56.
+ * FLAGS. scoped `#pragma optimization_level 4` around note_slot_to_value (retail's counter-loop shape; -O3 scores
+ *        90.97).
  */
 
 #include "types.h"
@@ -300,11 +307,13 @@ extern "C" u32 note_value_to_slot(u16 value) {
 
 /* 0x803A5070 - maps a flat slot index to its table value over the same four 6-entry tables and the
  * flat run at `note_slot_flat_table`; 0 past the end of both. */
+#pragma push
+#pragma optimization_level 4
 extern "C" u16 note_slot_to_value(u8 slot) {
-    u32 index;
     const u16* p;
     s32 t;
     s16 j;
+    u32 index;
     const u16* q;
 
     index = 0;
@@ -327,6 +336,7 @@ extern "C" u16 note_slot_to_value(u8 slot) {
     }
     return 0;
 }
+#pragma pop
 
 /* -------------------------------------------------------------------------------------------------
  * The interior-model resources (0x803A75D8..0x803A7E1C): eight 0x14000-byte buffers in `lobby_w`'s resource view,

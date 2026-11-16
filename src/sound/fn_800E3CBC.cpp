@@ -159,12 +159,12 @@ extern "C" u32 fn_800E440C(u32* p);
 /* Reset record list `idx`: clear its count and run the per-slot destructor over the whole capacity. */
 extern "C" void fn_800E3CBC(u8 idx)
 {
+    u32 i;
     PrimRec* p = (PrimRec*)prim_rec_pool[idx];
 
     prim_rec_count[idx] = 0;
-    for (u32 i = 0; i < prim_rec_capacity[idx]; i++) {
+    for (i = 0; i < prim_rec_capacity[idx]; i++, p++) {
         prim_rec_init(p);
-        p++;
     }
 }
 

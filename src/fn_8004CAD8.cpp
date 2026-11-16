@@ -32,6 +32,11 @@
  *   Data: .data/.sdata/.sdata2 not yet emitted in retail order (string literals and pool entries compile to @N);
  *   .data 0x80581180..0x805813E8 (event_flag_id_table, hunter_rank_points_table, gallery_unlock_table) is read only
  *   here but lies before userdata_item.cpp's .data, so it stays unclaimed (src/unsplit/userdata_tables.h).
+ * RESIDUALS. userdata_size_records_update: regsim aims the @2421/@2419 address temps at r4 and the loop temps at r6,
+ *            ours the reverse (every declaration order measured).
+ * RESIDUALS. hunter_rank_points_get: regsim EXACT; retail loads the 10000000 constant (`lis r3,153`) before the `rank
+ *            <= 50` test and keeps the step table in r7, ours loads it at the end; a `limit` local (89.76) and a
+ *            loop-exit return (75.12) do not move it.
  */
 
 #pragma peephole off
@@ -784,12 +789,13 @@ extern "C" u32 gun_set_record_used_ck(Q_UserData* user, u16 box)
 extern "C" void my_set_gun_id_swap(Q_UserData* user, u16 a, u16 b)
 {
     Q_GunSet* set;
+    u16* part;
     int i;
     int j;
     for (i = 0, set = user->gun_set_0x36C8; i < 20; set++, i++) {
         box_index_swap(&set->weapon_0x00, a, b);
-        for (j = 0; j < 2; j++) {
-            box_index_swap(&set->parts_0x02[j], a, b);
+        for (j = 0, part = set->parts_0x02; j < 2; part++, j++) {
+            box_index_swap(part, a, b);
         }
     }
 }
@@ -1310,6 +1316,7 @@ extern "C" void userdata_item_row_push(const Q_ItemRow* row)
     int i;
     Q_UserData* user = get_userdata();
     Q_ItemRow* rows;
+    int k;
     Q_ItemRow* rec = user->item_rows_0x4078;
     for (i = 0; i < 8; i++, rec++) {
         if (rec->kind_0x00 == 0) {
@@ -1318,7 +1325,7 @@ extern "C" void userdata_item_row_push(const Q_ItemRow* row)
         }
     }
     rows = user->item_rows_0x4078;
-    for (i = 0; i < 7; i++, rows++) {
+    for (k = 0; k < 7; k++, rows++) {
         place_rec_copy(rows, rows + 1);
     }
     place_rec_copy(rows, row);

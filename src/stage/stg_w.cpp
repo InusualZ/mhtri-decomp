@@ -85,6 +85,8 @@
  *     `frame`) or a float-third parameter in the owner's prototype (eft_area_part_break_set).
  *   - stage_area_load's effect-slot assignment is the inline helper stage_area_eft_assign (its early returns are
  *     retail's exits; no `goto`).
+ * RESIDUALS. stage_area_timer_arm: regsim shows `bit` (r34) in r4 against retail r5 and three backend temps rotated
+ *            (r37 r4/r0, r38 r0/r3, r40 r3/r4); `1u`, `bit <<= index` and an `s32 bit` do not move them.
  */
 
 #include "types.h"

@@ -45,6 +45,8 @@
  *   `fn_80100088`'s counts are `u32` (the `u16` call results convert once, right after each call).
  *   `fn_80100330` spells the six-flag pointer guard out in place (its `Panic` takes no pointer argument).
  *   `fn_800FF8D4` narrows `lb_event_state_ck()` (the owner's `u32`) with `(u8)`: retail's `clrlwi` after the call.
+ * FLAGS. scoped `#pragma global_optimizer off` around fn_800FFF08 (retail loads `work_0x38` before the `eft_control`
+ *        base).
  */
 
 #include "types.h"
@@ -1937,6 +1939,8 @@ extern "C" void eft004_slot_spawn(_EFT* self, s32 idx)
 }
 
 /* Retires one live effect: runs the nw4r teardown, releases it from the system and clears its slot. */
+#pragma push
+#pragma global_optimizer off
 extern "C" void fn_800FFF08(Eft004* self, u32 idx)
 {
     EftEffectPool* pool = (EftEffectPool*)self->work_0x38;
@@ -1952,6 +1956,7 @@ extern "C" void fn_800FFF08(Eft004* self, u32 idx)
         *slot = NULL;
     }
 }
+#pragma pop
 
 /* Copies the emitter's position out and, when the emitter is live, offsets it by the current view
  * matrix's translation. Answers whether the offset was applied. */

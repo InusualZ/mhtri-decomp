@@ -54,6 +54,9 @@
  *   `load_file_req`'s arguments are (name, data, size, callback, 4, ctx): the callback is the fourth.
  *   `eft_res_blocks_release` assigns the pointer difference to its `u32` index and shifts it in place (`index >>= 6`): the signed
  *   form emits `srawi` and a `clrrwi`, the one-expression form moves the index to another register.
+ * RESIDUALS. eft_pro_slot_find_kind: the Wii/1.3 stand-in dump unrolls six-wide (`li r0,0x22`) like ours with regsim
+ *            EXACT, so the unroll shape, not colouring, is the difference (retail: five compares per trip, count
+ *            0x33, `addi r5,r5,4`).
  */
 
 #include "types.h"

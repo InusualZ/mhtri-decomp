@@ -25,6 +25,8 @@
  *   `Pl/player_control.h` declares `player_work_array_get(void)` because `ef/system_core.cpp` redeclares it so;
  *   the definition takes the player count. The target's `.sdata` lacks three intra-section relocations
  *   (0x807920D4/E8/F0: `pl_lance_names[1]`, `pl_long_sword_names`, `pl_switch_axe_names`), which our object carries.
+ * RESIDUALS. player_move_start: regsim EXACT; retail's address `add r4,r4,r0` stays in r4 where ours uses r3
+ *            (volatile temp, not a regsim target).
  */
 
 #include "types.h"

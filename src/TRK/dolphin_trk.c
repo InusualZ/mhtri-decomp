@@ -129,7 +129,6 @@ asm void InitMetroTRK(void)
     blr
 fail:
     b TRK_main
-    blr
 }
 
 asm void InitMetroTRK_BBA(void)

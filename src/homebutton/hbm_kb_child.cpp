@@ -28,6 +28,11 @@
  * RESIDUALS. resetKeys and fadeOtherKeys: the table base and the index take each other's saved registers; the
  *            pane handler's onPaneEvent keeps the code index in a temporary where retail keeps the scaled offset.
  * RESIDUALS. setLanguage: retail schedules the language register copy before the pool base; ours after.
+ * RESIDUALS. resetKeys / fadeOtherKeys: retail keeps the region table in r31 and the byte offset in r30, ours the
+ *            reverse. The Wii/1.3 stand-in is EXACT for our order, so the difference is the GC/3.0a5.2 allocator;
+ *            declaration, init-order and split-init permutations score the same.
+ * RESIDUALS. __sinit: the epilogue's `lwz r31` / `lwz r30` restores sit before the last stores in retail and after
+ *            them in ours (scheduling).
  */
 
 #include "types.h"

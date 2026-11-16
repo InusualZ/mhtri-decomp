@@ -558,7 +558,7 @@ IdValue* userdata_pouch_get(LbItemDb* db, u8 side);
 IdValue* userdata_equip_item_slots_get(LbItemDb* db);
 u16 userdata_equip_item_id_get(LbItemDb* db, s32 index);
 s16 userdata_equip_item_value_get(LbItemDb* db, s16 index);
-s32 userdata_pouch_room_get(LbItemDb* db, u8 side);
+s32 userdata_pouch_room_get(LbItemDb* db, u16 id, u8 side);
 s32 userdata_item_total_count(LbItemDb* db, u16 id);
 s32 item_slots_room_get(u16 id, void* slots, s32 count);
 s32 item_pair_index_find(u16 id, IdValue* base, s32 count);
@@ -881,10 +881,12 @@ extern "C" s32 fn_801ED200(s32 index, u8 side)
     if (index >= userdata_item_slot_count(lobby_world_block)) {
         return 0;
     }
-    if (userdata_equip_item_id_get(lobby_world_block, index) == 0) {
+    u16 id = userdata_equip_item_id_get(lobby_world_block, index);
+
+    if (id == 0) {
         return 0;
     }
-    return userdata_pouch_room_get(lobby_world_block, side == 0);
+    return userdata_pouch_room_get(lobby_world_block, id, side == 0);
 }
 
 /* Copies the working equipment set into the backup run and re-arms the pane's two counters. */
@@ -1132,7 +1134,7 @@ extern "C" u8 fn_801EDA9C(LbListPane* self, u16 index, u16 item_id)
     if ((u8)*GetItemData(item_id) != 1 && index >= 0x18U) {
         return 1;
     }
-    if (item_slots_free_count(&lobby_world_block->slots_0x180[0], userdata_box_capacity(lobby_world_block)) == 0
+    if (item_slots_free_count(&lobby_world_block->slots_0x180[0], (u16)userdata_box_capacity(lobby_world_block)) == 0
         && userdata_equip_item_id_get(lobby_world_block, index) != 0) {
         return 2;
     }
@@ -1324,6 +1326,7 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
     s32 result;
     s32 r;
     u8 side;
+    u16 equip_id;
 
     result = 0;
     self->move_0x01C = 0;
@@ -1387,8 +1390,8 @@ extern "C" s32 fn_801EE1E4(LbListPane* self)
             id = fn_801ED53C(self);
             if (fn_801EDB34(self, id, self->item_id_0x024) == 0) {
                 side = self->side_0x005 == 0;
-                if (userdata_equip_item_id_get(lobby_world_block, id) != 0
-                    && userdata_pouch_room_get(lobby_world_block, side) <= 0) {
+                equip_id = userdata_equip_item_id_get(lobby_world_block, id);
+                if (equip_id != 0 && userdata_pouch_room_get(lobby_world_block, equip_id, side) <= 0) {
                     self->phase_0x001 = 3;
                     item_pair_copy(&tmp2, &userdata_equip_item_slots_get(lobby_world_block)[id]);
                     item_pair_clear(&userdata_pouch_get(lobby_world_block, self->side_0x005)[id]);

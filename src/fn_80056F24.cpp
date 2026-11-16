@@ -34,6 +34,7 @@
  *   registers; `fade_update`/`fade_set`: volatile register assignment only (declaration orders measured).
  * RESIDUALS. `filter_panel_upper_set`/`_lower_set`: `fmuls` operand order (height * scale; the swapped
  *   spelling measures lower).
+ * FLAGS. scoped `#pragma optimization_level 4` around fade_set (95.71 -> 100).
  */
 
 #include "types.h"
@@ -748,12 +749,15 @@ extern "C" void fade_work_clear(void) {
 /* `fade_set(slot, tableIndex)`: arm slot `slot` from the `fade_step_table` entry `tableIndex`.  The
  * coloured alpha the walk eases is the table's +0x04; the tick count is the alpha span divided by |step|,
  * rounded up. */
+#pragma push
+#pragma optimization_level 4
 void fade_set(s32 slot, s32 tableIndex) {
     FadeWork* fw = &fade_work;
+    s32 span;
     FadeStep* step = &fade_step_table[tableIndex];
     fw->tbl[slot] = tableIndex;
     fw->color[slot] = step->color_0x04;
-    s32 span = step->to_0x0C - step->from_0x08;
+    span = step->to_0x0C - step->from_0x08;
     if (span < 0) {
         span -= span * 2;
         fw->state[slot] = 2;
@@ -771,6 +775,7 @@ void fade_set(s32 slot, s32 tableIndex) {
     }
     fw->target[slot] = step->to_0x0C;
 }
+#pragma pop
 
 /* `fade_reset(slot)`: clear the six fields of one slot. */
 void fade_reset(s32 slot) {

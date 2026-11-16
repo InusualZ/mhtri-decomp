@@ -21,6 +21,8 @@
  *    `__OSInitPlayTime` takes `ESP_InitLib`'s result as a one-case `switch` (the target's `beq` + `b` over the body), runs
  *    `__OSGetPlayTime` under `result != -1017 && result == 0`, and computes the alarm ticks as
  *    `((s64)limitValue + 20) * (OS_BUS_CLOCK / 4)` (signed: `li` + `addc`/`adde`).
+ * RESIDUALS. __OSPlayTimeAlarmExpired: regsim EXACT; retail sets `li r9,0` before `mr r3,r31` among OSCreateThread's
+ *            arguments, ours the reverse (scheduling; no scoped pragma moves it).
  */
 
 #define OS_THREAD_TYPED_API

@@ -38,6 +38,8 @@
  *   where retail has them in r30/r31), `drawshape_tev_stages_set` (99.4 %: the stage pointer and the counter swap
  *   r29/r30), `drawshape_exec` (99.65 %: one vertex loop's pointer and count swap r25/r26), `drawshape_gx_begin_setup`
  *   (99.8 %: r30/r31 swap between the work base and the copied matrix pointer).
+ * FLAGS. scoped `#pragma global_optimizer off` around drawshape_set_translate and drawshape_set_tex_translate
+ *        (retail's saved-register order).
  */
 
 #include "types.h"
@@ -404,7 +406,7 @@ extern "C" void drawshape_tev_stages_set(u8 count) {
     s32 i;
 
     GXSetTevSwapModeTable(0, 0, 1, 2, 3);
-    for (i = 0, stage = drawshape_tev_stage_tbl; i < count; i++, stage++) {
+    for (i = 0, stage = drawshape_tev_stage_tbl; i < count; stage++, i++) {
         GXSetTevSwapMode(*stage, 0, 0);
         GXSetTevDirect(*stage);
     }
@@ -826,12 +828,15 @@ extern "C" void drawshape_set_rot_scale_ivec2(const s16* pos, u16 angle, f32 sca
 }
 
 /* 0x800540D0 (0xA8): translates the shape by `pos`. */
+#pragma push
+#pragma global_optimizer off
 extern "C" void drawshape_set_translate(const f32* pos) {
     Mtx m;
 
     PSMTXTrans(m, pos[0], pos[1], 0.0f);
     drawshape_pos_mtx_apply(m);
 }
+#pragma pop
 
 /* 0x80054178 (0x64): translates the shape by an s16 position. */
 extern "C" void drawshape_set_offset_ivec2(s16* pos) {
@@ -861,12 +866,15 @@ extern "C" void drawshape_set_offset_f32(const f32* scale, const f32* offset) {
 }
 
 /* 0x800542C8 (0xA8): translates the texture coordinates by `pos`. */
+#pragma push
+#pragma global_optimizer off
 extern "C" void drawshape_set_tex_translate(const f32* pos) {
     Mtx m;
 
     PSMTXTrans(m, pos[0], pos[1], 0.0f);
     drawshape_tex_mtx_apply(m);
 }
+#pragma pop
 
 /* 0x80054370 (0xBC): scales the texture coordinates by `scale`, then moves them by `offset`. */
 extern "C" void drawshape_set_tex_scale(const f32* scale, const f32* offset) {

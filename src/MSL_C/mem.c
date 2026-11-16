@@ -13,6 +13,8 @@
  *    `memcmp` is byte-identical: regsim search's exact plan declares `d`, `c`, `p`, `q` in that order.
  * SHAPES. the copy helpers align the destination bytewise, move 32-byte blocks, then single words, then the
  *    tail bytes; the unaligned ones merge two source words per destination word.
+ * RESIDUALS. __copy_longs_rev_unaligned: the shift-amount vreg (rsh r41) is r8 against retail r11 and the whole
+ *            pointer set is rotated one step (regsim plans cost 12-15 rewrites).
  */
 #include "types.h"
 
@@ -272,6 +274,8 @@ static void __copy_longs_unaligned(u8* dst, const u8* src, u32 n)
     }
 }
 
+#pragma push
+#pragma optimization_level 1
 static void __copy_longs_rev_unaligned(u8* dst, const u8* src, u32 n)
 {
     u8* d = dst + n;
@@ -319,3 +323,4 @@ static void __copy_longs_rev_unaligned(u8* dst, const u8* src, u32 n)
         } while (--n != 0);
     }
 }
+#pragma pop

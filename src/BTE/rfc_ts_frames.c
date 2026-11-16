@@ -19,6 +19,9 @@
  *   are reached through BT_BUF's data, except in rfc_send_buf_uih, which spells the payload `(u8*)&p_buf[1]` (the
  *   byte after the header): there the data[] spelling precomputes the +8 and stores with stbux, where the target adds
  *   the offset first and folds the 8 into each store's displacement.
+ * RESIDUALS. rfc_send_test: regsim EXACT; retail subtracts the offset into r4 (`addi r4,r6,-2`, the freed
+ *            `is_command` register) and materialises the DLCI 0 last (`li r4,0`), ours subtracts in r6 and loads the
+ *            0 earlier; `offset = offset - 2` and a `u16 off` local do not change it.
  */
 
 #include "BTE/rfc_ts_frames.h"

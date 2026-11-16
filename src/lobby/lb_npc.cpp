@@ -118,6 +118,8 @@
  *   reenter call, `lb_player_remote_follow`'s walk block); `lb_arm_wrestle_step` reads `lobby_w` through a pointer
  *   local (retail keeps its address in r31, playbook 214) and narrows its `u16` loop bound in the condition
  *   (playbook 216); `checkOwnInvite` and `lb_cmd_pressed_ck` results compare as `(u32)` where retail has `cmplwi`.
+ * RESIDUALS. lb_npc_ground_drop: retail adds `fadds f0,f0,f1` (y in f0) against ours `f1,f0`, and points the 48.0f at
+ *            `lbl_807998D8` where ours pools its own `@4432` (regsim EXACT).
  */
 #pragma optimization_level 4
 #include "types.h"
@@ -11125,7 +11127,9 @@ void lb_shop_buy_commit(LbShopWork* self)
 /* 0x80210D24 - sells the chosen row's items and credits the price. */
 void lb_shop_sell_commit(LbShopWork* self)
 {
-    s32 value = self->rows_0x144[self->cursor_0x006].price_0x4 * self->count_0x00C;
+    s32 value = self->rows_0x144[self->cursor_0x006].price_0x4;
+
+    value *= self->count_0x00C;
 
     if ((u16)userdata_item_give(lobby_world_block, self->rows_0x144[self->cursor_0x006].item_0x0, -self->count_0x00C,
                                 1) == 4) {

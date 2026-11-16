@@ -43,6 +43,8 @@
  * four `_EQUIP` records `Get_pl_type` and `equip_variant_get` take at +0x1D0 / +0x1DC / +0x1E8 / +0x1F4, and the
  * enemy list walks it at its 0xB20 stride. `slot_active` (+0x000), `chunk_ofs` (+0x008), `se_name_set` (+0x014)
  * and `se_name_idx` (+0x01D) are named from this unit's evidence.
+ * RESIDUALS. demo_bgm_ready_ck: regsim is EXACT for the saved set; retail emits `li r29,0` before `li
+ *            r31,demo_stream_slot@sda21`, ours the reverse (two constant vregs, instruction order).
  */
 
 #include "types.h"

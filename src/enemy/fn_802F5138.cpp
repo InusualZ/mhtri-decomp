@@ -35,6 +35,8 @@
  *   turn constants that feeds a call is a `(u16)` ternary; the static initializer reads the vector pairs through
  *   `extern` declarations and defines them after itself (so each is addressed on its own); `em032_frame_update`'s
  *   enemy-record search tests the searching record (`work`) with `em_work_die_ck`, as retail does.
+ * RESIDUALS. em032_area_attacker_ck: regsim's EXACT plans give the masked `area` copy (r43/r44 `rlwinm`) its own
+ *            local; `u8 want = area` leaves the mask a separate vreg (94.26), retail masks in place in r30.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -391,13 +393,14 @@ extern "C" void em032_event_notify(_ENEMY_WORK* work, u32 action, u32 state_sub)
 /* 0x802F548C (0xAC): reports whether a live enemy record with the attack flag set stands in the given area. */
 extern "C" u32 em032_area_attacker_ck(u8 area) {
     u16 max;
-    s32 i;
+    u8 want = area;
     _ENEMY_WORK* rec;
+    s32 i;
 
     rec = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
     for (i = 0; i < max; i++) {
-        if ((u32)em_work_die_ck(rec) != 1 && (rec->field_0x1C8 & 1) != 0 && rec->area_no == area) {
+        if ((u32)em_work_die_ck(rec) != 1 && (rec->field_0x1C8 & 1) != 0 && rec->area_no == want) {
             return 1;
         }
         rec++;

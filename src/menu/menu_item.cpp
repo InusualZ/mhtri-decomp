@@ -50,6 +50,8 @@
  *    assignment copies it member by member;
  *  - `menu_work_update`'s quest case falls through into `default: return;` (idea 232);
  *  - `ItemDataRecord`'s +0x000 is a union of both views (`kind_0x00`/`level_0x01` beside one `u16`).
+ * FLAGS. scoped `#pragma optimization_level 2` around menu_item_frame_update (retail masks the argument with `clrlwi
+ *        r3,r30,24`).
  */
 
 #include "types.h"
@@ -801,6 +803,8 @@ extern "C" u32 menu_slot_busy_ck(u8 idx)
 
 /* 0x802A0304: the same predicate for the slot the frame work selects, which is the current game
  * mode's own slot. */
+#pragma push
+#pragma optimization_level 2
 extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
 {
     MenuSlot* slot = &menu_work.slot[0];
@@ -825,6 +829,7 @@ extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
     }
     return cockpit_msg_slot_busy_ck(idx);
 }
+#pragma pop
 
 /* 0x802A03A4: whether the first slot is in use in its single-player mode. */
 extern "C" u32 menu_top_busy_ck(void)

@@ -44,6 +44,10 @@
  *   pane-switch helpers are file-scope statics so their names join the unit's string pool; single-case `switch`es
  *   and `||` early returns give retail's `beq; b` branch shapes; the shift/caps code toggles the case word through
  *   mask expressions and bit fields (HkbCaseBits) where retail does.
+ * RESIDUALS. findCommandByName: regsim (Wii/1.3 stand-in) needs the `i * 0x18` temp (@7349) numbered below `i`
+ *            (retail: i r31, offset r30); a `u32 offset` local and split declarations do not change it.
+ * RESIDUALS. setShiftOff: retail's `clrrwi r4,r0,4` sits in r4 where ours reuses r0 (peephole temp; regsim EXACT for
+ *            the saved set).
  */
 #include "homebutton/hkb_keyboard.h"
 
@@ -2373,10 +2377,11 @@ void HkbRecentKeys::push(u32 key) {
             }
         }
     } else {
-        for (s32 i = 0; i < 4; i++) {
-            mKeys[i] = mKeys[i + 1];
-            if (key == mKeys[i]) {
-                mKeys[i] = 0;
+        u32* k = mKeys;
+        for (s32 i = 0; i < 4; i++, k++) {
+            k[0] = k[1];
+            if (key == k[0]) {
+                k[0] = 0;
             }
         }
         mKeys[4] = key;

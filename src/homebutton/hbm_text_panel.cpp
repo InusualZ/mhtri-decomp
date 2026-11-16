@@ -94,6 +94,9 @@
  * SHAPES.    Constructors and destructors are the classes' own: a class whose table this unit does not emit declares an
  *            override (or a C-function slot) before its destructor so the destructor is not its key function; the
  *            panel's constructor puts its state in the initialiser list and the key queue and cell list in the body.
+ * RESIDUALS. hbmTextCellListInit (156 B, ours 152 B): retail derives `last` from the loop-test count (`subi r5,r5,1`
+ *            on the last `lhz r5,4(r3)`) and reloads `list->count` (`lhz r0,4(r3)`) for the free cell; `last =
+ *            list->count - 1` (84.49) and moving it before the free pointer (81.03) score lower.
  */
 
 #include "types.h"

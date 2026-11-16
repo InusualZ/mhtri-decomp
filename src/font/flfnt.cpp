@@ -27,6 +27,8 @@
  *   multibyte-next '\n' test branches to the '~' test (retail: straight to the newline block).
  *   flfntStackReset: the inner loop count `li r0,0x20` is not hoisted.  font_str_char_count: the byte and
  *   `two` swap r4/r5.
+ * RESIDUALS. font_str_char_count: regsim aims `two` (r35) at r4 and the @1828 temp at r5, ours the reverse;
+ *            declaration permutations do not reach it.
  */
 
 #pragma peephole off
@@ -370,9 +372,12 @@ extern "C" s32 flfntGlyphAdvance(u32 index);
 /* 0x8005B7D8 (0x9C): the console cells a UTF-8 string occupies: 1 per narrow character, 2 per wide one. */
 extern "C" s32 flfntStrCells(char* s)
 {
+    s32 len;
     FlFnt* state = flfnt_state;
-    s32 len = 0;
-    char* p = s;
+    char* p;
+
+    len = 0;
+    p = s;
 
     for (;;) {
         s32 c = flfntUtf8Decode((u8**)&p);

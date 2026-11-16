@@ -74,6 +74,11 @@
  *   of the screen-13 helpers; `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate
  *   it); a draw helper declares its layout base before the row position (retail puts the base at +0xC); the two-row
  *   loops are `for` loops (a `do`/`while` keeps an `extsh`/`clrlwi` on the test).
+ * FLAGS. scoped `#pragma peephole on` around lb_act_best_keep (99.60 -> 99.73).
+ * RESIDUALS. lb_act_best_keep: retail stores the raw `value` byte (r4) while ours stores the extsb copy, the CSE of
+ *            the sign extension (regsim EXACT; an `s8 value` local scores 93.65).
+ * RESIDUALS. lb_act_row_update: `mr r4,r31` against ours r30; the request copy (r32) is r30 x5 / r31 x2 in retail and
+ *            is not a regsim target.
  */
 
 #include "types.h"
@@ -462,11 +467,10 @@ void lb_act_announce(u8 unused, LbActReq* req) {
                 companion = work->companion_0xDC;
                 if (companion != NULL && (s8)companion->step_0x2C != 4) {
                     lb_entry_notify_send(1, req->index_0x01);
-                    return;
                 }
             }
         }
-        return;
+        break;
     case 7:
         quest_reward_faint_penalty(req->index_0x01);
         break;
@@ -549,9 +553,9 @@ void lb_handled_set(u8 unused, u8 index) {
 /* Whether every set bit of `lbl_80794B90[index]`'s low nibble belongs to a present pad: their count against
  * `countOccupiedServerSlots()`. */
 s32 lb_seen_pad_ck(u8 index) {
+    s32 i;
     s32 count;
     u8 bits;
-    u8 i;
 
     count = 0;
     bits = lbl_80794B90[index] & 0xF;
@@ -969,6 +973,8 @@ void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
 
 /* Act 22: keeps the companion work's high score `best_0x8F`, then hands the row on (`quest_item_pair_copy_row`,
  * `hud_msg_push`). */
+#pragma push
+#pragma peephole on
 void lb_act_best_keep(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -990,6 +996,7 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
         }
     }
 }
+#pragma pop
 
 /* Sends the header-only sub-0x18 command.  GUESS name: caller unwritten. */
 void lb_sub18_send(void) {

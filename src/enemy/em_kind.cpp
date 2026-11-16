@@ -33,6 +33,9 @@
  *   `fn_80140B10` so its `b` lands on the next word; `fn_80140B20` is `__declspec(export)` (force-active in retail);
  *   the 16 callees the folded sources declared differently are called through cast macros (`<name>_cN`,
  *   `<name>_viewN`) and the disagreeing header declarations are renamed away around their `#include`.
+ * RESIDUALS. fn_801406E0: one temp (r44 r0 vs retail r3: `addi r3,r3,1` against `addi r0,r3,1`).
+ *            fn_80140E48/fn_80140FB0: regsim differs on the mulli result (r38 r4 vs retail r5) while the flag mask
+ *            sits in r6; `u32 ctx = flag` declared first measures 94.5 %.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */

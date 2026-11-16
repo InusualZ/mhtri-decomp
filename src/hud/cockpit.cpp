@@ -2810,16 +2810,14 @@ void cockpit_msg_slot_rows_build(CockpitMsgSlot* slot)
 void cockpit_msg_slot_choice_a_build(CockpitMsgSlot* slot, s16 choice)
 {
     MenuEntry* entry = slot->choice;
-    s32 i = 0;
+    s32 i;
 
-    do {
+    for (i = 0; i < 2; i++, entry++) {
         entry->selected = 0;
         entry->field_0x02 = 1;
         entry->field_0x08 = get_menu_msg(14, i);
         entry->field_0x0C = 0;
-        i++;
-        entry++;
-    } while (i < 2);
+    }
     if (slot->state != 4) {
         slot->choice[choice].selected = 1;
     } else {
@@ -2831,16 +2829,14 @@ void cockpit_msg_slot_choice_a_build(CockpitMsgSlot* slot, s16 choice)
 void cockpit_msg_slot_choice_b_build(CockpitMsgSlot* slot, s16 choice)
 {
     MenuEntry* entry = slot->choice;
-    s32 i = 0;
+    s32 i;
 
-    do {
+    for (i = 0; i < 2; i++, entry++) {
         entry->selected = 0;
         entry->field_0x02 = 1;
         entry->field_0x08 = get_menu_msg(13, i);
         entry->field_0x0C = 0;
-        i++;
-        entry++;
-    } while (i < 2);
+    }
     slot->choice[choice].selected = 1;
 }
 

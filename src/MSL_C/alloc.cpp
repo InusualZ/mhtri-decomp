@@ -146,7 +146,7 @@ static void SubBlock_merge_next(SubBlock* ths, SubBlock** start)
 
     if (!(next_sb->size & 2)) {
         merged_size = size + SubBlock_size(next_sb);
-        ths->size = (word & 7) | (merged_size & ~7);
+        ths->size = (merged_size & ~7) | (word & 7);
         if (!(ths->size & 2)) {
             ((u32*)((char*)ths + merged_size))[-1] = merged_size;
         }
@@ -156,7 +156,7 @@ static void SubBlock_merge_next(SubBlock* ths, SubBlock** start)
             ((SubBlock*)((char*)ths + merged_size))->size |= 4;
         }
         if (*start == next_sb) {
-            *start = next_sb->next;
+            *start = (*start)->next;
         }
         if (*start == next_sb) {
             *start = NULL;

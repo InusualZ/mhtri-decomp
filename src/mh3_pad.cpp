@@ -46,9 +46,10 @@
  *   both the multiply and the base: worse).  `pad_fs_stick_read`: retail keeps the two s16 stick values in
  *   saved registers and re-extends them at every use; ours spills the one-element arrays to the stack.
  *   `pad_gc_stick_read`: retail stores the `rc_get_*` results without `extsb` (a `u8` getter into the `s8`
- *   arrays).  `pad_motor_start`: retail stores `time` without the `clrlwi` (`SystemWork.field_0x33` is `u8` in
- *   the shared `system_work.h`; `s8` would match, 95 includers).  `pointer_smooth`: `vec3_distance` (owner
- *   `fn_8004CAD8.h`) is declared `f32` where retail rounds its result with `frsp`.  `kpad_obj_copy`: retail
+ *   arrays).  `pad_motor_start`: retail stores `time` without the `clrlwi`; `SystemWork.field_0x33` is `u8` in the
+ *   shared `system_work.h` (`s8` would match, 95 includers), so the store goes through an `s8` view.  `pointer_smooth`:
+ *   `vec3_distance` (owner `fn_8004CAD8.h`) is declared `f32` where retail rounds its result with `frsp`.
+ *   `kpad_obj_copy`: retail
  *   copies `center` as two words (`lwz`/`stw`); a `Vec2` assignment gives `lfs`/`stfs` under either peephole
  *   setting.
  *   Data: the unit's `.data`/`.sdata`/`.sbss`/`.sdata2` are claimed but not emitted (the bodies `extern` them),
@@ -3344,7 +3345,7 @@ extern "C" void pad_motor_stop(u8 chan);
 extern "C" void pad_motor_start(u8 chan, s8 time)
 {
     if (system_w.field_0x32 != 0 && option_cfg_eq_ck(chan, 7, 0) != 0 && (u8)(get_cfg(chan, 20) ^ 1)) {
-        system_w.field_0x33[chan] = time;
+        ((s8*)system_w.field_0x33)[chan] = time;
         system_w.field_0x37[chan] = 1;
         WPADControlMotor(chan, 1);
     }

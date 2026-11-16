@@ -64,6 +64,9 @@
  *   GUESS (from each body and its callers): `se_slot_req_pos`, `se_req_orb`, `se_req_item_jingle`,
  *   `se_req_eft019_tick`, `se_req_splash`.
  * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
+ * RESIDUALS. se_talk_point_set: retail keeps `self + 0x30000` (`addis r31,r3,3`) in a saved register across the VEC3
+ *            assignment and addresses every field off it; ours keeps `self` in r31 and rebuilds the addis after the
+ *            call (dump: r33 self r31 vs r3, r36 r5 vs r3).
  */
 #pragma optimization_level 4
 #pragma peephole off
