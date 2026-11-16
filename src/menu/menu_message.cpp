@@ -1431,8 +1431,8 @@ extern "C" void menu_scroll_init(MenuScroll* scroll, u16 index, u16 total, u8 ro
 {
     s32 rows;
     s32 pages;
-    s32 page;
     u8 limit;
+    s32 page;
 
     scroll->index = index;
     scroll->rows_per_page = rows_per_page;

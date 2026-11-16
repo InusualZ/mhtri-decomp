@@ -24,7 +24,8 @@
  *     effect, work, NPC and counter r16-r20, ours the reverse.  Declaration permutes of its scalars do not move it.
  *   - em007_model_eft_job_draw: register colouring only (the hold angle of the second pose).
  *   - Em007ModelCopy::ExecCallbackB: retail moves `pManip` into r3 before the node index load (scheduling).
- *   - `eft052_page_count_add`'s delta is s32 in retail (no `extsh`; request #6): lb_goods_hold_give.
+ *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
+ *     operands does not move it (regsim: colouring exact).
  *   - register colouring only: lb_eqshop_weapon_page_build, lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
  *     lb_title_frame_draw, lb_eqshop_help_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
@@ -3587,7 +3588,7 @@ void lb_goods_hold_give(LbTradeWork* self)
 
     eft052_hold_row_get(&id, &count);
     eft052_page_count_add(id, count);
-    userdata_zenny_add(count * item_price_get(id));
+    userdata_zenny_add(item_price_get(id) * count);
     if (item_bonus_class_get(id) != 0) {
         lb_act_latch_set(self->plw_0x01C, 5);
     }

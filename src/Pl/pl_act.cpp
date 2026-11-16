@@ -93,13 +93,14 @@
  *    `lha` (`value +=`, `value = (s16)(value + x)` and a plain store measured);
  *  - `fn_8026A068`: retail divides the id before it loads the work's byte (`kind` local, no local, a pre-computed
  *    quotient, the swapped subscript, a pointer-to-array cast and `#pragma scheduling off` all measured; the order is
- *    fixed before scheduling);
+ *    fixed before scheduling; the Wii/1.3 dump's regsim plan is exact on the named locals and leaves the unnamed `@`
+ *    temporary of the row load in r4 where retail has r5);
  *  - `talisman_roll`: retail re-extends the points (`extsb`) before the `+ 10` (`(s32)`, `(s8)`, `(s8)10` measured);
  *  - `equip_deco_slots_free`: the free-slot return forms `andc` where ours has `and` (three return spellings measured);
  *  - `equip_gun_level_bonus_get`: the remainder loop bumps the index before the row pointer;
  *  - 66 functions partial (`sweepcomments.py --unit Pl/pl_act` lists them), including:
- *  - `equip_color_rgba_get`/`armor_color_rgba_get`: retail forms the row address `add r3,r4,r3` (offset first), ours
- *    `add r3,r3,r4`; a row-pointer local is worse;
+ *  - `equip_color_rgba_get`/`armor_color_rgba_get` read 100 % with the table indexed flat (`((u8*)table)[index * 3 + k]`),
+ *    which forms the row address offset-first as retail does;
  *  - `pl_area_stamina_drain_step`: retail's `self->unk37C -= v` subtracts the unextended `v` (r31) after the `extsh r0` compare;
  *    `-= (s16)v` reuses the extended copy (r3), and `-= v` moves the `extsh` ahead of the `sth`;
  *  - `pl_pos_blend_start`: retail stores the raw `arg1` (r31) to +0xB4 where ours reuses the `(s16)arg1` the
@@ -107,13 +108,15 @@
  *  - `pl_sharpness_add`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
  *  - `fn_80278D1C`: retail branches every id range test forward to its block (8, then 2, then 4) with a fall-through
  *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
- *  - `fn_802693C4`/`pl_parts_value_get`: retail adds the record offset into the base register (`add r4,r4,r0` /
- *    `add r5,r5,r0`), ours into a fresh one; `fn_8027AF88`: one `extsb` target register (r4 against r0);
+ *  - `fn_802693C4`: retail adds the record offset into the base register (`add r4,r4,r0`), ours into a fresh one
+ *    (`pl_parts_value_get` reads 100 % with `obj = pl_global->table; obj += self->chunk_ofs;`); `fn_8027AF88`: one
+ *    `extsb` target register (r4 against r0);
  *  - `pl_status_sheet_get`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
  *  - `equip_skill_points_get`/`equip_skill_tree_has_ck`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
  *    tests, and in `equip_skill_tree_has_ck` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
  *    removed reproduced more rows (docs/pl.md);
- *  - `Pl_cat_skill_ck`: MWCC reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every walk tried;
+ *  - `Pl_cat_skill_ck`: MWCC reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every walk tried (Wii/1.3 dump:
+ *    regsim exact on `i`, `p`; the fold happens in the frontend before the PCode);
  *  - `pl_parts_refresh`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
  *    `pend` by ours;
  *  - the int-to-float conversion constant: `pl_gun_deviation_get`, `Pl_chr_set_attr`, `Pl_get_gunner_vec`, `pl_eye_mtx_get`
@@ -138,7 +141,9 @@
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `pl_item_now_usable_ck`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
- *  - `pl_kind_item_equip_find`/`pl_act_held_class_get`/`pl_act6_class_ck`: one or two register or block choices around the id scans;
+ *  - `pl_kind_item_equip_find`/`pl_act6_class_ck`: one or two register or block choices around the id scans
+ *    (`pl_act_held_class_get` reads 100 % with `(s32)self->act_no == 0xC`; `pl_item_pouch_ok_ck` with `fn_80274DCC`
+ *    returning `u32`);
  *  - `pl_weapon0_hit_feedback`: the self/quake callee-saved registers are swapped (r31/r30), every spelling tried;
  *  - `pl_weapon_parts_refresh`: the weapon pointer and the variant sit in r26/r29 where retail has r27/r27 (98.5 %);
  *  - `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
@@ -397,7 +402,9 @@ s32 pl_parts_value_get(_PLW* self, s32 part)
     if (pl_global == NULL) {
         return -1;
     }
-    return pl_global->table[self->chunk_ofs].group[3][part];
+    _PLOBJ* obj = pl_global->table;
+    obj += self->chunk_ofs;
+    return obj->group[3][part];
 }
 
 /* 0 when the part already carries this value, 1 while it is still free, -1 once it is consumed. */
@@ -5182,7 +5189,7 @@ extern "C" u8 fn_80274D98(struct _PLW* plw, u8 kind)
 }
 
 /* True when the player-bound bonus sum is non-zero. */
-extern "C" u8 fn_80274DCC(struct _PLW* plw, u8 kind)
+extern "C" u32 fn_80274DCC(struct _PLW* plw, u8 kind)
 {
     return fn_80274D98(plw, kind) != 0;
 }
@@ -10182,7 +10189,7 @@ extern "C" s32 pl_act_held_class_get(_PLW* self) {
         }
         break;
     case 12:
-        if (self->act_no == 0xC) {
+        if ((s32)self->act_no == 0xC) {
             return 2;
         }
         break;
@@ -10305,9 +10312,9 @@ extern "C" s32 equip_color_rgba_get(u8 index) {
     PlRgba color;
 
     color.channel[3] = 0xFF;
-    color.channel[0] = equip_color_table[index][0];
-    color.channel[1] = equip_color_table[index][1];
-    color.channel[2] = equip_color_table[index][2];
+    color.channel[0] = ((u8*)equip_color_table)[index * 3];
+    color.channel[1] = ((u8*)equip_color_table)[index * 3 + 1];
+    color.channel[2] = ((u8*)equip_color_table)[index * 3 + 2];
     return color.word;
 }
 
@@ -10316,9 +10323,9 @@ extern "C" s32 armor_color_rgba_get(u8 index) {
     PlRgba color;
 
     color.channel[3] = 0xFF;
-    color.channel[0] = armor_color_table[index][0];
-    color.channel[1] = armor_color_table[index][1];
-    color.channel[2] = armor_color_table[index][2];
+    color.channel[0] = ((u8*)armor_color_table)[index * 3];
+    color.channel[1] = ((u8*)armor_color_table)[index * 3 + 1];
+    color.channel[2] = ((u8*)armor_color_table)[index * 3 + 2];
     return color.word;
 }
 

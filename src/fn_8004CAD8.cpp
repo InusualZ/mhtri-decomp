@@ -23,7 +23,7 @@
  *   the goto-free source omits those six instructions.
  *   getDirVec, VEC3::operator=: retail copies VEC3 as words and returns it by NRVO - its VEC3 derives from a base struct
  *   with a constructor; the shared nw4r::math::VEC3 here is a plain struct of floats (a 399-includer header).
- *   gun_set_box_used_ck keeps the last test as a branch where ours folds it to cntlzw; hunter_rank_points_get hoists
+ *   hunter_rank_points_get hoists
  *   the 10000000 return above the loop; set_mydata2vs ORs the tick first (`or r0,r4,r0`); lobby_friend_list_sort,
  *   userdata_hunter_rank_info_get, userdata_size_records_update, monster_size_crown_get, my_set_equip_id_swap,
  *   my_set_gun_id_swap, userdata_item_row_push, exportEquipRecord, userdata_worn_refresh: register order.
@@ -750,6 +750,8 @@ extern "C" u32 gun_set_any_ck(Q_UserData* user)
 }
 
 /* 0x8004DC2C (0x54): whether bowgun set `index` uses box record `box`. */
+#pragma push
+#pragma opt_rebuildconditionals off
 extern "C" u32 gun_set_box_used_ck(Q_UserData* user, u16 box, u8 index)
 {
     Q_GunSet* set = &user->gun_set_0x36C8[index];
@@ -764,6 +766,7 @@ extern "C" u32 gun_set_box_used_ck(Q_UserData* user, u16 box, u8 index)
     }
     return 0;
 }
+#pragma pop
 
 /* 0x8004DC80 (0x70): whether any bowgun set uses box record `box`. */
 extern "C" u32 gun_set_record_used_ck(Q_UserData* user, u16 box)

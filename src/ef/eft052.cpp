@@ -161,8 +161,9 @@ extern "C" void eft052_set()
 /* 0x80358908 (0x64): Hands every part slot's pooled handle back (the release hook). */
 extern "C" void eft052_release(_EFT* self)
 {
+    s32 i;
     EftPartWork* work = (EftPartWork*)self->work_0x38;
-    for (s32 i = 0; i < work->count_0x00; i++)
+    for (i = 0; i < work->count_0x00; i++)
         eft_res_models_release(&work->slots_0x04[i], 1);
 }
 
@@ -526,7 +527,7 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 }
 
 /* 0x80359140 (0x24): Moves the item page's count for one id by `delta` (a negative `delta` adds). */
-extern "C" void eft052_page_count_add(u16 id, s16 delta)
+extern "C" void eft052_page_count_add(u16 id, s32 delta)
 {
     if (id != 0)
         userdata_item_consume(lobby_world_block, id, -delta);
@@ -577,7 +578,8 @@ extern "C" s32 eft052_page_count_ck(u16 id, u8 use_rows)
 {
     if (use_rows == 0)
         return userdata_item_total_count(lobby_world_block, id);
-    return item_slots_room_get(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
+    u32 cap = userdata_box_capacity(lobby_world_block);
+    return item_slots_room_get(id, &lobby_world_block->field_0x0180, cap);
 }
 
 /* 0x80359334 (0x194): Fills the block's rows with page `page` of the entry's shown items (owned ones, or every listed

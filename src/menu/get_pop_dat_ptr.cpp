@@ -1027,9 +1027,11 @@ LobbyPeerCard* lb_pop_peer_card_find(LbPopWork* work)
 /* Copies the id of the peer under the cursor into the screen. */
 void lb_pop_peer_id_copy(LbPopWork* work)
 {
-    LobbyPeerList* list = &lobby_state_block.peer_list_0x0004;
-    s16 row = 0;
     s16 i;
+    s16 row;
+    LobbyPeerList* list = &lobby_state_block.peer_list_0x0004;
+
+    row = 0;
 
     for (i = 1; i < 4; i++) {
         if (list->peers_0x004[i].id_0x00[0] != 0) {

@@ -8,8 +8,9 @@
  *    (`Runtime.PPCEABI.H/memcpy.c`, `memset.c`).
  * EVIDENCE. call-graph closure: `memmove` calls the four `__copy_longs` helpers, nothing else calls them; no data.
  * RESIDUALS. COARSE: MSL may split `mem` and `mem_funcs`; no evidence to separate them. Register allocation only in
- *    `memcmp`, `__copy_longs_aligned`, `__copy_longs_unaligned` and `__copy_longs_rev_unaligned` (same opcode
+ *    `__copy_longs_aligned`, `__copy_longs_unaligned` and `__copy_longs_rev_unaligned` (same opcode
  *    sequences; the target keeps the destination in the parameter register).
+ *    `memcmp` is byte-identical: regsim search's exact plan declares `d`, `c`, `p`, `q` in that order.
  * SHAPES. the copy helpers align the destination bytewise, move 32-byte blocks, then single words, then the
  *    tail bytes; the unaligned ones merge two source words per destination word.
  */
@@ -100,10 +101,10 @@ void* __memrchr(const void* buf, int ch, u32 n)
 /* untyped: byte range */
 int memcmp(const void* a, const void* b, u32 n)
 {
-    const u8* q;
     u32 d;
     u32 c;
     const u8* p;
+    const u8* q;
 
     q = b;
     p = a;

@@ -33,15 +33,18 @@
  *
  *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   prim_queue_draw     85.27 (296/288 B)
  *   prim_init_all  100.00               prim_list_exec    88.10 (812/820 B)   set_blendmode  100.00
- *   fn_800E3D7C     89.40 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
+ *   fn_800E3D7C    100.00 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
  *   fn_800E4284     94.33 (268/264 B)   fn_800E4390    98.06 (124/124 B)
  *   fn_800E440C    100.00
  *
  * All twelve are at or above the 80 % bar; the unit is 92.16 % fuzzy, 4 of 12 byte-identical.  Residuals:
  * `prim_list_exec` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold, and
  * `prim_queue_draw` (-8 B) keeps one `lwz` fewer than retail across the `rec = (PrimRec*)local` reload;
- * `fn_800E3CBC`/`fn_800E3D7C`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
- * colouring.  `fn_800E4284` (-4 B) is the `(u32)((f32)(n - 1) * t)` conversion sequence.
+ * `fn_800E3CBC`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
+ * colouring (`fn_800E4390`: regsim search's best plan, `cur`/`raw` block locals ahead of `f`, reaches 4/5 volatile
+ * targets and measures worse - the unnamed `@` temporary stays r0 where retail has r5).  `fn_800E3D7C` reads
+ * 100 % with `p`, `i`, `base` declared in that order and `i = 0, p = base` in the for-init.
+ * `fn_800E4284` (-4 B) is the `(u32)((f32)(n - 1) * t)` conversion sequence.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_20`,
  *     `_savegpr_19`, `_restgpr_20`, `_restgpr_19`, `vec3_dot`.
  *   flipcheck: `.bss` claimed, not emitted.
@@ -176,11 +179,11 @@ void prim_init_all(void)
 /* Rebuild free-list `idx`: every slot points at the next one, the last is null. */
 extern "C" void fn_800E3D7C(u8 idx)
 {
-    u32* base = (u32*)lbl_80597D20[idx];
-    u32* p = base;
+    u32* p;
     u32 i;
+    u32* base = (u32*)lbl_80597D20[idx];
 
-    for (i = 0; i < lbl_80597D38[idx] - 1; i++) {
+    for (i = 0, p = base; i < lbl_80597D38[idx] - 1; i++) {
         *p = (u32)base + (i + 1) * 4;
         p++;
     }

@@ -29,7 +29,6 @@
  *  - `page17_rows_build` matches only with `#pragma opt_strength_reduction off` (retail indexes the option tables with
  *    the sign-extended row index each pass; the pragma over the whole file costs three rows); the
  *    `page17_value_max` address takes its `add` operands in the other order.
- *  - `page17_transfer_get`: retail keeps the 0/1 returns as branches where MWCC folds them branch-free.
  *  - `movie_page04_draw`, `movie_page04_split_draw`, `movie_page17_draw`, `friend_card_equip_page_draw`,
  *    `friend_card_confirm_draw`: retail clears the loop counter between the table call and the copy of its result
  *    (`bl`, `li i,0`, `mr`); MWCC puts the `li` before the call or after the copy, whichever statement order is used.
@@ -1932,6 +1931,8 @@ static void page17_scroll_init(MenuSlot* slot) {
 }
 
 /* 0x80442A6C (0x80): the value of transfer row `row` (3 transfer on/off, 4 level, 5 flag). */
+#pragma push
+#pragma opt_rebuildconditionals off
 static u8 page17_transfer_get(u8 row) {
     switch (row) {
     case 3:
@@ -1949,6 +1950,7 @@ static u8 page17_transfer_get(u8 row) {
     }
     return 0;
 }
+#pragma pop
 
 /* 0x80442AEC (0xBC): stores `value` (clamped) as transfer row `row` and applies it. */
 static void page17_transfer_set(u8 row, u8 value) {

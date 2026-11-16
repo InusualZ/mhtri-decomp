@@ -33,8 +33,7 @@
  *   `__sinit_\eft_slot_cpp` and `__ct__7EftSlotFv` are the compiler's.
  * RESIDUALS. Partial rows (register assignment unless noted):
  *  - `eft_slot_counters_step`: ours sign-extends the incremented resend timer (`extsh`) before its `sth`; an `s16`/`s32`
- *    local, `+= 1`, `++timer` and a cast all keep it;
- *  - `enemy_data_grp`: ours narrows the `flag == 0 ? 6 : 7` result (`clrlwi`) for the `u8` return; retail does not;
+ *    local, `+= 1`, `++timer`, a cast and the direct `field = field + 1` all keep it or lose the compare (regsim: exact);
  *  - `eft_slot_arena_state_change`: retail stores the u32 `index` raw to +0x36 and narrows for the call, ours narrows
  *    once for both;
  *  - `eft_slot_roam_step`, `eft_slot_linked_step`: retail narrows `state` (`clrlwi`) at the state compares and the
@@ -1001,7 +1000,7 @@ extern "C" u8 enemy_data_grp(u8 kind, u8 flag) {
     case 32:
         return flag == 2 ? 4 : 1;
     case 22:
-        return flag == 0 ? 6 : 7;
+        return flag == 0 ? (u8)6 : (u8)7;
     }
 }
 

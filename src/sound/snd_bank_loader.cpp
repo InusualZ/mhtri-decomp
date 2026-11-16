@@ -30,8 +30,8 @@
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.
  *   snd_quest_bgm_set: register colouring only (retail keeps the three parameters in r25..r27, ours r27..r29).
  *   pl_weapon_se_bank_load (96.18) and snd_player_banks_load (97.08): register colouring and one scheduled load.
- *   fn_800F02D4 (95.96): retail tests `count` with `bne` + `blr` where ours folds it into `beqlr`.
- *   snd_area_bank_load, fn_800F06AC, demo_bgm_ready_ck, snd_chunk_handle_get, snd_area_env_bank_load,
+ *   snd_area_bank_load, fn_800F06AC, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
+ *   retail loads and extends in the handle's own register, the plain s8 load measures worse), snd_area_env_bank_load,
  *   demo_bgm_load: register choice / operand order only.
  *   `.data` (4 B), `.sdata` (1 B) and `.sbss` (5 B) are short of their claims by the alignment tail before the next
  *   unit's 8-aligned section (`demo_stream_slot` is two bytes used, sized 3); every byte up to it matches.
@@ -1078,16 +1078,14 @@ extern "C" void fn_800F02D4(void* unused_0, SndWhdHeader* header)
         return;
     }
     slot = &header->slots[0];
-    if (header->flag == 0) {
+    if (header->flag == 0 || header->count == 0) {
         return;
     }
-    if (header->count != 0) {
-        for (i = 0; i < header->count; i++, slot++) {
-            slot->field_3C = slot->field_46;
-            slot->field_46 = 0;
-        }
-        snd_wk->stream_ok = 1;
+    for (i = 0; i < header->count; i++, slot++) {
+        slot->field_3C = slot->field_46;
+        slot->field_46 = 0;
     }
+    snd_wk->stream_ok = 1;
 }
 
 /* The stream completion callback: one `srt` half is in, and once both are the stream is released. */

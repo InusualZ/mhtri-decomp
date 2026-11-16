@@ -21,8 +21,7 @@
  * RESIDUALS. `.sbss` holds 8 bytes per object in retail (font_typed_count at +0x8), ours packs them.
  * RESIDUALS. utf82unicode2/flfntUtf8Decode: retail keeps the final continuation-byte test as a branch
  *   (`subi`/`cmplwi 0x3F`/`ble`); every spelling tried either splits the range test or becomes a select.
- *   getGlyphWidth: retail returns without `clrlwi` (an int return), but `Network/network_pat_control.cpp`
- *   measures better with the u16 declaration both units share.  flfntStrCells/flKnjMsgNumPtr: `state`/`len`
+ *   flfntStrCells/flKnjMsgNumPtr: `state`/`len`
  *   take r31/r30 swapped.  flfntDrawText: the second ASCII test re-reads wide_mode (retail jumps straight to
  *   the glyph path).  flfntColorPuts: retail keeps the `extsb` of both colour digits.  font_print_typed: the
  *   multibyte-next '\n' test branches to the '~' test (retail: straight to the newline block).
@@ -685,7 +684,7 @@ extern "C" u32 flfntAsciiCode(void)
 /* 0x8005BF68 (0x44): the cells of the character at `glyph`: 1 for a narrow one, 2 otherwise. */
 extern "C" u16 getGlyphWidth(const char* glyph)
 {
-    return flfntGlyphAdvance(flfntCodeIndex(flfntUtf8Decode((u8**)&glyph))) == 1 ? 1 : 2;
+    return flfntGlyphAdvance(flfntCodeIndex(flfntUtf8Decode((u8**)&glyph))) == 1 ? (u16)1 : (u16)2;
 }
 
 /* 0x8005BFAC (0x30): the advance class of glyph `index` (0 wide, 1 narrow), 1 past the loaded table. */

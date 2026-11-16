@@ -17,8 +17,8 @@
  * RESIDUALS.
  *  - `fn_8010C8F8`, `fn_8010CE80`: ours save the registers through `_savegpr_27` and a frame 0x10 larger where retail
  *    stores four registers inline, and invert the null/flag test before the state bump.
- *   The other partial rows (`fn_8010C7B8`, `fn_8010CD68`, `fn_8010C710`) have no recorded cause
- *   (`symdiff.py -u ef/eft016 --all`).
+ *   The other partial rows (`fn_8010C7B8`, `fn_8010CD68`) have no recorded cause
+ *   (`symdiff.py -u ef/eft016 --all`); `fn_8010C710` reads 100 % with `i` declared before `work` (regsim search).
  *   flipcheck: `.text` differs (the rows above); `.data`, `.sdata` and `.sdata2` are emitted and byte-identical.
  * SHAPES. The light family's work block is a view of `_EFT::work_0x38`.  The pool is written as literals: the angle
  *   in `fn_8010CFCC` is one expression passed to `rotVecZ` (0.5 is pooled before 65536/360), `rot.y += 2048.0f` keeps
@@ -297,8 +297,8 @@ extern "C" void eft_npc_aura_create(void* source)
 /* The release hook: frees the effect's pooled handles and clears the count. */
 extern "C" void fn_8010C710(_EFT* self)
 {
-    _EFT_LIGHT_WORK* work = (_EFT_LIGHT_WORK*)self->work_0x38;
     s32 i;
+    _EFT_LIGHT_WORK* work = (_EFT_LIGHT_WORK*)self->work_0x38;
 
     for (i = 0; i < work->count_0x18; i++) {
         eft_res_models_release(&work->models_0x1c[i], 1);

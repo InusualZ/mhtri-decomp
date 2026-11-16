@@ -41,10 +41,16 @@ typedef struct LbActSelBytes {
     /* +0x03 */ u8 d_0x03;
 } LbActSelBytes; /* size: 0x4 */
 
+typedef struct LbActSelHalves {
+    /* +0x00 */ u16 low_0x00;
+    /* +0x02 */ u16 high_0x02;   /* the 16-bit view `lb_act_row_apply` hands on (the target loads `lhz`) */
+} LbActSelHalves; /* size: 0x4 */
+
 typedef union LbActSel {
     /* +0x00 */ u32 word_0x00;
     /* +0x00 */ u16 half_0x00;   /* the 16-bit view `lb_act_best_keep` hands on (the target loads `lhz`) */
     /* +0x00 */ LbActSelBytes bytes_0x00;
+    /* +0x00 */ LbActSelHalves halves;
 } LbActSel; /* size: 0x4 */
 
 typedef struct LbActHalves {
@@ -400,7 +406,7 @@ typedef struct LbQuestWork {
     /* +0x00 */ u8 active_0x00;      /* the state; 0 while the block is idle */
     /* +0x01 */ u8 page_0x01;        /* the page shown */
     /* +0x02 */ u8 page_count_0x02;  /* the last page (`lb_triplet_value2_get`) */
-    /* +0x03 */ u8 note_row_0x03;    /* the note list's cursor row */
+    /* +0x03 */ s8 note_row_0x03;    /* the note list's cursor row */
     /* +0x04 */ u16 cursor_0x04;     /* the frame cursor word, cleared every step */
     /* +0x06 */ u8 kind_0x06;        /* the tutorial kind `lb_quest_work_init` stores */
     /* +0x07 */ u8 index_0x07;       /* the page set the request picked */
@@ -529,7 +535,7 @@ s8 fn_800CF384(void);
 int memcmp(const void* a, const void* b, u32 n);
 void camera_slot_bit_set(u8 index, u8 value);
 s32 ai_npc_level_get(u16 id);
-s32 fn_802D7C6C(u16 id);
+u8 fn_802D7C6C(u16 id);
 void userdata_progress_flag_set(u32 a);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band

@@ -40,15 +40,16 @@
  *   `ai_npc_skill_group_get`, `ai_npc_pair_values_get`, `ai_npc_level_rank_get`.
  * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
- *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local does not change it);
- *  - `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
- *    reads +0x8 (+0x7);
- *  - `lb_act_row_apply`: retail loads +0x6 with `lhz`, ours `lbz` + `clrlwi` (a field width);
+ *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
+ *    not change it; regsim reports the colouring exact, so the difference is in the instruction selector's address
+ *    folding, not the allocator);
+ *  - `lb_act_slot_write`: retail reads the request's +0x9 where ours reads +0x7;
  *  - `lb_act_award_handover`, `lb_act_slot_write`: ours emits a `clrlwi` or `extsb` retail does not;
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
- *    shift; `lb_name_tail_copy`: the word copies' load/store order;
+ *    shift; `lb_name_tail_copy`: the word copies' load/store order (dump 03: the word loop is unrolled with one
+ *    temporary per load; a struct assignment and pointer-walk spellings measure worse or equal, regsim's r42/r45
+ *    temporaries are retail's r5 where ours stay r0);
  *  - `lb_entry_start_send`, `lb_act_entry_start`: the companion work's parameter bytes and the request's +0x18..+0x1B;
- *  - `lb_entry_model_publish`: a byte against a word store;
  *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
  *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
  *  - `lb_skill_unlock_announce`: retail walks `lb_skill_unlock_items` with two pointers (one for the `need_0x00` test,
@@ -58,7 +59,7 @@
  *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
  *    callee-saved colours (the best declaration orders are applied);
  *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`,
- *    `lb_page_bits_set`, `lb_tutorial_note_draw`, `lb_dance_list_step`, `lb_s13_slot_list_draw`: register colouring.
+ *    `lb_dance_list_step`, `lb_s13_slot_list_draw`: register colouring.
  *  - `lb_deli_cost_draw`'s `"%d"` (retail `lbl_80793018`) merges with `lb_combo_rate_sprintf`'s (`lbl_80793008`) in
  *    ours, so `.sdata` carries one copy where retail has two;
  *  - `lb_status_preview_update` builds `LbCompanionSetup`, the layout of `ai/ai_npc.h`'s `AINPCSetup`, because that
@@ -735,10 +736,10 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
     if ((s32)kind != 0) {
         if (kind == 1) {
             if (isReadyCountOne() == 1) {
-                lb_sub0e_send(0, req->sel_0x04.bytes_0x00.c_0x02, 2, req->mask_0x08.half_0x00);
+                lb_sub0e_send(0, req->sel_0x04.halves.high_0x02, 2, req->mask_0x08.half_0x00);
             }
         } else {
-            quest_score_deduct(req->sel_0x04.bytes_0x00.c_0x02, req->mask_0x08.half_0x00);
+            quest_score_deduct(req->sel_0x04.halves.high_0x02, req->mask_0x08.half_0x00);
         }
     }
 }
@@ -866,7 +867,7 @@ void lb_sub14_send(s8 value) {
     }
 }
 
-/* Act 20: sets `companion->flag_0x6A29` once the request's word reaches `limit_0x6A2A`. */
+/* Act 20: sets `companion->flag_0x6A29` once the request's first byte reaches `limit_0x6A2A`. */
 void lb_act_limit_set(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -874,7 +875,7 @@ void lb_act_limit_set(u8 unused, LbActReq* req) {
     work = get_move_work_adrs(0);
     if (work != NULL) {
         companion = work->companion_0xDC;
-        if (companion != NULL && (s32)req->mask_0x08.word_0x00 >= (s8)companion->limit_0x6A2A) {
+        if (companion != NULL && (s32)req->sel_0x04.bytes_0x00.a_0x00 >= (s8)companion->limit_0x6A2A) {
             companion->flag_0x6A29 = 1;
         }
     }
@@ -1376,7 +1377,7 @@ void lb_tutorial_step(void) {
             break;
         case 2:
             if (work->last_0x09 == 0) {
-                if ((u32)note_slot_cursor_step(work->ptr_0x0C->note_0x05, &work->note_row_0x03,
+                if ((u32)note_slot_cursor_step(work->ptr_0x0C->note_0x05, (u8*)&work->note_row_0x03,
                                                pad->button_0x2C0.pressed_0x04, &work->cursor_0x04) == 1) {
                     ainpc_entry_update_all();
                     subTransSetPrio(7, (u32)lb_tutorial_note_draw, 0, 0);
@@ -2267,7 +2268,7 @@ void lb_page_flags_update(void) {
 void lb_entry_model_publish(void) {
     u8 entry = lobby_world_block->entry_0x3E03 & 0x7F;
 
-    lobby_world_block->ids_0x5180[entry].word_0x00 = fn_802D7C6C(lobby_world_block->ids_0x51A6[entry]);
+    lobby_world_block->ids_0x5180[entry].level_0x00 = fn_802D7C6C(lobby_world_block->ids_0x51A6[entry]);
 }
 
 /* Both of the block's refresh steps in order (`lb_page_flags_update`, `lb_entry_model_publish`). */
@@ -2517,8 +2518,8 @@ void lb_status_preview_update(LbScreen13Work* work) {
 
 /* Greys out the list row of the entry the block has selected and sets the list's row count. */
 void lb_page_bits_set(LbScreen13Work* work) {
-    u8 i;
     u32 selected;
+    u8 i;
 
     selected = lobby_world_block->entry_0x3E03 & 0x7F;
     work->list_0x070.count_0x06 = work->count_0x006;

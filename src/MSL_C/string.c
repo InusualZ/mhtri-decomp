@@ -12,8 +12,9 @@
  * EVIDENCE. `strtok`'s two `.sdata` statics (0x80793CE8 / 0x80793CEC) point at the pooled empty string `.sdata2`
  *    0x8079CA00; no function of the run calls outside it.
  * RESIDUALS. register allocation only: `strcpy` (the two `& 3` loads and the constant register), `strcmp` (same),
- *    `strstr` (the loop byte lives in r3 where the target uses r0), `strtok` (`li r0,0` scheduled after the cursor
- *    store, 3 instructions).
+ *    `strtok` (`li r0,0` scheduled after the cursor store, 3 instructions).
+ *    `strstr` is byte-identical: the needle guard is one `needle == 0 || (first = *needle) == 0` return (retail's
+ *    `beqlr` + `bne`/`blr` pair) and regsim search's exact plan declares the inner block's `a`, `b`, `p`, `q` in that order.
  * SHAPES. `strcpy` and `strcmp` copy/compare word-wise once both pointers share an alignment, using the
  *    zero-byte test `(w - 0x01010101) & ~w & 0x80808080`; the rest walk with pre-incremented byte pointers.
  */
@@ -305,28 +306,25 @@ char* strstr(const char* haystack, const char* needle)
     u32 first;
 
     h--;
-    if (needle != 0) {
-        first = *(const u8*)needle;
-        if (first != 0) {
-            while ((c = *++h) != 0) {
-                if (c == first) {
-                    const u8* p = h - 1;
-                    const u8* q = (const u8*)needle;
-                    u32 a;
-                    u32 b;
+    if (needle == 0 || (first = *(const u8*)needle) == 0) {
+        return (char*)haystack;
+    }
+    while ((c = *++h) != 0) {
+        if (c == first) {
+            u32 a;
+            u32 b;
+            const u8* p = h - 1;
+            const u8* q = (const u8*)needle;
 
-                    q--;
-                    do {
-                        a = *++p;
-                        b = *++q;
-                    } while (a == b && a != 0);
-                    if (b == 0) {
-                        return (char*)h;
-                    }
-                }
+            q--;
+            do {
+                a = *++p;
+                b = *++q;
+            } while (a == b && a != 0);
+            if (b == 0) {
+                return (char*)h;
             }
-            return 0;
         }
     }
-    return (char*)haystack;
+    return 0;
 }

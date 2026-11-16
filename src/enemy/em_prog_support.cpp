@@ -29,7 +29,8 @@
  *  - `note_page_draw`, `lb_screen16_step`: retail lowers the 0..1 / 0..2 case ranges to one `cmplwi` and the other
  *    cases to `cmpwi`; ours either keeps `cmpwi 0; blt` (int switch) or `cmplwi` throughout (the `(u32)` switch kept,
  *    95.00 against 92.78); `lb_screen16_step` keeps a branch where retail if-converts `off_mask |= 2`.
- *  - `chat_log_lines_draw`, `chat_log_scroll_get`, `note_slot_find`, `chat_log_page_draw`: register colouring only
+ *  - `chat_log_lines_draw`, `chat_log_scroll_get`, `note_slot_find` (`want` takes r3 where retail has r0 and the three
+ *    state/kind byte temporaries r0 where retail has r3; regsim's decl-order plans do not reach them), `chat_log_page_draw`: register colouring only
  *    (declaration orders searched with `permdecl`/`hill`).
  *  - `note_work_frame`: retail stores the ground height to +0x1A4 and then `frsp`s it for +0x174 (an f64 view puts
  *    the `frsp` first: 97.69 against 98.79).
@@ -1307,13 +1308,13 @@ extern "C" void em_prog_slots_init(void) {
 extern "C" u8 note_slot_find(u8 kind) {
     NoteSlot* slots = note_slots;
     u32 want = kind;
-    if (slots[0].state_0x01 != 0 && slots[0].kind_0x02 == want) {
+    if (slots[0].state_0x01 != 0 && want == slots[0].kind_0x02) {
         return 0;
     }
-    if (slots[1].state_0x01 != 0 && slots[1].kind_0x02 == want) {
+    if (slots[1].state_0x01 != 0 && want == slots[1].kind_0x02) {
         return 1;
     }
-    if (slots[2].state_0x01 != 0 && slots[2].kind_0x02 == want) {
+    if (slots[2].state_0x01 != 0 && want == slots[2].kind_0x02) {
         return 2;
     }
     return 0xFF;

@@ -146,7 +146,7 @@ extern "C" void snd_voice_alloc(SndPool2* self)
 /* Allocates one 0x110 node: pops the free list and pushes it onto the active list. */
 extern "C" SndNode2* fn_800ED8DC(SndPool2* self)
 {
-    if (fn_800ED9A0(&self->free_list) == 1) {
+    if (fn_800ED9A0(&self->free_list) != 0) {
         return 0;
     }
     {
@@ -183,9 +183,11 @@ extern "C" void fn_800ED9B8(SndPool2* self, SndNode2* src, u32 count)
 /* Inserts `count` consecutive 0x110 nodes from `src` at the head of `list`. */
 extern "C" void fn_800EDA10(SndNode2* list, SndNode2* src, u32 count)
 {
-    u32 i = 0;
-    SndNode2* node = src;
+    SndNode2* node;
+    u32 i;
 
+    i = 0;
+    node = src;
     while (i < count) {
         fn_800ED93C(list, node);
         node++;

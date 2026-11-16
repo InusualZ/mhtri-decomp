@@ -49,8 +49,10 @@
  *    `fn_801EDC4C`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`, `fn_801ED688`, `fn_801EDB34`;
  *  - `lb_equip_icon_cell_draw`: retail loads the `draw_frame_rect_z` float before `r7`/`r8` (a named
  *    `static const` does not move it); `fn_801EDA34`: retail's
- *    `bge`/`b` pair around the minimum; `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ECF74`,
- *    `fn_801F5534` (`(u16)count <= 1` needs a bare `cmplwi r5,1`), `fn_801F86FC` (retail keeps the `flags` pointer in
+ *    `bge`/`b` pair around the minimum (regsim exact; ternary, `return value` pair and `>=` select spellings measure
+ *    the same or worse); `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ECF74`,
+ *    `fn_801ED184` (the `db` temporary and `count` swap r30/r31; regsim's plan needs a named local for the unnamed
+ *    `lobby_world_block` load and measures equal), `fn_801F86FC` (retail keeps the `flags` pointer in
  *    r30), `fn_801FB364` (frame 0x30 against 0x20 with the same local offsets), `lb_count_box_draw` (one `mr` source).
  *   Data: the `.sdata` tables the code reads are defined here in address order (0x80791C58-0x80791C68 in the panes band,
  *   0x80791C70-0x80791D40 in the page band); `.sdata2` is the compiler's pool (0.0f and the signed int-to-float
@@ -5222,7 +5224,7 @@ s16 fn_801F5534(LbPage* self)
         s16 extra = self->field_0x008 + 1;
 
         value += extra;
-        if ((u16)self->count_0x006 <= 1 && self->field_0x008 == 1 && userdata_gunner_ck(lobby_world_block) == 0) {
+        if ((u32)self->count_0x006 <= 1 && self->field_0x008 == 1 && userdata_gunner_ck(lobby_world_block) == 0) {
             value = (s16)(value + 1);
         }
     }

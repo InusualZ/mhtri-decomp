@@ -410,12 +410,13 @@ extern "C" void fn_800E4C18(StreamRec* rec, RelocTable* table)
 /* Installs a relocation table into the given state and resolves every entry that is not yet fixed. */
 extern "C" void snd_reloc_state_rebase(RelocState* state, RelocTable* table)
 {
+    u32 entry;
     u32 i;
 
     state->table = table;
     state->entries = (void**)((u8*)table + table->entries_offset);
     for (i = 0; i < state->table->count; i++) {
-        u32 entry = (u32)state->entries[i];
+        entry = (u32)state->entries[i];
         if ((entry & 0x80000000) == 0 && entry != 0) {
             state->entries[i] = (void*)((u32)state->entries + entry);
         }

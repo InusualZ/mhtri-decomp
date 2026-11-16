@@ -35,8 +35,6 @@
  *   `eft013_target_set` (0x80107914), `eft020_actor_spawn` (0x80114D28), `pl_sharpness_add` (0x80278674),
  *   `pl_class7_meter_add` (0x8027CA48).
  * RESIDUALS. Every row is written; the partial rows:
- *  - `hit_side_kind_get`: retail lays the three tail returns out as 2, 1, 3 (ours 2, 3, 1; an else chain, a ternary, a
- *    negated test and split tests measure the same or worse);
  *  - `hit_id_list_absent_ck`: retail bumps the dead `+9` accumulator before the list pointer, ours after;
  *  - `hit_registry_update`: register permutation (retail keeps the hit in r29 and the NPC record in r31);
  *  - `hit_life_update`: retail reads the second motion pair through a `+4` base register (an unrolled four-entry loop
@@ -298,9 +296,10 @@ extern "C" u32 hit_side_kind_get(_HIT_W* self)
         if (self->value_0x54 > 0.0f || self->value_0x54 <= -100.0f) {
             return 2;
         }
-        return 3;
+    } else {
+        return 1;
     }
-    return 1;
+    return 3;
 }
 
 /* 0x8029A19C (0xD8): clears every player's, enemy's and the NPC's per-frame hit state before the pass. */
