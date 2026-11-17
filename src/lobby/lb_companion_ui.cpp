@@ -79,6 +79,11 @@
  *            the sign extension (regsim EXACT; an `s8 value` local scores 93.65).
  * RESIDUALS. lb_act_row_update: `mr r4,r31` against ours r30; the request copy (r32) is r30 x5 / r31 x2 in retail and
  *            is not a regsim target.
+ * RESIDUALS. mwcc-debugger dump, `lb_s13_entry_list_draw`: regsim 8/8 callee-saved, 7/7 volatile (EXACT, colouring
+ *            is not the cause); first divergence insn 28: retail `<DIFF_INSERT>` vs ours `add r3, r29, r4`
+ * RESIDUALS. mwcc-debugger dump, `lb_act_award_handover`: regsim 3/3 callee-saved, 5/5 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 27: retail `<DIFF_INSERT>` vs ours `clrlwi r0, r0, 24`; size
+ *            differs from retail
  */
 
 #include "types.h"

@@ -36,6 +36,10 @@
  * SHAPES. The pooled `0.0f` is loaded through its label `lbl_8079B640` (a literal emits a 4-byte `.sdata2` of ours).
  *   `get_lsp_data`'s record is read through `EftLspRect` (`hud/layout_types.h` cannot meet `menu/menu_item_page.h`).
  *   `x / 2.0f` keeps retail's `fmuls x, 0.5` operand order where `x * 0.5f` swaps it.
+ * RESIDUALS. mwcc-debugger dump, `eft052_box_cell_merge`: regsim 0/0 callee-saved, 19/19 volatile, best plan cost 3;
+ *            first divergence insn 5: retail `mr r8, r4` vs ours `mr r9, r4`
+ * RESIDUALS. mwcc-debugger dump, `hud_msg_enqueue`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 1; first
+ *            divergence insn 5: retail `addi r6, r4, 0xbcc` vs ours `li r6, 0x0`
  */
 
 #include "types.h"

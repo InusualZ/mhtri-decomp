@@ -37,6 +37,9 @@
  *   `__sinit` as in retail and the entry's ground record is cleared in its body; the rotation fill walks a byte
  *   offset beside the count; the point rows copy field by field through pointers; em_set_result_store takes the
  *   player work before `my_player_no`.
+ * RESIDUALS. mwcc-debugger dump, `em_set_move_start`: regsim 1/1 callee-saved, 0/0 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 22: retail `clrlwi r0, r3, 24` vs ours `<DIFF_DELETE>`; size differs
+ *            from retail
  */
 
 #include "types.h"

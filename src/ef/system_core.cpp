@@ -71,6 +71,8 @@
  *   objects are 0x50/0x668) and `.sbss` an `unused_sbss_0x04` word (retail's hole before `pad_notice_shown`).
  *   flipcheck: `.text` 4 bytes short (`loading_disp_draw`) and the open rows above; `.sdata` is 0x14 to retail's 0x18
  *   (the section's 8-byte tail).
+ * RESIDUALS. mwcc-debugger dump, `work_stack_alloc`: regsim 2/2 callee-saved, 23/25 volatile, best plan cost 0;
+ *            first divergence insn 10: retail `lbz r6, 0x20(r30)` vs ours `lbz r4, 0x20(r30)`
  */
 
 #include "types.h"

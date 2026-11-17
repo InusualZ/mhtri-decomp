@@ -85,6 +85,9 @@
  *        90.97).
  * RESIDUALS. note_value_to_slot: regsim volatile targets r39/r41/r42 (backend temporaries of the table pointer, row
  *            pointer and masked value) swap; a `row` local and a pointer-walked table measure lower.
+ * RESIDUALS. mwcc-debugger dump, `note_value_to_slot`: regsim 0/0 callee-saved, 8/11 volatile, best plan cost 0;
+ *            first divergence insn 3: retail `addi r5, r4, note_slot_table@l` vs ours `addi r6, r4,
+ *            note_slot_table@l`
  */
 
 #include "types.h"

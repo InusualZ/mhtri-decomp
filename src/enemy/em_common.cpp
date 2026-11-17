@@ -170,6 +170,11 @@
  *            indexing, `global_optimizer off` (+0.1 %) and optimization levels 0/1 do not reproduce it.
  * RESIDUALS. em_team_member_claim: a `u8 area_no` local, `(state_sub & 0xFF)` and a `u32` local all still store the
  *            masked copy (-4.8 to -13 B); retail stores the raw r30.
+ * RESIDUALS. mwcc-debugger dump, `em_team_member_claim`: regsim 3/3 callee-saved, 11/11 volatile (EXACT, colouring
+ *            is not the cause); first divergence insn 40: retail `stb r30, 0xa05(r31)` vs ours `stb r4, 0xa05(r31)`
+ * RESIDUALS. mwcc-debugger dump, `em_area_decide`: regsim 2/2 callee-saved, 3/3 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 44: retail `<DIFF_INSERT>` vs ours `mr r3, r30`; size differs from
+ *            retail
  */
 
 /* Names the included headers declare with the callers' older signatures, hidden while they are read. */

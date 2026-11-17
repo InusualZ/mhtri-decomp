@@ -48,6 +48,8 @@
  *            (retail: i r31, offset r30); a `u32 offset` local and split declarations do not change it.
  * RESIDUALS. setShiftOff: retail's `clrrwi r4,r0,4` sits in r4 where ours reuses r0 (peephole temp; regsim EXACT for
  *            the saved set).
+ * RESIDUALS. mwcc-debugger dump, `DrawQuad`: no regsim plan (dump unavailable for this row); first divergence insn
+ *            18: retail `mr r24, r30` vs ours `mr r25, r30`
  */
 #include "homebutton/hkb_keyboard.h"
 

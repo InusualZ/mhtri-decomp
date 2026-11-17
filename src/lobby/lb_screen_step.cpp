@@ -42,6 +42,8 @@
  * RESIDUALS. lb_smith_pl_turn_step: retail's `lobby_net_busy_ck() == 1` return is `bne body; b end` (a block that
  *            only jumps), ours a single `beq end`; nested ifs, an empty-then/else and early-return spellings give the
  *            same bytes (regsim EXACT).
+ * RESIDUALS. mwcc-debugger dump, `lb_smith_deco_draw`: regsim 1/1 callee-saved, 3/3 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 8: retail `<DIFF_INSERT>` vs ours `addi r3, r3, 0x154`
  */
 #include "types.h"
 

@@ -29,6 +29,10 @@
  *   `two` swap r4/r5.
  * RESIDUALS. font_str_char_count: regsim aims `two` (r35) at r4 and the @1828 temp at r5, ours the reverse;
  *            declaration permutations do not reach it.
+ * RESIDUALS. mwcc-debugger dump, `utf82unicode2`: regsim 0/0 callee-saved, 7/7 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 19: retail `subi r0, r3, 0x80` vs ours `subi r3, r3, 0x80`
+ * RESIDUALS. mwcc-debugger dump, `flfntUtf8Decode`: regsim 0/0 callee-saved, 7/9 volatile, best plan cost 0; first
+ *            divergence insn 20: retail `ble 0xb2c` vs ours `<DIFF_DELETE>`; size differs from retail
  */
 
 #pragma peephole off

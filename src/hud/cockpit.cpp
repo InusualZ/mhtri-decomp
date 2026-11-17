@@ -60,6 +60,9 @@
  * RESIDUALS. ainpc_page_select_button_ck: `else { down = 1; }`, `down != 1` and the ternary all collapse the
  *            inversion (-20 B); only `else if (down == 0)` keeps retail's second branch, which then carries one
  *            `cmpwi`/`bne` pair retail lacks.
+ * RESIDUALS. mwcc-debugger dump, `ainpc_page_select_button_ck`: regsim 4/4 callee-saved, 13/13 volatile (EXACT,
+ *            colouring is not the cause); first divergence insn 48: retail `<DIFF_INSERT>` vs ours `cmpwi r31, 0x0`;
+ *            size differs from retail
  */
 
 #include "types.h"

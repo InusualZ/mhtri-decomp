@@ -67,6 +67,8 @@
  *   - `(u32)stage_water_enabled_ck() == 1` keeps retail's `cmplwi` (the owner declares the function `s32`).
  *
  * Inventory and evidence: `python tools/units/ledger.py unit stage/shell.cpp`.
+ * RESIDUALS. mwcc-debugger dump, `pull_shell_work`: regsim 0/0 callee-saved, 7/7 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 23: retail `b 0x12c` vs ours `b 0x128`; size differs from retail
  */
 
 #include "types.h"

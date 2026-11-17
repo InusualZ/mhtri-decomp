@@ -36,6 +36,8 @@
  *   spellings, which keeps retail's `clrlwi`.  The motion-event switch lists `0xC` beside `0xCF`/`0xE5` and
  *   `0x66`/`0x67` for the frame-38 block (a decision-tree walk of retail's compares).  Two pool constants are
  *   computed in separate statements (`bias`, `dist`), which orders `.sdata2` like retail.
+ * RESIDUALS. mwcc-debugger dump, `em004_route_points_get`: regsim 3/3 callee-saved, 16/18 volatile, best plan cost
+ *            0; first divergence insn 21: retail `cmplw r0, r4` vs ours `cmplw r0, r5`
  */
 
 #include "types.h"

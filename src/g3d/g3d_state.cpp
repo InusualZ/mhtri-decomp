@@ -126,6 +126,8 @@
  *   a closing `#pragma dont_inline on`: MWCC's static initialiser then calls each constructor out of line and emits
  *   the weak copies after it in reverse order, as retail.  G3dIndMtxCallbackStd's destructor body is visible and
  *   empty, so its object gets no `__register_global_object` (retail has none).
+ * RESIDUALS. mwcc-debugger dump, `g3d_tex_obj_cache_load`: regsim 6/6 callee-saved, 5/6 volatile, best plan cost 0;
+ *            first divergence insn 33: retail `slwi r0, r27, 5` vs ours `<DIFF_DELETE>`; size differs from retail
  */
 
 #include "types.h"

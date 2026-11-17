@@ -31,6 +31,9 @@
  *   (playbook 183: `pl_weapon2_hit_react`, `pl_weapon2_alt_act_charge`).  Narrow sums: `field_0x0B6 += (u16)3`
  *   keeps the raw `sth`.  Retail compares a `u16` result signed (`(s32)Get_motion_no(...)`, an `s32` local) and a
  *   `s32` flag result unsigned (`pl_part_flag2_ck(...) == 1`).
+ * RESIDUALS. mwcc-debugger dump, `pl_weapon2_act_shell_fire`: regsim 1/1 callee-saved, 3/3 volatile (EXACT,
+ *            colouring is not the cause); first divergence insn 41: retail `<DIFF_INSERT>` vs ours `lwz r5,
+ *            shell_set_func_ptr@sda21`
  */
 
 #include "types.h"

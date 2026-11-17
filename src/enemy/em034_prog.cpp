@@ -21,6 +21,9 @@
  *   and bump it with `+= 1` inside case 0 (a `u8 state` local loads it at entry); case-level exits are `break`;
  *   `kind == 1 || kind == 4` tests compare `(s32)kind`; the SE-table calls pass `self` through the 4-argument view;
  *   `fn_801B670C`'s motion 0x12 re-tests its frame window before the plain effect.
+ * RESIDUALS. mwcc-debugger dump, `fn_801B63E8`: regsim 1/1 callee-saved, 7/7 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 49: retail `clrlwi r4, r4, 16` vs ours `<DIFF_DELETE>`; size differs from
+ *            retail
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */

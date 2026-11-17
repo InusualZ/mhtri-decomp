@@ -91,6 +91,8 @@
  *            them, as homebutton/hbm_anim_record.cpp's table does.
  * RESIDUALS. hbmKbWidgetDestroy: `(*widget).~...`, a reference local and the qualified pointer call all keep the
  *            inline destructor's own null test.
+ * RESIDUALS. mwcc-debugger dump, `hbmKbWidgetDestroy`: no regsim plan (dump unavailable for this row); first
+ *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `beq 0x20c`
  */
 
 #include "types.h"

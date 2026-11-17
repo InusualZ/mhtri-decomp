@@ -37,6 +37,9 @@
  * RESIDUALS. hunter_rank_points_get: regsim EXACT; retail loads the 10000000 constant (`lis r3,153`) before the `rank
  *            <= 50` test and keeps the step table in r7, ours loads it at the end; a `limit` local (89.76) and a
  *            loop-exit return (75.12) do not move it.
+ * RESIDUALS. mwcc-debugger dump, `exportItemBoxPage`: regsim 2/2 callee-saved, 14/16 volatile, best plan cost 5;
+ *            first divergence insn 8: retail `lwz r6, lobby_world_block@sda21` vs ours `lwz r5,
+ *            lobby_world_block@sda21`; size differs from retail
  */
 
 #pragma peephole off

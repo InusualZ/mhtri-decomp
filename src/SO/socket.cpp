@@ -35,6 +35,10 @@
  * SHAPES. `RecvFrom` names the argument record (`args = &block->args`), which is what makes retail address the
  *   peer-address bytes from it (`addi r21,r4,0x20`) and save from r21; its copy-back length is
  *   `from->len > address[0] ? (u32)address[0] : (u32)from->len` (u8 arms add a `clrlwi`).
+ * RESIDUALS. mwcc-debugger dump, `SOGetPeerName`: regsim 4/4 callee-saved, 2/2 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 32: retail `mr r4, r27` vs ours `mr r3, r28`
+ * RESIDUALS. mwcc-debugger dump, `SOGetSockName`: regsim 4/4 callee-saved, 2/2 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 32: retail `mr r4, r27` vs ours `mr r3, r28`
  */
 #include "SO/socket.h"
 #include "SO/soi.h"

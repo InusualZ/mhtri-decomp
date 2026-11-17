@@ -47,6 +47,11 @@
  * SHAPES. `lb_room_rooms_draw` passes `(u8)sel != 0`; `lb_item_box_rows_draw` spells `(u8)(state + 0xFF) <= 1` for
  *   retail's `addi 0xFF`; `eft_em_model_pair_move` declares its colours after the model block load and sits under
  *   `#pragma fp_contract off` (retail keeps `fmuls`+`fadds`); declaration orders were picked with `permdecl`.
+ * RESIDUALS. mwcc-debugger dump, `lb_room_place_put`: regsim 0/0 callee-saved, 2/3 volatile, best plan cost 0; first
+ *            divergence insn 17: retail `<DIFF_INSERT>` vs ours `clrlwi r4, r3, 24`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `pop_dat_spare_load`: regsim 5/5 callee-saved, 2/3 volatile, best plan cost 1;
+ *            first divergence insn 20: retail `lwz r28, 0x4(r31)` vs ours `lwz r29, 0x4(r31)`; size differs from
+ *            retail
  */
 
 #include "types.h"

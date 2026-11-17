@@ -40,6 +40,8 @@
  *   (99.8 %: r30/r31 swap between the work base and the copied matrix pointer).
  * FLAGS. scoped `#pragma global_optimizer off` around drawshape_set_translate and drawshape_set_tex_translate
  *        (retail's saved-register order).
+ * RESIDUALS. mwcc-debugger dump, `drawshape_set_scale`: regsim 3/4 callee-saved, 5/5 volatile, best plan cost 4;
+ *            first divergence insn 6: retail `addi r3, r1, 0x38` vs ours `addi r3, r1, 0x8`
  */
 
 #include "types.h"

@@ -66,6 +66,8 @@
  *   the accelerometer deltas are `prev - cur` (the magnitude is taken); `pad_menu_merge` seeds `dirbtn` from
  *   the masked hold it tests; `pad_motor_start` tests `get_cfg(...) ^ 1` (retail's `xori`: the getter's result
  *   is used as a bool).
+ * RESIDUALS. mwcc-debugger dump, `stage_map_set`: regsim 1/1 callee-saved, 18/19 volatile, best plan cost 0; first
+ *            divergence insn 26: retail `<DIFF_INSERT>` vs ours `lwz r3, lbl_807947C0@sda21`
  */
 
 #pragma peephole off

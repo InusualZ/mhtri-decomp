@@ -38,6 +38,8 @@
  *            retail adds in place (`add r31,r28,r0; addi r31,r31,3584`); a block-local `rec` scores 98.66.
  * RESIDUALS. userdata_item_consume: retail masks the id (`clrlwi r3,r4,16`) after the first `neg`/`extsh` of the
  *            amount; a named negated local compiles identically.
+ * RESIDUALS. mwcc-debugger dump, `userdata_item_consume`: regsim 3/3 callee-saved, 3/3 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 13: retail `<DIFF_INSERT>` vs ours `clrlwi r3, r4, 16`
  */
 
 #pragma peephole off

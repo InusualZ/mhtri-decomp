@@ -57,6 +57,8 @@
  * RESIDUALS. eft_pro_slot_find_kind: the Wii/1.3 stand-in dump unrolls six-wide (`li r0,0x22`) like ours with regsim
  *            EXACT, so the unroll shape, not colouring, is the difference (retail: five compares per trip, count
  *            0x33, `addi r5,r5,4`).
+ * RESIDUALS. mwcc-debugger dump, `eft_res_slot_get`: regsim 0/0 callee-saved, 7/7 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 22: retail `b 0x22d4` vs ours `b 0x2308`; size differs from retail
  */
 
 #include "types.h"

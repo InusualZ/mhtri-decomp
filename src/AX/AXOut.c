@@ -31,6 +31,8 @@
  *    them; __AXOutNewFrame copies the profile with a `*dst++ = *src++` byte walk (retail's fresh r29 copy of the
  *    base); __AXOutInit's clear loops keep their pointer and count in block scope; the DMA
  *    callback's next read index is incremented and reduced in two steps.
+ * RESIDUALS. mwcc-debugger dump, `__AXOutInitDSP`: no regsim plan (dump unavailable for this row); first divergence
+ *            insn 2: retail `lis r11, __AXDspDramBuffer@ha` vs ours `lis r3, __AXDspImage@ha`
  */
 
 #include "types.h"

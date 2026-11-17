@@ -58,6 +58,8 @@
  *   `fmuls x, 0.5` operand order; `rec = recs; rec += index;` keeps the result out of r3 (`em_roster_record_get`).
  * RESIDUALS. em_pop_work_alloc: regsim plan 1 declares the `new` temporary as a local first; `cb = new ...` before
  *            or after `work` measures 8.2 B lower.
+ * RESIDUALS. mwcc-debugger dump, `em_pop_work_alloc`: regsim 6/8 callee-saved, 3/3 volatile, best plan cost 4; first
+ *            divergence insn 15: retail `lis r31, 0x1` vs ours `lis r30, 0x1`
  */
 
 

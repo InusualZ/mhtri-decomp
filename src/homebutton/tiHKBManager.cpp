@@ -78,6 +78,11 @@
  *            inline destructor is emitted as a weak 0x40-byte copy retail's object does not carry.
  * RESIDUALS. datagap: the claimed `.data` 0x80658290..0x80658458 spans at least 3 TUs (emission-order seams at
  *            0x806583A0 and in [0x80658408, 0x80658440)) - a seam question for the registration.
+ * RESIDUALS. mwcc-debugger dump, `hkbManagerSetMap`: regsim 6/6 callee-saved, 11/11 volatile, best plan cost 4;
+ *            first divergence insn 9: retail `add r27, r3, r0` vs ours `add r29, r3, r0`
+ * RESIDUALS. mwcc-debugger dump, `hkbGuiPaneManagerWalkInChildren`: regsim 1/9 callee-saved, 0/0 volatile, best plan
+ *            cost 4; first divergence insn 0: retail `stwu r1, -0x40(r1)` vs ours `stwu r1, -0x30(r1)`; size differs
+ *            from retail
  */
 
 #include "types.h"

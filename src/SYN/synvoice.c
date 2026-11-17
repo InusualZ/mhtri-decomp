@@ -26,6 +26,8 @@
  *    repeat the zero stores in both branches, compute the end address before the first block store (a store between
  *    the two `voice->sample` loads forces a reload), write the `sync` word through an `axVoice` local and copy the
  *    ADPCM loop context field by field (a struct copy is a word and a halfword).
+ * RESIDUALS. mwcc-debugger dump, `SYNVoiceUpdateMix`: regsim 1/1 callee-saved, 22/23 volatile, best plan cost 0;
+ *            first divergence insn 50: retail `lwz r4, 0x8(r31)` vs ours `lwz r3, 0x8(r31)`
  */
 
 #include "types.h"

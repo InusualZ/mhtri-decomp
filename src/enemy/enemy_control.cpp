@@ -29,6 +29,12 @@
  *   of ENEMY_WORK.h/ENEMY_MINI_WORK.h.  The record constructors are `inline` under
  *   `#pragma dont_inline on` so MWCC emits the implicit `EmcWork` ctor and the member ctors as weak functions after
  *   `__sinit_\enemy_control_cpp`.
+ * RESIDUALS. mwcc-debugger dump, `emc_event_hold_release`: regsim 2/2 callee-saved, 17/19 volatile, best plan cost
+ *            9; first divergence insn 11: retail `extsh r10, r3` vs ours `extsh r7, r3`
+ * RESIDUALS. mwcc-debugger dump, `emc_event_act_end`: regsim 7/7 callee-saved, 8/8 volatile, best plan cost 11;
+ *            first divergence insn 7: retail `mr r26, r3` vs ours `mr r29, r3`
+ * RESIDUALS. mwcc-debugger dump, `emc_joint_cache_fill`: regsim 4/4 callee-saved, 9/10 volatile, best plan cost 0;
+ *            first divergence insn 26: retail `<DIFF_INSERT>` vs ours `mr r7, r5`; size differs from retail
  */
 
 #include "types.h"

@@ -47,6 +47,10 @@
  *            (`clrlwi r4,r31,16` before Pl_chr_set_attr_default), not colouring; `motion` as s32/u32/s16 measures
  *            equal or lower. em_net_parts_unpack: retail indexes `in->value[part]` through the masked r4, ours
  *            through r0 (backend temporary; an `idx` or value local compiles identically).
+ * RESIDUALS. mwcc-debugger dump, `pl_act_attr_stage_set`: regsim 7/7 callee-saved, 6/6 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 34: retail `clrlwi r4, r31, 16` vs ours `<DIFF_DELETE>`
+ * RESIDUALS. mwcc-debugger dump, `em_net_parts_unpack`: regsim 6/6 callee-saved, 14/15 volatile, best plan cost 0;
+ *            first divergence insn 29: retail `clrlwi r4, r30, 24` vs ours `clrlwi r0, r30, 24`
  */
 
 #include "types.h"

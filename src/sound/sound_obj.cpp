@@ -32,6 +32,9 @@
  * RESIDUALS. snd_obj_play_chain: regsim colours `cfg` r31 / `line` r30 (retail r30 / r31) for every declaration
  *            order, and retail masks `cfg->next_cue` with `clrlwi r4,r0,16` at the second cue lookup (a `(u16)` cast
  *            compiles identically).
+ * RESIDUALS. mwcc-debugger dump, `snd_obj_play_chain`: regsim 2/3 callee-saved, 4/4 volatile, best plan cost 0;
+ *            first divergence insn 10: retail `addi r31, r3, 0x90` vs ours `addi r30, r3, 0x90`; size differs from
+ *            retail
  */
 
 #include "sound/sound_obj_types.h" /* SndBase, SndPlayerBase (rule 1) */

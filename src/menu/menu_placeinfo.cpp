@@ -75,6 +75,8 @@
  *   header spells a `void`/`s32` return retail tests or stores as a byte go through signature casts
  *   (`requestListRefreshAlias`, `requestCommand17`, `getSelectedServerTypeIndex`).  The asserts sit on retail's lines
  *   288 and 292 (`#line`).
+ * RESIDUALS. mwcc-debugger dump, `place_model_load`: regsim 3/8 callee-saved, 7/7 volatile, best plan cost 4; first
+ *            divergence insn 6: retail `mr r25, r4` vs ours `mr r26, r4`; size differs from retail
  */
 
 #include "types.h"

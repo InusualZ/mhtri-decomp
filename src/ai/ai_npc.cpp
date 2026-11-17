@@ -111,6 +111,9 @@
  * RESIDUALS. fn_802D3398: `#pragma opt_common_subs off` re-reads *row in the second loop as retail does but also in
  *            the first (224 B against 220 B); a `weight` local, a `while` form and `row[0]` indexing compile
  *            identically.
+ * RESIDUALS. mwcc-debugger dump, `fn_802D3398`: regsim 3/3 callee-saved, 9/9 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 31: retail `lhz r0, 0x0(r30)` vs ours `<DIFF_DELETE>`; size differs from
+ *            retail
  */
 
 #pragma optimization_level 4

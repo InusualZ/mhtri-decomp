@@ -102,6 +102,8 @@
  *    through `st->` at each use (a cached `rows` pointer costs a callee-saved register);
  *  - every `.sdata2` constant is emitted by its reader (the pool's float literals and the tag lists), so no `.sdata2`
  *    row is declared `extern`; `maskedUserName` (`.sdata`) still is.
+ * RESIDUALS. mwcc-debugger dump, `sendReqLoginInfo`: regsim 3/3 callee-saved, 11/11 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 20: retail `li r0, 0x9` vs ours `li r30, 0x3`
  */
 
 #include "types.h"

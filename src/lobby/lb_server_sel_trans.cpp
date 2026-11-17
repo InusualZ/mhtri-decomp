@@ -46,6 +46,9 @@
  * RESIDUALS. lb_screen26_picks_draw: dump 03 shows the backend temporary r37 is a copy of `work` strength-reduced by
  *            2 per iteration with the +0x94 offset folded into each load (retail `lhz 0x94(r30)` with r30 stepping
  *            by 2); a `u16* pick = work->picks` local gives `addi r30,r26,0x94` (98.5) and swaps the increments.
+ * RESIDUALS. mwcc-debugger dump, `lb_screen26_picks_draw`: regsim 6/6 callee-saved, 9/9 volatile, best plan cost 4;
+ *            first divergence insn 15: retail `li r31, lb_s26_pick_row_lsp@sda21` vs ours `li r30,
+ *            lb_s26_pick_row_lsp@sda21`
  */
 
 

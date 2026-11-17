@@ -38,6 +38,8 @@
  *   +0x30 and +0x3C are called without the table argument the header spells (r6/r8 there is only the table base),
  *   and their id argument is a `u16`.  `x -= n; if (x < lim)` (not a local) gives retail's store-then-`extsh`.
  *   The aim fade step is a named `.sdata2` word: a literal `x - -0.005f` folds into `x + 0.005f`.
+ * RESIDUALS. mwcc-debugger dump, `em016_strafe_point_get`: regsim 3/3 callee-saved, 4/5 volatile, best plan cost 0;
+ *            first divergence insn 25: retail `li r3, 0x11c7` vs ours `li r4, 0x11c7`
  */
 
 #include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */

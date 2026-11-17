@@ -63,6 +63,10 @@
  * RESIDUALS. quest_targets_update_a/_b: the first PCode dump (backend-03) already holds `li r35,4` before `cmpi
  *            cr11` in the block after quest_mark_visible_ck, and no source spelling of the helper (flag=0/if, early
  *            returns, ?:) moves it after the compare (scheduler, not a source-visible pass).
+ * RESIDUALS. mwcc-debugger dump, `quest_targets_update_a`: regsim 4/4 callee-saved, 7/7 volatile (EXACT, colouring
+ *            is not the cause); first divergence insn 42: retail `<DIFF_INSERT>` vs ours `li r0, 0x4`
+ * RESIDUALS. mwcc-debugger dump, `quest_targets_update_b`: regsim 5/5 callee-saved, 10/10 volatile (EXACT, colouring
+ *            is not the cause); first divergence insn 42: retail `<DIFF_INSERT>` vs ours `li r0, 0x4`
  */
 
 #include "types.h"

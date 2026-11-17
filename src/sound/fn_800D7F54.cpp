@@ -73,6 +73,12 @@
  * RESIDUALS. se_frame_req, fn_800D9DB4: retail keeps `param & 0xFFFFFF` in the parameter's own register (regsim:
  *            `lo` r5 vs retail r29, params swap in fn_800D9DB4); the in-place `param &= 0xFFFFFF` form measures 96.5
  *            / 96.4.
+ * RESIDUALS. mwcc-debugger dump, `fn_800DBFAC`: regsim 4/5 callee-saved, 6/6 volatile, best plan cost 0; first
+ *            divergence insn 10: retail `addi r30, r3, lobby_w@l` vs ours `addi r31, r3, lobby_w@l`
+ * RESIDUALS. mwcc-debugger dump, `se_frame_req`: regsim 5/6 callee-saved, 10/10 volatile, best plan cost 0; first
+ *            divergence insn 22: retail `clrlwi r29, r29, 8` vs ours `clrlwi r5, r29, 8`
+ * RESIDUALS. mwcc-debugger dump, `fn_800D9DB4`: regsim 4/5 callee-saved, 10/10 volatile, best plan cost 0; first
+ *            divergence insn 23: retail `clrrwi r0, r29, 24` vs ours `clrrwi r0, r28, 24`
  */
 #pragma optimization_level 4
 #pragma peephole off

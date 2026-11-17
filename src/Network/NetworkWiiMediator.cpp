@@ -69,6 +69,8 @@
  *  - `NetworkPool::isECStarted` (0x8041793C) is defined here: retail emits the pool's accessor in this range.
  * RESIDUALS. updateServerTime: regsim EXACT; retail returns the empty path as `li r4,0; mr r3,r4` (a zero u64 kept in
  *            a register), ours `li r3,0`; a `result` local (80.69) and an else assignment (98.46) do not produce it.
+ * RESIDUALS. mwcc-debugger dump, `pushTransferRecord`: regsim 2/3 callee-saved, 13/13 volatile, best plan cost 4;
+ *            first divergence insn 8: retail `mr r31, r6` vs ours `mr r29, r6`
  */
 
 #include "types.h"

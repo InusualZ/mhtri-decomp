@@ -51,6 +51,8 @@
  *   stores through such a copy too.  The handshake retry count is a post-increment in the compare.
  *   `wpadDispatchReport` takes its sample slot through the `wpadCurrentSample` inline and declares `level` between `cb`
  *   and `result`; the calibration sums are initialised `sumX = sumY = 0.0f`.
+ * RESIDUALS. mwcc-debugger dump, `wpadReportButtonsAccel`: regsim 0/0 callee-saved, 33/33 volatile (EXACT, colouring
+ *            is not the cause); first divergence insn 6: retail `lwzx r6, r7, r8` vs ours `<DIFF_DELETE>`
  */
 
 #include "types.h"

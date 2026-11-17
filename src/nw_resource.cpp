@@ -49,6 +49,9 @@
  *   `dont_inline off` inlines the bind helper).
  *   `nw_res_list_load`: retail tests the entry's size word in r4, ours in r0 (a `size` local, a `for` loop: no change).
  *   `ResEntry.flag` is compared signed by `nwDelResource` (a cast; the shared header types it `u32`).
+ * RESIDUALS. mwcc-debugger dump, `nw_res_effect_init`: regsim 4/4 callee-saved, 10/10 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 7: retail `li r3, nw_res_ef_pool_sizes@sda21` vs ours
+ *            `<DIFF_DELETE>`
  */
 
 #define MHTRI_NW_RESOURCE_OWNER

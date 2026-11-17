@@ -75,6 +75,10 @@
  *   landing pad retail does not have).
  * RESIDUALS. lobby_net_leave_select: regsim EXACT needs `r46` (the u16 conversion of stage_entry_angle_get's u32
  *            result) folded into `angle`; a `u32 angle` with a `(u16)` at the call measures 5 B lower.
+ * RESIDUALS. mwcc-debugger dump, `em020_arm_mot1_side_wait80`: regsim 2/2 callee-saved, 6/7 volatile, best plan cost
+ *            0; first divergence insn 25: retail `addi r4, r4, 0x51` vs ours `addi r0, r4, 0x51`
+ * RESIDUALS. mwcc-debugger dump, `lobby_net_leave_select`: regsim 4/4 callee-saved, 4/4 volatile, best plan cost 4;
+ *            first divergence insn 38: retail `mr r30, r3` vs ours `mr r31, r3`
  */
 
 #include "types.h"

@@ -254,6 +254,19 @@
  *            ours and after it in retail (regsim EXACT).
  * RESIDUALS. fn_8027FB84: retail masks the u8 `cap` (`clrlwi r0,r29,24`) before the final `cmpwi`; `cap` as u32/s32
  *            or a `(u8)` compare measure lower or equal.
+ * RESIDUALS. mwcc-debugger dump, `Get_pl_type`: regsim 2/2 callee-saved, 8/8 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 39: retail `extsh r4, r31` vs ours `extsh r0, r31`
+ * RESIDUALS. mwcc-debugger dump, `fn_8027D40C`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 1; first
+ *            divergence insn 0: retail `li r6, 0x0` vs ours `li r5, 0x0`
+ * RESIDUALS. mwcc-debugger dump, `pl_attack_range_tier_get`: regsim 1/1 callee-saved, 17/19 volatile, best plan cost
+ *            0; first divergence insn 14: retail `lwzx r5, r3, r0` vs ours `lwzx r4, r3, r0`
+ * RESIDUALS. mwcc-debugger dump, `fn_8027FB84`: regsim 6/6 callee-saved, 7/7 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 47: retail `clrlwi r0, r29, 24` vs ours `<DIFF_DELETE>`; size differs
+ *            from retail
+ * RESIDUALS. mwcc-debugger dump, `pl_carry_item_get`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 5; first
+ *            divergence insn 1: retail `subi r6, r4, 0x1` vs ours `subi r5, r4, 0x1`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `fn_802699C8`: regsim 0/0 callee-saved, 22/26 volatile, best plan cost 1; first
+ *            divergence insn 3: retail `lwz r12, 0x10(r10)` vs ours `lwz r4, 0x10(r10)`
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -453,9 +466,10 @@ u8 pl_motion_bank_no_get(void)
  * the six value words go to -1 and the player's slot byte to 0. */
 void fn_802699C8(u8 player)
 {
-    _PLGLOBAL* g = pl_global;
-    _PLOBJ* obj;
+    _PLGLOBAL* g;
     s32 i;
+    _PLOBJ* obj;
+    g = pl_global;
 
     if (g == NULL) {
         return;

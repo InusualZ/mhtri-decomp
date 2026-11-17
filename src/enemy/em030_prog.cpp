@@ -31,6 +31,8 @@
  *   `__sinit` from `Em030VecPair`'s constructor.
  * RESIDUALS. em_area_engaged_ck: the positive-form `if ((u32)(team - 1) <= 1) {...} else switch` that lays the team
  *            1/2 block first measures 39.8 B lower.
+ * RESIDUALS. mwcc-debugger dump, `em_area_engaged_ck`: regsim 4/4 callee-saved, 5/5 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 26: retail `ble 0x80` vs ours `ble 0xb0`
  */
 
 #include "types.h"

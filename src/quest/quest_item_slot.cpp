@@ -27,6 +27,8 @@
  * RESIDUALS. quest_item_slot_find: regsim has no retail target; in dump 14 the id mask (r36) is coloured after the
  *            five loads, retail colours it first (mask in r0, loads in r4). `id == slots[n].id` is the 99.09
  *            spelling; `peephole on` drops the mask (128 B, 94.70).
+ * RESIDUALS. mwcc-debugger dump, `quest_item_pair_copy_block`: regsim 5/5 callee-saved, 11/11 volatile, best plan
+ *            cost 7; first divergence insn 8: retail `mr r31, r5` vs ours `mr r29, r5`
  */
 
 #include "quest/quest_item_slot.h"

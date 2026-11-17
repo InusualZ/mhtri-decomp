@@ -73,6 +73,9 @@
  * RESIDUALS. 4 functions (1200 bytes) are unwritten: 0x80561148-0x805615F8, the text part factories (slots 0x140,
  *            0x144, 0xB8, 0x148). They build homebutton/hbm_text_panel.cpp's HbmKbTextWidget (and a derived panel with
  *            table 0x80657F10) through its inline constructor, and that class is defined in that unit's .cpp.
+ * RESIDUALS. mwcc-debugger dump, `__sinit_\hbm_kb_event_cpp`: no regsim plan (dump unavailable for this row); first
+ *            divergence insn 2: retail `lis r4, __dt__16HkbKbStateClosedFv@ha` vs ours `lis r6,
+ *            __vt__16HkbKbStateClosed@ha`
  */
 
 #include "types.h"

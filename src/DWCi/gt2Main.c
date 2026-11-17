@@ -14,6 +14,8 @@
  *   select; the if/else spelling keeps the size).
  * SHAPES. The blocking `gt2Connect` loop repeats `gt2Think`'s body in place (retail calls the receive and think
  *   steps directly).
+ * RESIDUALS. mwcc-debugger dump, `gt2Send`: regsim 0/2 callee-saved, 7/7 volatile, best plan cost 0; first
+ *            divergence insn 4: retail `mr r31, r6` vs ours `mr r31, r3`
  */
 #include "DWCi/gt2Main.h"
 #include "DWCi/dwc_nasfunc.h"

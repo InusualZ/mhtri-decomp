@@ -48,6 +48,8 @@
  *   index, not a 6-byte struct `mulli`.
  * RESIDUALS. lb_farm_seed_ck: regsim volatile targets r34(level)/r37 backend temporary differ at cost 0 (no
  *            declaration order moves them).
+ * RESIDUALS. mwcc-debugger dump, `lb_farm_seed_ck`: regsim 1/1 callee-saved, 10/12 volatile, best plan cost 0; first
+ *            divergence insn 16: retail `lbz r5, 0x2(r3)` vs ours `lbz r7, 0x2(r3)`
  */
 #include "types.h"
 

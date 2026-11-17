@@ -31,6 +31,8 @@
  *   negative-status test measured identical).
  * RESIDUALS. NCDGetLinkStatus: retail tests `reply[1] < 0` with `blt` over a `b`, ours with `bge`; the ternary, an
  *            empty-if/else and an else-less form compile identically.
+ * RESIDUALS. mwcc-debugger dump, `NCDGetLinkStatus`: regsim 4/4 callee-saved, 1/1 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 46: retail `blt 0x310` vs ours `bge 0x31c`; size differs from retail
  */
 
 #include "NCD/ncdsystem.h"

@@ -94,6 +94,8 @@
  *   and the hand-off heads a `for (;;)` holding id 2's case (playbook 252); its clear tail heads the loop of a
  *   one-case `switch (goal)` (playbook 274).  quest_special_element_step gives case 4 its own move local, declared
  *   after `el` and `i`; quest_all_player_item_count_sum walks the elements with a pointer.
+ * RESIDUALS. mwcc-debugger dump, `quest_arena_need_get`: regsim 1/1 callee-saved, 11/14 volatile, best plan cost 0;
+ *            first divergence insn 11: retail `addi r6, r3, quest_work@l` vs ours `addi r4, r3, quest_work@l`
  */
 
 #include "quest/quest_entry.h"

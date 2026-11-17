@@ -21,6 +21,8 @@
  *   if/else and for map 17 as a ternary.  `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)`.
  *   `fn_80116B00` uses literal constants (the loop hoists them), converts the shifted angle through `(s32)(u16)`
  *   (signed int-to-float), declares `i` before `work`, and caches `tables[i]` only across the `sinf` call.
+ * RESIDUALS. mwcc-debugger dump, `fn_80116EEC`: regsim 0/0 callee-saved, 3/4 volatile, best plan cost 0; first
+ *            divergence insn 1: retail `lwz r3, 0x38(r3)` vs ours `lwz r5, 0x38(r3)`; size differs from retail
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */

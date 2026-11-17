@@ -41,6 +41,8 @@
  *   previous row taken before the `-1` test (the row walkers); flags built with `|=` from a zeroed byte; a kept `bool`
  *   for the values passed to `GetMenuFontColor`; a `continue`/`break` switch instead of retail's goto-shaped material
  *   filter (lb_seisan_materials_get).
+ * RESIDUALS. mwcc-debugger dump, `lb_text_center_print`: regsim 8/8 callee-saved, 9/11 volatile, best plan cost 0;
+ *            first divergence insn 21: retail `lha r0, 0x14(r1)` vs ours `lha r6, 0xc(r1)`
  */
 #include "types.h"
 

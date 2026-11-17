@@ -30,6 +30,8 @@
  * SHAPES. `note_slot_cursor_bounds` returns the slot pair packed into the high half of its result.  `menu_row_find` and
  *   the place-list loops walk a pointer (`rows++`/`rec++`), not an index; `menu_row_empty_count` returns `u16` (both
  *   callers narrow its result with `clrlwi 16`).
+ * RESIDUALS. mwcc-debugger dump, `note_slot_cursor_step`: regsim 3/3 callee-saved, 8/9 volatile, best plan cost 0;
+ *            first divergence insn 34: retail `lbz r4, 0x0(r29)` vs ours `lbz r3, 0x0(r29)`
  */
 
 #include "types.h"

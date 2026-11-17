@@ -86,6 +86,8 @@
  *   (a u8 return is zero-extended again at each compare).  `wudCalcCrc` declares its two sums and assigns the high one first.
  *   `WUDiSyncFiber` case 0x10 wraps its device-type switch in `do { } while (0)` (idea 183): the 0x11 paths `continue`
  *   past the shared `state = 0xF`, which the simple-mode store and the other types reach by `break`, as the target does.
+ * RESIDUALS. mwcc-debugger dump, `__wudAppendRuntimePatch`: regsim 1/1 callee-saved, 22/24 volatile, best plan cost
+ *            0; first divergence insn 23: retail `lbz r4, 0xe8(r31)` vs ours `lbz r5, 0xe8(r31)`
  */
 
 #include "types.h"

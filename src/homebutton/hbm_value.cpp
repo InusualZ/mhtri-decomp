@@ -88,6 +88,9 @@
  *            Refresh counts with a u32 indexed through (u16); PlaceCaret takes the cursor into locals y-first.
  * RESIDUALS. .data 0x80651568..0x80652340 spans at least 10 TUs (datagap.py emission-order seams), so the data cannot match
  *            until the range is re-cut.
+ * RESIDUALS. mwcc-debugger dump, `fn_8055E194`: no regsim plan (dump unavailable for this row); first divergence
+ * RESIDUALS. mwcc-debugger dump, `v_0x03C`: regsim 1/1 callee-saved, 3/3 volatile (EXACT, colouring is not the
+ *            cause); first divergence insn 21: retail `lfs f3, 0x30(r1)` vs ours `lfs f3, 0x20(r1)`
  */
 
 #include "types.h"

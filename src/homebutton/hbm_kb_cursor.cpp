@@ -54,6 +54,8 @@
  *            HbmKbCursorArrows (create/draw/update/select; the nine `G_Arw*` groups), HbmKbCursorKeyGroup,
  *            HbmKbCursorPaneHandler, view HbmCursorRootView, data hbmKbCursorArrowAnimDefs / hbmKbCursorArrowGroupDefs /
  *            hbmKbCursorArrowGroupNames.
+ * RESIDUALS. mwcc-debugger dump, `hbmKbCursorDrawFooter`: regsim 2/2 callee-saved, 2/2 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 18: retail `lfs f0, 0x50(r3)` vs ours `lfs f1, 0x50(r3)`
  */
 
 #include "types.h"

@@ -120,6 +120,10 @@
  *   (playbook 216); `checkOwnInvite` and `lb_cmd_pressed_ck` results compare as `(u32)` where retail has `cmplwi`.
  * RESIDUALS. lb_npc_ground_drop: retail adds `fadds f0,f0,f1` (y in f0) against ours `f1,f0`, and points the 48.0f at
  *            `lbl_807998D8` where ours pools its own `@4432` (regsim EXACT).
+ * RESIDUALS. mwcc-debugger dump, `lb_act_carry_put`: regsim 1/1 callee-saved, 5/5 volatile (EXACT, colouring is not
+ *            the cause); first divergence insn 23: retail `<DIFF_INSERT>` vs ours `li r4, 0x0`
+ * RESIDUALS. mwcc-debugger dump, `lb_npc_walk_blend_set`: regsim 2/2 callee-saved, 3/3 volatile (EXACT, colouring is
+ *            not the cause); first divergence insn 27: retail `sth r31, 0xb4(r30)` vs ours `sth r0, 0xb4(r30)`
  */
 #pragma optimization_level 4
 #include "types.h"
