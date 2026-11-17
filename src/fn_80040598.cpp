@@ -66,6 +66,10 @@
  *   0x807947C4, written only here: the aligned BSS end for load modes 3 and the default).
  * DATA. `.sbss` 0x807947C4..0x807947C8 is this unit's (sole referencer); 0x807947B4..0x807947D0's other
  *   words are read by `mh3_pad.cpp` too and stay unclaimed.
+ * RESIDUALS. mwcc-debugger dump, `fn_80040598`: regsim 3/3 callee-saved, 13/13 volatile (EXACT); first divergence
+ *            insn 38: retail `cmplwi r0, 0xff` vs ours `cmplwi r0, 0x4`; case order 4, default, 3, 0xFF reproduces retail's
+ *            body layout; retail's compare chain is 0xFF, 3, 4 where ours tests 4, 3, 0xFF (every label order measured)
+ * SHAPES. `fn_80040598` lists its cases as 4, default, 3, 0xFF.
  */
 
 #include "types.h"
@@ -121,17 +125,17 @@ extern "C" void* fn_80040598(const char* path, void* buffer, u32 mode)
         end = ALIGN32((u32)buffer + size);
 
         switch (mode & 0xFF) {
-        case 0xFF:
-            lbl_807947B8 = ALIGN32(end + bssSize);
-            break;
-        case 3:
-            rso_overlay_bss_end = ALIGN32(end + bssSize);
-            break;
         case 4:
             break;
         default:
             lbl_807947C0 = ALIGN32(end + bssSize);
             rso_overlay_bss_end = ALIGN32(end + bssSize);
+            break;
+        case 3:
+            rso_overlay_bss_end = ALIGN32(end + bssSize);
+            break;
+        case 0xFF:
+            lbl_807947B8 = ALIGN32(end + bssSize);
             break;
         }
     }

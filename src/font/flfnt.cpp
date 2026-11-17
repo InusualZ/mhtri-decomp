@@ -33,6 +33,8 @@
  *            cause); first divergence insn 19: retail `subi r0, r3, 0x80` vs ours `subi r3, r3, 0x80`
  * RESIDUALS. mwcc-debugger dump, `flfntUtf8Decode`: regsim 0/0 callee-saved, 7/9 volatile, best plan cost 0; first
  *            divergence insn 20: retail `ble 0xb2c` vs ours `<DIFF_DELETE>`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `flfntDrawText`: regsim 3/4 callee-saved, 6/6 volatile, best plan cost 0; first
+ *            divergence insn 30: retail `bne 0xe14` vs ours `bne 0xdfc`; size differs from retail (308 B vs 316 B)
  */
 
 #pragma peephole off

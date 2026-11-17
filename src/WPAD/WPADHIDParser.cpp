@@ -53,6 +53,8 @@
  *   and `result`; the calibration sums are initialised `sumX = sumY = 0.0f`.
  * RESIDUALS. mwcc-debugger dump, `wpadReportButtonsAccel`: regsim 0/0 callee-saved, 33/33 volatile (EXACT, colouring
  *            is not the cause); first divergence insn 6: retail `lwzx r6, r7, r8` vs ours `<DIFF_DELETE>`
+ * RESIDUALS. mwcc-debugger dump, `wpadReportButtonsDpd10Ext9`: regsim 4/4 callee-saved, 4/4 volatile (EXACT);
+ *            first divergence insn 14: retail `lbz r0, 0x2(r4)` vs ours `lbz r6, 0x2(r4)`
  */
 
 #include "types.h"

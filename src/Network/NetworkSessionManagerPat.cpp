@@ -65,6 +65,9 @@
  *  - `initNetworkSessionStable` is C++ (`__nw__FUl`, five virtual calls) with C linkage; its `new` expression gives the
  *    target's 24-byte extab record; `getOwnIndex` is declared `s32` so the call site narrows with `extsb` as retail.
  *  - `updateSession`'s error code 0x80060034 is a `config.yml` relocation block.
+ * RESIDUALS. mwcc-debugger dump, `updatePlayerRecord__24NetworkSessionManagerPatFScPCUcPCcUl`: regsim 6/6
+ *            callee-saved, 7/7 volatile (EXACT); first divergence insn 38: retail `lwz r12, 0x0(r3)` vs ours `lwz r12,
+ *            0x540(r31)`
  */
 
 #include "Network/NetworkSessionManager.h"

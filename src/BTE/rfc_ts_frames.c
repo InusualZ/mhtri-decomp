@@ -22,6 +22,9 @@
  * RESIDUALS. rfc_send_test: regsim EXACT; retail subtracts the offset into r4 (`addi r4,r6,-2`, the freed
  *            `is_command` register) and materialises the DLCI 0 last (`li r4,0`), ours subtracts in r6 and loads the
  *            0 earlier; `offset = offset - 2` and a `u16 off` local do not change it.
+ * RESIDUALS. mwcc-debugger dump, `rfc_send_msc`: regsim 4/4 callee-saved, 13/18 volatile, best plan cost 0 (the
+ *            Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 18:
+ *            retail `li r6, 0xc` vs ours `li r7, 0xc`
  */
 
 #include "BTE/rfc_ts_frames.h"

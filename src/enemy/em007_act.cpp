@@ -56,6 +56,8 @@
  *   local assigned first (`em007_act7_8`'s hit mask, `em007_act7_3`'s speed, `em007_act9_1`'s gauge scale) and a
  *   product whose operands retail swaps takes its call result through a local (`em007_act2_10`/`7_1`/`7_11`).  The data is defined between the functions in retail
  *   order (the jump tables fall between the definitions).
+ * RESIDUALS. mwcc-debugger dump, `em007_model_copy_bind_nodes`: regsim 5/5 callee-saved, 11/11 volatile (EXACT);
+ *            first divergence insn 22: retail `stw r3, 0xc(r1)` vs ours `stw r3, 0x10(r1)`
  */
 
 #include "types.h"
@@ -297,7 +299,7 @@ void em_stamina_add(struct _ENEMY_WORK* self, u32 a);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
 void em_timer_0x81C_arm(struct _ENEMY_WORK* self);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
-void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u16 flags);
 u32 em_turn_seq_step(struct _ENEMY_WORK* self, void* tbl);
 void em_move_vec_clr(struct _ENEMY_WORK* self);
 void em_move_vec2_clr(struct _ENEMY_WORK* self);

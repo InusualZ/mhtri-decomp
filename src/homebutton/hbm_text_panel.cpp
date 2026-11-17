@@ -97,6 +97,15 @@
  * RESIDUALS. hbmTextCellListInit (156 B, ours 152 B): retail derives `last` from the loop-test count (`subi r5,r5,1`
  *            on the last `lhz r5,4(r3)`) and reloads `list->count` (`lhz r0,4(r3)`) for the free cell; `last =
  *            list->count - 1` (84.49) and moving it before the free pointer (81.03) score lower.
+ * RESIDUALS. mwcc-debugger dump, `hbmPanelSetItemCaret`: regsim 2/2 callee-saved, 15/17 volatile, best plan cost 0
+ *            (the Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 29:
+ *            retail `lhz r8, 0x4(r7)` vs ours `lhz r6, 0x4(r7)`
+ * RESIDUALS. mwcc-debugger dump, `hbmPanelCreate`: regsim 3/3 callee-saved, 18/24 volatile, best plan cost 0 (the
+ *            Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 28:
+ *            retail `lwz r6, 0x19e4(r31)` vs ours `lwz r8, 0x19e4(r31)`
+ * RESIDUALS. mwcc-debugger dump, `fn_8054CF38`: regsim None callee-saved, None volatile (the Wii/1.3 stand-in
+ *            compiles it differently from the unit's compiler: a hint only); first divergence insn 10: retail `<DIFF_INSERT>`
+ *            vs ours `beq 0xa9c0`; size differs from retail (308 B vs 312 B)
  */
 
 #include "types.h"

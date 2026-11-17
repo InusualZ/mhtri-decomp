@@ -35,6 +35,8 @@
  *            first divergence insn 7: retail `mr r26, r3` vs ours `mr r29, r3`
  * RESIDUALS. mwcc-debugger dump, `emc_joint_cache_fill`: regsim 4/4 callee-saved, 9/10 volatile, best plan cost 0;
  *            first divergence insn 26: retail `<DIFF_INSERT>` vs ours `mr r7, r5`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `em_variant_element_pick`: regsim 7/7 callee-saved, 18/18 volatile (EXACT); first
+ *            divergence insn 31: retail `lwz r3, 0x4(r27)` vs ours `lwz r5, 0x4(r27)`
  */
 
 #include "types.h"

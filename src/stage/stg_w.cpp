@@ -87,6 +87,8 @@
  *     retail's exits; no `goto`).
  * RESIDUALS. stage_area_timer_arm: regsim shows `bit` (r34) in r4 against retail r5 and three backend temps rotated
  *            (r37 r4/r0, r38 r0/r3, r40 r3/r4); `1u`, `bit <<= index` and an `s32 bit` do not move them.
+ * RESIDUALS. mwcc-debugger dump, `stage_area_colour_update`: regsim 1/1 callee-saved, 14/14 volatile (EXACT);
+ *            first divergence insn 10: retail `addi r3, r1, 0xc` vs ours `addi r3, r1, 0x10`
  */
 
 #include "types.h"

@@ -91,6 +91,10 @@
  * RESIDUALS. mwcc-debugger dump, `fn_8055E194`: no regsim plan (dump unavailable for this row); first divergence
  * RESIDUALS. mwcc-debugger dump, `v_0x03C`: regsim 1/1 callee-saved, 3/3 volatile (EXACT, colouring is not the
  *            cause); first divergence insn 21: retail `lfs f3, 0x30(r1)` vs ours `lfs f3, 0x20(r1)`
+ * RESIDUALS. `fn_8055DFCC` (unwritten, 0x128 B): the HbmKeyboard creator - allocate 0x150 B from the allocator,
+ *            build HbmPaneManager at +0x4C, two HkbKeyButton members at +0x108/+0x12C, then the HbmKeyboard table stores; the
+ *            dump has no function of that name (the unit's compile never generates it), so it needs the keyboard class with
+ *            its constructor first
  */
 
 #include "types.h"

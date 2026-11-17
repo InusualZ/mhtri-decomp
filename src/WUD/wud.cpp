@@ -88,6 +88,14 @@
  *   past the shared `state = 0xF`, which the simple-mode store and the other types reach by `break`, as the target does.
  * RESIDUALS. mwcc-debugger dump, `__wudAppendRuntimePatch`: regsim 1/1 callee-saved, 22/24 volatile, best plan cost
  *            0; first divergence insn 23: retail `lbz r4, 0xe8(r31)` vs ours `lbz r5, 0xe8(r31)`
+ * RESIDUALS. mwcc-debugger dump, `WUDiDeleteAllLinkKeys`: regsim 3/6 callee-saved, 10/10 volatile, best plan cost
+ *            5 EXACT; first divergence insn 11: retail `li r29, 0x0` vs ours `li r31, 0x0`; the plan wants the
+ *            strength-reduced offset (`li r62,0`) as a named local between `found` and `cb`; apply-local refuses it (not an
+ *            addi of a local) and every declaration permutation measured no better
+ * RESIDUALS. mwcc-debugger dump, `WUDiStoreDeviceInfoToSC`: regsim 4/8 callee-saved, 7/7 volatile, best plan cost
+ *            4; first divergence insn 5: retail `lis r29, wudCB@ha` vs ours `lis r30, ...bss.0@ha`
+ * SHAPES. The four list-move bodies (`WUDiMoveDeviceToHead`/`ToTail`, `WUDiMoveWbcToHead`/`ToTail`) declare `node`
+ *            at function scope, then `cb`, `level`, `i` (the regsim plan order).
  */
 
 #include "types.h"
@@ -2490,14 +2498,15 @@ WUDDevice* WUDiGetDevInfo(const u8* bdAddr)
 /* Moves the balance board list entry of `device` to the head of the list. */
 void WUDiMoveWbcToHead(WUDDevice* device)
 {
-    u32 level;
+    WUDDeviceNode* node;
     WUDCB* cb = &wudCB;
+    u32 level;
     s32 i;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
         if (memcmp(cb->wbcNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
-            WUDDeviceNode* node = &cb->wbcNodes[i];
+            node = &cb->wbcNodes[i];
             if (memcmp(cb->wbcHead->device->bdAddr, node->device->bdAddr, 6) != 0) {
                 cb->wbcNodes[i].prev->next = cb->wbcNodes[i].next;
                 if (memcmp(cb->wbcTail->device->bdAddr, node->device->bdAddr, 6) == 0) {
@@ -2519,14 +2528,15 @@ void WUDiMoveWbcToHead(WUDDevice* device)
 /* Moves the balance board list entry of `device` to the tail of the list. */
 void WUDiMoveWbcToTail(WUDDevice* device)
 {
-    u32 level;
+    WUDDeviceNode* node;
     WUDCB* cb = &wudCB;
+    u32 level;
     s32 i;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
         if (memcmp(cb->wbcNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
-            WUDDeviceNode* node = &cb->wbcNodes[i];
+            node = &cb->wbcNodes[i];
             if (memcmp(cb->wbcTail->device->bdAddr, node->device->bdAddr, 6) != 0) {
                 cb->wbcNodes[i].next->prev = cb->wbcNodes[i].prev;
                 if (memcmp(cb->wbcHead->device->bdAddr, node->device->bdAddr, 6) == 0) {
@@ -2599,14 +2609,15 @@ void WUDiInsertWbcNode(WUDDevice* device)
 /* Moves the remote list entry of `device` to the head of the list. */
 void WUDiMoveDeviceToHead(WUDDevice* device)
 {
-    u32 level;
+    WUDDeviceNode* node;
     WUDCB* cb = &wudCB;
+    u32 level;
     s32 i;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         if (memcmp(cb->deviceNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
-            WUDDeviceNode* node = &cb->deviceNodes[i];
+            node = &cb->deviceNodes[i];
             if (memcmp(cb->deviceHead->device->bdAddr, node->device->bdAddr, 6) != 0) {
                 cb->deviceNodes[i].prev->next = cb->deviceNodes[i].next;
                 if (memcmp(cb->deviceTail->device->bdAddr, node->device->bdAddr, 6) == 0) {
@@ -2628,14 +2639,15 @@ void WUDiMoveDeviceToHead(WUDDevice* device)
 /* Moves the remote list entry of `device` to the tail of the list. */
 void WUDiMoveDeviceToTail(WUDDevice* device)
 {
-    u32 level;
+    WUDDeviceNode* node;
     WUDCB* cb = &wudCB;
+    u32 level;
     s32 i;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
         if (memcmp(cb->deviceNodes[i].device->bdAddr, device->bdAddr, 6) == 0) {
-            WUDDeviceNode* node = &cb->deviceNodes[i];
+            node = &cb->deviceNodes[i];
             if (memcmp(cb->deviceTail->device->bdAddr, node->device->bdAddr, 6) != 0) {
                 cb->deviceNodes[i].next->prev = cb->deviceNodes[i].prev;
                 if (memcmp(cb->deviceHead->device->bdAddr, node->device->bdAddr, 6) == 0) {

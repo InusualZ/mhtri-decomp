@@ -17,6 +17,13 @@
  *    `beqlr` + `bne`/`blr` pair) and regsim search's exact plan declares the inner block's `a`, `b`, `p`, `q` in that order.
  * SHAPES. `strcpy` and `strcmp` copy/compare word-wise once both pointers share an alignment, using the
  *    zero-byte test `(w - 0x01010101) & ~w & 0x80808080`; the rest walk with pre-incremented byte pointers.
+ * RESIDUALS. mwcc-debugger dump, `strcmp`: regsim 0/0 callee-saved, 16/18 volatile, best plan cost 0; first
+ *            divergence insn 0: retail `lbz r5, 0x0(r3)` vs ours `lbz r6, 0x0(r3)`
+ * RESIDUALS. mwcc-debugger dump, `strtok`: regsim 0/0 callee-saved, 22/23 volatile, best plan cost 0; first
+ *            divergence insn 68: retail `<DIFF_INSERT>` vs ours `stw r4, strtok_cursor@sda21`; the cursor load goes through a
+ *            `start` local (`d = start - 1`); retail stores the cursor after `li r0,0` and keeps the incremented pointer in
+ *            r4
+ * SHAPES. `strtok` reads the cursor through a `start` local and stores `++t` / `*(t - 1) = 0` at the end.
  */
 #pragma ipa file
 #include "types.h"
@@ -271,8 +278,8 @@ char* strtok(char* str, const char* set)
     while ((c = *++d) != 0) {
         table[(c >> 3) & 0x1F] |= (u8)(1 << (c & 7));
     }
-    d = (const u8*)strtok_cursor;
-    d--;
+    start = (const u8*)strtok_cursor;
+    d = start - 1;
     while ((c = *++d) != 0) {
         if (!(table[(c >> 3) & 0x1F] & (u8)(1 << (c & 7)))) {
             break;
@@ -293,8 +300,8 @@ char* strtok(char* str, const char* set)
     } else {
         char* t = (char*)d;
 
-        strtok_cursor = t + 1;
-        *t = 0;
+        strtok_cursor = ++t;
+        *(t - 1) = 0;
     }
     return (char*)start;
 }

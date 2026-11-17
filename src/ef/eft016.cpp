@@ -17,9 +17,12 @@
  * RESIDUALS.
  *  - `fn_8010C8F8`, `fn_8010CE80`: ours save the registers through `_savegpr_27` and a frame 0x10 larger where retail
  *    stores four registers inline, and invert the null/flag test before the state bump.
- *   The other partial rows (`fn_8010C7B8`, `fn_8010CD68`) have no recorded cause
+ *   The other partial row (`fn_8010C7B8`) has no recorded cause
  *   (`symdiff.py -u ef/eft016 --all`); `fn_8010C710` reads 100 % with `i` declared before `work` (regsim search).
  *   flipcheck: `.text` differs (the rows above); `.data`, `.sdata` and `.sdata2` are emitted and byte-identical.
+ * SHAPES. `fn_8010CD68` runs its first loop for a different area as well as for flag 0, reloads `models[i]` instead of
+ *   caching it across the request, binds after the request whether or not it returned a record, and calls
+ *   `sound_job_request` with the owner's parameter order (handle = the model's +0x118 word, kind 0, flags 0x40).
  * SHAPES. The light family's work block is a view of `_EFT::work_0x38`.  The pool is written as literals: the angle
  *   in `fn_8010CFCC` is one expression passed to `rotVecZ` (0.5 is pooled before 65536/360), `rot.y += 2048.0f` keeps
  *   retail's `fadds` operand order, and `VEC3::operator=` takes `VEC3(x, y, z)`'s result.  `fn_8010D1A8` indexes the segment
@@ -45,6 +48,7 @@
 #include "mh3_pad.h" /* VEC3::VEC3() / VEC3::operator= / VEC3(x, y, z) (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
+#include "sound/sound_job_request.h" /* sound_job_request (rule 2: the owner's leaf header) */
 #include "ef/eft_res.h" /* eft_res_slot_get, eft_res_slot_release, eft_res_model_get, eft_res_models_release,
                          * eft_res_models_spawn, res_eft_model_create (rule 2) */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -141,7 +145,6 @@ s32 res_node_mtx_id_get(void* handle);
 void fn_800DAA4C(nw4r::math::VEC3* pos);
 s32 mhchar_wld_mtx_array_get(MHchar* model);
 void mhchar_draw_mode_set(MHchar* model, s32 value);
-void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
 void pl_joint_mtx_get(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
 u32 ai_npc_motion_step_ck(_ENEMY_WORK* enemy, u8 a, u16 b);
 void ai_npc_joint_mtx_get(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
@@ -158,7 +161,7 @@ void fn_8010C77C(_EFT* self);
 void fn_8010C7B8(_EFT* self);
 void fn_8010C8F8(_EFT* self);
 void fn_8010CD68(_EFT* self, MHchar** models, s32 count);
-void fn_8010CE80(void* arg);
+void fn_8010CE80(struct PrimRec* arg);
 void fn_8010CFCC(_EFT* self, nw4r::math::MTX34* out, nw4r::math::MTX34* mtx, s16 index);
 void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b);
 f32 fn_8010D1A8(_EFT* self, s32 arg1, f32 farg0);
@@ -511,12 +514,7 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
     VEC3 vec;
     s32 i;
 
-
-    if ((u8)self->area_0x44 != (u8)get_now_areano()) {
-        return;
-    }
-
-    if (self->flag_0x01 == 0) {
+    if ((u8)self->area_0x44 != (u8)get_now_areano() || self->flag_0x01 == 0) {
         for (i = 0; i < count; i++) {
             MHchar* model = models[i];
             if (model == NULL) {
@@ -524,31 +522,30 @@ extern "C" void fn_8010CD68(_EFT* self, MHchar** models, s32 count)
             }
             if (((_EFT_MODEL_VIEW*)model)->field_0x118 ==
                 *(u32*)((u8*)((_EFT_MODEL_VIEW*)model)->slot_0x10C + 4)) {
-                g3d_root_model_bind(pRoot, 0);
+                g3d_root_model_bind(pRoot, ((_EFT_MODEL_VIEW*)model)->field_0x118);
             }
         }
     } else {
         for (i = 0; i < count; i++) {
-            MHchar* model = models[i];
             void* p;
-            if (model == NULL) {
+            if (models[i] == NULL) {
                 continue;
             }
-            if (((_EFT_MODEL_VIEW*)model)->field_0x118 !=
-                *(u32*)((u8*)((_EFT_MODEL_VIEW*)model)->slot_0x10C + 4)) {
+            if (((_EFT_MODEL_VIEW*)models[i])->field_0x118 !=
+                *(u32*)((u8*)((_EFT_MODEL_VIEW*)models[i])->slot_0x10C + 4)) {
                 continue;
             }
-            p = sound_job_request(1, model->ready, 0, 0x40, 0, fn_8010CE80);
+            p = sound_job_request(1, models[i]->ready, ((_EFT_MODEL_VIEW*)models[i])->field_0x118, 0, 0x40, NULL, fn_8010CE80);
             if (p != NULL) {
                 ((_EFT_LIGHT_OBJ*)p)->owner_0x2C = self;
-                g3d_root_model_bind(pRoot, ((_EFT_MODEL_VIEW*)model)->field_0x118);
             }
+            g3d_root_model_bind(pRoot, ((_EFT_MODEL_VIEW*)models[i])->field_0x118);
         }
     }
 }
 
 /* The light-object callback `sound_job_request` installs: places the effect's models on the enemy joint. */
-extern "C" void fn_8010CE80(void* arg)
+extern "C" void fn_8010CE80(struct PrimRec* arg)
 {
     _EFT* self = ((_EFT_LIGHT_OBJ*)arg)->owner_0x2C;
     _EFT_LIGHT_WORK* work = (_EFT_LIGHT_WORK*)self->work_0x38;

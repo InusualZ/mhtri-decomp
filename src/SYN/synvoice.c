@@ -28,6 +28,9 @@
  *    ADPCM loop context field by field (a struct copy is a word and a halfword).
  * RESIDUALS. mwcc-debugger dump, `SYNVoiceUpdateMix`: regsim 1/1 callee-saved, 22/23 volatile, best plan cost 0;
  *            first divergence insn 50: retail `lwz r4, 0x8(r31)` vs ours `lwz r3, 0x8(r31)`
+ * RESIDUALS. mwcc-debugger dump, `SYNVoicePitchRatio`: regsim 0/0 callee-saved, 11/20 volatile, best plan cost 1;
+ *            first divergence insn 5: retail `lwz r8, 0x7c(r3)` vs ours `lwz r8, 0x40(r3)`; size differs from retail (308 B
+ *            vs 300 B)
  */
 
 #include "types.h"

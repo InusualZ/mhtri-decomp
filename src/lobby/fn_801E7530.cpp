@@ -50,6 +50,10 @@
  *            declaration order moves them).
  * RESIDUALS. mwcc-debugger dump, `lb_farm_seed_ck`: regsim 1/1 callee-saved, 10/12 volatile, best plan cost 0; first
  *            divergence insn 16: retail `lbz r5, 0x2(r3)` vs ours `lbz r7, 0x2(r3)`
+ * RESIDUALS. mwcc-debugger dump, `lb_goods_single_cell_draw`: regsim 4/4 callee-saved, 2/2 volatile (EXACT); first
+ *            divergence insn 0: retail `stwu r1, -0x30(r1)` vs ours `stwu r1, -0x20(r1)`
+ * RESIDUALS. mwcc-debugger dump, `lb_farm_seed_list_draw`: regsim 3/7 callee-saved, 12/12 volatile, best plan cost
+ *            3 EXACT; first divergence insn 5: retail `mr r29, r3` vs ours `mr r28, r3`
  */
 #include "types.h"
 

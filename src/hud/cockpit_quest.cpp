@@ -67,6 +67,8 @@
  *            is not the cause); first divergence insn 42: retail `<DIFF_INSERT>` vs ours `li r0, 0x4`
  * RESIDUALS. mwcc-debugger dump, `quest_targets_update_b`: regsim 5/5 callee-saved, 10/10 volatile (EXACT, colouring
  *            is not the cause); first divergence insn 42: retail `<DIFF_INSERT>` vs ours `li r0, 0x4`
+ * RESIDUALS. mwcc-debugger dump, `cockpit_npc_digit_draw`: regsim 2/2 callee-saved, 7/7 volatile (EXACT); first
+ *            divergence insn 48: retail `lfs f0, lbl_8079A920@sda21` vs ours `lfs f4, 0x4c(r1)`
  */
 
 #include "types.h"

@@ -81,7 +81,7 @@ void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 void em_frame_flag_set(struct _ENEMY_WORK* self);
 
-void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u16 flags);
 
 /* 0x8012E644 / 0x8012E654 / 0x8012E884 / 0x8012E8C0 - the record's hit test, the mini record's, whether the enemy
  * was captured, and the mini record's end kind (2 when it left without a kill).  GUESS names. */

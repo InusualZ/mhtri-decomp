@@ -44,6 +44,7 @@
  *            same bytes (regsim EXACT).
  * RESIDUALS. mwcc-debugger dump, `lb_smith_deco_draw`: regsim 1/1 callee-saved, 3/3 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 8: retail `<DIFF_INSERT>` vs ours `addi r3, r3, 0x154`
+ * SHAPES. `lb_smith_detach_list_build` declares `deco`, `id`, `flags`, `i` in that order (regsim plan order).
  */
 #include "types.h"
 
@@ -1608,9 +1609,9 @@ void lb_smith_detach_list_build(LbSmithWork* self, _EQUIP* equip)
 {
     u16 ids[3];
     LbSmithDeco* deco;
-    s16 i;
-    u16 flags;
     u16* id;
+    u16 flags;
+    s16 i;
 
     memset(self->decos_0x324, 0, sizeof(self->decos_0x324));
     ids[0] = 0;

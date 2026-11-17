@@ -101,7 +101,6 @@
  *  - `equip_gun_clip_get`: retail numbers `kind` (r4) below `clip` (r5) at the entry (regsim's EXACT plan, the declaration
  *    order rec/kind/clip, measures 95.7 against the 99.1 of the kept order; `kind` is an `s32` for the retail `cmpwi`, the
  *    mask shift an unsigned one);
- *  - `equip_gun_level_bonus_get`: the remainder loop bumps the index before the row pointer;
  *  - 66 functions partial (`sweepcomments.py --unit Pl/pl_act` lists them), including:
  *  - `equip_color_rgba_get`/`armor_color_rgba_get` read 100 % with the table indexed flat (`((u8*)table)[index * 3 + k]`),
  *    which forms the row address offset-first as retail does;
@@ -267,6 +266,17 @@
  *            divergence insn 1: retail `subi r6, r4, 0x1` vs ours `subi r5, r4, 0x1`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `fn_802699C8`: regsim 0/0 callee-saved, 22/26 volatile, best plan cost 1; first
  *            divergence insn 3: retail `lwz r12, 0x10(r10)` vs ours `lwz r4, 0x10(r10)`
+ * RESIDUALS. mwcc-debugger dump, `pl_pos_blend_start`: regsim 2/2 callee-saved, 3/3 volatile (EXACT); first
+ *            divergence insn 30: retail `sth r31, 0xb4(r30)` vs ours `sth r0, 0xb4(r30)`; retail stores the raw `arg1` where
+ *            ours reuses the extended copy
+ * RESIDUALS. mwcc-debugger dump, `pl_input_button_hold_count`: regsim 5/8 callee-saved, 15/15 volatile, best plan
+ *            cost 5 EXACT; first divergence insn 9: retail `addi r30, r3, pl_input_button_masks@l` vs ours `addi r29, r3,
+ *            pl_input_button_masks@l`; declaration order mask, i, buttons applied; the plan needs the frontend temporary `in
+ *            + i` as a named local, which is pointer arithmetic (apply-local refuses an `add`)
+ * RESIDUALS. mwcc-debugger dump, `fn_8027AF88`: regsim 3/3 callee-saved, 24/24 volatile (EXACT); first divergence
+ *            insn 55: retail `extsb r4, r0` vs ours `extsb r0, r0`
+ * SHAPES. `equip_gun_level_bonus_get` steps `i++, row++` in the for header (retail's remainder-loop increment
+ *            order).
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -10636,9 +10646,8 @@ s32 equip_gun_level_bonus_get(_EQUIP* equip)
     s32 sum = 0;
     s16 i;
 
-    for (i = 0; i < (s16)level; i++) {
+    for (i = 0; i < (s16)level; i++, row++) {
         sum += *row;
-        row++;
     }
     return (s16)((u16)rec->base_value + sum);
 }
@@ -13840,8 +13849,8 @@ void pl_input_menu_clear(_PLW* self, PlInput* in)
  * slot follows `pressed`), a held button counts up to 100 frames, a release ends the hold. */
 void pl_input_button_hold_count(_PLW* self, PlInput* in)
 {
-    s32 i;
     u16* mask;
+    s32 i;
     u16 buttons;
 
     for (i = 0, mask = pl_input_button_masks; i < 8; i++) {

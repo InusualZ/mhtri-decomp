@@ -47,6 +47,10 @@
  *   their tables (`a[i]`, not walking pointers), loop counters are `s16` where retail unrolls by two and `s32` where it
  *   unrolls fully, row indices into the u16 reference table are `u16`, `toggle_word_step`'s last argument is a `u16`,
  *   and the goods table is picked with a conditional expression.
+ * RESIDUALS. mwcc-debugger dump, `lb_barter_cart_slot_find`: regsim 0/0 callee-saved, 10/10 volatile (EXACT);
+ *            first divergence insn 20: retail `bne 0x56d8` vs ours `bne 0x5580`; size differs from retail (308 B vs 312 B)
+ * SHAPES. `lb_barter_refs_kind_build` walks the first table through its own pointer `src_a` (declared after
+ *            `src`), the plan's extra named local.
  */
 #include "types.h"
 #include "lobby/fn_802FA9A0.h"
@@ -3474,17 +3478,18 @@ void lb_barter_hold_open(LbBarterWork* work) {
 /* Lists the open offer rows of kind `kind` from both tables: the first table's rows from 0, the second's from the
  * first page after them, and counts the pages of each. */
 void lb_barter_refs_kind_build(LbBarterWork* work, u8 kind) {
-    u16 n = 0;
-    LbBarterSrc* src;
-    u16 index;
     u16 m;
+    u16 n = 0;
+    LbBarterSrc* src_a;
+    LbBarterSrc* src;
     u16 index2;
+    u16 index;
 
     memset(work->refs_0x146, 0xFFFF, 0x300);
     work->kind_0x008 = kind;
-    src = lb_barter_src_a[kind];
-    for (index = 0; src->item_0x00 != 0; index++, src++) {
-        if (lb_barter_src_ok_ck(src) == 1) {
+    src_a = lb_barter_src_a[kind];
+    for (index = 0; src_a->item_0x00 != 0; index++, src_a++) {
+        if (lb_barter_src_ok_ck(src_a) == 1) {
             work->refs_0x146[n].index_0x00 = index;
             work->refs_0x146[n].kind_0x02 = kind;
             n++;

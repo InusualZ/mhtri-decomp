@@ -47,6 +47,8 @@
  *   `fn_800FF8D4` narrows `lb_event_state_ck()` (the owner's `u32`) with `(u8)`: retail's `clrlwi` after the call.
  * FLAGS. scoped `#pragma global_optimizer off` around fn_800FFF08 (retail loads `work_0x38` before the `eft_control`
  *        base).
+ * RESIDUALS. mwcc-debugger dump, `fn_80100330`: regsim 1/1 callee-saved, 19/22 volatile, best plan cost 1; first
+ *            divergence insn 5: retail `li r4, 0x1` vs ours `li r5, 0x1`
  */
 
 #include "types.h"

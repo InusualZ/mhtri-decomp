@@ -35,6 +35,11 @@
  * SHAPES. Locals are declared in the order retail allocates their saved registers (first declared, highest);
  *   switch cases are written in the order retail lays out their bodies (single cases before a case range);
  *   `lb_talk_state` is defined at the foot so every use keeps its own `lis`/`addi`.
+ * RESIDUALS. mwcc-debugger dump, `lb_equip_detail_item_draw`: regsim 2/2 callee-saved, 4/4 volatile (EXACT); first
+ *            divergence insn 25: retail `clrlwi r7, r7, 16` vs ours `<DIFF_DELETE>`; size differs from retail (272 B vs 268
+ *            B)
+ * RESIDUALS. mwcc-debugger dump, `lb_menu_row_insert`: regsim 5/5 callee-saved, 11/11 volatile (EXACT); first
+ *            divergence insn 16: retail `mr r5, r27` vs ours `mr r6, r27`
  */
 #include "types.h"
 

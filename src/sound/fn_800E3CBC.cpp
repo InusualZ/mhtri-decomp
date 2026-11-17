@@ -31,25 +31,34 @@
  *
  * Measured against this range's split object with `recompile.py --measure` (the official report metric):
  *
- *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   prim_queue_draw     85.27 (296/288 B)
+ *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   prim_queue_draw     99.19 (296/296 B)
  *   prim_init_all  100.00               prim_list_exec    88.10 (812/820 B)   set_blendmode  100.00
  *   fn_800E3D7C    100.00 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
- *   fn_800E4284     94.33 (268/264 B)   fn_800E4390    98.06 (124/124 B)
+ *   fn_800E4284    100.00 (268/268 B)   fn_800E4390    98.06 (124/124 B)
  *   fn_800E440C    100.00
  *
- * All twelve are at or above the 80 % bar; the unit is 92.16 % fuzzy, 4 of 12 byte-identical.  Residuals:
- * `prim_list_exec` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold, and
- * `prim_queue_draw` (-8 B) keeps one `lwz` fewer than retail across the `rec = (PrimRec*)local` reload;
+ * All twelve are at or above the 80 % bar; the unit is 94.77 % fuzzy, 7 of 12 byte-identical.  Residuals:
+ * `prim_list_exec` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold;
+ * `prim_queue_draw` is size-exact: retail's case 2 of the `kind` switch is a signed `cmpwi` where the `(u32)`
+ * selector that keeps the 0..1 range test unsigned gives `cmplwi`, and the kind-2 handle's virtual call loads its
+ * table pointer into r5 where retail uses r12 (a base-class view of the handle fixed the slot, not that register);
  * `fn_800E3CBC`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
  * colouring (`fn_800E4390`: regsim search's best plan, `cur`/`raw` block locals ahead of `f`, reaches 4/5 volatile
  * targets and measures worse - the unnamed `@` temporary stays r0 where retail has r5).  `fn_800E3D7C` reads
  * 100 % with `p`, `i`, `base` declared in that order and `i = 0, p = base` in the for-init.
- * `fn_800E4284` (-4 B) is the `(u32)((f32)(n - 1) * t)` conversion sequence.
+ * FLAGS. `#pragma fp_contract off` for the file: retail keeps `fmuls`+`fadds` in `fn_800E4284` where one `fmadds` is
+ * fused (no other row moves).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_20`,
  *     `_savegpr_19`, `_restgpr_20`, `_restgpr_19`, `vec3_dot`.
  *   flipcheck: `.bss` claimed, not emitted.
  *   flipcheck: `.sdata2` size gap.
  * NAMES. GUESS (from each body and its callers): `sound_free_lists_reset`.
+ * RESIDUALS. mwcc-debugger dump, `prim_queue_draw`: regsim 2/2 callee-saved, 5/5 volatile (EXACT); first
+ *            divergence insn 43: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`; case 2 of the kind switch is a signed
+ *            `cmpwi` in retail and the virtual call loads its table pointer into r12
+ * SHAPES. `prim_queue_draw` switches on `mode` and, through a `(u32)` selector, on the record kind; its kind-2
+ *            handle is a class (`PrimKind2Obj`, a 0x1C-byte base then five placeholder virtuals) so the call is the canonical
+ *            `lwz r12,0x1c(r3)` / `lwz r12,0x1c(r12)`; no table is emitted (nothing constructs it).
  */
 
 #include "types.h"
@@ -67,6 +76,7 @@
 #include "g3d/g3d_scnmdlsmpl.h"   /* nw4r::g3d::ScnMdlSimple::CalcSkinning (rule 2) */
 
 #pragma peephole off
+#pragma fp_contract off
 
 /* ------------------------------------------------------------------ types */
 
@@ -102,6 +112,23 @@ typedef struct ObjSub {
     /* 0x00 */ u8 pad_0x00[0x1C];
     /* 0x1C */ void (*slot7)(Obj* self, void* m);
 } ObjSub;
+
+/* The non-polymorphic head of a kind-2 draw handle: the vtable pointer sits behind it, at +0x1C.  size: 0x1C */
+struct PrimKind2Base {
+    /* 0x00 */ u8 pad_0x00[0x1C];
+};
+
+/* A kind-2 draw handle: `prim_queue_draw` calls its sixth virtual (vtable +0x1C, `lwz r12,0x1c(r12)`); the five
+ * slots before `draw` only fix its position.  Nothing constructs it, so no table is emitted.  size: 0x20 (approximate) */
+struct PrimKind2Obj : PrimKind2Base {
+    virtual void slot0();
+    virtual void slot1();
+    virtual void slot2();
+    virtual void slot3();
+    virtual void slot4();
+    /* untyped: the manager's +0x29084 word, passed through */
+    virtual void draw(void* m);
+};
 
 /* A draw handle.  size: 0x20 */
 struct Obj {
@@ -351,7 +378,7 @@ extern "C" void fn_800E4284(PrimRec* self, u8 layer, f32 f1, f32 f2)
         t = lbl_80796468;
     }
     u32 k = (u32)((f32)(n - 1) * t);
-    fn_800E4390(&base[n - 1 - k], self, layer);
+    fn_800E4390(&base[n - k - 1], self, layer);
 }
 
 /* Sorted-list insert.  `link` is the slot the chain hangs off; the low bit of a stored link marks the
@@ -413,33 +440,38 @@ extern "C" void prim_queue_draw(u8 idx, u8 mode)
         if (rec == 0) {
             return;
         }
-        if (mode == 2) {
+        switch (mode) {
+        case 2:
             if (rec->state != 2) {
                 continue;
             }
-        } else if (mode == 3) {
+            break;
+        case 3:
             if (rec->state == 2) {
                 continue;
             }
+            break;
         }
         if ((rec->flags & 0x40) == 0 && rec->callback != 0) {
             rec->callback(rec);
         }
         rec = (PrimRec*)local;
-        if (rec->kind <= 1) {
+        switch ((u32)rec->kind) {
+        case 0:
+        case 1:
             if (mode == 1) {
                 scn_mdl_draw(rec->handle, 4);
             } else {
                 scn_mdl_draw(rec->handle, -1);
             }
             continue;
-        }
-        if (rec->kind == 2) {
-            Obj* h = (Obj*)rec->handle;
+        case 2: {
+            PrimKind2Obj* h = (PrimKind2Obj*)rec->handle;
             void* m = ((PrimMgr*)nw_res_manager)->field_0x29084;
-            h->sub->slot7(h, m);
+            h->draw(m);
             g3d_state_invalidate(0x7FF);
             continue;
+        }
         }
     }
 }

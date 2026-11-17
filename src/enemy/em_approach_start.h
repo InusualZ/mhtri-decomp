@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u16 flags);
 #ifdef __cplusplus
 }
 #endif

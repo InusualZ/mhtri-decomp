@@ -32,9 +32,11 @@
  * RESIDUALS. `glare_filter_capture`: the same lazy `extsh` of `width`/`height` inside the halving loop.
  * RESIDUALS. `filter_panel_draw`: retail's frame is 0x10 B larger and its two strips use disjoint saved
  *   registers; `fade_update`/`fade_set`: volatile register assignment only (declaration orders measured).
- * RESIDUALS. `filter_panel_upper_set`/`_lower_set`: `fmuls` operand order (height * scale; the swapped
- *   spelling measures lower).
  * FLAGS. scoped `#pragma optimization_level 4` around fade_set (95.71 -> 100).
+ * RESIDUALS. mwcc-debugger dump, `fade_update`: regsim 0/0 callee-saved, 28/37 volatile, best plan cost 0; first
+ *            divergence insn 6: retail `addi r6, r3, fade_work@l` vs ours `addi r3, r3, fade_work@l`
+ * SHAPES. `filter_panel_upper_set`/`_lower_set` compute the half height in a local before scaling (retail's
+ *            `fmuls` operand order).
  */
 
 #include "types.h"
@@ -693,7 +695,8 @@ extern "C" void filter_panel_upper_set(s32 start, s32 count, u32* colors, f32 sc
         if (screen_split_ck() == 0) {
             p->upper_height = (s16)(Screen_w.height_f * p->upper_scale);
         } else {
-            p->upper_height = (s16)(Screen_w.height_f * panel_f32_half * p->upper_scale);
+            f32 half_height = Screen_w.height_f * panel_f32_half;
+            p->upper_height = (s16)(half_height * p->upper_scale);
         }
     }
     if (0 <= start && start <= 5) {
@@ -715,7 +718,8 @@ extern "C" void filter_panel_lower_set(s32 start, s32 count, u32* colors, f32 sc
         if (screen_split_ck() == 0) {
             p->lower_height = (s16)(Screen_w.height_f * p->lower_scale);
         } else {
-            p->lower_height = (s16)(Screen_w.height_f * panel_f32_half * p->lower_scale);
+            f32 half_height = Screen_w.height_f * panel_f32_half;
+            p->lower_height = (s16)(half_height * p->lower_scale);
         }
     }
     if (0 <= start && start <= 5) {

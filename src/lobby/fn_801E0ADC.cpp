@@ -30,8 +30,7 @@
  *     lb_title_frame_draw, lb_eqshop_help_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
- *   - eft_em_spawn_joint: retail compares id 0x21 signed (`cmpwi`); the switch spelling of the test loses more (95.3).
- *   - em007_model_eft_draw: one register.
+ * *   - em007_model_eft_draw: one register.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
  *   extab/extabindex short of the claim.  The trade tables (0x805BA660-0x805BA750) are an unclaimed hole read by this
  *   unit and lobby/fn_801E7530 (src/unsplit/lb_trade_rows.h, request #8).  LbShopListTmpl is the 0x14 template
@@ -43,6 +42,7 @@
  *   Two early-exit tests are one `||` return (`beq exit; bne body; b exit`: lb_pl_model_turn_step, eft033_move_gun).
  *   A table index written in place (`a[idx * 3 + 1]`) keeps retail's `addi` beside its `lbzx` (em007_model_colors_get).
  *   The two locals that open lb_goods_hold_step are declared `ret` first.
+ * SHAPES. `eft_em_spawn_joint` compares the id as `(s32)(u8)id == 0x21` (retail's signed `cmpwi`).
  */
 
 #include "types.h"
@@ -1408,7 +1408,7 @@ void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 joint, u32 id, nw4r::math:
     Eft033Work* work;
 
     get_joint_wpos_em(self, joint, (Vec3*)&wpos);
-    if ((u32)((u8)id - 0x19) <= 6 || (u8)id == 0x21 || !(wpos.y > self->field_0x210)) {
+    if ((u32)((u8)id - 0x19) <= 6 || (s32)(u8)id == 0x21 || !(wpos.y > self->field_0x210)) {
         eft = eft033_alloc(self->area_no, id);
         if (eft != NULL) {
             eft->source_0x30 = self;

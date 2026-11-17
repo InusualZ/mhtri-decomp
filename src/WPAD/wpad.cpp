@@ -86,6 +86,10 @@
  *   (`reconnectLevel` in `wpadShutdownCallback`, `sendLevel` in `wpadSendWbcCommand`), `wpadDropLink` copies the handle into an `s8` (the
  *   field's type), `wpadPollSample` spells the back sample in place, `wpadUpdateRadioSensitivity` accumulates `sum` in
  *   two statements and `wpadInitSequence` picks `calSize` with `?:`.
+ * RESIDUALS. mwcc-debugger dump, `wpadUpdateRadioSensitivity`: regsim 0/0 callee-saved, 27/28 volatile, best plan
+ *            cost 0; first divergence insn 23: retail `clrlwi r5, r3, 16` vs ours `clrlwi r3, r3, 16`
+ * RESIDUALS. mwcc-debugger dump, `wpadFilterButtons`: regsim 1/1 callee-saved, 23/26 volatile, best plan cost 0;
+ *            first divergence insn 13: retail `add r6, r31, r0` vs ours `add r5, r31, r0`
  */
 
 #include "types.h"

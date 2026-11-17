@@ -57,6 +57,12 @@
  *   last. `lb_trade_cost_draw` reaches price `i` as notice word `i + 1` of the offer, the evaluation order retail's
  *   `add` shows (`&offer->costs[i]` measures lower). `lb_kitchen_skill_text`'s non-numeric kinds return from the
  *   switch and share the strong/weak tail after it, which gives case 4 its own `li r3,5; b`.
+ * RESIDUALS. mwcc-debugger dump, `lb_kitchen_courses_roll`: regsim 1/10 callee-saved, 11/11 volatile, best plan
+ *            cost 6; first divergence insn 9: retail `li r27, 0x0` vs ours `li r28, 0x0`; the second loop's own counter
+ *            `round` gives retail's registers except the first loop's counter and bound (r27/r26 in retail, r28/r27 ours;
+ *            every declaration order measured)
+ * SHAPES. `lb_kitchen_courses_roll` runs its second loop on its own counter `round`, declared between `count` and
+ *            `list`.
  */
 
 #pragma pool_data off
@@ -422,18 +428,19 @@ u32 lb_kitchen_course_ck(u8 course) {
 void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course) {
     u8 picks[0x20];
     s32 i;
-    s32 count;
-    u8* list;
     u8* pick;
+    s32 count;
+    s32 round;
+    u8* list;
     u16 seed;
 
     work->seed = ((Q_UserData*)lobby_world_block)->kitchen_seed_0x484E;
     for (i = 0; i < course * 37; i++) {
         work->seed = rand_lcg_step(work->seed);
     }
-    for (i = 0; i < 5; i++) {
+    for (round = 0; round < 5; round++) {
         count = 0;
-        list = lb_kitchen_course_lists[i];
+        list = lb_kitchen_course_lists[round];
         memset(picks, 0, sizeof(picks));
         pick = picks;
         while (*list != 0) {
@@ -446,10 +453,10 @@ void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course) {
         }
         seed = rand_lcg_step(work->seed);
         work->seed = seed;
-        if (i == 4) {
+        if (round == 4) {
             work->extra_course = picks[seed % count];
         } else {
-            work->courses[i] = picks[seed % count];
+            work->courses[round] = picks[seed % count];
         }
     }
 }

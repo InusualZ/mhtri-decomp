@@ -145,6 +145,11 @@
  *    `pl_act_wind_launched`).
  * RESIDUALS. fn_80260198: regsim finds no plan for the saved set (r44 r0 vs retail r30); the `add r0,r31,r0` operand
  *            pair is swapped.
+ * RESIDUALS. mwcc-debugger dump, `pl_act_step_pitfall_arm`: regsim 1/1 callee-saved, 3/3 volatile (EXACT); first
+ *            divergence insn 17: retail `<DIFF_INSERT>` vs ours `clrlwi r0, r0, 24`; size differs from retail (284 B vs 288
+ *            B)
+ * RESIDUALS. mwcc-debugger dump, `pl_gather_item_take`: regsim 2/2 callee-saved, 6/6 volatile (EXACT); first
+ *            divergence insn 24: retail `cmplwi r0, 0x2` vs ours `cmplwi r0, 0x3`
  */
 
 #include "types.h"

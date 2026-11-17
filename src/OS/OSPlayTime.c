@@ -23,6 +23,8 @@
  *    `((s64)limitValue + 20) * (OS_BUS_CLOCK / 4)` (signed: `li` + `addc`/`adde`).
  * RESIDUALS. __OSPlayTimeAlarmExpired: regsim EXACT; retail sets `li r9,0` before `mr r3,r31` among OSCreateThread's
  *            arguments, ours the reverse (scheduling; no scoped pragma moves it).
+ * RESIDUALS. mwcc-debugger dump, `__OSWriteExpiredFlag`: regsim 2/2 callee-saved, 0/0 volatile (EXACT); first
+ *            divergence insn 6: retail `li r5, 0x0` vs ours `li r4, 0x3f`
  */
 
 #define OS_THREAD_TYPED_API

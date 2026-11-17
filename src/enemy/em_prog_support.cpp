@@ -38,6 +38,8 @@
  *  - `.sbss`/`.bss` end 4 bytes short of the claim (alignment padding).
  * SHAPES. A `case` range of a byte field is spelled `if ((u32)(x - lo) > n) switch (x) ... else ...` where retail
  *   lowers it to `addi`+`cmplwi` before the chain; `++`/`--` on the page cursor read through `(s8)(u8)`.
+ * RESIDUALS. mwcc-debugger dump, `note_page_draw`: regsim 0/0 callee-saved, 9/9 volatile (EXACT); first divergence
+ *            insn 12: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`
  */
 
 #include "types.h"

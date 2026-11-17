@@ -16,7 +16,7 @@
  * temporary copy-constructed into each member) and its `.ctors` word.
  *
  * RESIDUAL.
- *   * `quest_item_pair_copy_block`/`_row` 89-94 %: callee-saved colouring (target `rec`=r29, `dst`/
+ *   * `quest_item_pair_copy_block`/`_row`: callee-saved colouring (target `rec`=r29, `dst`/
  *     `flagged`=r30, `kind`=r31; ours a cyclic shift), plus `quest_item_slot_find`'s mask/load scheduling.
  *   * `quest_item_slot_add` 92.50 %: target's `extsh` temp, unsigned `cmplwi r3,5` and preserved loop counter.
  *     Kept: the `Q_ItemCount* slot` declaration inside the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
@@ -29,6 +29,11 @@
  *            spelling; `peephole on` drops the mask (128 B, 94.70).
  * RESIDUALS. mwcc-debugger dump, `quest_item_pair_copy_block`: regsim 5/5 callee-saved, 11/11 volatile, best plan
  *            cost 7; first divergence insn 8: retail `mr r31, r5` vs ours `mr r29, r5`
+ * RESIDUALS. mwcc-debugger dump, `quest_item_pair_copy_row`: regsim 4/5 callee-saved, 19/19 volatile, best plan
+ *            cost 0; first divergence insn 55: retail `add r31, r30, r0` vs ours `add r30, r30, r0`; post-increment arguments
+ *            (`item_pair_copy(dst++, rec++)`) reproduce the call setup; the loop counter and `dst` take r31/r30 where retail
+ *            has r30/r31 (a function-scope counter and `rec` moves measured)
+ * SHAPES. `quest_item_pair_copy_row` passes post-incremented pointers (`item_pair_copy(dst++, rec++)`).
  */
 
 #include "quest/quest_item_slot.h"
@@ -206,9 +211,7 @@ void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind) {
     rec += (row - 1) * 8 + 0x10;
     dst += (row - 1) * 8 + 0x10;
     for (s32 i = 0; i < 8; i++) {
-        item_pair_copy(dst, rec);
-        dst++;
-        rec++;
+        item_pair_copy(dst++, rec++);
     }
 }
 

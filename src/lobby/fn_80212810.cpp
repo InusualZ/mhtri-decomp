@@ -885,9 +885,9 @@ u16 lb_recipe_material_flags_get(Q_UserData* user, LbSmithRow* row, u8 level)
  * marking the level-only materials it skips). */
 u16 lb_gun_recipe_material_flags_get(Q_UserData* user, LbSmithGunRow* row, u8 level)
 {
-    u16 flags;
     s32 i;
     s32 have;
+    u16 flags;
 
     flags = 0;
     for (i = 0; i < 4; i++) {

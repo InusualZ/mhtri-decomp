@@ -59,6 +59,9 @@
  *            0x33, `addi r5,r5,4`).
  * RESIDUALS. mwcc-debugger dump, `eft_res_slot_get`: regsim 0/0 callee-saved, 7/7 volatile (EXACT, colouring is not
  *            the cause); first divergence insn 22: retail `b 0x22d4` vs ours `b 0x2308`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `eft_res_blocks_get`: regsim 0/0 callee-saved, 2/7 volatile, best plan cost 16;
+ *            first divergence insn 1: retail `addi r9, r4, eft_control@l` vs ours `addi r6, r4, eft_control@l`; size differs
+ *            from retail (308 B vs 312 B)
  */
 
 #include "types.h"

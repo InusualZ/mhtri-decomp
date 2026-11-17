@@ -49,6 +49,8 @@
  * RESIDUALS. mwcc-debugger dump, `lb_screen26_picks_draw`: regsim 6/6 callee-saved, 9/9 volatile, best plan cost 4;
  *            first divergence insn 15: retail `li r31, lb_s26_pick_row_lsp@sda21` vs ours `li r30,
  *            lb_s26_pick_row_lsp@sda21`
+ * SHAPES. `lb_screen26_trade_commit` declares `roll`, `sum`, `pick`, `i` and assigns them in statements (split
+ *            initialisers, regsim plan order).
  */
 
 
@@ -1561,11 +1563,14 @@ s32 lb_screen26_pick_step(LbScreen26Work* work)
 void lb_screen26_trade_commit(LbScreen26Work* work)
 {
     LbTradeUserData* user = (LbTradeUserData*)lobby_world_block;
-    s32 pick = 0;
-    u16 roll = lobby_w.trade_seed_0x03E % 100;
-    u16 sum = 0;
+    u16 roll;
+    u16 sum;
+    s32 pick;
     s32 i;
 
+    pick = 0;
+    roll = lobby_w.trade_seed_0x03E % 100;
+    sum = 0;
     for (i = 0; i < 4; i++) {
         sum += lb_trade_reward_odds[i];
         if (roll < sum) {

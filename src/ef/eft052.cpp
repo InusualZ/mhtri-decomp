@@ -40,6 +40,11 @@
  *            first divergence insn 5: retail `mr r8, r4` vs ours `mr r9, r4`
  * RESIDUALS. mwcc-debugger dump, `hud_msg_enqueue`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 1; first
  *            divergence insn 5: retail `addi r6, r4, 0xbcc` vs ours `li r6, 0x0`
+ * RESIDUALS. mwcc-debugger dump, `eft052_page_counts_get`: regsim 7/7 callee-saved, 1/2 volatile, best plan cost
+ *            0; first divergence insn 11: retail `mr r29, r3` vs ours `extsh r29, r3`; size differs from retail (276 B vs 280
+ *            B)
+ * SHAPES. `eft_area_se_req` tests `(u32)(type - 9) <= 1` and `(s32)type == 1`; `eft052_box_menu_draw` writes the
+ *            enable test as `if (total == 0 && i != 2) enabled = false; else enabled = true;` (retail's arm order).
  */
 
 #include "types.h"
@@ -1147,10 +1152,10 @@ extern "C" void eft052_box_menu_draw(Eft052ItemBox* box, u16 lsp, const u16* fra
     active = box->state_0x00 == 0;
     for (i = 0; i < 3; i++) {
         picked = i == box->menu_0x02;
-        if (box->total_0x1C != 0 || i == 2)
-            enabled = true;
-        else
+        if (box->total_0x1C == 0 && i != 2)
             enabled = false;
+        else
+            enabled = true;
         color = GetMenuFontColor(enabled, picked, active, 0);
         if (!active)
             picked = 0;
@@ -1608,11 +1613,11 @@ extern "C" void eft_area_se_req(_EFT* self)
         }
         break;
     case 10:
-        if ((u8)(self->type_0x02 - 9) <= 1)
+        if ((u32)(self->type_0x02 - 9) <= 1)
             shell_se_req(((_ENEMY_WORK*)self->source_0x30)->se_0xB14, &self->pos_0x18, 2, (u32)self);
         break;
     case 14:
-        if (self->type_0x02 == 1)
+        if ((s32)self->type_0x02 == 1)
             shell_se_req(((_ENEMY_WORK*)self->source_0x30)->se_0xB14, &self->pos_0x18, 2, (u32)self);
         break;
     }

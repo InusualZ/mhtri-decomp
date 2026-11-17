@@ -23,6 +23,9 @@
  *   (signed int-to-float), declares `i` before `work`, and caches `tables[i]` only across the `sinf` call.
  * RESIDUALS. mwcc-debugger dump, `fn_80116EEC`: regsim 0/0 callee-saved, 3/4 volatile, best plan cost 0; first
  *            divergence insn 1: retail `lwz r3, 0x38(r3)` vs ours `lwz r5, 0x38(r3)`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `fn_80117120`: regsim 2/2 callee-saved, 17/17 volatile (EXACT); first divergence
+ *            insn 41: retail `addi r7, r7, 0x1` vs ours `<DIFF_DELETE>`; size differs from retail (268 B vs 264 B); retail
+ *            keeps the dead loop counter's increment in both unrolled halves
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */

@@ -124,6 +124,8 @@
  *            the cause); first divergence insn 23: retail `<DIFF_INSERT>` vs ours `li r4, 0x0`
  * RESIDUALS. mwcc-debugger dump, `lb_npc_walk_blend_set`: regsim 2/2 callee-saved, 3/3 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 27: retail `sth r31, 0xb4(r30)` vs ours `sth r0, 0xb4(r30)`
+ * RESIDUALS. mwcc-debugger dump, `lb_npc_map_setup`: regsim 6/6 callee-saved, 12/13 volatile, best plan cost 0;
+ *            first divergence insn 43: retail `lbz r3, 0x0(r30)` vs ours `lbz r0, 0x0(r30)`
  */
 #pragma optimization_level 4
 #include "types.h"

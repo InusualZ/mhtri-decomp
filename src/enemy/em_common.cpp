@@ -113,9 +113,9 @@
  *  - `em_ambient_color_update`: the point-light blend converts the channel before the half difference (retail
  *    after it) and multiplies `step * ratio` (ours `ratio * step`); `+=`, operand orders, the ratio inlined and the
  *    three pragmas above do not reach it;
- *  - `em_level_raise`/`em_approach_start`: retail stores the `kind`/`flags` parameter unmasked (`stb r31`/`sth r31`),
- *    so its parameters are `u8`/`u16`; ours keeps the `u32` the 29 calling units' prototype carries (a `clrlwi`
- *    before the store);
+ *  - `em_level_raise`: retail stores the `kind` parameter unmasked (`stb r31`), so its parameter is `u8`; ours keeps the
+ *    `u32` the calling units' prototype carries (a `clrlwi` before the store); `em_approach_start` takes `u16 flags` in
+ *    every declaration and stores it raw;
  *  - `em_team_member_claim`: retail stores `state_sub` raw (`stb r30`) where ours reuses the compare's masked copy;
  *    `em_area_decide`: retail's hook arm branches to the final `fn_80129984` call (a ternary or `||` condition
  *    sharing the call is worse); `em_hate_update`: retail loads the four default bands through one base in index
@@ -8830,7 +8830,7 @@ extern "C" void em_turn_in_window2(_ENEMY_WORK* self, f32 lo, f32 hi, s32 angle)
 
 /* 0x80134004 (0x110): starts an approach to the target position: the distance to run (3D with flag 2), the
  * fixed yaw with flag 8, and the flags. */
-extern "C" void em_approach_start(_ENEMY_WORK* self, f32 speed, u32 flags)
+extern "C" void em_approach_start(_ENEMY_WORK* self, f32 speed, u16 flags)
 {
     nw4r::math::VEC3 unused;
     f32 extra;

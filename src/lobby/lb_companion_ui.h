@@ -58,12 +58,19 @@ typedef struct LbActHalves {
     /* +0x02 */ s16 high_0x02;
 } LbActHalves; /* size: 0x4 */
 
+typedef struct LbActMaskBytes {
+    /* +0x00 */ u8 index_0x00;
+    /* +0x01 */ u8 sent_0x01;   /* the sender's marker byte (`LbCmdSub16::value_0x09`): `lb_act_slot_write` tests it */
+    /* +0x02 */ u8 unused_0x02;
+    /* +0x03 */ u8 unused_0x03;
+} LbActMaskBytes; /* size: 0x4 */
+
 typedef union LbActMask {
     /* +0x00 */ u32 word_0x00;
     /* +0x00 */ u16 half_0x00;
     /* +0x00 */ u8 byte_0x00;
     /* +0x00 */ LbActHalves halves;
-    /* +0x01 */ u8 unused_0x01[0x3];
+    /* +0x00 */ LbActMaskBytes bytes_0x00;
 } LbActMask; /* size: 0x4 */
 
 typedef struct LbActReq {
@@ -124,8 +131,8 @@ typedef struct LbCompanionWork {
     /* +0x06A3D */ u8 param_0x6A3D;
     /* +0x06A3E */ u8 param_0x6A3E;
     /* +0x06A3F */ u8 param_0x6A3F;
-    /* +0x06A40 */ u32 started_0x6A40;  /* 1 once the act has been announced */
-    /* +0x06A44 */ u8 unused_0x06A44[0x24];
+    /* +0x06A40 */ u8 started_0x6A40;  /* 1 once the act has been announced */
+    /* +0x06A41 */ u8 unused_0x06A41[0x27];
     /* +0x06A68 */ u8 index_0x6A68;
     /* +0x06A69 */ u8 unused_0x06A69[0x3];
 } LbCompanionWork; /* size: 0x6A6C */
@@ -260,7 +267,7 @@ typedef struct LbCmdSub19 {          /* sub 0x19: the entry-start announcement *
     /* +0x08 */ s32 value_0x08;
     /* +0x0C */ s32 value_0x0C;
     /* +0x10 */ s32 value_0x10;
-    /* +0x14 */ s8 flag_0x14;
+    /* +0x14 */ u8 flag_0x14;
     /* +0x15 */ u8 index_0x15;
     /* +0x16 */ u8 value_0x16;
     /* +0x17 */ u8 value_0x17;

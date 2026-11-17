@@ -16,6 +16,8 @@
  * SHAPES. The challenge check is a static inline returning 0/1 (retail expands it ahead of the response loop); the
  *   key index is `c * (i * 17991)` with `c` a `char` (retail strength-reduces `i * 17991` and sign-extends `c`);
  *   `gti2GetChallenge` clears `odd` after drawing the first byte.
+ * RESIDUALS. mwcc-debugger dump, `gti2GetChallenge`: regsim 5/5 callee-saved, 20/27 volatile, best plan cost 0;
+ *            first divergence insn 24: retail `clrlwi r4, r5, 31` vs ours `clrlwi r3, r5, 31`
  */
 #include "DWCi/gt2Auth.h"
 #include "DWCi/dwc_nasfunc.h"

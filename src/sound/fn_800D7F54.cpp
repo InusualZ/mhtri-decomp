@@ -79,6 +79,12 @@
  *            divergence insn 22: retail `clrlwi r29, r29, 8` vs ours `clrlwi r5, r29, 8`
  * RESIDUALS. mwcc-debugger dump, `fn_800D9DB4`: regsim 4/5 callee-saved, 10/10 volatile, best plan cost 0; first
  *            divergence insn 23: retail `clrrwi r0, r29, 24` vs ours `clrrwi r0, r28, 24`
+ * RESIDUALS. mwcc-debugger dump, `se_item_pickup_play`: regsim 2/2 callee-saved, 3/5 volatile, best plan cost 0;
+ *            first divergence insn 21: retail `bne 0x2bf0` vs ours `beq 0x482c`; size differs from retail (276 B vs 284 B);
+ *            fn_800F2680's result goes through a u8 local; retail lays the shared silent return of cases 139/395 out as `bne`
+ *            + `b` where ours emits two `b`, and builds the s16 argument in r4 (`lwz r4; extsh r4,r4`) where ours loads r0
+ * SHAPES. `fn_800DBE94` declares `work` and `s` ahead of `lw` (regsim plan order); `se_item_pickup_play` keeps
+ *            `fn_800F2680`'s result in a `u8` local and folds cases 139 and 395 into one return.
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -1070,15 +1076,17 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
  * own, so no kind lookup. The id's top bit is the "loud" flag, stripped off and recorded as no owner.
  */
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
+    _se_w* work;
+    SeSlot* s;
     LbLobbyWork* lw = &lobby_w;
     if (se_disabled_ck() == 1) {
         return NULL;
     }
-    _se_w* work = lw->field_0x0B8;
+    work = lw->field_0x0B8;
     if (work == NULL) {
         return NULL;
     }
-    SeSlot* s = fn_800D8E58(work, id);
+    s = fn_800D8E58(work, id);
     if (s == NULL) {
         return NULL;
     }
@@ -3222,7 +3230,6 @@ extern "C" void se_item_pickup_play(u16 code) {
         se_slot_req(5);
         return;
     case 139:
-        return;
     case 395:
         return;
     }
@@ -3239,7 +3246,8 @@ extern "C" void se_item_pickup_play(u16 code) {
     if (voice == 0) {
         return;
     }
-    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 0)));
+    u8 level = fn_800F2680(handle, 0);
+    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)level));
 }
 
 /* --- the two-voice crossfade helper ---------------------------------------------------------------- */

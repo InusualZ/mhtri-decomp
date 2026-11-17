@@ -16,6 +16,9 @@
  *    target builds the flag word before the merged size; `.bss` ours 52 B vs 56 B and `.sbss` 1 B vs 8 B (map rows pad).
  * SHAPES. a sub-block header is `{size|flags, owner, prev, next}` with the size repeated in the last word of a free
  *    block; bit 1 of the size word marks a block in use, bit 2 a free predecessor.
+ * SHAPES. `free` and `deallocate_from_fixed_pools` keep `block->prev` in one local (declared before `next` in
+ *            `free`); `free` picks the block size with an inverted ternary (`!(owner & 1) ? client_size : SubBlock_size -
+ *            8`), which is retail's arm order.
  */
 #include "MSL_C/GCN_Mem_Alloc.h"
 #include "MSL_C/alloc.h"
@@ -242,8 +245,9 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
                 pool->start = next;
             }
             if (next != NULL) {
-                next->prev = block->prev;
-                block->prev->next = next;
+                Block* prev = block->prev;
+                next->prev = prev;
+                prev->next = next;
             }
             block->next = NULL;
             block->prev = NULL;
@@ -270,11 +274,7 @@ void free(void* ptr)
     pool = &protopool;
     if (ptr != NULL) {
         u32 owner = ((u32*)ptr)[-1];
-        if (owner & 1) {
-            size = SubBlock_size((SubBlock*)((SubBlock**)ptr - 2)) - 8;
-        } else {
-            size = ((FixedSizeBlock*)owner)->client_size;
-        }
+        size = !(owner & 1) ? ((FixedSizeBlock*)owner)->client_size : SubBlock_size((SubBlock*)((SubBlock**)ptr - 2)) - 8;
         if (size <= 68) {
             deallocate_from_fixed_pools(pool, (FixedChunk**)ptr, size);
             return;
@@ -292,6 +292,7 @@ void free(void* ptr)
             }
         }
         if (empty) {
+            Block* prev;
             Block* next = block->next;
             if (next == block) {
                 next = NULL;
@@ -300,8 +301,9 @@ void free(void* ptr)
                 pool->start = next;
             }
             if (next != NULL) {
-                next->prev = block->prev;
-                block->prev->next = next;
+                prev = block->prev;
+                next->prev = prev;
+                prev->next = next;
             }
             block->next = NULL;
             block->prev = NULL;

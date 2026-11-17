@@ -42,6 +42,8 @@
  *   is the OR order retail emits.
  * SHAPES. Vertex arrays are filled with chained assignments in retail's store order (the rightmost target is
  *   stored first); `cur`/`prev` in the animation steps are declared `prev` first.
+ * RESIDUALS. mwcc-debugger dump, `draw_spin_icon`: regsim 3/3 callee-saved, 15/15 volatile (EXACT); first
+ *            divergence insn 60: retail `<DIFF_INSERT>` vs ours `li r4, 0x4000`
  */
 
 #include "types.h"

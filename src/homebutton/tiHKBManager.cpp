@@ -83,6 +83,12 @@
  * RESIDUALS. mwcc-debugger dump, `hkbGuiPaneManagerWalkInChildren`: regsim 1/9 callee-saved, 0/0 volatile, best plan
  *            cost 4; first divergence insn 0: retail `stwu r1, -0x40(r1)` vs ours `stwu r1, -0x30(r1)`; size differs
  *            from retail
+ * RESIDUALS. mwcc-debugger dump, `hkbSetModifierState`: regsim 4/6 callee-saved, 10/18 volatile, best plan cost 8
+ *            (the Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 7:
+ *            retail `mulli r7, r0, 0x6c` vs ours `mulli r0, r0, 0x6c`
+ * RESIDUALS. mwcc-debugger dump, `hkbGuiPaneComponentContains`: regsim 2/2 callee-saved, 2/2 volatile (EXACT) (the
+ *            Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 28:
+ *            retail `addi r4, r1, 0x38` vs ours `addi r4, r1, 0x30`
  */
 
 #include "types.h"

@@ -41,6 +41,10 @@
  *   extab/extabindex differing; the `.sdata`/`.sdata2` pools are partial (a candidate fold with `lobby/lb_quest_screen`,
  *   which owns the `.sdata2` word 0x8079C448 that `note_pane_player_near_ck` reads).
  * SHAPES. None.
+ * RESIDUALS. mwcc-debugger dump, `name_menu_list_draw`: regsim 4/6 callee-saved, 20/20 volatile, best plan cost 4
+ *            EXACT; first divergence insn 22: retail `addi r31, r3, name_menu_row_tbl@l` vs ours `addi r30, r3,
+ *            name_menu_row_tbl@l`
+ * SHAPES. `pig_dress_list_draw` declares `i`, `color`, then `sel` and `cur` (the regsim plan order).
  */
 
 #include "types.h"
@@ -947,9 +951,9 @@ extern "C" void pig_dress_list_draw(LbPigMenuWork* w, bool active) {
     _mh_ivec2_ pos;
     const u16* row;
     s32 i;
+    u32 color;
     bool sel;
     bool cur;
-    u32 color;
 
     get_lsp_data(9387, &pos);
     draw_sprite_anim_ary(pig_dress_sprite_tbl, w->dress_0x2C.count_0x06, &pos);

@@ -43,13 +43,12 @@
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
  *    not change it; regsim reports the colouring exact, so the difference is in the instruction selector's address
  *    folding, not the allocator);
- *  - `lb_act_slot_write`: retail reads the request's +0x9 where ours reads +0x7;
- *  - `lb_act_award_handover`, `lb_act_slot_write`: ours emits a `clrlwi` or `extsb` retail does not;
+ *  - `lb_act_award_handover`: ours emits a `clrlwi` or `extsb` retail does not;
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
  *    shift; `lb_name_tail_copy`: the word copies' load/store order (dump 03: the word loop is unrolled with one
  *    temporary per load; a struct assignment and pointer-walk spellings measure worse or equal, regsim's r42/r45
  *    temporaries are retail's r5 where ours stay r0);
- *  - `lb_entry_start_send`, `lb_act_entry_start`: the companion work's parameter bytes and the request's +0x18..+0x1B;
+ *  - `lb_act_entry_start`: the request's +0x18..+0x1B;
  *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
  *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
  *  - `lb_skill_unlock_announce`: retail walks `lb_skill_unlock_items` with two pointers (one for the `need_0x00` test,
@@ -84,6 +83,10 @@
  * RESIDUALS. mwcc-debugger dump, `lb_act_award_handover`: regsim 3/3 callee-saved, 5/5 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 27: retail `<DIFF_INSERT>` vs ours `clrlwi r0, r0, 24`; size
  *            differs from retail
+ * RESIDUALS. mwcc-debugger dump, `lb_s13_skill_list_draw`: regsim 4/6 callee-saved, 17/17 volatile, best plan cost
+ *            4 EXACT
+ * SHAPES. `LbCmdSub19` carries the companion parameter bytes at +0x14..+0x1A in retail's order (the request side
+ *            already reads them so); `started_0x6A40` is a byte; `lb_act_slot_write` tests the request's +0x9 sender marker.
  */
 
 #include "types.h"
@@ -944,7 +947,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
     if (work != NULL) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
-            if (req->sel_0x04.bytes_0x00.d_0x03 == 0) {
+            if (req->mask_0x08.bytes_0x00.sent_0x01 == 0) {
                 if (isReadyCountOne() != 0 && quest_sub_state_end_ck(1) == 0 &&
                     quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
@@ -1044,13 +1047,13 @@ void lb_entry_start_send(LbCompanionWork* companion, u8 value, s32 arg, u8 flag)
     cmd.value_0x08 = companion->slots_0x94[0].value_0x00;
     cmd.value_0x0C = companion->slots_0x94[1].value_0x00;
     cmd.value_0x10 = companion->slots_0x94[2].value_0x00;
-    cmd.value_0x16 = companion->param_0x6A3C;
+    cmd.flag_0x14 = companion->param_0x6A3C;
     cmd.index_0x15 = value;
-    cmd.value_0x17 = companion->param_0x6A3A;
-    cmd.value_0x18 = companion->param_0x6A3B;
-    cmd.value_0x19 = companion->param_0x6A3D;
-    cmd.value_0x1A = companion->param_0x6A3E;
-    cmd.flag_0x14 = companion->param_0x6A3F;
+    cmd.value_0x16 = companion->param_0x6A3A;
+    cmd.value_0x17 = companion->param_0x6A3B;
+    cmd.value_0x18 = companion->param_0x6A3D;
+    cmd.value_0x19 = companion->param_0x6A3E;
+    cmd.value_0x1A = companion->param_0x6A3F;
     if (started == 1) {
         companion->started_0x6A40 = 1;
         cmd.started_0x1B = 1;

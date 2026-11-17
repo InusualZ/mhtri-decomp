@@ -38,6 +38,9 @@
  *   computed in separate statements (`bias`, `dist`), which orders `.sdata2` like retail.
  * RESIDUALS. mwcc-debugger dump, `em004_route_points_get`: regsim 3/3 callee-saved, 16/18 volatile, best plan cost
  *            0; first divergence insn 21: retail `cmplw r0, r4` vs ours `cmplw r0, r5`
+ * RESIDUALS. mwcc-debugger dump, `em004_state_act_arm`: regsim 1/1 callee-saved, 2/2 volatile (EXACT); first
+ *            divergence insn 17: retail `bne 0xcc` vs ours `beq 0x178`; size differs from retail (272 B vs 268 B); retail
+ *            branches over a `b` after the die test; every early-return spelling measured
  */
 
 #include "types.h"

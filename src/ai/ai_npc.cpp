@@ -114,6 +114,8 @@
  * RESIDUALS. mwcc-debugger dump, `fn_802D3398`: regsim 3/3 callee-saved, 9/9 volatile (EXACT, colouring is not the
  *            cause); first divergence insn 31: retail `lhz r0, 0x0(r30)` vs ours `<DIFF_DELETE>`; size differs from
  *            retail
+ * RESIDUALS. mwcc-debugger dump, `fn_802D6A00`: regsim 1/7 callee-saved, 36/36 volatile, best plan cost 4; first
+ *            divergence insn 5: retail `mr r29, r3` vs ours `mr r28, r3`; size differs from retail (300 B vs 304 B)
  */
 
 #pragma optimization_level 4

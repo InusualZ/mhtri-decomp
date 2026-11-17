@@ -27,6 +27,9 @@
  *    (`>= 0x10000000`, `< 0x1C000000`) merge into one `subis`/`subi` range check the target does not have.
  *    `InitMetroTRK`, `InitMetroTRK_BBA` and `TRKLoadContext` are `nofralloc` assembly (the register image is
  *    stored and reloaded by hand); the rest is C.
+ * RESIDUALS. mwcc-debugger dump, `TRKOverrideInterruptVectors`: regsim 10/10 callee-saved, 12/12 volatile (EXACT);
+ *            first divergence insn 27: retail `lis r25, 0x300` vs ours `lis r27, 0x1c00`; size differs from retail (308 B vs
+ *            316 B)
  */
 #include "TRK/dolphin_trk.h"
 #include "TRK/gdev_cc.h"

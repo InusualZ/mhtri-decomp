@@ -25,6 +25,11 @@
  *     `r31` save): register colouring or scheduling.
  * RESIDUALS. NHTTPi_SocSend: regsim EXACT; retail loads `lwz r0,172(r3)` before saving r31 (`stw r31,12(r1)`), ours
  *            after it (prologue scheduling of the sslHandle load); a hoisted `ssl` local scores the same.
+ * RESIDUALS. mwcc-debugger dump, `NHTTPi_SocRecv_sub`: regsim 3/3 callee-saved, 16/17 volatile, best plan cost 0;
+ *            first divergence insn 37: retail `addis r3, r30, 0x1` vs ours `addis r4, r30, 0x1`
+ * RESIDUALS. mwcc-debugger dump, `NHTTPi_findHeaderField`: regsim 6/6 callee-saved, 5/5 volatile (EXACT) (the
+ *            Wii/1.3 stand-in compiles it differently from the unit's compiler: a hint only); first divergence insn 6: retail
+ *            `mr r29, r5` vs ours `mr r28, r4`
  */
 
 #include "NHTTP/d_nhttp.h"

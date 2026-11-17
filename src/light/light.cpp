@@ -18,13 +18,17 @@
  * RESIDUALS. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
  *   `mhchar_construct` (retail calls only that, which is MHchar's own constructor; request vec3-world#3).
  *   light_update, light_em_slot_alloc, light_point_nearest_get, light_set_default_select,
- *   light_flare_setup: register allocation only. light_em_slot_find_free: retail's `(u8)i` index and the loaded slot byte take r4 where
+ *   light_em_slot_find_free: retail's `(u8)i` index and the loaded slot byte take r4 where
  *   ours take r0 (regsim's plan leaves r39/r41/r42 on r0; named locals for them measure equal). light_init: the light-setting/object registers and one `addi`
  *   scheduled late. light_flare_update: the camera temporary's stack slot. light_point_scale_set: `mode`'s copy
  *   scheduled one instruction early. light_point_param_get: one dead `b` of an empty case.
  * SHAPES. `light_set_get`/`light_setting_get_light_set` keep the out-pointer form (a by-value LightSet measured
  *   worse); a pointer to the light set held across the loop (`pset`) is retail's register shape; the returned
  *   `get_camera_pos()` temporary is assigned directly as retail does.
+ * RESIDUALS. mwcc-debugger dump, `light_point_scale_set`: regsim 3/3 callee-saved, 12/12 volatile (EXACT); first
+ *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `mr r31, r5`
+ * SHAPES. `light_flare_setup` loops its second pass on its own counter `flare_index` (declared before `i`), which
+ *            is what colours the loop counter and the model pointer like retail.
  */
 
 #include "types.h"
@@ -339,6 +343,7 @@ extern "C" void light_flare_setup(LightPointWork* w)
     ResEntry* entry;
     LightFlare* flare;
     MHchar* chr;
+    u8 flare_index;
     u8 i;
 
     res_file_ctor(&file, 0);
@@ -357,8 +362,8 @@ extern "C" void light_flare_setup(LightPointWork* w)
         return;
     }
     res_file_assign(&file, res_file_ctor(&sub, (u32)entry->data));
-    for (i = 0; i < 10; i++) {
-        flare = &w->flare[i];
+    for (flare_index = 0; flare_index < 10; flare_index++) {
+        flare = &w->flare[flare_index];
         flare->active = 0;
         flare->visible = 0;
         flare->alpha = 0;

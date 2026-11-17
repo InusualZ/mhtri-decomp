@@ -39,6 +39,10 @@
  *   enemy-record search tests the searching record (`work`) with `em_work_die_ck`, as retail does.
  * RESIDUALS. em032_area_attacker_ck: regsim's EXACT plans give the masked `area` copy (r43/r44 `rlwinm`) its own
  *            local; `u8 want = area` leaves the mask a separate vreg (94.26), retail masks in place in r30.
+ * RESIDUALS. mwcc-debugger dump, `em032_init`: regsim 1/1 callee-saved, 1/1 volatile (EXACT); first divergence
+ *            insn 33: retail `b 0x164` vs ours `<DIFF_DELETE>`; size differs from retail (280 B vs 276 B)
+ * RESIDUALS. mwcc-debugger dump, `em032_act11_se_play`: regsim 0/0 callee-saved, 16/16 volatile (EXACT); first
+ *            divergence insn 39: retail `ble 0x397c` vs ours `ble 0x39b0`
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */

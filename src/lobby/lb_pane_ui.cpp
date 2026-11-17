@@ -89,6 +89,9 @@
  *   `lb_choice_draw`/`lb_help_num_put` through `_c1` views on the owner's signatures (`unsplit/lobby.h` declares other
  *   ones) and sees `lb_entry_pane_scroll_kind_get` returning a word (its definition returns `u8`); `Screen_w`'s size is
  *   converted signed (`(f32)(s16)`) where retail loads it with `lha`.
+ * RESIDUALS. mwcc-debugger dump, `fn_801EDB34`: regsim 2/7 callee-saved, 7/7 volatile, best plan cost 7; first
+ *            divergence insn 24: retail `mr r29, r3` vs ours `mr r30, r3`; the kept declaration permutation moves it closer;
+ *            the plan's backend temporary (`mr r48,r3`) is not nameable
  */
 #include "types.h"
 #include "id_value.h"
@@ -1141,10 +1144,10 @@ extern "C" u8 fn_801EDA9C(LbListPane* self, u16 index, u16 item_id)
 /* Whether the pane's entry can be moved: 1 unknown, 2 too big, 3 no room, 0 ok. */
 extern "C" u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
 {
-    u8 side;
     u8* data;
     u16 slot_id;
     s32 limit;
+    u8 side;
 
     side = self->side_0x005 == 0;
     data = GetItemData(item_id);

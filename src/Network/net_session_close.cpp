@@ -60,6 +60,10 @@
  *   through a `u8` view of the slot (no `extsb`); the community callback's id text is 0x10 B (its 0x30 B frame);
  *   the circle-list loop initialises `i` then the cursor and steps the cursor first; `buildRosterSync`'s party flag
  *   is a `bool`.
+ * RESIDUALS. mwcc-debugger dump, `startRosterFetch`: regsim 0/5 callee-saved, 9/10 volatile, best plan cost 0;
+ *            first divergence insn 7: retail `mr r31, r3` vs ours `mr r29, r3`
+ * RESIDUALS. mwcc-debugger dump, `sendProfileHead`: regsim 6/6 callee-saved, 11/11 volatile (EXACT); first
+ *            divergence insn 19: retail `slwi r4, r0, 24` vs ours `slwi r0, r0, 24`
  */
 
 #include "Network/net_session_close.h"

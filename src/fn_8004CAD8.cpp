@@ -40,6 +40,9 @@
  * RESIDUALS. mwcc-debugger dump, `exportItemBoxPage`: regsim 2/2 callee-saved, 14/16 volatile, best plan cost 5;
  *            first divergence insn 8: retail `lwz r6, lobby_world_block@sda21` vs ours `lwz r5,
  *            lobby_world_block@sda21`; size differs from retail
+ * RESIDUALS. mwcc-debugger dump, `exportEquipRecord`: regsim 2/5 callee-saved, 12/12 volatile, best plan cost 4
+ *            EXACT; first divergence insn 6: retail `lwz r29, lobby_world_block@sda21` vs ours `lwz r31,
+ *            lobby_world_block@sda21`
  */
 
 #pragma peephole off

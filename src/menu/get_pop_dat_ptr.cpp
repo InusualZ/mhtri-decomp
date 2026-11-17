@@ -52,6 +52,14 @@
  * RESIDUALS. mwcc-debugger dump, `pop_dat_spare_load`: regsim 5/5 callee-saved, 2/3 volatile, best plan cost 1;
  *            first divergence insn 20: retail `lwz r28, 0x4(r31)` vs ours `lwz r29, 0x4(r31)`; size differs from
  *            retail
+ * RESIDUALS. mwcc-debugger dump, `lb_pop_room_enter`: regsim 0/3 callee-saved, 2/2 volatile, best plan cost 5
+ *            EXACT; first divergence insn 20: retail `beq 0xd30` vs ours `beq 0xd64`; size differs from retail (268 B vs 272
+ *            B); plan declaration order applied (registers match); retail does not retest `i >= 4` after the loop - its loop
+ *            exit returns directly and the found path jumps to the body behind it (`!(i < 4)`, `i == 4`, an `if (i < 4)` wrap
+ *            and the body inside the loop with `break` measured)
+ * RESIDUALS. mwcc-debugger dump, `lb_pop_screen_draw`: regsim 3/3 callee-saved, 9/9 volatile (EXACT); first
+ *            divergence insn 30: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`
+ * SHAPES. `lb_pop_room_enter` declares `place`, `kind`, `player`, `peer`, `i` (regsim plan order).
  */
 
 #include "types.h"
@@ -960,11 +968,11 @@ void lb_pop_confirm_open(LbPopWork* work)
  * Poogie, and closes the screen. */
 void lb_pop_room_enter(LbPopWork* work)
 {
+    LbPlaceRec* place;
+    u32 kind;
     struct _PLW* player = work->player_0x2C;
     LobbyPeerCopy* peer;
-    LbPlaceRec* place;
     s32 i;
-    u32 kind;
 
     sysSE_req(0);
     peer = &lobby_state_block.peers_0x0008[1];

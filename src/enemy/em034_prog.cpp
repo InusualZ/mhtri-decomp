@@ -24,6 +24,12 @@
  * RESIDUALS. mwcc-debugger dump, `fn_801B63E8`: regsim 1/1 callee-saved, 7/7 volatile (EXACT, colouring is not the
  *            cause); first divergence insn 49: retail `clrlwi r4, r4, 16` vs ours `<DIFF_DELETE>`; size differs from
  *            retail
+ * RESIDUALS. mwcc-debugger dump, `fn_801B4694`: regsim 1/2 callee-saved, 8/8 volatile, best plan cost 4 EXACT;
+ *            first divergence insn 18: retail `clrlwi r4, r30, 24` vs ours `clrlwi r3, r3, 24`; phase is a u32 (retail
+ *            narrows it with a clrlwi at the call); retail narrows `index` before `count` in the bound test and loads the
+ *            segment value before the `li r6`/`clrlwi r7` argument setup (a u8 count, a count-less compare, a value local and
+ *            casts measured)
+ * SHAPES. `fn_801B4694` keeps the random phase in a `u32`.
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
@@ -341,7 +347,7 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     EmSeatRec* list;
     u8 count;
     u8 i;
-    u16 phase;
+    u32 phase;
 
     list = NULL;
     nw4r::math::VEC3 a;

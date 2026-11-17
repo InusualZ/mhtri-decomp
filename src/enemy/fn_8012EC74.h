@@ -100,7 +100,7 @@ void em_max_hp_set(struct _ENEMY_WORK* self, u32 a);
  * (`enemy/em003_prog.cpp`, `enemy/em008_prog.cpp`) reach it through.  A prototype here is an
  * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both
  * headers, which is what `enemy/em001_prog.cpp` does. */
-void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u16 flags);
 /* r3 the work record, r4/r5 two scalars; returns 1 while the running motion has not finished. */
 u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
 /* r3 the work record, r4 the effect table, r5/r6/r7 the three scalars the spawn helper takes. */
