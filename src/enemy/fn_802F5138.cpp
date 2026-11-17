@@ -19,6 +19,8 @@
  *   the step suffixes (`swim_forward`, `circle`, `leap`, `charge`, ...), `em032_half_hp_ck`, `em032_area_attacker_ck`,
  *   the route-table and vector-pair names are GUESSes from the bodies.  `eft013_spark_set_em` (0x801078BC,
  *   `ef/eft013_fx.cpp`) is a registry name.
+ * RESIDUALS. em032_act0_idle / em032_act0_idle_swim: the if / else-if spelling (`<= 2 || (u32)(m - 5) <= 1` first, then the 3..4
+ *   test, with or without an empty branch) measures 81-82 %, 4 B short, against 97.4 for the kept form.
  * RESIDUALS. Every row is written; 10 rows short of 100:
  *  - `em032_act0_idle`, `em032_act0_idle_swim`: retail tests both mode ranges before either motion block (a mixed
  *    unsigned/signed chain no if, else-if or switch spelling reproduces);

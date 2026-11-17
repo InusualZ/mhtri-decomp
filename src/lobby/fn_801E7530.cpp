@@ -20,6 +20,8 @@
  *   `lb_rand_pick_take`'s guarded unroll, `lb_farm_panel_draw`), back at 3 for `lb_farm_grow_marks_update` and
  *   `lb_farm_box_page_draw` (both lose a few bytes at 4); `#pragma opt_unroll_loops off` around `lb_daily_menu_roll`
  *   (retail keeps its 17-row clear as a `mtctr` loop).
+ * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
+ *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B).
  * RESIDUALS. lb_count_add_cap99: dump 03 adds into its own vreg (`add r34,r35,r36`, coloured r0) where retail adds back into r3; ternary, `u16` and
  *   in-place spellings lower the row.
  * RESIDUALS. Every row is written.
@@ -37,7 +39,7 @@
  *    counter is closest;
  *  - `lb_count_add_cap99`: retail returns through `ble` + `clrlwi`, ours through `blelr`;
  *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
- *    `lb_farm_box_page_draw`, `lb_farm_box_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
+ *    `lb_farm_box_page_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
  *    `lb_farm_harvest_roll`, `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
  *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`, `lb_trade_list_step`, `lb_goods_sale_draw`: register colouring;
  *  - flipcheck: `.data` (2344 B) and `.sdata` (232 B) are claimed but not emitted (the tables are declared, not
@@ -2133,8 +2135,8 @@ void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
 void lb_farm_box_draw(void)
 {
     _mh_ivec2_ anchor;
-    LbItemBoxView* box;
     const u16* id;
+    LbItemBoxView* box;
     s32 i;
     u8 last;
 

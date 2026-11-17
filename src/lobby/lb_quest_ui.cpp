@@ -1950,7 +1950,7 @@ s32 lb_trade_exchange(LbTradeWork* work) {
     LbTradeOffer* offer;
     LbTradeCost item;
     LbTradeCost cost;
-    u8 stored[4];
+    u16 stored[2];
 
     offer = (LbTradeOffer*)&((u32*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index * 4];
     item_pair_copy(&item, &offer->item);

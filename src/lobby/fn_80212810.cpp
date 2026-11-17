@@ -1202,7 +1202,7 @@ u16 lb_kakou_weapon_cost_flags_get(u8 kind, u16 idx)
     if (lb_seisan_price_get(kind, idx) > user->zenny_0x18) {
         flags |= 4;
     }
-    for (i = 0; i < 3; i++, mat++) {
+    for (i = 0; i < 3; mat++, i++) {
         if (mat->item_0x00 != 0 && mat->count_0x02 > 0 &&
             userdata_item_count_total(mat->item_0x00, lobby_world_block) < mat->count_0x02) {
             flags |= 8;

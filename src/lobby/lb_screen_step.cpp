@@ -234,7 +234,7 @@ typedef struct LbSmithWork {
     /* +0x1D4 */ _EQUIP row_0x1D4;
     /* +0x1E0 */ u8 unused_0x1E0[0x18];
     /* +0x1F8 */ u16 box_0x1F8[3];        /* the box entries the bought pieces went to */
-    /* +0x1FE */ s16 stored_0x1FE;
+    /* +0x1FE */ u16 stored_0x1FE;
     /* +0x200 */ s32 confirm_0x200;
     /* +0x204 */ _PLW* plw_0x204;
     /* +0x208 */ u8* npc_0x208;

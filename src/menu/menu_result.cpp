@@ -61,8 +61,6 @@
  *    the last save step computes `Psw[box_player]` with the `mulli` ahead of the base (three spellings equal).
  *  - `q_result_phase_next`: retail leaves the loop by `bne exit; b top`, ours by `beq top`; `for (;;)`, `while`,
  *    `do-while`, `continue` and a return inside the loop all compile the same.
- *  - `q_result_owned_count_get`: retail returns the sum without the final `extsh` (an `s32` return matches the row
- *    but costs its caller `q_result_item_counts_draw` 7 B; `+=` and a local measured the same).
  *  - `q_result_time_page_draw`: the row pointer and the rank-kind walk swap r28/r27 (loop-header orders measured).
  *  - `multi_box_grid_clear`: one `mullw` operand order (both operand orders and casts measured equal).
  *   flipcheck: `.text` (the rows above, +4 B) and extabindex differ; `.sbss` emits `multi_box_save_keep`'s 2 bytes of
@@ -296,7 +294,7 @@ void q_result_draw(QResultScreen* self);
 s16 q_result_box_count_get(u16 item);
 u8 q_result_box_fit_ck(u16 item, s16 count, s16* fit);
 void q_result_box_take(u16 item, s16 count);
-s16 q_result_owned_count_get(u16 item);
+s32 q_result_owned_count_get(u16 item);
 void q_result_box_slot_set(u16 item, s16 count, u16 index);
 void q_result_box_record_init(_multi_result_work* rec, u8 player_no);
 
@@ -1951,7 +1949,7 @@ void q_result_item_counts_draw(IdValue* item)
 {
     _mh_ivec2_ pos;
     s16 boxed;
-    s16 owned;
+    s32 owned;
 
     if (item != NULL) {
         get_lsp_data(0x11EE, &pos);
@@ -1962,7 +1960,7 @@ void q_result_item_counts_draw(IdValue* item)
             boxed = 0;
             owned = 0;
         }
-        menu_item_row_draw_values((u16*)item, &pos, boxed, owned);
+        menu_item_row_draw_values((u16*)item, &pos, (s16)boxed, (s16)owned);
     }
 }
 
@@ -3268,7 +3266,7 @@ void q_result_box_take(u16 item, s16 count)
 }
 
 /* 0x8039CFA8 (0xC0): How many of `item` the player owns: the pouch the equipment set uses plus the item box. */
-s16 q_result_owned_count_get(u16 item)
+s32 q_result_owned_count_get(u16 item)
 {
     s16 count;
     s32 size;

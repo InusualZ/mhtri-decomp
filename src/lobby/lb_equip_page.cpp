@@ -23,6 +23,8 @@
  *   `res_file_handle_copy`, `pl_weapon_alt_form_ck`, `res_node_mtx_id_get`, `vec3_float_copy`, `equip_variant_get`,
  *   `pl_charge_cycle_get`, `anm_chr_result_rot_get`/`_rot_set`/`_mtx_get`/`_mtx_set`, `mtx34_rot_xyz_deg`,
  *   `mhchar_wld_mtx_array_get`, `pl_rig_hair_style_tbls`, `pl_rig_face_style_tbls`.
+ * RESIDUALS. pl_rig_slot_node_map: the `own`/`body` ResNode temporaries take the stack words 0x0C/0x08 where retail has 0x08/0x0C (a
+ *   stack-slot order, not a colouring choice; the declaration orders measured the same).
  * RESIDUALS.
  *  - `pl_rig_kind2/4_pose` reach their shared pose blocks goto-free (idea 183's `do { switch } while (0)`, kind4's
  *    keyed-pose exit as an inline helper's `return`, idea 219).  `pl_rig_kind8_pose`: cases 0x462 (leaning) and 0x465

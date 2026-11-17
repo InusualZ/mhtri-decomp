@@ -89,14 +89,18 @@
  *  - `pl_input_refresh`: the Classic Controller arm's held/alt/pressed locals take r3/r6 where retail has r6/r3 (block
  *    locals and every declaration order measured);
  *  - `pl_stg_weapon_near_find`: the second loop's index and row pointer sit in r28/r27 where retail has r27/r28;
- *  - `fn_802753E4`: the lobby parameter block base and the id swap r3/r4, and retail keeps an `extsh` after the first
- *    `lha` (`value +=`, `value = (s16)(value + x)` and a plain store measured);
+ *  - `fn_802753E4`: retail keeps an `extsh r31,r0` after the first `lha` (`value +=`, `value = (s16)(value + x)` and a
+ *    plain store measured; the Wii/1.3 dump's regsim plan is exact on the named locals);
  *  - `fn_8026A068`: retail divides the id before it loads the work's byte (`kind` local, no local, a pre-computed
  *    quotient, the swapped subscript, a pointer-to-array cast and `#pragma scheduling off` all measured; the order is
  *    fixed before scheduling; the Wii/1.3 dump's regsim plan is exact on the named locals and leaves the unnamed `@`
  *    temporary of the row load in r4 where retail has r5);
  *  - `talisman_roll`: retail re-extends the points (`extsb`) before the `+ 10` (`(s32)`, `(s8)`, `(s8)10` measured);
- *  - `equip_deco_slots_free`: the free-slot return forms `andc` where ours has `and` (three return spellings measured);
+ *  - `equip_deco_slots_free`: the free-slot return forms `andc` where ours has `and` (three return spellings measured;
+ *    the Wii/1.3 dump's regsim colouring of `used`/`slots` is exact, so the operand roles of the `subfc` are not a colouring choice);
+ *  - `equip_gun_clip_get`: retail numbers `kind` (r4) below `clip` (r5) at the entry (regsim's EXACT plan, the declaration
+ *    order rec/kind/clip, measures 95.7 against the 99.1 of the kept order; `kind` is an `s32` for the retail `cmpwi`, the
+ *    mask shift an unsigned one);
  *  - `equip_gun_level_bonus_get`: the remainder loop bumps the index before the row pointer;
  *  - 66 functions partial (`sweepcomments.py --unit Pl/pl_act` lists them), including:
  *  - `equip_color_rgba_get`/`armor_color_rgba_get` read 100 % with the table indexed flat (`((u8*)table)[index * 3 + k]`),
@@ -141,7 +145,7 @@
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `pl_item_now_usable_ck`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
- *  - `pl_kind_item_equip_find`/`pl_act6_class_ck`: one or two register or block choices around the id scans
+ *  - `pl_kind_item_equip_find`: one or two register or block choices around the id scans
  *    (`pl_act_held_class_get` reads 100 % with `(s32)self->act_no == 0xC`; `pl_item_pouch_ok_ck` with `fn_80274DCC`
  *    returning `u32`);
  *  - `pl_weapon0_hit_feedback`: the self/quake callee-saved registers are swapped (r31/r30), every spelling tried;
@@ -5348,7 +5352,7 @@ extern "C" u32 Pl_item_id_usable_ck(u16 id, s32 mode)
     if (item_bonus_class_get(id) != 0) {
         return 0;
     }
-    if ((u32)(id - 0x1B6) <= 1U || id == 0x2B || id == 0x35 || id == 0xDF) {
+    if ((u32)(id - 0x1B6) <= 1U || (s32)id == 0x2B || (s32)id == 0x35 || (s32)id == 0xDF) {
         return 0;
     }
     return 1;
@@ -5388,8 +5392,10 @@ extern "C" s16 fn_802753E4(struct _PLW* plw, u16 id)
         return 0;
     }
     {
-        LbParamWork* param = &lb_param_w;
-        s32 key = id;
+        s32 key;
+        LbParamWork* param;
+        param = &lb_param_w;
+        key = id;
 
         if (key == param->flag_0x0C[0]) {
             value = (s16)(value + param->value_0x10[0]);
@@ -10215,7 +10221,7 @@ extern "C" s32 pl_act6_class_ck(_PLW* self, s32 arg1) {
     }
     switch (arg1) {
     case 0:
-        if ((u16)(self->act_no - 0x15) <= 1U) {
+        if ((u16)(self->act_no + 0xFFEB) <= 1U) {
             return 1;
         }
         break;
@@ -10226,7 +10232,7 @@ extern "C" s32 pl_act6_class_ck(_PLW* self, s32 arg1) {
         break;
     case 2:
         if ((u32)(self->act_no - 4) <= 3U || (u32)(self->act_no - 0x1E) <= 2U ||
-            (u32)(self->act_no - 0x1A) <= 1U || self->act_no == 0x26) {
+            (u32)(self->act_no - 0x1A) <= 1U || (s32)self->act_no == 0x26) {
             return 1;
         }
         break;
@@ -10579,21 +10585,23 @@ u8 equip_level_stage_get(_EQUIP* equip, u8 level)
 s32 equip_defense_get(_EQUIP* equip)
 {
     PlSlotRec* slot;
-    s16* steps;
-    s16 total;
     s32 i;
+    _EQUIP* piece;
+    s16 total;
+    s16* steps;
     s32 end;
     u8 stage;
 
-    if (equip->kind == 6) {
+    piece = equip;
+    if (piece->kind == 6) {
         return 0;
     }
-    slot = (PlSlotRec*)equip_slot_rec_get(equip);
-    steps = &pl_armor_defense_steps[0][((PlArmorLevelRec*)equip_armor_ex_rec_get(equip))->step_row * 5];
+    slot = (PlSlotRec*)equip_slot_rec_get(piece);
+    steps = &pl_armor_defense_steps[0][((PlArmorLevelRec*)equip_armor_ex_rec_get(piece))->step_row * 5];
     total = 0;
-    end = equip->deco_count + 1;
+    end = piece->deco_count + 1;
     for (i = 1; i < end; i++) {
-        stage = equip_level_stage_get(equip, i);
+        stage = equip_level_stage_get(piece, i);
         if (stage == 5) {
             total += slot->top_step;
         } else {
@@ -10742,12 +10750,12 @@ s32 equip_gun_clip_get(_EQUIP* equip, u8 shell)
 {
     PlWeaponRec* rec;
     u8 clip = 0;
-    u8 kind = equip->kind;
+    s32 kind = equip->kind;
 
     if ((u32)(kind - 12) > 1) {
         if (kind == 11) {
             rec = (PlWeaponRec*)equip_weapon_rec_get(equip);
-            if ((rec->clip_mask[shell >> 5] & (1 << (shell & 31))) != 0) {
+            if ((rec->clip_mask[(u32)shell >> 5] & (1 << (shell & 31))) != 0) {
                 clip = pl_gun_clip_table[rec->clip_row][shell];
             } else {
                 clip = 0;

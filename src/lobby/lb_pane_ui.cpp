@@ -50,9 +50,9 @@
  *  - `lb_equip_icon_cell_draw`: retail loads the `draw_frame_rect_z` float before `r7`/`r8` (a named
  *    `static const` does not move it); `fn_801EDA34`: retail's
  *    `bge`/`b` pair around the minimum (regsim exact; ternary, `return value` pair and `>=` select spellings measure
- *    the same or worse); `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ECF74`,
- *    `fn_801ED184` (the `db` temporary and `count` swap r30/r31; regsim's plan needs a named local for the unnamed
- *    `lobby_world_block` load and measures equal), `fn_801F86FC` (retail keeps the `flags` pointer in
+ *    the same or worse); `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ED184` (the `db` temporary and `count` swap r30/r31; regsim's plan needs a named local for the unnamed
+ *    `lobby_world_block` load and measures equal), `fn_801ED464` (the `id`/`limit` pair swaps r30/r31; regsim's EXACT plan needs the callee-result temporary `mr r41,r3` as a named local),
+ *    `fn_801F86FC` (retail keeps the `flags` pointer in
  *    r30), `fn_801FB364` (frame 0x30 against 0x20 with the same local offsets), `lb_count_box_draw` (one `mr` source).
  *   Data: the `.sdata` tables the code reads are defined here in address order (0x80791C58-0x80791C68 in the panes band,
  *   0x80791C70-0x80791D40 in the page band); `.sdata2` is the compiler's pool (0.0f and the signed int-to-float
@@ -405,7 +405,7 @@ typedef struct LbEntryPane {
     /* +0x02C */ LbList list_0x02C;
     /* +0x04C */ LbPaneScroll scroll_0x04C;
     /* +0x0CC */ LbList sort_lists_0x0CC[5];
-    /* +0x16C */ s16 sorted_ids_0x16C[0x64];
+    /* +0x16C */ u16 sorted_ids_0x16C[0x64];
 } LbEntryPane; /* size: 0x234 */
 
 /* The equipment-box screen work (`lobby_w.menu_0xAC` while the box is open): the done flag, the page record
@@ -552,7 +552,7 @@ s32 item_pair_copy(IdValue* dst, const IdValue* src);
 s32 equip_record_copy(LbEquipRec* dst, const LbEquipRec* src);
 u16 userdata_box_capacity(LbItemDb* db);
 s16 userdata_equip_box_capacity(LbItemDb* db);
-s16 userdata_pouch_size(u8 side);
+s32 userdata_pouch_size(u8 side);
 s32 userdata_item_slot_count(LbItemDb* db);
 IdValue* userdata_pouch_get(LbItemDb* db, u8 side);
 IdValue* userdata_equip_item_slots_get(LbItemDb* db);
@@ -793,8 +793,8 @@ extern "C" void fn_801ECEF0(LbDigitPane* self)
 /* Rebuilds the pane's 101-entry item list from the database's slot table. */
 extern "C" void fn_801ECF74(LbListPane* self)
 {
-    IdValue* slot;
     LbItemList* list;
+    IdValue* slot;
     LbEquipRec tmp;
     u16 count;
     u16 i;
@@ -802,12 +802,9 @@ extern "C" void fn_801ECF74(LbListPane* self)
     slot = &lobby_world_block->slots_0x180[0];
     list = &self->items_0x3B8;
     memset(list, 0, 404);
-    i = 0;
-    do {
+    for (i = 0; i < 101; i++, slot++) {
         item_slots_store(list, 101, slot->id, slot->value, &tmp);
-        i++;
-        slot++;
-    } while (i < 101U);
+    }
     item_pairs_compact_sort(list->entries_0x000, 101);
     count = userdata_box_capacity(lobby_world_block);
     for (; i < count; i++, slot++) {
@@ -931,9 +928,9 @@ extern "C" void fn_801ED3E8(LbListPane* self)
 /* Moves the pane's whole item stack to the other side. */
 extern "C" void fn_801ED464(LbListPane* self)
 {
-    u8 side;
     u16 id;
-    s16 limit;
+    s32 limit;
+    u8 side;
     s16 v;
 
     side = self->side_0x005 == 0;
@@ -1147,7 +1144,7 @@ extern "C" u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
     u8 side;
     u8* data;
     u16 slot_id;
-    s16 limit;
+    s32 limit;
 
     side = self->side_0x005 == 0;
     data = GetItemData(item_id);
@@ -3896,7 +3893,7 @@ u8 fn_801EDA9C(::LbListPane* self, u16 index, u16 item_id);
 s32 fn_801EDA34(s32 index, u8 side);
 u8 fn_801EDB34(::LbListPane* self, u16 index, u16 item_id);
 u16 userdata_equip_item_id_get(::LbItemDb* db, s32 index);
-s16 userdata_pouch_size(u8 side);
+s32 userdata_pouch_size(u8 side);
 s32 item_pair_index_find(u16 id, ::IdValue* base, s32 count);
 ::IdValue* userdata_pouch_get(::LbItemDb* db, u8 side);
 u16 userdata_box_capacity(::LbItemDb* db);
@@ -8072,7 +8069,7 @@ void lb_box_menu_draw(void)
     MenuSelCursor* cursor;
     s16 str;
     s16 index;
-    s16 count;
+    s32 count;
     u16 id;
 
     self = (LbBoxMenu*)lobby_w.menu_0xAC;

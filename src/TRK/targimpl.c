@@ -18,8 +18,7 @@
  *    are read by functions on both sides of every internal candidate boundary, so the run is one TU unless a
  *    boundary moves the globals.
  * RESIDUALS. TRKTargetAccessFPRegister: the target stores the first template word right after its `lwzu` (first template
- *    copy scheduling; declaration order of the locals has no effect). TRKTargetCopyBytes: the destination merge numbers its
- *    temporaries r3..r6 differently (inner declaration order and an early `old` read measured). TRKTargetAccessExtended1:
+ *    copy scheduling; declaration order of the locals has no effect). TRKTargetAccessExtended1:
  *    the second flag test recomputes `slwi` of the count, ours reuses the stored byte count (`+=`, statement order, signed
  *    count and index spellings measured). `.rodata`: the target pools the second template of
  *    TRKTargetAccessFPRegister with the first one of TRKTargetAccessSPR, ours emits four copies. `.bss` order: the target
@@ -178,10 +177,10 @@ static void TRKTargetCopyBytes(u8* dst, const u8* src, u32 length, u32 dst_msr, 
 
     while (length != 0) {
         u32* src_word;
-        u32* dst_word;
         u32 value;
         u32 mask;
         u32 old;
+        u32* dst_word;
 
         __TRK_set_MSR(src_msr);
         src_word = (u32*)((u32)s_ & ~3);

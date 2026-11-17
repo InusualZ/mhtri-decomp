@@ -412,8 +412,10 @@ s32 flfntStrLen(char* s)
 /* 0x8005B878 (0xB8): the position in `s` after `index` cells, or NULL when the string is shorter. */
 char* flKnjMsgNumPtr(char* s, s32 index)
 {
-    FlFnt* state = flfnt_state;
-    s32 len = 0;
+    s32 len;
+    FlFnt* state;
+    state = flfnt_state;
+    len = 0;
     char* p = s;
 
     for (;;) {

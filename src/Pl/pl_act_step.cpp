@@ -79,8 +79,6 @@
  *    take other saved registers; declaration order searched);
  *  - `fn_802607C4`: the bearing's `addis` is scheduled after the `+0x058` load in retail, and `diff` lives in r4
  *    where ours uses r0;
- *  - `fn_8026495C`: retail returns the level without the `u8` narrowing (`mr r3,r31`); a `u32` return makes
- *    `fn_80264A84` re-narrow and scores lower;
  *  - `pl_act_weapon_follow_up`: retail scales `variant` before the row (`slwi r4,r30,1` first, `lhax r5,row,idx`);
  *  - `pl_act_paralysis`: the step switch compares `variant` signed (`cmpwi`); a `(s32)` switch scores lower;
  *  - `pl_act_walk`, `pl_act_weapon_thrust`: `fmuls` takes the motion frame first; the division spelling (playbook
@@ -492,7 +490,7 @@ extern "C" {
 /* this unit's own entry points (unmangled `fn_*` stems, so C linkage - playbook 42/48) */
 void fn_80264274(struct _PLW* self, s16 value);
 void pl_facing_turn_set(struct _PLW* self, u32 value);
-u8 fn_8026495C(struct _PLW* self);
+u32 fn_8026495C(struct _PLW* self);
 void pl_sub_gauge_level_cost(struct _PLW* self);
 s32 fn_80264A84(struct _PLW* self);
 s32 fn_80264EA4(struct _PLW* self);
@@ -15966,7 +15964,7 @@ void pl_facing_turn_set(_PLW* self, u32 value) {
 }
 
 /* 0x8026495C - the actor's ball-spin charge level after the skill adjustments. */
-u8 fn_8026495C(_PLW* self) {
+u32 fn_8026495C(_PLW* self) {
     u32 level = self->field_0x3A1;
 
     if (Pl_Skill_ck(self, 0x22) == 1) {
@@ -16006,14 +16004,14 @@ void pl_sub_gauge_level_cost(_PLW* self) {
 #pragma opt_common_subs off
 #pragma optimization_level 4
 s32 fn_80264A84(_PLW* self) {
-    u8 level = fn_8026495C(self);
+    u32 level = fn_8026495C(self);
     s32 tier = 0;
 
     switch (self->field_0x002) {
     case 0:
-        if (level >= 0x28) {
+        if ((u8)level >= 0x28) {
             tier = 2;
-        } else if (level >= 0xF) {
+        } else if ((u8)level >= 0xF) {
             tier = 1;
         }
         break;
@@ -16021,16 +16019,16 @@ s32 fn_80264A84(_PLW* self) {
     case 5:
     case 6:
     case 1:
-        if (level >= 0x15) {
+        if ((u8)level >= 0x15) {
             tier = 2;
-        } else if (level >= 0xF) {
+        } else if ((u8)level >= 0xF) {
             tier = 1;
         }
         break;
     case 3:
-        if (level >= 0x32) {
+        if ((u8)level >= 0x32) {
             tier = 2;
-        } else if (level >= 0x28) {
+        } else if ((u8)level >= 0x28) {
             tier = 1;
         }
         break;

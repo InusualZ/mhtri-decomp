@@ -3016,7 +3016,7 @@ extern "C" void fn_800D84E8(_se_w* work) {
             }
             /* fall through */
         case 4:
-            if ((u8)(slot->kind - 3) <= 1) {
+            if ((u8)(slot->kind + 0xFD) <= 1) {
                 fn_800D8EA8(work, slot);
             }
             se_slot_level_calc(work, slot);
@@ -3046,7 +3046,7 @@ extern "C" void fn_800D85B0(_se_w* work, s32 mode) {
             }
             /* fall through */
         case 4:
-            if ((u8)(slot->kind - 3) <= 1) {
+            if ((u8)(slot->kind + 0xFD) <= 1) {
                 fn_800D8EA8(work, slot);
             }
             se_slot_level_calc(work, slot);
@@ -3133,7 +3133,8 @@ extern "C" void se_item_get_play(void) {
     if (voice == 0) {
         return;
     }
-    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
+    u8 volume = fn_800F2680(handle, 1);
+    fn_800E8354_c1(voice, (s16)(lbl_807963E4 * (f32)(u8)volume));
 }
 
 /* The same, but the voice is opened with the alternate argument. */
@@ -3151,7 +3152,8 @@ extern "C" void snd_item_fail_play(void) {
     if (voice == 0) {
         return;
     }
-    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
+    u8 volume = fn_800F2680(handle, 1);
+    fn_800E8354_c1(voice, (s16)(lbl_807963E4 * (f32)(u8)volume));
 }
 
 /* --- the SE work-area initialiser ------------------------------------------------------------------ */

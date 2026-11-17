@@ -22,7 +22,7 @@
  *   GUESS view slot names HkbKbdInputConfig::isNumeric/allowsDecimalPoint and HkbKbdInputLock::isLocked (from the
  *   keys the widget lets through), HkbKbdCharEvent/HkbKbdKeyEvent (the event 0 and event 38 records).
  *   HkbKbdState and its members follow homebutton/hkb_keyboard.cpp's names (setCapsLock, the three bits).
- * SHAPES. hkbAnimCountContents counts in an `int` and hoists the content count; HkbAnimTransform::Bind(Pane*) counts
+ * SHAPES. hkbAnimCountContents counts in an `int`, hoists the content count and declares its locals in regsim's order; HkbAnimTransform::Bind(Pane*) counts
  *   the tree with a literal `true` (retail passes `li r5,1` and drops the inner tests) into a `u32`; the links are
  *   pointed through a two-store helper (retail computes the link address once for both stores).
  * SHAPES. The three `.sdata` bytes 0x80794750..0x80794752 are one 3-byte object (hkbKbdShiftDefaults): separate
@@ -38,7 +38,7 @@
  *   `sym+2@sda21`; ours materialises the base (`li r3,sym@sda21`) and loads at +1/+2.
  * RESIDUALS. hkbGetKbdState's guard and object are retail's `.sbss` 0x80794D60/0x80794D64, inside
  *   menu/menu_plsearch.cpp's and menu/menu_sysmsg.cpp's claims (a seam request); ours are this object's own.
- * RESIDUALS. HkbLayout::CreateAnimTransform, hkbAnimCountContents, HkbAnimTransform::Bind(Pane*): register
+ * RESIDUALS. HkbLayout::CreateAnimTransform, HkbAnimTransform::Bind(Pane*): register
  *   allocation only (the file-version test's two registers, the counter and the content count).
  * RESIDUALS. hkbKbdInputUpdate: ours addresses `.rodata` through one hoisted section base (`...rodata.0`, r27 for
  *   the whole function), retail loads each object's address before its loop, which shifts every callee-saved
@@ -697,13 +697,18 @@ extern "C" void hkbKbdInputSetKeyMap(HkbKbdInput* self, s32 layoutType, s32 lang
 
 /* 0x8056EB10 (0xBC): The number of the animation's contents (pane or material) named `name`. */
 extern "C" int hkbAnimCountContents(const nw4r::lyt::AnimTransform* anim, const char* name) {
-    const nw4r::lyt::res::AnimationBlock* pRes = anim->mpRes;
+    u16 animContNum;
+    const nw4r::lyt::res::AnimationBlock* pRes;
+    int num;
+    const u32* animContOffsets;
+
+    pRes = anim->mpRes;
     if (pRes == NULL) {
         return 0;
     }
-    int num = 0;
-    const u32* animContOffsets = nw4r::lyt::detail::ConvertOffsToPtr<u32>(pRes, pRes->animContOffsetsOffset);
-    const u16 animContNum = pRes->animContNum;
+    num = 0;
+    animContOffsets = nw4r::lyt::detail::ConvertOffsToPtr<u32>(pRes, pRes->animContOffsetsOffset);
+    animContNum = pRes->animContNum;
     for (u16 i = 0; i < animContNum; ++i) {
         const nw4r::lyt::res::AnimationContent& animCont =
             *nw4r::lyt::detail::ConvertOffsToPtr<nw4r::lyt::res::AnimationContent>(pRes, animContOffsets[i]);

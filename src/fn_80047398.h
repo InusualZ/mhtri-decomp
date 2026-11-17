@@ -60,7 +60,7 @@ void userdata_item_consume(void* userdata, u16 id, s16 delta);
 s32 userdata_item_total_count(void* userdata, u16 id);
 s32 item_slots_room_get(u16 id, void* a, u16 b);
 s16 userdata_item_give(void* userdata, u16 id, s16 count, s32 flag);
-void item_box_store(u16 id, s16 count, void* out);
+u32 item_box_store(u16 id, u32 count, u16* slot);
 
 /* 0x8004A430 - decodes the packed 0x100-byte character record `blob` into the player card `card`
  * (`NetPlayerCard`, Network/network_pat_control.h). */

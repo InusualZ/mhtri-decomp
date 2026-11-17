@@ -28,8 +28,6 @@
  * RESIDUALS. eft052_item_half_get: dump 03 gives the shift result its own vreg (`srawi r33,r35,1`) coloured r0, retail reuses r3 (`u32`/`s32` value
  *   spellings measure equal).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
- *  - `eft052_page_take`: retail's parameters start at `r4` (a leading parameter ours lacks), and the `s16`
- *    sign-extensions sit at other points;
  *  - `eft052_place`: ours compares the area unsigned (`cmplwi`) in another order and keeps `+0x04`'s pointer in a
  *    register where retail reloads it per store;
  *  - `eft052_hold_list_draw`, `hud_msg_free`, `hud_msg_enqueue`, `fn_80358B40`: register colouring only;
@@ -58,6 +56,8 @@
 #include "fn_8004CAD8.h"
 #include "pl.h"                         /* MHchar */
 #include "ef/eft052_box.h"               /* the item box records */
+#include "ef/eft052_page_put.h"          /* eft052_page_put */
+#include "ef/eft052_page_take.h"         /* eft052_page_take */
 #include "ef/eft052_item_get_open.h"     /* eft052_item_box and the window entry points */
 #include "lobby/lb_cmd_pressed_ck.h"     /* lb_cmd_pressed_ck / lb_cmd_repeat_ck / lb_cmd_repeat_get / lb_yes_no_step */
 #include "lobby/lobby_w.h"               /* lobby_w */
@@ -534,31 +534,30 @@ extern "C" void eft052_page_count_add(u16 id, s32 delta)
 }
 
 /* 0x80359164 (0xB8): Moves `count` of an item from the page's own count into the caller's hand. */
-extern "C" void eft052_page_take(u16 id, s16 count, u8 flag)
+extern "C" void eft052_page_take(_PLW* plw, u16 id, s32 count, u8 flag)
 {
-    u8 sp8[8];
-    s16 avail;
+    u16 sp8[4];
+    s32 avail;
 
     GetItemData(id);
     avail = eft052_page_count_ck(id, 0);
     if (avail > 0) {
-        if (avail < count) {
-            userdata_item_give(lobby_world_block, id, avail, 1);
-        } else {
+        if (avail >= count) {
             userdata_item_give(lobby_world_block, id, count, 1);
             return;
         }
+        userdata_item_give(lobby_world_block, id, avail, 1);
     }
     if (flag == 1 && count != 0)
         item_box_store(id, count, sp8);
 }
 
 /* 0x8035921C (0xB8): Moves `count` of an item from the caller's hand into the page. */
-extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
+extern "C" void eft052_page_put(_PLW* plw, u16 id, s32 count, u8 flag)
 {
-    u8 sp8[8];
-    s16 left = count;
-    s16 avail;
+    u16 sp8[4];
+    s32 left = count;
+    s32 avail;
 
     avail = eft052_page_count_ck(id, 1);
     if (avail > 0) {
@@ -841,9 +840,10 @@ extern "C" void eft052_hold_draw(s32 busy)
 /* 0x80359BE0 (0xC8): Returns the summed counts of `n` box cells. */
 extern "C" s32 eft052_box_count_sum(Eft052BoxCell* cells, s32 n)
 {
-    s32 sum = 0;
     s32 i;
+    s32 sum;
 
+    sum = 0;
     for (i = 0; i < n; i++, cells++)
         sum += cells->count_0x02;
     return sum;
@@ -968,7 +968,7 @@ extern "C" s32 eft052_item_get_step(void)
     s32 done = 0;
     s32 cell;
     s32 room;
-    u8 tmp[8];
+    u16 tmp[4];
 
     if (++box->frame_0x08 > 40)
         box->frame_0x08 = 0;

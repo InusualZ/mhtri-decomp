@@ -73,6 +73,8 @@
  *   ResGenMode's GXGet*, ResTev's ref/ptr/GetClassName, ResMatChan::ptr and ResTexSrt's
  *   ref/ptr/GetTexMtxMode/GetTexSrtFlag/IsIdentityTexMtx/IsExist, ResShp::IsVtxAttrEnabled
  *   are nw4r's members.
+ * RESIDUALS. g3d_fog_table_load: `fog` and `color` swap the stack words 0x0C/0x08 against retail (`fog` scoped in the else branch, `color`
+ *   declared at function scope with a compound literal or field stores, measure 99.93 / 77.7 / 88.8).
  * RESIDUALS. Every function is written.  G3dFog and G3dFogData are this unit's views of the records g3d_fog.cpp
  *   defines; the owner's header declares the callees over them by forward declaration.
  *   g3d_light_table_set_setting: register order only (retail gives the camera pointer and the light count r31,

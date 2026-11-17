@@ -16,7 +16,7 @@
  * temporary copy-constructed into each member) and its `.ctors` word.
  *
  * RESIDUAL.
- *   * `quest_item_pair_copy_cell`/`_block`/`_row` 89-94 %: callee-saved colouring (target `rec`=r29, `dst`/
+ *   * `quest_item_pair_copy_block`/`_row` 89-94 %: callee-saved colouring (target `rec`=r29, `dst`/
  *     `flagged`=r30, `kind`=r31; ours a cyclic shift), plus `quest_item_slot_find`'s mask/load scheduling.
  *   * `quest_item_slot_add` 92.50 %: target's `extsh` temp, unsigned `cmplwi r3,5` and preserved loop counter.
  *     Kept: the `Q_ItemCount* slot` declaration inside the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
@@ -212,10 +212,13 @@ void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind) {
 
 /* Copies one 4-slot cell of an item record into the caller's buffer at the cell's own offset. */
 void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col) {
+    s32 i;
+    Q_ItemPair* out;
+    Q_ItemPair* rec;
+
     if (id == 0xFFFF) {
         return;
     }
-    Q_ItemPair* rec;
     if (id >= 0x64) {
         rec = q_item_pair_tbl_high[id - 0x64];
     } else {
@@ -224,12 +227,10 @@ void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col) {
     if (rec == 0) {
         return;
     }
-    dst += col * 4 + 0x20;
     rec += col * 4 + 0x20;
-    for (s32 i = 0; i < 4; i++) {
-        item_pair_copy(dst, rec);
-        dst++;
-        rec++;
+    out = dst + (col * 4 + 0x20);
+    for (i = 0; i < 4; i++) {
+        item_pair_copy(out++, rec++);
     }
 }
 

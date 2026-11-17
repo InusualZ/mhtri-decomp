@@ -998,11 +998,13 @@ void lb_pop_room_enter(LbPopWork* work)
 /* The card of the peer whose id the screen holds (the cursor follows it), or NULL once that peer left. */
 LobbyPeerCard* lb_pop_peer_card_find(LbPopWork* work)
 {
-    LobbyPeerList* list = &lobby_state_block.peer_list_0x0004;
-    s16 count = work->count_0x04;
-    LobbyPeerCopy* peer;
-    s16 row;
+    LobbyPeerList* list;
+    s16 count;
     s32 i;
+    s16 row;
+    LobbyPeerCopy* peer;
+    list = &lobby_state_block.peer_list_0x0004;
+    count = work->count_0x04;
 
     if (count <= 0) {
         return NULL;

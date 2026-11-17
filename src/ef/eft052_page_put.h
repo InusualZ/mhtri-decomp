@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 /* 0x8035921C - puts `count` of item `item` into the player's item pages (`flag` 1 announces it). */
-void eft052_page_put(struct _PLW* plw, u16 item, s32 count, s32 flag);
+void eft052_page_put(struct _PLW* plw, u16 item, s32 count, u8 flag);
 /* 0x80358FF4 - half the item record's +0x0C value (the decoration make price). */
 s32 eft052_item_half_get(u16 item);
 

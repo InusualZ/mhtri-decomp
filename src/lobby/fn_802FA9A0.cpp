@@ -20,6 +20,8 @@
  *   names after `Em015ProgTbl`'s scheme, the action groups by motion and purpose); the data rows eft036_spheres_*,
  *   eft038_torch_pos, lb_unlock_cond_tbl0/1, em023_turn_seq_a/b, em023_se_seq_*, em023_se_alt_seq_*, em023_route_*,
  *   em023_demo5_keys_a..f, em023_se_ofs_a/b, lb_barter_* tables, lb_kujira_stay_ranges.
+ * RESIDUALS. lb_barter_stock_add: retail advances one `page` pointer (`addi r3,r3,0x454`) across the four tail tests; ours folds the
+ *   offsets into `work` (a `page++` pointer measures the same, a counted loop is unrolled by two: 94.9 %, 208 B).
  * RESIDUALS. Every row is written; 13 rows are short of 100:
  *   - em023_stage_actor_busy_ck: retail narrows the area parameter in place in r31 before the loop and colours max/i
  *     r29/r28; every parameter/local order tried leaves the narrowing in the loop;

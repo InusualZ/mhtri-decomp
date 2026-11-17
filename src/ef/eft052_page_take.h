@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 /* 0x80359164 - takes `count` of item `item` out of the player's item pages into the user data (`flag` 1 announces it). */
-void eft052_page_take(struct _PLW* plw, u16 item, s32 count, s32 flag);
+void eft052_page_take(struct _PLW* plw, u16 item, s32 count, u8 flag);
 
 #ifdef __cplusplus
 }

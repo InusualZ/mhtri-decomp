@@ -17,7 +17,7 @@
  *    shared `lha` (a goto shape, rule 8); this size difference shifts every later function, so it blocks a flip;
  *  - `fn_80140778`: retail adds the recursive offset to `pos` before it sign-extends it for `in` and keeps one more
  *    register free; `fn_8013C7E0`: retail narrows the first `em_area_next` answer into r30 and schedules the
- *    `eft_slot_effect_key` narrowing later; `fn_8013D8C8`: retail ends the case-0 block with two branches;
+ *    `eft_slot_effect_key` narrowing later;
  *  - `fn_8013CAA0`: retail re-narrows the table byte it passes to `fn_8013AB74` (`clrlwi`);
  *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013D054`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
  *    `fn_80140E48`, `fn_80140FB0`, `em_kind_release`: register allocation only;
@@ -1308,14 +1308,12 @@ s16 fn_8013D80C(_ENEMY_WORK *self, u8 *in) {
 /* Sends the parameter's remainder modulo the record's step count. */
 void fn_8013D8C8(_ENEMY_WORK *self, u8 *in, u32 param) {
     if (in[0] == 0) {
-        if (fn_8013BE60(self, in, 34, 11, 1) >= 0) {
-            return;
-        }
-        {
+        if (fn_8013BE60(self, in, 34, 11, 1) < 0) {
             u8 *next = in + (u8)fn_801406E0_view1(34, in[0]);
             s16 step = fn_80140778_view1(next, 34, 2);
 
             fn_8013BE60(self, in, 34, 10, (s16)((u16)param % step));
+            return;
         }
         return;
     }
