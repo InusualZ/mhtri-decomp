@@ -113,7 +113,7 @@ extern void set_blendmode(u8 a, u8 b, u8 c);              /* 0x800E4574 -> set_b
  * own view until an owner header carries them. */
 extern "C" {
 bool camera_work_ck(void);                        /* 0x802BE3EC - `camera work +0x284 == 1` */
-u32 my_player_no(void);                          /* 0x800CF384 - `system_w +0x27`, the local player's index */
+#include "ef/fn_800CDB2C.h" /* my_player_no (0x800CF384, `system_w +0x27`) */
 u32 game_ready_ck(void);                          /* 0x800D0708 - `system_w +0x7D3 == 1`, the field's only writer clears it */
 u8 hud_key_lookup(const void* key);                /* 0x8033A0BC - memcmps 6 bytes over the 10x0x130 table, 0xFF = absent */
 s16 draw_lsp_element(void* work, u8 index, u8 kind, u16 id); /* 0x802E00A4 - draws the element's sprites/text, returns its -0x12 y offset */

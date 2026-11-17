@@ -815,9 +815,6 @@ EmActTimers* fn_80126494(_ENEMY_WORK* self);
 /* `enemy/em_common.cpp` */
 u32 em_busy_ck(_ENEMY_WORK* self);
 
-/* `ef/system_core.cpp` */
-u32 my_player_no(void);
-
 /* the 0x803xxxxx helpers the band shares */
 void lb_sub0e_send(u8 a, u16 b, u8 c, u16 d);
 }

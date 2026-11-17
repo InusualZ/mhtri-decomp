@@ -13,7 +13,7 @@ extern "C" {
 
 /* 0x800CF384 - `system_w` +0x27, the local player's index (a zero-extended byte load); `Pl/pl_master.cpp`,
  * `sound/fn_800D7F54.cpp`, `hud/move_work_update.cpp` and `main.cpp` read it. */
-u32 my_player_no(void);
+s8 my_player_no(void);
 /* 0x800CF394 - the setter paired with it, declared `s8`: every consumer (`light/light.cpp`'s fn_802BEDE8/fn_802BEE3C)
  * narrows its argument with `extsb`, which only a signed parameter emits; the map name is unmangled (C linkage). */
 void my_player_no_set(s8 value);

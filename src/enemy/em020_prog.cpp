@@ -3551,7 +3551,7 @@ u32 lobby_net_leave_select(s8 choice)
 /* Loads this player's own hunter card and the block's own id and name from the network's self record. */
 inline void lb_self_card_set(LobbyTimerBlock* block)
 {
-    s8 slot = my_player_no();
+    s32 slot = my_player_no();
     _PLW* plw = &((_PLW*)get_move_work_adrs(2))[slot];
     const NetPeerRec* self = (const NetPeerRec*)getSelfName();
 

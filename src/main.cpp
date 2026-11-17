@@ -307,12 +307,7 @@ extern "C" void VIWaitForRetrace(void);
 extern "C" void VISetTrapFilter(u8);
 extern "C" void PPCSync(void);
 extern "C" void OSSleepTicks(u32, u32);
-/* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form that unit's
- * consumers use, because this unit reads the byte as `s8` - its one call site indexes
- * `Screen_w.player_aspect` with `(s8)my_player_no()` - and the owner's `u32` view would put an `extsb` back. */
-extern "C" {
-s8 my_player_no(void);
-}
+#include "ef/fn_800CDB2C.h" /* my_player_no (the owner, `ef/system_core.cpp`) */
 
 /* The bus clock lives in the DOL header at a fixed address; the frame wait converts it to ticks. */
 #define OS_BUS_CLOCK (*(volatile u32*)0x800000F8)

@@ -4883,7 +4883,7 @@ extern "C" LightWork* camera_work_get(void)
 /* Runs camera_mode1_ck for the given player and puts the current player back afterwards. */
 extern "C" u32 camera_mode1_ck_player(s8 player)
 {
-    s32 previous;
+    s8 previous;
     u32 result;
 
     previous = my_player_no();
@@ -4896,7 +4896,7 @@ extern "C" u32 camera_mode1_ck_player(s8 player)
 /* Runs camera_aim_zoom_get for the given player and puts the current player back afterwards. */
 extern "C" u8 camera_aim_zoom_get_player(u32 unused, u8* out_mode, u8* out_zoom, f32* out_scale, s8 player)
 {
-    s32 previous;
+    s8 previous;
     u8 result;
 
     previous = my_player_no();
@@ -4909,7 +4909,7 @@ extern "C" u8 camera_aim_zoom_get_player(u32 unused, u8* out_mode, u8* out_zoom,
 /* Runs camera_work_ck for the given player and puts the current player back afterwards. */
 extern "C" void* camera_work_ck_player(s8 bank)
 {
-    s32 previous;
+    s8 previous;
     void* result;
 
     previous = my_player_no();
@@ -4922,7 +4922,7 @@ extern "C" void* camera_work_ck_player(s8 bank)
 /* Starts the kill cut for both split-screen players whose camera position is not inside the stage. */
 extern "C" void camera_kill_cut_start_split(u8 id, struct _ENEMY_WORK* arg)
 {
-    s32 previous;
+    s8 previous;
 
     previous = my_player_no();
 

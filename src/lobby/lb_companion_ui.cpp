@@ -66,8 +66,8 @@
  *   claim (the delivery, screen-13 and draw tables are emitted, byte-identical; the act switch tables, the icon lists
  *   0x805E6EF8-0x805E70C8 and `lb_s13_status_icon_ids` are not); `.text`/extab/extabindex short of the claim; the
  *   `.sdata`/`.sdata2` pool is shared with `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold
- *   candidate); the source still spells `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn`
- *   by their old stems `fn_800CF384`, `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
+ *   candidate); the source still spells `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn`
+ *   by their old stems `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
  * SHAPES. Declaration order decides the callee-saved colours of `lb_combo_rate_get`/`lb_combo_exec` (playbook 63) and
  *   of the screen-13 helpers; `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate
  *   it); a draw helper declares its layout base before the row position (retail puts the base at +0xC); the two-row
@@ -402,7 +402,7 @@ extern "C" {
 void lb_act_dispatch(u8 index, LbActReq* req) {
     void* entry;
 
-    if (Pl_net_can_send() != 0 && (s32)req->index_0x01 != fn_800CF384()) {
+    if (Pl_net_can_send() != 0 && (s32)req->index_0x01 != my_player_no()) {
         entry = fn_803438E4(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
         if (entry == NULL) {
             entry = fn_80343B74(req->sel_0x04.bytes_0x00.b_0x01, req->sel_0x04.bytes_0x00.a_0x00,
@@ -423,7 +423,7 @@ void lb_act_dispatch(u8 index, LbActReq* req) {
                 eft_net_recv_pos((EftSlot*)entry, (NetEftPosMsg*)req);
                 return;
             case 5:
-                eft_net_recv_work((EftSlot*)entry, (NetEftWorkMsg*)req, fn_800CF384());
+                eft_net_recv_work((EftSlot*)entry, (NetEftWorkMsg*)req, my_player_no());
                 return;
             case 6:
                 eft_net_recv_mark((EftSlot*)entry, (NetEftMarkMsg*)req);
@@ -629,7 +629,7 @@ void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
                 cmd.value_0x07 = value;
             } else {
                 ((NetMsgHeader*)&cmd)->fill(index, 0xD, 12);
-                cmd.pad_index_0x04 = fn_800CF384();
+                cmd.pad_index_0x04 = my_player_no();
                 cmd.entry_0x06 = index;
                 cmd.flag_0x05 = 1;
                 cmd.value_0x07 = value;
@@ -669,7 +669,7 @@ void lb_act_handover(u8 unused, LbActReq* req) {
                 }
             } else {
                 index = req->sel_0x04.bytes_0x00.c_0x02;
-                if ((s32)index == fn_800CF384()) {
+                if ((s32)index == my_player_no()) {
                     moves = (LbMoveEntry*)get_move_work_adrs(2);
                     if (moves == NULL) {
                         return;
@@ -815,7 +815,7 @@ void lb_sub11_send(s8 a, s8 b) {
     LbCmdSub11 cmd;
 
     if (isServerSelectState() != 0) {
-        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x11);
+        ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x11);
         cmd.value_0x04 = a;
         cmd.value_0x05 = b;
         broadcastSessionCommand(&cmd, 6);
@@ -835,7 +835,7 @@ void lb_sub12_send(u8 value) {
         stage_area_timer_arm(value);
         return;
     }
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x12);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x12);
     cmd.value_0x04 = value;
     broadcastSessionCommand(&cmd, 5);
 }
@@ -850,11 +850,11 @@ void lb_sub13_send(s16 first, s16 second, u8 value) {
     LbCmdSub13 cmd;
 
     if (isServerSelectState() != 0) {
-        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x13);
+        ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x13);
         cmd.value_0x04 = value;
         cmd.first_0x08 = first;
         cmd.second_0x0A = second;
-        cmd.pad_index_0x0C = fn_800CF384();
+        cmd.pad_index_0x0C = my_player_no();
         broadcastSessionCommand(&cmd, 0x10);
     }
 }
@@ -872,7 +872,7 @@ void lb_sub14_send(s8 value) {
     LbCmdSub10 cmd;
 
     if (isServerSelectState() != 0) {
-        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x14);
+        ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x14);
         cmd.value_0x04 = value;
         broadcastSessionCommand(&cmd, 5);
     }
@@ -896,7 +896,7 @@ void lb_act_limit_set(u8 unused, LbActReq* req) {
 void lb_sub15_send(void) {
     LbCmdSub05 cmd;
 
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x15);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x15);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -918,7 +918,7 @@ void lb_companion_tick(u8 unused, LbActReq* req) {
 void lb_sub1c_send(void) {
     LbCmdSub05 cmd;
 
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x1C);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x1C);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -927,7 +927,7 @@ void lb_sub16_send(s32 value, u8 flag) {
     LbCmdSub16 cmd;
 
     if (isServerSelectState() != 0) {
-        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x16);
+        ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x16);
         cmd.flag_0x08 = flag;
         cmd.value_0x04 = value;
         cmd.value_0x09 = 0;
@@ -950,7 +950,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
                 if (isReadyCountOne() != 0 && quest_sub_state_end_ck(1) == 0 &&
                     quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
-                    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x16);
+                    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x16);
                     cmd.flag_0x08 = req->mask_0x08.byte_0x00;
                     cmd.value_0x04 = req->sel_0x04.word_0x00;
                     cmd.value_0x09 = 1;
@@ -970,7 +970,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
 void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
     LbCmdSub17 cmd;
 
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x17);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x17);
     cmd.value_0x04 = value;
     cmd.first_0x06 = first;
     cmd.second_0x07 = second;
@@ -1009,7 +1009,7 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
 void lb_sub18_send(void) {
     LbCmdSub05 cmd;
 
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x18);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x18);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -1041,7 +1041,7 @@ void lb_entry_start_send(LbCompanionWork* companion, u8 value, s32 arg, u8 flag)
             return;
         }
     }
-    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x19);
+    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x19);
     cmd.value_0x04 = arg;
     cmd.value_0x08 = companion->slots_0x94[0].value_0x00;
     cmd.value_0x0C = companion->slots_0x94[1].value_0x00;
@@ -1082,7 +1082,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
         if (companion != NULL) {
             if (req->started_0x1B == 0) {
                 if (isReadyCountOne() != 0 && companion->started_0x6A40 == 0) {
-                    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x19);
+                    ((NetMsgHeader*)&cmd)->fill(my_player_no(), 0xD, 0x19);
                     cmd.value_0x04 = req->value_0x04;
                     cmd.value_0x08 = req->value_0x08;
                     cmd.value_0x0C = req->value_0x0C;
@@ -1192,7 +1192,7 @@ void lb_act_dispatch_ex(u8 index, LbActReq* req) {
         break;
     case 5:
         pad = req->index_0x01;
-        if ((s32)pad != fn_800CF384()) {
+        if ((s32)pad != my_player_no()) {
             quest_slot_arm_all_a((s8)pad);
         }
         break;
@@ -1231,7 +1231,7 @@ void lb_act_dispatch_ex(u8 index, LbActReq* req) {
         lb_act_index_apply(index, req);
         break;
     case 19:
-        if ((s32)req->index_0x01 != fn_800CF384()) {
+        if ((s32)req->index_0x01 != my_player_no()) {
             lb_act_value_apply(index, req);
         }
         break;
@@ -1249,7 +1249,7 @@ void lb_act_dispatch_ex(u8 index, LbActReq* req) {
         lb_act_best_keep(index, req);
         break;
     case 24:
-        if ((s32)req->index_0x01 != fn_800CF384()) {
+        if ((s32)req->index_0x01 != my_player_no()) {
             lb_companion_mode_set(index, req);
         }
         break;
@@ -1599,7 +1599,7 @@ s32 lb_combo_item_known_ck(u16 item) {
     if (moves == NULL) {
         return 0;
     }
-    plw = (_PLW*)&moves[fn_800CF384()];
+    plw = (_PLW*)&moves[my_player_no()];
     if ((data->field_0x002 & 0x20) != 0) {
         index = lb_combo_index_find(item);
         if (index != NULL) {
@@ -1656,7 +1656,7 @@ LbComboRecipe* lb_combo_recipe_find(u16 a, u16 b, s32 mode) {
                     return recipe;
                 }
                 moves = (LbMoveEntry*)get_move_work_adrs(2);
-                if (lb_combo_recipe_open_ck((_PLW*)&moves[fn_800CF384()], recipe) == 1) {
+                if (lb_combo_recipe_open_ck((_PLW*)&moves[my_player_no()], recipe) == 1) {
                     return recipe;
                 }
                 break;
@@ -1720,7 +1720,7 @@ s8 lb_combo_rate_get(LbComboRecipe* recipe, s32 mode) {
         if (moves == NULL) {
             return -1;
         }
-        plw = (_PLW*)&moves[fn_800CF384()];
+        plw = (_PLW*)&moves[my_player_no()];
         if (lb_combo_recipe_open_ck(plw, recipe) == 0) {
             return -1;
         }
@@ -1810,7 +1810,7 @@ u32 lb_combo_recipe_known_ck(LbComboRecipe* recipe, s32 mode) {
         if (moves == NULL) {
             return 0;
         }
-        if (lb_combo_recipe_open_ck((_PLW*)&moves[fn_800CF384()], recipe) != 1) {
+        if (lb_combo_recipe_open_ck((_PLW*)&moves[my_player_no()], recipe) != 1) {
             return 0;
         }
     }
@@ -1849,7 +1849,7 @@ s16 lb_combo_exec(u8* yield, u16 item_a, u16 item_b, s32 mode, u16 slot_a, u16 s
             *yield = lb_combo_yield_tbl[recipe->yield_0x05];
         } else {
             moves = (LbMoveEntry*)get_move_work_adrs(2);
-            if (pl_skill_have_ck((_PLW*)&moves[fn_800CF384()], 0xA0) == 1) {
+            if (pl_skill_have_ck((_PLW*)&moves[my_player_no()], 0xA0) == 1) {
                 *yield = lb_combo_yield_tbl[recipe->yield_0x05];
             } else {
                 roll = ran_suu(1) % 100;
@@ -1878,7 +1878,7 @@ s16 lb_combo_exec(u8* yield, u16 item_a, u16 item_b, s32 mode, u16 slot_a, u16 s
         } else {
             moves = (LbMoveEntry*)get_move_work_adrs(2);
             if (moves != NULL) {
-                plw = (_PLW*)&moves[fn_800CF384()];
+                plw = (_PLW*)&moves[my_player_no()];
                 pl_item_add(plw, item_a, -1);
                 pl_item_add(plw, item_b, -1);
             }

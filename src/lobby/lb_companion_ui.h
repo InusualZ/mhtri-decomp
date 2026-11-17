@@ -12,6 +12,7 @@
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 #include "lobby/lobby_hunter_cards.h" /* LbQuestPage, lobby_hunter_cards - this unit's leaf header */
 #include "id_value.h" /* IdValue, the item box slots */
+#include "ef/fn_800CDB2C.h" /* my_player_no */
 #include "hud/layout.h" /* _mh_ivec2_, _SPR_DATA_ and the draw_* family (rule 1, rule 2) */
 #include "lobby/lb_list.h" /* LbList, LbItemCount (rule 1) */
 #include "enemy/ENEMY_WORK.h" /* EmGroundRec, the text command's +0x0C record (rule 1) */
@@ -536,7 +537,6 @@ void em_small_spawn_stat(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void em_res_peer_count_inc(s8 value, u8 index);
 void stage_area_flag_set(u8 a, u8 b);
 void stage_area_timer_arm(u8 index);
-s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
 int memcmp(const void* a, const void* b, u32 n);
@@ -544,7 +544,6 @@ void camera_slot_bit_set(u8 index, u8 value);
 s32 ai_npc_level_get(u16 id);
 u8 fn_802D7C6C(u16 id);
 void userdata_progress_flag_set(u32 a);
-s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
 int memcmp(const void* a, const void* b, u32 n);

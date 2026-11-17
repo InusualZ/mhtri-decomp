@@ -3533,7 +3533,7 @@ void quest_marker_draw_faded(CockpitWork* work, u16 id, u32 mode, _mh_ivec2_ pos
     u32 angle_on;
     f32 proj[2];
     f32 scale;
-    u32 prev_player;
+    s8 prev_player;
 
     plw = work->plw;
     work->window_x_0x084 = pos.x;
