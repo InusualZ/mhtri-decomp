@@ -13,9 +13,10 @@ TIER = "fixture"
 
 def _bump(path: Path, data: bytes) -> None:
     """Rewrite `path` and move its mtime forward, so a stat signature sees the change on any filesystem."""
+    before = os.stat(path).st_mtime_ns if path.exists() else 0
     path.write_bytes(data)
     st = os.stat(path)
-    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000_000))
+    os.utime(path, ns=(st.st_atime_ns, max(st.st_mtime_ns, before) + 2_000_000_000))
 
 
 def test_states(c):
