@@ -18,8 +18,22 @@ python tools/mwcc-debugger/regsim.py verify DIR [--pass N] [--all] [--json]
 python tools/mwcc-debugger/regsim.py want   DIR -u UNIT [--symbol S] [--ours OBJ --retail OBJ] [--json]
 python tools/mwcc-debugger/regsim.py search DIR -u UNIT [--symbol S] [--source F] [--function F] [--params N]
                                        [--want rV=rP,...] [--saved-only] [--no-edits] [--max-evals N] [--top N]
-                                       [--seed N] [--require-exact] [--tryvar [--keep]] [--json]
+                                       [--seed N] [--require-exact] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]] [--json]
+python tools/mwcc-debugger/regsim.py run UNIT FUNCTION [--no-search] [--gdb G] [--size N] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]]
 ```
+
+`run` (usage line for lanes: `python .claude/skills/mwcc-unit-matching/scripts/mt.py regsim run <unit> <function>`):
+compiles the unit with its own compiler and, when that is not Wii/1.3, with Wii/1.3 as a stand-in (unknown options
+dropped, named), dumps `FUNCTION` (plain, mangled, `Class::method` or address) with the unit's real command line
+(`-pragma "cats off"` quoted), into `.pi/tmp/regsim-run/<unit>/<function>/`, finds or fetches gdb into `.pi/tmp/mwcc-dbg`,
+prints `stand-in check: IDENTICAL` (trust the dump) or `DIFFERS` (a hint only), then `verify` and `search`
+(`--search` is accepted, searching is the default; `--no-search` stops after `verify`). `--ours` for the search is the
+stand-in's object so the instruction counts agree with the dump.
+
+`--apply-local` (search/run) writes the best plan's local - a walking pointer for a declared `addi T,L,K` temp, or a
+hoisted call result for a temp held across a call that retail computes after it (`spec/lib-localedit.md`) - runs it as a
+unittry trial and keeps it only when the unit's matched bytes rise with no row down. A shape it cannot identify
+unambiguously is refused (exit 3, nothing written) with the edit to make by hand; `--dry-run` prints the edit only.
 
 `DIR` is a `mwcc_debugger.py` output directory (`regalloc-gpr-pass-N-all.txt`, `-assigned.txt`, the `backend-*`
 dumps). Get one with `python tools/mwcc-debugger/mwcc_debugger.py --gdb GDB -a '<unit command line>' FUNCTION DIR`
@@ -52,7 +66,7 @@ Exit 2 (SystemExit) when the dump is missing, the symbol is not in an object, or
 
 ## Inputs and outputs
 
-Reads the dump directory, the two objects and the unit's source; prints to stdout. Writes only the `--tryvar` spec
+Reads the dump directory, the two objects and the unit's source; prints to stdout. Writes only the `--tryvar`/`--apply-local` spec
 (`.pi/tmp/regsim/<function>.spec`); unittry then edits and restores the unit's source as its own spec says.
 
 ## Invariants and rules
@@ -66,7 +80,7 @@ Reads the dump directory, the two objects and the unit's source; prints to stdou
 
 ## Lib dependencies
 
-regsim, objcompare (function bytes), units, repo.
+regsim, regsimrun, localedit, objcompare (function bytes), units, repo.
 
 ## Test contract
 
@@ -76,6 +90,13 @@ saying no plan is exact and 1 with `--require-exact`, a target that is no node o
 `--tryvar` spelling splits an initialiser off a reordered run, writes nothing for the source's own order and refuses
 a plan with an edit; the run writes nothing into the repository. Measured by hand: a `--tryvar` run on
 `ef/ef_drawsmoothstripestrategy` scored the rewrite (one row 100 -> 99.89), reverted it and restored the file.
+
+Real rows (2026-11-17): `run fn_8004CAD8 my_set_equip_id_swap --apply-local` writes `u16* part`, the order set/part/i/j
+and `for (j = 0, part = set->parts_0x02; j < 2; part++, j++)` (the fix batch 5 wrote by hand), unit 98.7907 -> 98.8102;
+`userdata_hunter_rank_info_get` hoists `hunter_rank_points_get(999)` into a local before its `if`, 98.8102 -> 98.8449;
+`run homebutton/tiHKBManager hkbManagerSetMap` (GC/3.0a5.2): stand-in IDENTICAL, the plan folds r43 into a dead local
+and `--apply-local` refuses saying so. Selftests: `tools/tests/lib/test_regsimrun.py`, the `rewrite_runs` extra-local
+case in `test_regsim.py`.
 
 ## Known gaps
 

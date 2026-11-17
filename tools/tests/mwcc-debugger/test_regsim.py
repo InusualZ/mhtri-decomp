@@ -5,7 +5,7 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import importlib
 from pathlib import Path
 
-from tools.lib import regsim, testing
+from tools.lib import localedit, regsim, testing
 
 TIER = "fixture"
 cli = importlib.import_module("tools.mwcc-debugger.regsim")
@@ -331,6 +331,12 @@ def test_tryvar_spelling(c):
     edit = regsim.Plan(regsim.Layout([32], [34, 33], [], ("declare r40(@1) as a local at declaration position 0",)),
                        (2, 2), (0, 0), {}, [], 4)
     c.raises("a plan that needs an edit is not spelled", SystemExit, cli.rewrite_runs, edit, base, mapping, REORDER)
+    new = localedit.NewLocal(40, "p", "int* p;", 0)
+    plan3 = regsim.Plan(regsim.Layout([32], [34, 40, 33], [], ("declare r40(@1) as a local at declaration position 1",)),
+                        (2, 2), (0, 0), {}, [], 4)
+    c.check("a new local joins the declaration run at the plan's position",
+            cli.rewrite_runs(plan3, base, mapping, REORDER, {40: new}),
+            [("    int x = a;\n    int y;", "    int x;\n    int* p;\n    int y;\n    x = a;")])
 
 
 def test_cli(c):
