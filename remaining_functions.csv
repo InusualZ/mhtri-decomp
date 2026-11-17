@@ -355,7 +355,6 @@ size_bytes,unit,function,match_percent,address
 296,homebutton/hbm_value,fn_8055DFCC,0.0,0x8055DFCC
 296,homebutton/tiHKBManager,hkbGuiPaneComponentContains,99.8108,0x8056B8AC
 296,hud/layout,draw_spin_icon,97.2973,0x802E4850
-296,sound/fn_800E3CBC,prim_queue_draw,85.2703,0x800E444C
 300,Network/net_session_close,sendProfileHead,93.52,0x80435740
 300,ai/ai_npc,fn_802D6A00,97.2,0x802D6A00
 300,enemy/fn_802F5138,em032_act11_se_play,99.8667,0x802F89F8
@@ -378,12 +377,10 @@ size_bytes,unit,function,match_percent,address
 308,lobby/lb_quest_ui,lb_kitchen_skill_apply,99.8052,0x803907F4
 308,menu/get_pop_dat_ptr,entry_list_update,94.3896,0x803C09C0
 308,stage/shell,shell_block_alloc,87.8571,0x802AAB04
-312,enemy/em019_ai,em019_area_change_ck,98.5256,0x80382C80
 312,fn_80047398,face_buf_reset,94.4615,0x8004882C
 312,fn_8004C9A0,equip_record_wear,97.8846,0x8004C9A0
 312,menu/get_pop_dat_ptr,move_work_name_draw,97.8846,0x803C3098
 312,sound/fn_800D7F54,se_slot_req_pos,98.718,0x800DA72C
-312,userdata_item,userdata_init,97.4359,0x800497B4
 316,HID/hid,hid_device_manage_change,98.6076,0x80528080
 316,Network/NetworkWiiMediator,parseReflectPacket,94.7468,0x804152CC
 316,Network/network_pat_control,resetArenaVectors,98.1646,0x80424308
@@ -392,11 +389,8 @@ size_bytes,unit,function,match_percent,address
 316,enemy/em_common,em_level_raise,98.6709,0x8013170C
 316,enemy/em_kind,fn_80140778,95.8861,0x80140778
 316,enemy/enemy_control,em_size_scale_pick,97.3418,0x8014281C
-316,light/light,light_em_slot_alloc,96.5823,0x802C05D0
 316,lobby/fn_801E0ADC,lb_eqshop_draw,99.8734,0x801E6C20
-316,lobby/lb_pane_ui,lb_entry_pane_list_reset,97.4684,0x801F06F8
 316,menu/menu_result,q_result_phase_next,98.6076,0x803970FC
-316,sound/fn_800E3CBC,fn_800E4148,89.7468,0x800E4148
 316,sound/fn_800F2A94,demo_stream_stop_ck,99.2405,0x800F2E38
 320,Pl/pl_act,pl_area_spot_valid_ck,97.375,0x80278310
 320,RVLGX/GXBump,GXSetIndTexMtx,82.55,0x804B8F70
@@ -423,11 +417,9 @@ size_bytes,unit,function,match_percent,address
 332,enemy/em001_prog,em001_target_range_ck,99.6988,0x80154638
 332,enemy/em001_prog,em001_tev_color_update,99.6386,0x80154184
 332,hud/cockpit_quest,cockpit_prompt_draw,97.5904,0x802EF730
-332,lobby/fn_80212810,lb_recipe_material_flags_get,98.9157,0x802135F4
 332,userdata_item,item_slots_store,95.241,0x8004BD58
 336,MSL_C/alloc,Block_link,98.25,0x80458C94
 336,Network/net_session_close,getProfileMemberCounts,99.6429,0x804349A4
-336,enemy/em019_ai,em019_motion_next,97.1429,0x8037924C
 336,enemy/enemy_control,emc_area_move_kind,99.7619,0x80145920
 336,menu/menu_message,menu_entry_window_draw,96.6429,0x802AA29C
 336,stage/stg_w,stage_part_joints_hide,98.9881,0x802B1E8C
@@ -443,9 +435,7 @@ size_bytes,unit,function,match_percent,address
 348,Network/PatInterface,sendLayerBinaryRecord,97.7011,0x80403304
 348,Pl/pl_act_step,pl_act_step_pitfall_hold,97.7011,0x8024F9C4
 348,enemy/em_kind,fn_8013FD98,99.6322,0x8013FD98
-348,enemy/em_prog_support,note_work_frame,98.7931,0x803858F8
 348,lobby/fn_80219260,lb_award_rows_apply,98.3103,0x8021B690
-348,sound/fn_800D7F54,fn_800D9B6C,99.4828,0x800D9B6C
 352,Network/NetworkWiiMediator,popTransferRecord__18NetworkWiiMediatorFScPUcll,97.1932,0x80416F20
 352,Network/net_session_close,installCommunityCallback,95.3977,0x80435570
 352,Pl/player_control,pl_players_ready_ck,97.9545,0x802673E8
@@ -463,7 +453,6 @@ size_bytes,unit,function,match_percent,address
 360,WUD/wud,WUDiInsertWbcNode,96.9556,0x804FE770
 360,WUD/wud,WUDiSyncDone,99.5556,0x804FA5E0
 360,enemy/em033_prog,em033_area_roster_ck,99.6111,0x8035E81C
-360,enemy/em_kind,em_kind_release,98.8333,0x80141050
 360,homebutton/hbm_text_panel,hbmPanelLayoutText,99.8333,0x80545C44
 360,hud/layout,note_text_draw,98.7778,0x802E4340
 364,enemy/fn_802F5138,em032_act5_circle_wide,99.8352,0x802F76EC

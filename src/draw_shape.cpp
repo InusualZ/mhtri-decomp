@@ -788,8 +788,8 @@ void drawshape_set_scale(const _MH_VEC2* pos, const _MH_VEC2* scale) {
 
 /* 0x80053E78 (0x148): rotates by `angle` and scales by `scale` about `pos`. */
 extern "C" void drawshape_set_rot_scale(const f32* pos, const f32* scale, u16 angle) {
-    Mtx trans;
     Mtx m;
+    Mtx trans;
 
     PSMTXRotTrig(m, 'z', sin_idx_get(angle), anim_tick_cos(angle));
     m[0][0] *= scale[0];

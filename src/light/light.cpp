@@ -17,12 +17,13 @@
  *   record views `LightSceneRoot`, `LightPlayerView`, `LightNpcView`.
  * RESIDUALS. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
  *   `mhchar_construct` (retail calls only that, which is MHchar's own constructor; request vec3-world#3).
- *   light_update, light_em_slot_alloc, light_point_nearest_get, light_set_default_select,
+ *   light_update, light_point_nearest_get, light_set_default_select,
  *   light_em_slot_find_free: retail's `(u8)i` index and the loaded slot byte take r4 where
  *   ours take r0 (regsim's plan leaves r39/r41/r42 on r0; named locals for them measure equal). light_init: the light-setting/object registers and one `addi`
  *   scheduled late. light_flare_update: the camera temporary's stack slot. light_point_scale_set: `mode`'s copy
  *   scheduled one instruction early. light_point_param_get: one dead `b` of an empty case.
- * SHAPES. `light_set_get`/`light_setting_get_light_set` keep the out-pointer form (a by-value LightSet measured
+ * SHAPES. `light_em_slot_alloc` sets `i = 0` ahead of `base = slot * 3` (retail schedules the counter first).
+ *   `light_set_get`/`light_setting_get_light_set` keep the out-pointer form (a by-value LightSet measured
  *   worse); a pointer to the light set held across the loop (`pset`) is retail's register shape; the returned
  *   `get_camera_pos()` temporary is assigned directly as retail does.
  * RESIDUALS. mwcc-debugger dump, `light_point_scale_set`: regsim 3/3 callee-saved, 12/12 volatile (EXACT); first
@@ -881,8 +882,8 @@ extern "C" u8 light_em_slot_find_free(void)
 s32 light_em_slot_alloc(_ENEMY_WORK* em)
 {
     s32 base;
-    LightPointWork* w = &light_point_work;
     s32 i;
+    LightPointWork* w = &light_point_work;
     u8 set_no;
     g3d::LightSet set;
     u8 slot;
@@ -899,8 +900,9 @@ s32 light_em_slot_alloc(_ENEMY_WORK* em)
             return set_no;
         }
         w->em_slot[em->group] = slot;
+        i = 0;
         base = slot * 3;
-        for (i = 0; i < 3; i++) {
+        for (; i < 3; i++) {
             set.SelectLightObj(i, i + base + 21);
         }
     } else {

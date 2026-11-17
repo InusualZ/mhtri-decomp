@@ -18,20 +18,17 @@
  *   are named by the action id `em_act_run` dispatches on.  Where a callee's owner header declares another
  *   signature than retail's call, the call goes through a cast view (`_c1`/`_c2`).
  * RESIDUALS. Partial rows:
- *  - `em019_motion_next`: retail tests the 31..32 cases as `subi` + `cmplwi 1`; ours as `cmpwi 31`/`blt` +
- *    `cmpwi 32`/`ble` (every case order measured; a scoped `peephole on` changes nothing; the switch value is r4 in
- *    retail, a scratch r0 in ours);
  *  - `em019_act7_rush`: retail multiplies `ratio * scale` as (f0, f31); ours (f31, f0) (an operand swap and a `ratio`
  *    local were measured; regsim's declaration plan, two function-scope angles, closed the register half);
  *  - `em019_act7_jump`: retail loads +0x1C0 after the angle conversion in the `+=`; ours before it;
  *  - `em019_spawn_point_pick`: retail narrows `first` before the loop and colours i/first r28/r30, ours r30/r28
  *    (every declaration order measured);
- *  - `em019_area_change_ck`: retail re-narrows the second `map == 5 ? 9 : 0xFF` with `clrlwi`, ours does not.
  *   Data: `.ctors` is not
  *   emitted (`em019_se_shift_init` is a plain function: `VEC3(x, y, z)`/`VEC3::operator=` are C-linkage helpers, not a
  *   constructor pair); the map splits `em019_se_shift` at 0x806C2400 and `em019_se_ofs_mot28` at 0x805EE810 (one
  *   object each in retail, requests filed); `.sdata2` is 0x2D4 of the claimed 0x2D8 (a trailing pad word).
- * SHAPES. `Em019UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ * SHAPES. `em019_motion_next` sits in `#pragma optimization_level 4` (only level 4 lowers its 31..32 cases as
+ *   `subi` + `cmplwi`).  `Em019UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
  *   The `ShellSetFuncs` +0x2C/+0x3C/+0x74 calls go through spellings without the trailing table argument:
@@ -349,6 +346,7 @@ Em019UserData::Em019UserData()
 
 extern "C" {
 
+#pragma optimization_level 4
 /* Picks the follow-up motion of a finished motion pair: the stand-ups after motion 2, and the part-break
  * reactions after motion 7. */
 void em019_motion_next(_ENEMY_WORK* self, u8* motion, u8* next)
@@ -391,6 +389,7 @@ void em019_motion_next(_ENEMY_WORK* self, u8* motion, u8* next)
         break;
     }
 }
+#pragma optimization_level reset
 
 /* Reacts to an (kind, sub) event: the meat and flag events of kind 1, and the part-hit and break events of
  * kind 10. */
@@ -4343,7 +4342,7 @@ u32 em019_area_change_ck(_ENEMY_WORK* self, u16 timer)
         }
     }
     if (moved == 0 && self->value_0x452 >= 900 &&
-        em_pack_area_pick_c1(self, 29, (s32)map == 5 ? 9 : 0xFF, timer, (u8*)em019_follow_area_tbl, (u8*)em019_follow_point_tbl) == 1)
+        em_pack_area_pick_c1(self, 29, (s32)map == 5 ? (u8)9 : (u8)0xFF, timer, (u8*)em019_follow_area_tbl, (u8*)em019_follow_point_tbl) == 1)
         return 1;
     if (em_area_roam_pick(self, timer) == 1)
         return 1;

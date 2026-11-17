@@ -677,9 +677,9 @@ extern "C" void fn_800D9B6C(_se_w* work, SeSlot* slot) {
     SeWorkObj* w = (SeWorkObj*)work;
     SeSlotObj* sl = (SeSlotObj*)slot;
     _PLW* plw;
+    s32 found;
     u16* p;
     u8* q;
-    s32 found;
 
     sl->field_0x25 = 0;
     found = 0;
@@ -1252,10 +1252,6 @@ extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * Residuals (everything here is measured with `.pi/scratch/measure_part.py`; 10 of the 16 symbols are
  * byte-exact, the rest differ only in which callee-saved register the allocator picked).
  *
- * fn_800D9B6C      96.667  the `9/10` range test of the switch: retail lowers it to `addi r,r,-9;
- *                          cmplwi r,1; ble` (3 instrs), ours to `cmpwi r,9; blt; cmpwi r,10; ble` (4).
- *                          `found` also lands in r29 and `p` in r30, retail has them the other way
- *                          round; the bodies, the two lookup loops and the compare chain order are equal.
  * se_frame_req      99.831  `param &= 0xFFFFFF` is folded into the else arm's store (`clrlwi r5,r29,8` +
  *                          `clrlwi r0,r5,24`), retail keeps it in the parameter's own r29
  *                          (`clrlwi r29,r29,8` then `clrlwi r0,r29,24`). Same two instructions.
@@ -2470,8 +2466,7 @@ extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamV
  * (`cmpwi rX,3; blt; cmpwi rX,4; ble`); retail has the fused unsigned form (`addi r0,rX,-3; cmplwi r0,1;
  * ble`). With the pragma the same source reproduces retail's dispatch byte-for-byte - calibrated on
  * `se_slot_kind_dispatch` (16 target instructions reproduced exactly at level 4, not at level 3, and unchanged by
- * `#pragma peephole on`). This also explains part a's `fn_800D9B6C` residual (96.667 %): its 9/10 range
- * test is the same symptom. The unit is most likely a `-O4,p` object (`-O4,p` also implies
+ * `#pragma peephole on`). `fn_800D9B6C`'s 9/10 range test is the same symptom (it matches under the pragma). The unit is most likely a `-O4,p` object (`-O4,p` also implies
  * `-func_align 16`, which the per-function pragma cannot give) - worth a `cflags` change by the
  * orchestrator; the pragma pair is the per-function fallback and is what this part uses.
  *

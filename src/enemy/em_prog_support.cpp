@@ -32,11 +32,10 @@
  *  - `chat_log_lines_draw`, `note_slot_find` (`want` takes r3 where retail has r0 and the three
  *    state/kind byte temporaries r0 where retail has r3; regsim's decl-order plans do not reach them), `chat_log_page_draw`: register colouring only
  *    (declaration orders searched with `permdecl`/`hill`).
- *  - `note_work_frame`: retail stores the ground height to +0x1A4 and then `frsp`s it for +0x174 (an f64 view puts
- *    the `frsp` first: 97.69 against 98.79).
  *  - `note_page_step`: retail computes `lines - 1` after the cursor store.
  *  - `.sbss`/`.bss` end 4 bytes short of the claim (alignment padding).
- * SHAPES. A `case` range of a byte field is spelled `if ((u32)(x - lo) > n) switch (x) ... else ...` where retail
+ * SHAPES. `note_work_frame` stores the ground height to +0x1A4 and then copies that field to +0x174 (a chained
+ *   `a = b = f()` puts the `frsp` first).  A `case` range of a byte field is spelled `if ((u32)(x - lo) > n) switch (x) ... else ...` where retail
  *   lowers it to `addi`+`cmplwi` before the chain; `++`/`--` on the page cursor read through `(s8)(u8)`.
  * RESIDUALS. mwcc-debugger dump, `note_page_draw`: regsim 0/0 callee-saved, 9/9 volatile (EXACT); first divergence
  *            insn 12: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`
@@ -1575,7 +1574,8 @@ extern "C" void note_work_frame(NoteWork* self) {
     if (self->flag_0x1AC != 0) {
         note_work_wall_slide(self);
     }
-    self->vec_0x170.y = self->effect_y_ofs_0x1A4 = GetGroundHit(&self->vec_0x170, 0xFFFF, self->field_0x195);
+    self->effect_y_ofs_0x1A4 = GetGroundHit(&self->vec_0x170, 0xFFFF, self->field_0x195);
+    self->vec_0x170.y = self->effect_y_ofs_0x1A4;
     self->vec_0x17C = self->vec_0x170;
     note_work_pose_sync(self);
     mhchar_model_mtx_update(&self->model);

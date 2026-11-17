@@ -42,7 +42,7 @@
  *    `lb_dye_pane_step` (`self`/`pad`/`widths` in r28/r29/r27 for retail's r29/r27/r28: `self` is a stalled
  *    parameter node, no declaration order reaches it - regsim), `lb_box_lists_draw`, `lb_box_menu_draw`,
  *    `lb_entry_pane_menu_step` (the sort loop), `lb_entry_pane_sort_apply`,
- *    `lb_entry_pane_list_reset` (the `-(owner == NULL)` delta), `lb_model_pane_draw` (the row text id from the
+ *    `lb_model_pane_draw` (the row text id from the
  *    unmasked counter), `lb_my_set_detail_draw`/`lb_gun_set_detail_draw` (the page row count re-masked at the use),
  *    `lb_box_top_draw`, `lb_my_set_list_draw`, `lb_equip_set_pane_step`, `lb_equip_set_pane_init` (parameter homes),
  *    `lb_equip_box_wear_step`, `lb_entry_pane_scroll_refresh` (the `kind == 10` test is `cmplwi`), `fn_801EE1E4`,
@@ -2470,14 +2470,14 @@ extern "C" void lb_entry_pane_sort_apply(LbEntryPane* self, u8 kind)
  * there is no owner screen, and one fewer again when the record slot is empty). */
 extern "C" void lb_entry_pane_list_reset(LbEntryPane* self, LbEquipBoxWork* owner)
 {
-    s16 delta;
     s16 cursor;
+    s32 delta;
     s16 index;
 
     delta = -(owner == NULL);
     index = lb_digit_pane_value(self);
     if (lobby_world_block->equip_0x0E00[index].kind_0x00 == 0) {
-        delta--;
+        delta = (s16)(delta - 1);
     }
     if ((u32)(self->slot_kind_0x016 - 1) > 2) {
         if (self->list_mode_0x021 == 2 && self->list_0x02C.cursor_0x00 >= 2) {

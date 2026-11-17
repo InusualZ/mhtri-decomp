@@ -28,7 +28,7 @@
  *   - `lb_sprite_pulse_draw`, `lb_count_window_draw`: `mullw` operand order; both source orders give ours.
  *   - register colouring or scheduling only: `lb_text_center_print` (retail loads `spr.width` before `spr.pos.x`),
  *     `lb_list_draw_ex`, `lb_item_window_draw`, `lb_seisan_row_flags_get`, `lb_kakou_weapon_flags_get`,
- *     `lb_kakou_icon_build`, `lb_recipe_material_flags_get`, `lb_gun_recipe_material_flags_get`,
+ *     `lb_kakou_icon_build`, `lb_gun_recipe_material_flags_get`,
  *     `lb_item_cell_draw_layout`, `lb_kakou_source_draw`, `lb_item_need_list_draw`, `lb_equip_row_next`,
  *     `lb_scene_npc_refresh` (retail steps the NPC pointer before the counter).
  *   - this unit's views of foreign records (`LbArmorView`, `LbArmorExView`, `LbBladeView`, `LbGunView` over the Pl rows,
@@ -843,9 +843,9 @@ u32 lb_recipe_cond_ck(Q_UserData* user, s16 cond)
  * for the user data `user`; `level` nonzero skips the held counts. */
 u16 lb_recipe_material_flags_get(Q_UserData* user, LbSmithRow* row, u8 level)
 {
-    u16 flags;
     s32 i;
     s32 have;
+    u16 flags;
 
     flags = 0;
     for (i = 0; i < 4; i++) {

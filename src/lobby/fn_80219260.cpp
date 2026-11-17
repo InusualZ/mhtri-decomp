@@ -1496,12 +1496,12 @@ s16 lb_title_hunt_need[6] = { 100, 50, 20, 30, 20, 10 };
 
 /* Grants the titles the hunter rank and the hunt counts have earned. */
 void lb_award_rows_apply(void) {
+    s16* need;
     LbTitleHuntRow* hunt;
     LbSaveView* save;
+    u16 monster;
     s16 i;
     LbTitleRankRow* rank;
-    s16* need;
-    u16 monster;
 
     save = (LbSaveView*)lobby_world_block;
     for (rank = (LbTitleRankRow*)lb_title_rank_rows; rank->rank_0x00 != 0xFFFF; rank++) {

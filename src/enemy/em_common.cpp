@@ -113,9 +113,9 @@
  *  - `em_ambient_color_update`: the point-light blend converts the channel before the half difference (retail
  *    after it) and multiplies `step * ratio` (ours `ratio * step`); `+=`, operand orders, the ratio inlined and the
  *    three pragmas above do not reach it;
- *  - `em_level_raise`: retail stores the `kind` parameter unmasked (`stb r31`), so its parameter is `u8`; ours keeps the
- *    `u32` the calling units' prototype carries (a `clrlwi` before the store); `em_approach_start` takes `u16 flags` in
- *    every declaration and stores it raw;
+ *  - `em_level_raise`: the `u8 kind` parameter stores raw (`stb r31`) as retail does, but the later `kind == 1` test
+ *    narrows it first (`clrlwi`) where retail compares r31 (`(u32)`/`(s32)` casts and a `u32` parameter with
+ *    `peephole on` measure equal or lower); `em_approach_start` takes `u16 flags` in every declaration and stores it raw;
  *  - `em_team_member_claim`: retail stores `state_sub` raw (`stb r30`) where ours reuses the compare's masked copy;
  *    `em_area_decide`: retail's hook arm branches to the final `fn_80129984` call (a ternary or `||` condition
  *    sharing the call is worse); `em_hate_update`: retail loads the four default bands through one base in index
@@ -7259,7 +7259,7 @@ extern "C" u32 em_sight_player_ck(_ENEMY_WORK* self, EmSight* sight, nw4r::math:
 extern "C" u32 em_sight_cone_ck(EmSight* sight, nw4r::math::VEC3* eye, nw4r::math::VEC3* target, u32 angle,
                                 f32 reach);
 extern "C" void em_sight_player_set(_ENEMY_WORK* self, u8 player);
-extern "C" void em_level_raise(_ENEMY_WORK* self, u32 kind);
+extern "C" void em_level_raise(_ENEMY_WORK* self, u8 kind);
 
 /* 0x80131150 (0x32C): the per-frame sight test: marks the players the enemy sees (every other frame, by its group's
  * parity) and raises the alert level on a flash it sees. */
@@ -7414,7 +7414,7 @@ struct EmLevelBlock {
 
 /* 0x8013170C (0x13C): raises the alert level: arms its hold timer from the enemy data (shorter each raise, at least
  * 150 frames) and tells the peers when `kind` is 1 in a network game. */
-extern "C" void em_level_raise(_ENEMY_WORK* self, u32 kind)
+extern "C" void em_level_raise(_ENEMY_WORK* self, u8 kind)
 {
     EmLevelFrames* frames = NULL;
     nw4r::math::VEC3 unused;

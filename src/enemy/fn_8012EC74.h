@@ -18,7 +18,7 @@ extern "C" {
 /* The status and action-flag helpers the enemy net receiver (`hud/pl_frame_sync.cpp`) drives. */
 u32 em_status_set(struct _ENEMY_WORK* work, s32 kind);
 void em_alt_mode_set(struct _ENEMY_WORK* work, s32 value);
-void em_level_raise(struct _ENEMY_WORK* work, s32 amount);
+void em_level_raise(struct _ENEMY_WORK* work, u8 kind);
 u32 em_status_ck(struct _ENEMY_WORK* work, s32 value);
 void em_status_start(struct _ENEMY_WORK* work);
 void em_status_advance(struct _ENEMY_WORK* work);

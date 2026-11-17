@@ -280,12 +280,12 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
 /* 0x801B4458 (0x158).  Picks the seat record of the `kind` set `fn_801B4398` hands back whose point
  * (or two-point segment midpoint) is nearest the work record's `pos`; 0xFF when the set is empty. */
 extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
-    EmSeatRec* list;
-    u8 best;
-    u8 count;
-    u8 i;
     f32 bestDist;
+    u8 count;
+    EmSeatRec* list;
+    u8 i;
     f32 dist;
+    u8 best;
 
     list = NULL;
     best = 0xFF;

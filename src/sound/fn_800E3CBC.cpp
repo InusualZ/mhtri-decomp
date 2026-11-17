@@ -29,23 +29,11 @@
  * `prim_queue_draw`'s `rlwinm`+`cmpwi` zero test fuses into `rlwinm.`+`bne` and the whole unit loses ~5
  * points (prim_queue_draw 74.5 -> 85.3, fn_800E4148 85.8 -> 89.7, fn_800E4284 89.9 -> 94.3).
  *
- * Measured against this range's split object with `recompile.py --measure` (the official report metric):
- *
- *   fn_800E3CBC     99.33 (132/132 B)   sound_free_lists_reset   100.00   prim_queue_draw     99.19 (296/296 B)
- *   prim_init_all  100.00               prim_list_exec    88.10 (812/820 B)   set_blendmode  100.00
- *   fn_800E3D7C    100.00 (100/100 B)   fn_800E4148    89.75 (316/324 B)   set_zmode       97.50
- *   fn_800E4284    100.00 (268/268 B)   fn_800E4390    98.06 (124/124 B)
- *   fn_800E440C    100.00
- *
- * All twelve are at or above the 80 % bar; the unit is 94.77 % fuzzy, 7 of 12 byte-identical.  Residuals:
- * `prim_list_exec` (+8 B) and `fn_800E4148` (+8 B) materialise an address the peephole pass would fold;
- * `prim_queue_draw` is size-exact: retail's case 2 of the `kind` switch is a signed `cmpwi` where the `(u32)`
- * selector that keeps the 0..1 range test unsigned gives `cmplwi`, and the kind-2 handle's virtual call loads its
- * table pointer into r5 where retail uses r12 (a base-class view of the handle fixed the slot, not that register);
- * `fn_800E3CBC`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
- * colouring (`fn_800E4390`: regsim search's best plan, `cur`/`raw` block locals ahead of `f`, reaches 4/5 volatile
- * targets and measures worse - the unnamed `@` temporary stays r0 where retail has r5).  `fn_800E3D7C` reads
- * 100 % with `p`, `i`, `base` declared in that order and `i = 0, p = base` in the for-init.
+ * Residuals: `prim_list_exec` (+8 B) materialises an address the peephole pass would fold; `fn_800E4390`/
+ * `set_zmode` are size-exact and differ only in register colouring (`fn_800E4390`: regsim search's best plan,
+ * `cur`/`raw` block locals ahead of `f`, reaches 4/5 volatile targets and measures worse - the unnamed `@` temporary
+ * stays r0 where retail has r5).  `fn_800E3D7C` reads 100 % with `p`, `i`, `base` declared in that order and
+ * `i = 0, p = base` in the for-init.
  * FLAGS. `#pragma fp_contract off` for the file: retail keeps `fmuls`+`fadds` in `fn_800E4284` where one `fmadds` is
  * fused (no other row moves).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_20`,
@@ -53,10 +41,9 @@
  *   flipcheck: `.bss` claimed, not emitted.
  *   flipcheck: `.sdata2` size gap.
  * NAMES. GUESS (from each body and its callers): `sound_free_lists_reset`.
- * RESIDUALS. mwcc-debugger dump, `prim_queue_draw`: regsim 2/2 callee-saved, 5/5 volatile (EXACT); first
- *            divergence insn 43: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`; case 2 of the kind switch is a signed
- *            `cmpwi` in retail and the virtual call loads its table pointer into r12
- * SHAPES. `prim_queue_draw` switches on `mode` and, through a `(u32)` selector, on the record kind; its kind-2
+ * RESIDUALS. `prim_list_exec`, `fn_800E4390`, `set_zmode`: see the paragraph above.
+ * SHAPES. `prim_queue_draw` and `fn_800E4148` sit in `#pragma optimization_level 4` (only level 4 lowers the 0..1 case group as
+ *            `cmplwi 1; ble` with the other cases signed); `prim_queue_draw` switches on `mode` and on the record kind; its kind-2
  *            handle is a class (`PrimKind2Obj`, a 0x1C-byte base then five placeholder virtuals) so the call is the canonical
  *            `lwz r12,0x1c(r3)` / `lwz r12,0x1c(r12)`; no table is emitted (nothing constructs it).
  */
@@ -329,23 +316,31 @@ extern "C" void prim_list_exec(void* a, u8 mode)
     }
 }
 
+#pragma optimization_level 4
 /* Project the record against `arg` and decide whether it survives this frame's culling. */
 extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
 {
     VEC3 v;
 
     if (self->flags & 0x1) {
-        vec3_dot(&self->pos, &arg->v_0x20);
         self->key = -(arg->f_0x2C + vec3_dot(&self->pos, &arg->v_0x20));
-    } else if (self->kind <= 1) {
-        f32* m = (f32*)reinterpret_cast<nw4r::g3d::ScnObj*>(self->handle)->GetMtxPtr(nw4r::g3d::ScnObj::MTX_VIEW);
-        self->key = -m[0xB];
-    } else if (self->kind == 2) {
-        f32* m = (f32*)ef_effect_root_mtx(self->handle);
-        setVector3(&v, m[3], m[7], m[11]);
-        self->key = -(arg->f_0x2C + vec3_dot(&v, &arg->v_0x20));
     } else {
-        return 0;
+        switch (self->kind) {
+        case 0:
+        case 1: {
+            f32* m = (f32*)reinterpret_cast<nw4r::g3d::ScnObj*>(self->handle)->GetMtxPtr(nw4r::g3d::ScnObj::MTX_VIEW);
+            self->key = -m[0xB];
+            break;
+        }
+        case 2: {
+            f32* m = (f32*)ef_effect_root_mtx(self->handle);
+            setVector3(&v, m[3], m[7], m[11]);
+            self->key = -(arg->f_0x2C + vec3_dot(&v, &arg->v_0x20));
+            break;
+        }
+        default:
+            return 0;
+        }
     }
     if (self->flags & 0x80) {
         if (self->key < -self->limit_lo) {
@@ -360,6 +355,7 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
     return 1;
 }
 
+#pragma optimization_level reset
 /* Insert `self` into free-list `layer`'s sorted chain at the position the depth metric picks. */
 extern "C" void fn_800E4284(PrimRec* self, u8 layer, f32 f1, f32 f2)
 {
@@ -428,6 +424,7 @@ extern "C" u32 fn_800E440C(u32* p)
     return fn_800E440C(p);
 }
 
+#pragma optimization_level 4
 /* Draw one free-list bucket.  `mode` filters on the record state. */
 extern "C" void prim_queue_draw(u8 idx, u8 mode)
 {
@@ -456,7 +453,7 @@ extern "C" void prim_queue_draw(u8 idx, u8 mode)
             rec->callback(rec);
         }
         rec = (PrimRec*)local;
-        switch ((u32)rec->kind) {
+        switch (rec->kind) {
         case 0:
         case 1:
             if (mode == 1) {
@@ -476,6 +473,7 @@ extern "C" void prim_queue_draw(u8 idx, u8 mode)
     }
 }
 
+#pragma optimization_level reset
 /* Map the three arguments through their GX enums and tail-call GXSetBlendMode. */
 void set_blendmode(u8 mode, u8 src, u8 dst)
 {

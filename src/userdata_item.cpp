@@ -21,8 +21,7 @@
  *   sys_tex_obj_get, nw_res_view_mtx_apply, prim_list_exec, prim_queue_draw); the Q_UserData / NetUserProfile /
  *   SystemWork field names added for this range.  `userdata_item_total_count` is the map's older name for a pouch-room
  *   query (the sibling of `userdata_item_room_get`), kept.
- * RESIDUALS. register allocation or scheduling only (no source shape found): userdata_save_import and userdata_init
- *   (the `system_w` base is materialised after the first load), item_box_take, item_box_store, item_slots_store,
+ * RESIDUALS. register allocation or scheduling only (no source shape found): item_box_take, item_box_store, item_slots_store,
  *   userdata_item_consume, userdata_equip_box_rec_get/set/add/add_new, userdata_new_game_init (the arena-row loop's
  *   registers and the flag-bit loop's test), item_room_get/item_room_or_full_get (retail keeps the found count in r31),
  *   drawSpr2TF (`fmuls` operand order), userdata_pl_look_set.
@@ -30,6 +29,8 @@
  *   exit rule 8 forbids); the loop-then-test form keeps the counter live (+32 B / +12 B).
  *   Flip blockers: the 11 registry callees resolve only once their names land in the map; retail force-actives
  *   userdata_item_room_get, userdata_equip_box_free_index and userdata_equip_box_rec_get (.comment), ours does not.
+ * SHAPES. `userdata_init` takes the `system_w` ring address into a local after the save-block pointer, which orders
+ *   retail's `lis`/`addi` before the first `lhz`.
  * FLAGS. scoped `#pragma optimization_level 4` around userdata_equip_box_add_new; `(u16)userdata_box_capacity(...)`
  *        casts on the capacity argument (item_box_store) drop the `mr r0,r3` temp.
  * RESIDUALS. item_room_get: retail returns the match path through the shared `mr r3,r31` tail (`subf r31,...`), ours
@@ -667,10 +668,12 @@ extern "C" void userdata_init(void)
     for (i = 0; i < 0x20; i++) {
         userdata_block()->seed_0x3920[i] = seed;
     }
-    system_w.field_0x18[0] = userdata_block()->seed_0x3920[0];
-    system_w.field_0x18[1] = userdata_block()->seed_0x3920[1];
-    system_w.field_0x18[2] = userdata_block()->seed_0x3920[2];
-    system_w.field_0x18[3] = userdata_block()->seed_0x3920[3];
+    Q_UserData* user = userdata_block();
+    u16* ring = system_w.field_0x18;
+    ring[0] = user->seed_0x3920[0];
+    ring[1] = user->seed_0x3920[1];
+    ring[2] = user->seed_0x3920[2];
+    ring[3] = user->seed_0x3920[3];
 }
 
 /* Caches the save block and clears it. */
@@ -1624,11 +1627,11 @@ extern "C" void item_box_slot_take(IdValue* box, u16 index, s16 delta)
 extern "C" s16 item_box_take(u16 id, s16 delta)
 {
     Q_UserData* user = userdata_block();
-    u16 cap;
-    s16 rest;
-    u32 n;
-    s32 i;
     IdValue* slot;
+    u16 cap;
+    u32 n;
+    s16 rest;
+    s32 i;
 
     if (item_id_excluded_ck(id) == 1) {
         return 0;

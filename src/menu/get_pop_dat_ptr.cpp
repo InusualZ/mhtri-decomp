@@ -1836,10 +1836,10 @@ extern "C" {
 void entry_list_update(LbRoomWork* work)
 {
     CockpitHoldEntry entry;
-    s16 count;
-    s32 kind;
-    s32 i;
     u16* goods;
+    s32 kind;
+    s16 count;
+    s32 i;
 
     memset(work->items_0xAC, 0, sizeof(work->items_0xAC));
     count = 0;
@@ -2902,9 +2902,9 @@ u16 move_work_name_sprites[4] = {0x2293, 0x2294, 0x2295, 0xFFFF};
 /* 0x803C3098 (0x138): draws the visited room owner's name banner while the player stands in a visited room. */
 void move_work_name_draw(struct _PLW* player)
 {
+    LobbyPeerCopy* peer;
     s8* name = NULL;
     LobbyTimerBlock* block = &lobby_state_block;
-    LobbyPeerCopy* peer;
     _mh_ivec2_ pos;
     s32 i;
 
