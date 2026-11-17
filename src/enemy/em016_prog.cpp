@@ -20,7 +20,8 @@
  *   their records `<table>_rec<N>`; `em017_0x328`'s alert pair and `EmActWork` are this unit's views.
  * RESIDUALS. 5 rows short of 100:
  *  - `em016_frame_em017`: self sits in r31 where retail has r29 (the loop's found/rec/max/i take r31..r27);
- *  - `em016_frame_effect`: retail recomputes `(u16)(angle + 0x8000)` at each test, ours keeps it in a register;
+ *  - `em016_frame_effect`: retail masks the `calcVecAngX` result (`clrlwi r30,r3,16`), ours keeps the `u16` return
+ *    unmasked (scoped `#pragma opt_common_subs off` gives retail's per-test `(u16)(angle + 0x8000)`, size equal);
  *  - `em016_action_select`: retail lowers the `act_id` 5/6/8 case group as a range test (`subi`+`cmplwi`);
  *  - `em016_strafe_point_get`: the selected offset lands in r4 where retail has r3 (`&v` computed late);
  *  - `em016_action_allow_ck`, `em016_swim_rest`: one scratch register coloured differently.
@@ -6265,6 +6266,8 @@ void em016_action_dispatch(_ENEMY_WORK* self) {
 
 /* 0x8018D370 - the per-frame effect spawner: measures the joint point against the water/height
  * gates and picks one of the four ground/air effect ids. */
+#pragma push
+#pragma opt_common_subs off
 void em016_frame_effect(_ENEMY_WORK* self) {
     VEC3 sp8;
     MTX34 sp18;
@@ -6307,6 +6310,7 @@ void em016_frame_effect(_ENEMY_WORK* self) {
         }
     }
 }
+#pragma pop
 
 /* 0x8018D558 - the effect-spawn router: `arg1` picks the position (+0x210 height, a joint, +0x20C height),
  * `arg3` the joint (0xFF: the work), then `eft009_set_pos` or `eft009_spawn_at_joint`. */

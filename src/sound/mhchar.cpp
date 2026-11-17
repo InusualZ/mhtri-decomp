@@ -28,9 +28,9 @@
  *   - .data: retail emits the base `ICalcWorldCallback` table (0x80597CC0) here and the two callback tables
  *     before the assert strings; the g3d header defines the base slots out of line, so this object emits
  *     neither the base table nor that order.
- *   - `mhchar_mat_hide_set`/`mhchar_mdl_prepare`: retail copies the `ResMatMisc` handle through the
- *     out-of-line `ResMatMisc(const ResMatMisc&)`, which g3d_resmat.h does not declare (declaring it changes
- *     `g3d/g3d_draw.cpp`'s copies).
+ *   - `mhchar_mat_hide_set` (99.85): retail keeps the `ResMatMisc` copy's source temporary below the copy on the stack
+ *     (0x8 against 0xC); ours has the opposite order.  `mhchar_mdl_prepare` and this function call the compiler's
+ *     out-of-line `ResMatMisc`/`ResTexSrt` copy constructors under `#pragma dont_inline on`.
  *   - `mhchar_frame_check`: the hold path jumps into the shared case switch (a `goto` shape); the body uses a
  *     flag, one saved register more.
  *   - `mhchar_layer_weight_update`/`mhchar_model_release`: retail hoists the motion-table walk's trip count into
@@ -1468,6 +1468,7 @@ extern "C" u32 scn_mdl_vis_access_valid_ck(ScnMdlVisAccess* access)
 }
 
 /* 0x800E3164 (0x84): Sets material `index`'s light set. */
+#pragma dont_inline on
 extern "C" void mhchar_mat_hide_set(MHchar* chr, u32 index, s32 light)
 {
     MHcharModel* self = reinterpret_cast<MHcharModel*>(chr);
@@ -1482,6 +1483,7 @@ extern "C" void mhchar_mat_hide_set(MHchar* chr, u32 index, s32 light)
         }
     }
 }
+#pragma dont_inline reset
 
 /* `get_joint_num` for the bare-stem caller. */
 extern "C" int mhchar_node_count(MHchar* self)
@@ -1659,23 +1661,23 @@ extern "C" nw4r::g3d::AnmObjChrRes* mhchar_bank_anm_create(u32 kind, s32 index, 
 
 /* 0x800E38BC (0x1AC): Prepares a loaded model's materials: environment-mapped texture coordinates follow
  * camera -1, light 1, and the normal-map indirect stages use reference 1. */
+#pragma dont_inline on
 extern "C" void mhchar_mdl_prepare(nw4r::g3d::ResMdl* mdl)
 {
     const _GXIndTexMtxID ids[3] = {GX_ITM_0, GX_ITM_1, GX_ITM_2};
     u32 num = mdl->GetResMatNumEntries();
+    u32 map_mode;
+    u32 tex_num;
+    u32 j;
+    u32 i;
 
-    for (u32 i = 0; i < num; i++) {
-        struct ResHandle mat;
-        u32 handle = (u32)mdl->GetResMat(i).mpData;
-        res_mat_copy_ctor((struct ResHandle*)&mat, (struct ResHandle*)&handle);
-        if (reinterpret_cast<nw4r::g3d::ResMat&>(mat).IsValid()) {
-            u32 srt_handle = (u32)reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTexSrt().mpData;
-            nw4r::g3d::ResTexSrt srt;
-            res_tex_srt_copy_ctor(&srt, srt_handle);
-            u32 tex_num = reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetNumResTexPlttInfo();
+    for (i = 0; i < num; i++) {
+        nw4r::g3d::ResMat mat(mdl->GetResMat(i));
+        if (mat.IsValid()) {
+            nw4r::g3d::ResTexSrt srt(mat.GetResTexSrt());
+            tex_num = mat.GetNumResTexPlttInfo();
             if (srt.IsValid() == 1) {
-                for (u32 j = 0; j < tex_num; j++) {
-                    u32 map_mode;
+                for (j = 0; j < tex_num; j++) {
                     srt.GetMapMode(j, &map_mode, 0, 0);
                     switch (map_mode) {
                     case 3:
@@ -1687,20 +1689,20 @@ extern "C" void mhchar_mdl_prepare(nw4r::g3d::ResMdl* mdl)
                     }
                 }
             }
-            u32 misc_handle = (u32)reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResMatMisc().mpData;
-            nw4r::g3d::ResMatMisc misc(*(nw4r::g3d::ResMatMisc*)&misc_handle);
+            nw4r::g3d::ResMatMisc misc(mat.GetResMatMisc());
             if (misc.IsValid() == 1) {
-                for (u32 j = 0; j < 3; j++) {
+                for (j = 0; j < 3; j++) {
                     nw4r::g3d::ResMatMiscData::IndirectMethod method;
                     misc.GetIndirectMethod(ids[j], &method, 0);
                     if (method == 1) {
-                        misc.SetIndirectMethod(ids[j], (nw4r::g3d::ResMatMiscData::IndirectMethod)1, 1);
+                        misc.SetIndirectMethod(ids[j], method, 1);
                     }
                 }
             }
         }
     }
 }
+#pragma dont_inline reset
 
 /* 0x800E3AF0 (0x3C): Constructs the callback: the world-callback base, then this class's table. */
 MHcharWorldCallback::MHcharWorldCallback()

@@ -18,8 +18,10 @@
  * RESIDUAL.
  *   * `quest_item_pair_copy_block`/`_row`: callee-saved colouring (target `rec`=r29, `dst`/
  *     `flagged`=r30, `kind`=r31; ours a cyclic shift), plus `quest_item_slot_find`'s mask/load scheduling.
- *   * `quest_item_slot_add` 92.50 %: target's `extsh` temp, unsigned `cmplwi r3,5` and preserved loop counter.
- *     Kept: the `Q_ItemCount* slot` declaration inside the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
+ *   * `quest_item_slot_add` 93.06 %: target keeps the dead loop counters (`li r5,0` / `addi r5,r5,1`), stores the
+ *     rotation byte before masking it (`addi; stb; clrlwi`) and skips the `extsb` before the merged count store.
+ *     Kept: `u32 result` (the unsigned `cmplwi r3,5` and the `extsh` temp), the `Q_ItemCount* slot` declaration inside
+ *     the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
  *
  * SHAPES: the zone objects are defined after every function body under `#pragma pool_data off`, so the
  * `__sinit` loads each object's own address (pooled, MWCC addresses them from one `r30` section base); `quest_item_slots_use` is one `switch` with `default:` first and an inner `switch
@@ -264,7 +266,7 @@ s16 quest_item_slot_find(Q_ItemCount* slots, u16 id) {
  * the caller's rotation byte points at. */
 s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count) {
     ItemDataRecord* rec = GetItemData(id);
-    s32 result;
+    u32 result;
     s32 i;
 
     if (rec == NULL) {

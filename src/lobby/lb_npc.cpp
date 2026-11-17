@@ -11522,13 +11522,16 @@ void lb_shop_buy_list_draw(LbShopWork* self)
 void lb_shop_sell_list_draw(LbShopWork* self)
 {
     u16* ids;
-    u8 arrow;
     s16 i;
     LbShopCell cell;
     _mh_ivec2_ pos;
     u16* frame;
     _mh_ivec2_ base;
     u32 active;
+    LbSprHead* spr;
+    s32 picked;
+    u8 mode;
+    u8 arrow;
 
     active = self->sub_0x001 == 0;
     if (self->page_0x008 == 3) {
@@ -11547,10 +11550,6 @@ void lb_shop_sell_list_draw(LbShopWork* self)
     get_lsp_data(0x144F, &pos);
     PutPageArrow(lb_page_arrow_ids, self->page_0x008, self->pages_0x00A, self->blink_0x004, &pos, arrow);
     for (i = 0; i < 8; i++) {
-        LbSprHead* spr;
-        s32 picked;
-        u8 mode;
-
         cell.item_0x0 = self->rows_0x144[i].item_0x0;
         cell.price_0x2 = self->rows_0x144[i].price_0x4;
         spr = (LbSprHead*)get_lsp_data(ids[i], 0);

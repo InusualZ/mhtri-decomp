@@ -771,6 +771,7 @@ s32 em_spawn_count_get(u16 order, u8 area, u8 flags, u8 large) {
     u32 max;
     _ENEMY_WORK* work;
     s32 by_area;
+    s32 j;
     EmAreaEntry* entry;
     s32 count;
     s32 i;
@@ -786,7 +787,7 @@ s32 em_spawn_count_get(u16 order, u8 area, u8 flags, u8 large) {
         }
     }
     entry = &em_area_entry_tbl[0][0];
-    for (i = 0; i < 128; i++, entry++) {
+    for (j = 0; j < 128; j++, entry++) {
         if (entry->active != 0 && entry->state_0x08 != 1 && (by_area == 0 || area == entry->area_0x0A) &&
             (large != 0 || !(enemy_data_by_team_get(entry->group, entry->team_0x03)->flags_0x00 & 1)) &&
             (large != 1 || (enemy_data_by_team_get(entry->group, entry->team_0x03)->flags_0x00 & 1)) &&
@@ -1261,8 +1262,8 @@ _ENEMY_WORK* em_area_entry_restore(_ENEMY_MINI_WORK* mini) {
     rec.field_0x05 = mini->field_0x13;
     rec.area_0x01 = mini->area_0x0A;
     if (spawn != NULL) {
-        rec.pos_0x08 = nw4r::math::VEC3(*(const Vec*)&spawn->slot_0x8->element_0x08.word_0x10);
-        eft_rot_vec_copy(&rec.rot_0x14, (_CP_VECTOR*)&spawn->slot_0x8->element_0x08.word_0x1C);
+        rec.pos_0x08 = nw4r::math::VEC3(*(const Vec*)&spawn->slot_0x8->element_0x08.word_0x08);
+        eft_rot_vec_copy(&rec.rot_0x14, (_CP_VECTOR*)&spawn->slot_0x8->element_0x08.word_0x14);
     } else {
         rec.pos_0x08 = VEC3(0.0f, 0.0f, 0.0f);
         rec.field_0x14 = 0;
@@ -1862,8 +1863,9 @@ void emc_mini_event_b(_ENEMY_MINI_WORK* mini, u8 remote) {
     if (mini->field_0x0C == 3 && state != 4) {
         if (em_spawn_rec_live_ck2((_ENEMY_WORK*)mini) == 1) {
             u16 order = mini->order_0x16;
+            u8 level;
             s8 element = mini->element_s8_0x0D;
-            u8 level = mini->stat_level_0x1F;
+            level = mini->stat_level_0x1F;
             f32 scale = mini->size_scale_0x24;
             s8 area_slot = mini->area_slot_s8_0x1D;
             em_area_entry_setup(mini, mini->monster_0x02, spawn->slot_0x8->element_0x08.byte_0x01);
@@ -2479,25 +2481,27 @@ void emc_event_hold_init(void) {
 
 /* Holds event `event`'s targets in place (at most five): moves each to its target position and area and freezes it. */
 void emc_event_hold_set(u8 event) {
+    EmcEvent* ev;
+    s32 bit;
+    u8 n;
+    s16 i;
+    s32 taken;
+    EmcEventTarget* target;
+    _ENEMY_WORK* work;
     _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
     s16 max = get_move_work_max(3);
-    EmcEvent* ev = emc_event_tbl_get(event);
+    ev = emc_event_tbl_get(event);
     if (ev != NULL && ev->active != 0) {
-        EmcEventTarget* target = ev->targets;
+        target = ev->targets;
         if (target != NULL) {
-            s32 taken;
-            u8 n;
             emc_event_hold.event = event;
             taken = 0;
             n = 0;
             for (; target->kind != 0; target++) {
-                s16 i;
-                _ENEMY_WORK* work;
                 if (n >= 5) {
                     return;
                 }
                 for (i = 0, work = works; i < max; i++, work++) {
-                    s32 bit;
                     if (work->active != 0 && ((bit = 1 << i), (taken & bit) == 0) && work->team == target->kind &&
                         (target->area_match == 0 || work->field_0x00A == target->area)) {
                         if (target->pos != NULL) {
@@ -2593,26 +2597,32 @@ void emc_event_area_move(u8 event) {
 /* Issues event `event`'s spawn requests: one per spawn row, from the first live enemy (else area record) of the
  * row's kind. */
 void emc_event_spawn(u8 event) {
-    EmAreaEntry* entries;
+    u8 e_count;
+    u8 e_entry;
+    EmcEventSpawn* spawn;
     _ENEMY_WORK* works;
     s16 max;
+    EmAreaEntry* entries;
     EmcEvent* ev;
+    u8 kind;
+    s32 found;
+    s16 i;
+    u8 n;
+    EmAreaEntry* e;
+    _ENEMY_WORK* work;
+    u8 entry;
+    u8 count;
     works = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
     entries = &em_area_entry_tbl[0][0];
     ev = emc_event_tbl_get(event);
     if (ev != NULL) {
-        EmcEventSpawn* spawn = ev->spawns;
+        spawn = ev->spawns;
         if (spawn != NULL) {
-            u8 kind;
             while ((kind = spawn->kind) != 0) {
-                s32 found = 0;
-                s16 i;
-                _ENEMY_WORK* work;
+                found = 0;
                 for (i = 0, work = works; i < max; i++, work++) {
                     if (work->active != 0 && work->team == kind) {
-                        u8 entry;
-                        u8 count;
                         if (spawn->keep_entry == 1) {
                             entry = work->field_0x46C;
                         } else {
@@ -2626,23 +2636,19 @@ void emc_event_spawn(u8 event) {
                     }
                 }
                 if (found == 0) {
-                    u8 n;
-                    EmAreaEntry* e;
                     if (entries == NULL) {
                         return;
                     }
                     for (n = 0, e = entries; n < 128; n++, e++) {
                         if (e->active != 0 && e->monster_0x02 == spawn->kind) {
-                            u8 entry;
-                            u8 count;
                             if (spawn->keep_entry == 1) {
-                                entry = e->entry_0x09;
+                                e_entry = e->entry_0x09;
                             } else {
-                                entry = 0xFF;
+                                e_entry = 0xFF;
                             }
-                            count = spawn->count;
+                            e_count = spawn->count;
                             em_spawn_request(e->order_0x16, spawn->req_kind, spawn->req_team, emc_event_area_get(),
-                                             entry, count, count, spawn->flags, 0xFF, NULL, 0);
+                                             e_entry, e_count, e_count, spawn->flags, 0xFF, NULL, 0);
                             break;
                         }
                     }

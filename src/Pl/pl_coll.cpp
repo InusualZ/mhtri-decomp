@@ -1766,11 +1766,11 @@ void em_coll_shape_set(_ENEMY_WORK* self, u8 mode, u16 layers) {
 void em_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _ENEMY_WORK* self) {
     VEC3 unused;
     EmMotionSlot* slot;
-    PlCollPoly* poly;
     s8* free_at;
-    u32 i;
-    u32 angle;
     u8 count;
+    u32 i;
+    PlCollPoly* poly;
+    u32 angle;
     s32 mode;
 
     count = 0;

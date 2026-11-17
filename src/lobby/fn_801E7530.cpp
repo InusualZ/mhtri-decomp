@@ -1047,7 +1047,11 @@ void lb_deli_screen_draw(void)
         case 1:
             eft052_hold_draw(1);
             eft052_hold_row_get(&row, &count);
-            lb_help_num_put(0x1877, 0xD, item_price_get(row) * count);
+            {
+                u32 price = item_price_get(row);
+
+                lb_help_num_put(0x1877, 0xD, price * count);
+            }
             lb_panel_yes_no_draw(0x1879, self->yes_no_0x18);
             break;
         }

@@ -2656,13 +2656,15 @@ void lb_kujira_day_step(void) {
     s32 i;
     u8 lo;
     u8 hi;
+    s8 cur;
 
-    if (work->count_0x02 != 0) {
+    cur = work->count_0x02;
+    if (cur != 0) {
         step = 1;
-        if (work->count_0x02 > 0) {
+        if (cur > 0) {
             step = -1;
         }
-        work->count_0x02 = work->count_0x02 + step;
+        work->count_0x02 = cur + step;
         if (work->count_0x02 == 0) {
             if (step > 0) {
                 lb_kujira_seed_roll(work);

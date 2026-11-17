@@ -7476,13 +7476,13 @@ void lb_model_pane_draw(::LbModelPane* self)
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     u32 color;
-    LbWorldBlock* world;
+    u8 i;
     bool selected;
     s16 help;
     bool enabled;
     s32 text;
     bool worn;
-    u8 i;
+    LbWorldBlock* world;
 
     help = -1;
     world = lobby_world_block;

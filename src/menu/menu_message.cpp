@@ -1957,15 +1957,15 @@ extern "C" void menu_choice_window_draw(MenuEntry* entries, u8 count, _mh_ivec2_
     _SPR_DATA_* lsp;
     s32 i;
     s16 x;
-    s16 y;
     u32 color;
+    s16 y;
 
     draw_window_box(pos->x, pos->y, 112, (count + 1) * 30, 0, 0);
     row.x = pos->x + 9;
     row.y = pos->y + 17;
     lsp = get_lsp_data(740, NULL);
     font_set_size(lsp->width, lsp->height);
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < count; i++, entries++) {
         draw_sprite_ary((u16*)get_menu_lsp_tbl(43), &row);
         x = menu_text_center_x((char*)entries->field_0x08, (s16)(row.x + lsp->pos.x), lsp->width);
         y = row.y + lsp->pos.y;
@@ -1989,7 +1989,6 @@ extern "C" void menu_choice_window_draw(MenuEntry* entries, u8 count, _mh_ivec2_
             put_menu_cursor((u16*)get_menu_lsp_tbl(44), 0, &row);
         }
         row.y += 30;
-        entries++;
     }
 }
 

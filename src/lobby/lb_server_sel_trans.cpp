@@ -2934,10 +2934,10 @@ void lb_server_select_types_draw(LbServerSelWork* work, bool active)
     bool picked;
     s32 color;
     s32 shade;
-    s16 y;
+    s16 i;
     s16 x;
     s16 x2;
-    s16 i;
+    s16 y;
 
     x = put_frame_dialog_title(0x168, 0x40, 0x104, 0xAA, 0, 0, 0, (s8*)LbStr(0, 0x262), 4) + 20;
     x2 = x + 110;

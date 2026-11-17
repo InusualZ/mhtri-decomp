@@ -1259,8 +1259,12 @@ void lb_ship_order_panel_draw(LbShipWork* work)
 void lb_ship_tabs_draw(LbShipWork* work)
 {
     Q_UserData* ud = lb_userdata();
-    u16 dim;
+    LbShipTab* tab;
     s32 i;
+    s32 ship;
+    u16 anim;
+    u16 frame;
+    u16 dim;
     _mh_ivec2_ pos;
 
     if (work->step_0x000 == 3 && work->mode_0x001 == 2) {
@@ -1269,13 +1273,9 @@ void lb_ship_tabs_draw(LbShipWork* work)
         dim = 0;
     }
     for (i = 0; i < 3; i++) {
-        s32 ship = lb_ship_tab_order[work->ship_0x02E][i];
+        ship = lb_ship_tab_order[work->ship_0x02E][i];
 
         if (ship < ud->ship_0x4654.ships_0x1C) {
-            u16 anim;
-            u16 frame;
-            LbShipTab* tab;
-
             if (ship != work->ship_0x02E) {
                 anim = 6;
                 frame = 0;

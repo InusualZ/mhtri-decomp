@@ -1479,12 +1479,12 @@ void lb_list_draw_ex(LbList* list, u16 panel, const u16* sprites, const u16* row
                      const u16* strs)
 {
     _mh_ivec2_ pos;
-    bool active;
+    const u16* str;
     s32 bit;
     s32 i;
     u32 color;
     s32 sel;
-    const u16* str;
+    bool active;
 
     get_lsp_data(panel, &pos);
     draw_sprite_anim_ary(sprites, list->count_0x06, &pos);
@@ -2732,9 +2732,9 @@ void lb_item_window_draw(u16 item, _mh_ivec2_* pos)
     _SPR_DATA_ spr;
     ItemDataRecord* data;
     u16 species;
-    u32 color;
     s32 have;
     s32 used;
+    u32 color;
     u16 i;
     u16 slots;
 

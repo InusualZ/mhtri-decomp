@@ -1193,6 +1193,8 @@ void gpframe_tex_load(void) {
     u32 tex_tmp;
     u32 pltt_tmp;
     u32 buf;
+    ResEntry* entry;
+    u32 slot;
     u32 i;
 
     cnvt_eur_fname(path, desc->name_0x04);
@@ -1208,11 +1210,11 @@ void gpframe_tex_load(void) {
             res_tex_ctor(&tex, 0);
             res_pltt_ctor(&pltt, 0);
             nwAddResource(desc->name_0x04, (void*)buf);
-            ResEntry* entry = ckResourceName(desc->name_0x04);
+            entry = ckResourceName(desc->name_0x04);
             if (entry != NULL) {
                 res_file_assign(&file, res_file_ctor(&file_tmp, (u32)entry->data));
                 for (i = 0; i <= 3; i++) {
-                    u32 slot = i + 3;
+                    slot = i + 3;
                     if (gpframe_tex_name_tbl[i] == NULL) {
                         break;
                     }
@@ -1244,6 +1246,8 @@ void menu_tex_load(void) {
     u32 tex_tmp;
     u32 pltt_tmp;
     u32 buf;
+    ResEntry* entry;
+    u32 slot;
     u32 i;
 
     cnvt_eur_fname(path, desc->name_0x04);
@@ -1259,11 +1263,11 @@ void menu_tex_load(void) {
             res_tex_ctor(&tex, 0);
             res_pltt_ctor(&pltt, 0);
             nwAddResource(desc->name_0x04, (void*)buf);
-            ResEntry* entry = ckResourceName(desc->name_0x04);
+            entry = ckResourceName(desc->name_0x04);
             if (entry != NULL) {
                 res_file_assign(&file, res_file_ctor(&file_tmp, (u32)entry->data));
                 for (i = 0; i <= 5; i++) {
-                    u32 slot = i + 7;
+                    slot = i + 7;
                     if (menu_tex_name_tbl[i] == NULL) {
                         break;
                     }
