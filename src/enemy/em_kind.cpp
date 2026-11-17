@@ -16,8 +16,8 @@
  *  - `fn_8013BE60` (+16 B): the in-loop exits (`return result`) each reload the result where retail branches to one
  *    shared `lha` (a goto shape, rule 8); this size difference shifts every later function, so it blocks a flip;
  *  - `fn_80140778`: retail adds the recursive offset to `pos` before it sign-extends it for `in` and keeps one more
- *    register free; `fn_8013C7E0`: retail narrows the first `em_area_next` answer into r30 and schedules the
- *    `eft_slot_effect_key` narrowing later;
+ *    register free; `fn_8013C7E0`: retail stores the first `em_area_next` answer (`stb r3`) and then narrows it
+ *    into r30 (`clrlwi r30,r3,24`), ours copies it (`mr r30,r3`) first (a `u8`/`s32` local and chained assignments measure equal or worse);
  *  - `fn_8013CAA0`: retail re-narrows the table byte it passes to `fn_8013AB74` (`clrlwi`);
  *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013D054`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
  *    `fn_80140E48`, `fn_80140FB0`: register allocation only;
@@ -782,7 +782,7 @@ void fn_8013C7E0(_ENEMY_WORK *self, u8 *in) {
         break;
     }
     case 4: {
-        u32 id;
+        u8 id;
         _ENEMY_DATA *entry = (_ENEMY_DATA *)enemy_data_find((u8)enemy_data_grp(self->team, self->field_0x00A),
                                                             self->field_0x46C);
 

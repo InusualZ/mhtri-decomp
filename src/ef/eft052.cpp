@@ -28,8 +28,7 @@
  * RESIDUALS. eft052_item_half_get: dump 03 gives the shift result its own vreg (`srawi r33,r35,1`) coloured r0, retail reuses r3 (`u32`/`s32` value
  *   spellings measure equal).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
- *  - `eft052_place`: ours compares the area unsigned (`cmplwi`) in another order and keeps `+0x04`'s pointer in a
- *    register where retail reloads it per store;
+ *  - `eft052_place`: the register colouring only (regsim EXACT: retail's `table` is r26 and the loop counter r27, ours r27/r29);
  *  - `eft052_hold_list_draw`, `hud_msg_free`, `hud_msg_enqueue`, `fn_80358B40`: register colouring only;
  *  - `hud_msg_update`: retail steps its first queue walk by 8 bytes (`queue += 2`, kept as written).
  *   flipcheck: `.bss`/`.data`/`.sbss`/`.sdata`/`.sdata2` claimed, not emitted.
@@ -198,18 +197,24 @@ extern "C" void eft052_dispatch(_EFT* self)
 /* 0x803589A8 (0x198): Picks the per-area table, creates both parts' models and advances to the alive state. */
 extern "C" void eft052_place(_EFT* self)
 {
-    u8* table;
     EftPartWork* work = (EftPartWork*)self->work_0x38;
+    u8* table;
 
     self->area_0x44 = get_now_areano();
     work->paths_0x40 = NULL;
     work->field_0x44 = 0;
-    if (get_now_mapno() == 3) {
+    switch (get_now_mapno()) {
+    case 3:
         table = lbl_805ED168;
-        if (self->area_0x44 == 2)
+        switch (self->area_0x44) {
+        case 2:
             work->paths_0x40 = lbl_805ED0C0;
-        else if (self->area_0x44 == 3)
+            break;
+        case 3:
             work->paths_0x40 = lbl_805ED120;
+            break;
+        }
+        break;
     }
     if (work->paths_0x40 == NULL) {
         eft052_pool_release(self);
@@ -227,12 +232,11 @@ extern "C" void eft052_place(_EFT* self)
     self->field_0x10 = 0;
     work->path_count_0x48 = table[self->area_0x44];
     for (s32 i = 0; i < work->count_0x00; i++) {
-        MHchar* model = work->slots_0x04[i].model_0x00;
-        setVector3(&model->scale_0x1C, lbl_8079B640, lbl_8079B640, lbl_8079B640);
-        model->field_0x28 = 0;
-        model->field_0x2C = 0;
-        model->field_0x28 = 0;
-        model->ready = 0;
+        setVector3(&work->slots_0x04[i].model_0x00->scale_0x1C, lbl_8079B640, lbl_8079B640, lbl_8079B640);
+        work->slots_0x04[i].model_0x00->field_0x28 = 0;
+        work->slots_0x04[i].model_0x00->field_0x2C = 0;
+        work->slots_0x04[i].model_0x00->field_0x28 = 0;
+        work->slots_0x04[i].model_0x00->ready = 0;
         work->slots_0x04[i].phase_0x04 = 0;
     }
     work->timer_0x3C = 0;
@@ -609,9 +613,12 @@ extern "C" void eft052_hold_row_set(CockpitHoldBlock* block, s16 page)
     count = block->entry_0x38.item_count_0x0C;
     for (i = 0; i < count; i++) {
         id = block->entry_0x38.items_0x14[i];
-        if (block->entry_0x38.kind_0x18 == 2)
-            have = id != 0 ? 1 : 0;
-        else
+        if (block->entry_0x38.kind_0x18 == 2) {
+            if (id != 0)
+                have = 1;
+            else
+                have = 0;
+        } else
             have = userdata_item_count_total(id, lobby_world_block);
         if (have == 0 && block->entry_0x38.kind_0x18 != 2)
             continue;
@@ -1529,33 +1536,33 @@ extern "C" s32 hud_item_msg_push(s32 kind, s32 id, u16 arg)
     char** table = (char**)get_str_tbl(4);
     s32 result = -1;
 
-    if (hud_msg_work == NULL)
-        return result;
-    switch (kind) {
-    case 1:
-        strcpy((s8*)line, (const s8*)table[id]);
-        result = hud_msg_push(0, line);
-        break;
-    case 2:
-        if (arg == 0) {
-            strcpy((s8*)line, (const s8*)table[9]);
-        } else {
-            strcpy((s8*)name, (const s8*)ItemName(arg));
-            sprintf((s8*)line, table[id], name);
+    if (hud_msg_work != NULL) {
+        switch (kind) {
+        case 1:
+            strcpy((s8*)line, (const s8*)table[id]);
+            result = hud_msg_push(0, line);
+            break;
+        case 2:
+            if (arg == 0) {
+                strcpy((s8*)line, (const s8*)table[9]);
+            } else {
+                strcpy((s8*)name, (const s8*)ItemName(arg));
+                sprintf((s8*)line, table[id], name);
+            }
+            result = hud_msg_push(0, line);
+            if (id == 18)
+                se_slot_req(2);
+            break;
+        case 3:
+            strcpy((s8*)line, (const s8*)((u8*)get_move_work_adrs(2) + arg * 0xB20 + 0x5CA));
+            strcat((char*)line, (const char*)table[id]);
+            result = hud_msg_push(0, line);
+            break;
+        case 4:
+            sprintf((s8*)line, "%d%s", arg, table[id]);
+            result = hud_msg_push(0, line);
+            break;
         }
-        result = hud_msg_push(0, line);
-        if (id == 18)
-            se_slot_req(2);
-        break;
-    case 3:
-        strcpy((s8*)line, (const s8*)((u8*)get_move_work_adrs(2) + arg * 0xB20 + 0x5CA));
-        strcat((char*)line, (const char*)table[id]);
-        result = hud_msg_push(0, line);
-        break;
-    case 4:
-        sprintf((s8*)line, "%d%s", arg, table[id]);
-        result = hud_msg_push(0, line);
-        break;
     }
     return result;
 }

@@ -35,8 +35,9 @@
  *  - `lb_deli_screen_draw`: retail loads the hold count after the panel/string arguments of `lb_help_num_put`;
  *  - `lb_goods_slots_draw`: retail computes the page arrow's `mode - 1` after the other arguments;
  *  - `lb_hunt_info_draw`: retail adds the variant row offset before the table base (`add rX, t, base`);
- *  - `lb_farm_plot_tabs_draw`: retail indexes the tab order with a plain int counter and no strength reduction; a u8
- *    counter is closest;
+ *  - `lb_farm_plot_tabs_draw`: retail indexes the tab order with a plain int counter and no strength reduction
+ *    (`#pragma opt_strength_reduction off`, `s32 i`); the colouring is left (regsim EXACT: frame r29/i r27, retail
+ *    i r29/frame r27; the three declaration orders tried measure equal or worse);
  *  - `lb_count_add_cap99`: retail returns through `ble` + `clrlwi`, ours through `blelr`;
  *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
  *    `lb_farm_box_page_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
@@ -2168,6 +2169,7 @@ void lb_farm_box_list_draw(void)
 
 /* 0x801EB560 (0x194): draws the plot tabs, in the order the picked plot sets, with the picked one's cursor and page
  * arrows. */
+#pragma opt_strength_reduction off
 void lb_farm_plot_tabs_draw(LbFarmWork* self)
 {
     _mh_ivec2_ anchor;
@@ -2175,7 +2177,7 @@ void lb_farm_plot_tabs_draw(LbFarmWork* self)
     u16 frame;
     u16 blink;
     u8 plot;
-    u8 i;
+    s32 i;
 
     for (i = 0; i < 3; i++) {
         plot = lb_farm_tab_order[self->plot_0x08 * 3 + i];
@@ -2207,6 +2209,8 @@ void lb_farm_plot_tabs_draw(LbFarmWork* self)
         }
     }
 }
+
+#pragma opt_strength_reduction reset
 
 void lb_farm_page_marks_draw(void)
 {

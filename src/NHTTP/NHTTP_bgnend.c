@@ -169,14 +169,19 @@ s32 NHTTPi_GetSSLError(NHTTPInfo* info) {
  * block being initialised, so the two are distinct objects here. */
 s32 NHTTPi_Startup(NHTTPInfo* info, NHTTPAllocFn alloc, NHTTPFreeFn free, u32 arg) {
     NHTTPInfo* base = info;
+    u8* memory;
     const char* messages = NHTTPi_startupMessages;
     NHTTPInfo* bgnend = (NHTTPInfo*)NHTTPi_GetBgnEndInfoP(base);
+    NHTTPInfo* sys;
+    NHTTPInfo* sys2;
+    u8* buffer;
     NHTTPListInfo* list = (NHTTPListInfo*)NHTTPi_GetListInfoP(base);
     NHTTPRequestInfo* request = (NHTTPRequestInfo*)NHTTPi_GetReqInfoP(base);
     NHTTPMutexInfo* mutex = (NHTTPMutexInfo*)NHTTPi_GetMutexInfoP(base);
     NHTTPThreadInfo* thread = (NHTTPThreadInfo*)NHTTPi_GetThreadInfoP(base);
-    u8* memory = 0;
+    s32 error;
 
+    memory = 0;
     bgnend->alloc_fn = (void*)alloc;
     bgnend->free_fn = (void*)free;
     bgnend->error = 0;
@@ -187,12 +192,9 @@ s32 NHTTPi_Startup(NHTTPInfo* info, NHTTPAllocFn alloc, NHTTPFreeFn free, u32 ar
     NHTTPi_initLockReqList(mutex);
     NHTTPi_InitConnectionList();
     bgnend->socket = -1;
-    {
-        NHTTPInfo* sys = NHTTPi_GetSystemInfoP();
-
-        if (sys->alloc_fn != 0) {
-            memory = (u8*)((NHTTPAllocFn)sys->alloc_fn)(8192, 8);
-        }
+    sys = NHTTPi_GetSystemInfoP();
+    if (sys->alloc_fn != 0) {
+        memory = (u8*)((NHTTPAllocFn)sys->alloc_fn)(8192, 8);
     }
     bgnend->comm_stack = memory;
     if (memory == 0) {
@@ -201,26 +203,20 @@ s32 NHTTPi_Startup(NHTTPInfo* info, NHTTPAllocFn alloc, NHTTPFreeFn free, u32 ar
         return 0;
     }
     if (NHTTPi_createCommThread(thread, arg, memory) == 0) {
-        NHTTPInfo* sys;
-        u8* buffer;
-
         bgnend->error = 9;
         buffer = (u8*)bgnend->comm_stack;
-        sys = NHTTPi_GetSystemInfoP();
-        if (sys->free_fn != 0) {
-            ((NHTTPFreeFn)sys->free_fn)(buffer);
+        sys2 = NHTTPi_GetSystemInfoP();
+        if (sys2->free_fn != 0) {
+            ((NHTTPFreeFn)sys2->free_fn)(buffer);
         }
         bgnend->comm_stack = 0;
         NHTTPi_exitLockReqList();
         return 0;
     }
-    {
-        s32 error = NCDGetCurrentIpConfig(bgnend);
-
-        if (error < 0) {
-            OSReport(messages, error);
-            OSPanic(messages + 0x20, 230, messages + 0x30);
-        }
+    error = NCDGetCurrentIpConfig(bgnend);
+    if (error < 0) {
+        OSReport(messages, error);
+        OSPanic(messages + 0x20, 230, messages + 0x30);
     }
     bgnend->field_0x7CC = 1;
     return 1;

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (300)
+## Ideas that work (302)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -309,6 +309,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 321 | [Reordering a whole TU: classify real vs deferred-inline functions from the target's relocations, then generate the source order](321-reordering-a-whole-tu.md) | works | source-shape, sections, process, tooling | Every row of a unit is at 100 % but its `.text` symbol order, `.data` string pools and extab differ from the target, so the object cannot flip; the helpers were written as plain functions at the top of the file. |
 | 322 | [A nested u16 call argument is copied into r0 before its narrowing: hold it in a u32 local](322-nested-u16-call-argument.md) | works | source-shape, allocator | A u16-returning call passed as the last argument of another call reads `mr r0,r3 ... clrlwi r5,r0,16` in ours where retail narrows straight from the return register (`clrlwi r5,r3,16`, then the other arguments) |
 | 323 | [An if/else assigning one local is laid out like retail's when written as a ternary on the inverted test](323-if-else-assigning-one.md) | works | source-shape | Retail branches over the fall-through arm of a two-way size or kind pick (`bne` to the second arm, the first arm below it) where our `if (c) A else B` branches the other way (`beq`) and emits the arms in the opposite... |
+| 324 | [A regsim plan that lists block-scope locals: hoist them to function scope in the plan's order](324-regsim-plan-that-lists.md) | works | allocator, source-shape | Regsim reports an EXACT plan whose order mixes function-scope and block-scope locals, and reordering the function-scope declarations alone leaves the callee-saved colours wrong |
+| 325 | [A guard that returns early where retail shares one exit: wrap the rest in the positive test](325-guard-that-returns-early.md) | works | source-shape | Ours emits an extra `li r3,-1; b epilogue` pair (+8 B) at an early `return`, where retail's guard branches past the whole body to the one shared return |
 
 ## Ruled out - tried and it did not work, do not re-run (14)
 

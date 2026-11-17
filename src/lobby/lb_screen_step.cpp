@@ -14,8 +14,7 @@
  *   `lb_screen15_step` was named by the hub pass.  GUESS (from each body and its callers): every `lb_smith_*` function,
  *   `lb_smith_menu_tmpls` and every `LbSmith*` type; the foreign callees this unit named are in the name registry.
  * RESIDUALS. Register colouring or instruction scheduling only, unless noted:
- *  - `lb_smith_make_page_build`, `lb_smith_deco_page_build`, `lb_smith_attach_page_build`, `lb_smith_detach_list_build`,
- *    `lb_smith_deco_goods_draw`: the loop's saved registers (the declaration orders are the best a hill climb found);
+ *  - `lb_smith_make_page_build`, `lb_smith_detach_list_build`: the loop's saved registers (the declaration orders are the best a hill climb found);
  *  - `lb_smith_deco_draw`, `lb_smith_attach_draw`, `lb_smith_detach_draw`, `lb_smith_kakou_draw`: retail computes the
  *    page-draw mode before the scroll address (`addi r3,0x154` after the branch); ours has it at initpcode, before the
  *    branch, because the frontend folds the mode statement back into the call argument (a separate `mode`, a scroll
@@ -1091,13 +1090,13 @@ void lb_smith_deco_preview_set(LbSmithWork* self)
 /* 0x803614C0 (0x17C): builds page `page` of the decoration recipes the slot filter passes. */
 void lb_smith_deco_page_build(LbSmithWork* self, s16 page)
 {
-    s32 first;
-    s32 n;
-    LbSmithRecipe* table;
     LbSmithRecipe* recipe;
+    s32 n;
+    s32 first;
+    s32 last;
     s32 idx;
     u16 item;
-    s32 last;
+    LbSmithRecipe* table;
     u16 flags;
     ItemDataRecord* data;
     ItemSpeciesRecord* species;
@@ -1403,9 +1402,9 @@ void lb_smith_attach_page_build(LbSmithWork* self, s16 page)
 {
     s32 n;
     s32 first;
-    _EQUIP* box;
-    s32 item;
     s32 last;
+    s32 item;
+    _EQUIP* box;
     u16 flags;
     ItemDataRecord* data;
     ItemSpeciesRecord* species;
@@ -2603,16 +2602,16 @@ void lb_smith_sort_labels_draw(LbSmithWork* self, _mh_ivec2_* base)
 /* 0x80364790 (0x19C): draws the decoration recipes window. */
 void lb_smith_deco_goods_draw(LbSmithWork* self)
 {
-    s32 active;
+    _SPR_DATA_* lsp;
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     _mh_ivec2_ window;
-    _SPR_DATA_* lsp;
+    LbSmithGoods* goods;
     s32 i;
+    s32 mode;
     s32 enabled;
     s32 picked;
-    s32 mode;
-    LbSmithGoods* goods;
+    s32 active;
 
     active = self->step_0x001 == 0;
     get_lsp_data(0x1915, &base);

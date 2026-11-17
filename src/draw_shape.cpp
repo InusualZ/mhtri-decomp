@@ -1467,6 +1467,8 @@ void village_tex_load(void) {
     u32 tex_tmp;
     u32 pltt_tmp;
     u32 buf;
+    ResEntry* entry;
+    u32 slot;
     u32 i;
 
     buf = work_stack_alloc(desc->size_0x00, 0, "VILLAGE");
@@ -1477,11 +1479,11 @@ void village_tex_load(void) {
             res_tex_ctor(&tex, 0);
             res_pltt_ctor(&pltt, 0);
             nwAddResource(desc->name_0x04, (void*)buf);
-            ResEntry* entry = ckResourceName(desc->name_0x04);
+            entry = ckResourceName(desc->name_0x04);
             if (entry != NULL) {
                 res_file_assign(&file, res_file_ctor(&file_tmp, (u32)entry->data));
                 for (i = 0; i <= 6; i++) {
-                    u32 slot = i + 26;
+                    slot = i + 26;
                     if (village_tex_name_tbl[i] == NULL) {
                         break;
                     }

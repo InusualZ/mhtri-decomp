@@ -864,12 +864,15 @@ extern "C" void snd_player_banks_load(void)
 {
     char name[0x88];
     u32 args[3];
-    _PLW* work = (_PLW*)get_move_work_adrs(2);
-    s32 max = get_move_work_max(2);
-    _PLW* p;
     s32 i;
     s32 chunk;
+    _PLW* p;
+    _PLW* work;
+    s32 max;
+    s32 j;
 
+    work = (_PLW*)get_move_work_adrs(2);
+    max = get_move_work_max(2);
     if (work != NULL && max != 0) {
         p = work;
         for (i = 0; i < max; i++, p++) {
@@ -894,7 +897,6 @@ extern "C" void snd_player_banks_load(void)
                           (u32)fn_800F0230, 3, args);
         }
         if (GameMode_ck() == 0 || GameMode_ck() == 3) {
-            s32 j;
             for (j = 0; j < max; j++, work++) {
                 pl_weapon_se_bank_load(work);
             }

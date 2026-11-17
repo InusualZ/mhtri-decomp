@@ -3580,6 +3580,71 @@ extern "C" void se_area_part_play(u32 arg0, VEC3* pos)
     se_slot_req_pos(46, se_code, pos);
 }
 
+extern "C" nw4r::math::VEC3 se_splash_pos_tbl[];
+extern "C" nw4r::math::VEC3 se_splash_pos_area9_tbl[];
+extern "C" nw4r::math::VEC3 se_splash_pos_area10_tbl[];
+
+/* 0x800DD1F0 (0x19C): requests the splash SE (bank 46) at the fixed position the current area's table gives; areas 9 and 10
+ * pick the entry and the id by `id`. */
+extern "C" void se_req_splash(u8 id, nw4r::math::VEC3* pos)
+{
+    nw4r::math::VEC3 splash_pos;
+    nw4r::math::VEC3* tbl;
+    s32 row;
+
+    get_now_mapno();
+    switch (get_now_areano()) {
+    case 0:
+        row = 0;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 1:
+        row = 1;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 2:
+        row = 2;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 3:
+        row = 3;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 6:
+        row = 4;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 8:
+        row = 5;
+        tbl = se_splash_pos_tbl;
+        break;
+    case 9:
+        row = 6;
+        tbl = se_splash_pos_area9_tbl;
+        break;
+    case 10:
+        row = 7;
+        tbl = se_splash_pos_area10_tbl;
+        break;
+    default:
+        return;
+    }
+    if (row < 6) {
+        splash_pos = nw4r::math::VEC3(tbl[row].x, tbl[row].y, tbl[row].z);
+        se_slot_req_pos(46, 12, &splash_pos);
+    } else {
+        s32 se_code;
+        if (id == 0) {
+            se_code = 13;
+            splash_pos = nw4r::math::VEC3(tbl[id].x, tbl[id].y, tbl[id].z);
+        } else {
+            se_code = 11;
+            splash_pos = nw4r::math::VEC3(tbl[id].x, tbl[id].y, tbl[id].z);
+        }
+        se_slot_req_pos(46, se_code, &splash_pos);
+    }
+}
+
 /* Non-positional SE: bank 46, id 15. */
 extern "C" s32 fn_800DD38C(void)
 {

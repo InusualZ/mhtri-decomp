@@ -593,6 +593,10 @@ s32 WUDiSyncCheckSearch(void)
 /* Opens the HID connection of the stored device and returns the next pairing step for the device the inquiry found. */
 s32 WUDiSyncCheckInquiry(void)
 {
+    u32 level;
+    WUDDeviceNode* node;
+    WUDDevice* wbc;
+    WUDDevice* device;
     s32 next = 0xFF;
 
     if (memcmp(wudInquiryResult.name, "Nintendo RVL-CNT", 0x10) == 0) {
@@ -601,13 +605,12 @@ s32 WUDiSyncCheckInquiry(void)
         next = 6;
     }
     if (wudLinkedWbc != 0 && memcmp(wudInquiryResult.name, "Nintendo RVL-WBC", 0x10) == 0) {
-        WUDDeviceNode* node;
-        WUDDevice* wbc = NULL;
-        u32 level = OSDisableInterrupts();
         WUDCB* cb = &wudCB;
 
+        wbc = NULL;
+        level = OSDisableInterrupts();
         for (node = cb->deviceHead; node != NULL; node = node->next) {
-            WUDDevice* device = node->device;
+            device = node->device;
             if (memcmp(device->name, "Nintendo RVL-WBC", 0x10) == 0) {
                 wbc = device;
             }
@@ -2673,20 +2676,22 @@ void WUDiMoveDeviceToTail(WUDDevice* device)
 #pragma opt_common_subs off
 void WUDiInsertDeviceNode(WUDDevice* device)
 {
-    u32 level;
+    WUDDeviceNode* node;
     WUDCB* cb = &wudCB;
     s32 i;
+    u32 level;
+    WUDDevice* other;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
-        WUDDeviceNode* node = &cb->deviceNodes[i];
+        node = &cb->deviceNodes[i];
 
         if (memcmp(node->device->bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* head = cb->deviceHead;
             WUDDeviceNode* cur;
 
             for (cur = head; cur != NULL; cur = cur->next) {
-                WUDDevice* other = cur->device;
+                other = cur->device;
 
                 if (memcmp(other->bdAddr, device->bdAddr, 6) != 0 &&
                     (other->linkState <= 1 ||
@@ -2727,18 +2732,19 @@ void WUDiInsertDeviceNodeTail(WUDDevice* device)
     WUDCB* cb = &wudCB;
     s32 i;
     u32 level;
+    WUDDevice* other;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 10; i++) {
-        WUDDeviceNode* node = &cb->deviceNodes[i];
         u8* bdAddr = cb->deviceNodes[i].device->bdAddr;
+        WUDDeviceNode* node = &cb->deviceNodes[i];
 
         if (memcmp(bdAddr, device->bdAddr, 6) == 0) {
             WUDDeviceNode* head = cb->deviceHead;
             WUDDeviceNode* cur;
 
             for (cur = head; cur != NULL; cur = cur->next) {
-                WUDDevice* other = cur->device;
+                other = cur->device;
 
                 if (memcmp(other->bdAddr, device->bdAddr, 6) != 0 &&
                     (other->linkState == 0 || cur == cb->deviceTail)) {

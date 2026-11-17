@@ -26,7 +26,7 @@
  *   - Em007ModelCopy::ExecCallbackB: retail moves `pManip` into r3 before the node index load (scheduling).
  *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
  *     operands does not move it (regsim: colouring exact).
- *   - register colouring only: lb_eqshop_weapon_page_build, lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
+ *   - register colouring only: lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
  *     lb_title_frame_draw, lb_eqshop_help_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
@@ -2086,15 +2086,19 @@ void lb_eqshop_goods_preview_set(LbEquipShopWork* self)
  * the kind filter allows, marking the ones the box or the money cannot take. */
 void lb_eqshop_weapon_page_build(LbEquipShopWork* self, s16 page)
 {
-    LbEftFlagBlock* user = lobby_world_block;
-    u16 free = userdata_equip_box_free_count();
-    s32 first = page * 8;
-    s32 last = first + 7;
-    LbIdRow6* table;
+    u16 free;
     s32 n;
+    s32 first;
+    s32 last;
+    LbEftFlagBlock* user;
+    LbIdRow6* table;
     s32 idx;
     u16 id;
     LbShopGoods* goods;
+    user = lobby_world_block;
+    free = userdata_equip_box_free_count();
+    first = page * 8;
+    last = first + 7;
 
     lb_eqshop_goods_clear(self, page);
     table = (LbIdRow6*)lb_eqshop_weapon_tables[self->category_list_0x044.cursor_0x00];

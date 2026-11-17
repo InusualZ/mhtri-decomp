@@ -24,9 +24,10 @@
  *   user of `ncdMutex`, which puts it at +0x00 ahead of `ncdReply`/`ncdVectors` as in retail (without it every
  *   base-relative offset in `NCDiGetWirelessMacAddress`, `NCDiConfigRequest`, `NCDiInitAndLock` and
  *   `NCDGetLinkStatus` swaps 0x00/0x20); mwld strips the unreferenced helper again.
- * RESIDUALS. `NCDiGetEnabledConfigList` re-reads the profile's mode byte
- *   (`lbz r0,0x7ca(r4)` twice per profile) and keeps the masks in r25-r27 (ours CSEs the byte, masks in r29-r31;
- *   an inline predicate, a declaration reorder and a volatile view were measured, none moves it).
+ * FLAGS. `NCDiGetEnabledConfigList` is scoped `#pragma opt_common_subs off`: retail re-reads the profile's mode byte
+ *   (`lbz r0,0x7ca(r4)` twice per profile) where common-subexpression elimination folds the loads (380 B against 368 B).
+ * RESIDUALS. `NCDiGetEnabledConfigList`: the config buffer pointer and the flags byte take r5/r4 where retail has r4/r5
+ *   (regsim plan 1 applied: `result` declared before the masks; three `buffer` positions measure equal).
  *   `NCDGetLinkStatus` branches `blt`+`b` around its `result = -1` where ours emits one `bge` (five spellings of the
  *   negative-status test measured identical).
  * RESIDUALS. NCDGetLinkStatus: retail tests `reply[1] < 0` with `blt` over a `b`, ours with `bge`; the ternary, an
@@ -255,12 +256,13 @@ s32 NCDiGetWirelessMacAddress(u8* address) {
     return result;
 }
 
+#pragma opt_common_subs off
 /* 0x8051C9D0 (0x17C): the bit masks of the enabled wired, wireless and other-wireless profiles. */
 s32 NCDiGetEnabledConfigList(u32* wired, u32* wireless, u32* wirelessOther) {
+    s32 result;
     u32 wiredMask = 0;
     u32 wirelessMask = 0;
     u32 otherMask = 0;
-    s32 result;
     NCDConfig* buffer;
     s32 i;
 
@@ -295,6 +297,7 @@ s32 NCDiGetEnabledConfigList(u32* wired, u32* wireless, u32* wirelessOther) {
     }
     return result;
 }
+#pragma opt_common_subs reset
 
 /* 0x8051CB4C (0x194): reads (3/5) or writes (4/6) the NCD configuration through the shared IPC buffer. */
 s32 NCDiConfigRequest(const char* function, NCDConfig* config, s32 command) {

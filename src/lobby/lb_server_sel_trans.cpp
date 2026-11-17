@@ -26,7 +26,7 @@
  * RESIDUALS. 17 rows below 100 %, register/stack colouring or one scheduling pair each (hill-climbed declaration
  *   orders are applied): lb_screen26_trade_list_draw, lb_screen26_combo_list_draw, lb_screen26_trade_tabs_draw,
  *   npc_talk_start, lb_server_select_types_draw, lb_screen26_trade_commit, lb_server_select_rooms_build,
- *   lb_server_select_rooms_draw, lb_screen26_status_draw, lb_server_select_help_draw, lb_screen26_trade_build,
+ *   lb_server_select_rooms_draw, lb_server_select_help_draw, lb_screen26_trade_build,
  *   lb_screen26_picks_draw, lb_server_select_servers_draw, lb_server_select_screen_step, lb_screen26_box_draw,
  *   lb_screen26_step, lb_screen26_combo_items_draw.
  *   npc_talk_start is 8 bytes long (msg * 8 is recomputed after the conditional `choice` store; retail keeps it), so
@@ -2126,9 +2126,10 @@ void lb_screen26_status_draw(void)
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     s8 text[48];
-    u8 wait;
-    LbTradeUserData* user = (LbTradeUserData*)lobby_world_block;
     s8* unit;
+    LbTradeUserData* user;
+    u8 wait;
+    user = (LbTradeUserData*)lobby_world_block;
 
     get_lsp_data(0x24ED, &base);
     draw_sprite_ary(lb_s26_status_sprites, &base);

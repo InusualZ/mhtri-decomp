@@ -29,7 +29,7 @@
  *   - register colouring or scheduling only: `lb_text_center_print` (retail loads `spr.width` before `spr.pos.x`),
  *     `lb_list_draw_ex`, `lb_item_window_draw`, `lb_seisan_row_flags_get`, `lb_kakou_weapon_flags_get`,
  *     `lb_kakou_icon_build`, `lb_gun_recipe_material_flags_get`,
- *     `lb_item_cell_draw_layout`, `lb_kakou_source_draw`, `lb_item_need_list_draw`, `lb_equip_row_next`,
+ *     `lb_item_cell_draw_layout`, `lb_kakou_source_draw`, `lb_item_need_list_draw`,
  *     `lb_scene_npc_refresh` (retail steps the NPC pointer before the counter).
  *   - this unit's views of foreign records (`LbArmorView`, `LbArmorExView`, `LbBladeView`, `LbGunView` over the Pl rows,
  *     `LbSmithRow`/`LbSmithGunRow`/`LbSmithKakouRow` over `lobby/lb_screen_step.cpp`'s recipes, `LbShopGoodsRow` over
@@ -751,9 +751,9 @@ s32 lb_equip_sort_key_get(_EQUIP* equip, u8 sort)
 s32 lb_equip_row_next(u8 sort, s32 prev, _EQUIP* rows, u16 count, s32 kinds, s32 picked, u8 wearer)
 {
     s32 base;
-    s32 best;
-    s32 key;
     s32 best_key;
+    s32 key;
+    s32 best;
     _EQUIP* row;
     s32 i;
 
@@ -1221,15 +1221,19 @@ u16 lb_kakou_weapon_flags_get(u8 kind, u16 idx, _EQUIP* equip)
     s32 count;
     s32 room;
     s32 kinds;
+    u16* deco;
+    LbItemCount* entry;
     s32 i;
+    u16 id;
+    s32 j;
+    s32 found;
+    s32 full;
 
     kinds = 0;
     flags = lb_kakou_weapon_cost_flags_get(kind, idx);
     count = equip_deco_count(equip);
     room = (u16)item_slots_free_count(((Q_UserData*)lobby_world_block)->box_0x180, userdata_box_capacity(lobby_world_block));
     if (room < count) {
-        u16* deco;
-        LbItemCount* entry;
         species[0].item_0x00 = 0;
         species[0].count_0x02 = 0;
         species[1].item_0x00 = 0;
@@ -1238,9 +1242,8 @@ u16 lb_kakou_weapon_flags_get(u8 kind, u16 idx, _EQUIP* equip)
         species[2].count_0x02 = 0;
         equip_deco_ids_get(equip, decos, 1);
         for (i = 0, deco = decos, entry = species; i < count; i++, deco++, entry++) {
-            u16 id = get_item_species_data(*deco)->item_id;
-            s32 found = 0;
-            s32 j;
+            id = get_item_species_data(*deco)->item_id;
+            found = 0;
             for (j = 0; j < i; j++) {
                 if (id == species[j].item_0x00) {
                     species[j].count_0x02++;
@@ -1255,7 +1258,7 @@ u16 lb_kakou_weapon_flags_get(u8 kind, u16 idx, _EQUIP* equip)
             }
         }
         if (room < kinds) {
-            s32 full = room * 99;
+            full = room * 99;
             for (i = 0, entry = species; i < kinds; i++, entry++) {
                 if (item_slots_room_get(entry->item_0x00, ((Q_UserData*)lobby_world_block)->box_0x180,
                                         userdata_box_capacity(lobby_world_block)) - full < entry->count_0x02) {

@@ -1984,8 +1984,8 @@ u8 em_get_unique_work(u16 id, _ENEMY_WORK** out, _ENEMY_MINI_WORK** mini) {
         }
     }
     if (mini != NULL) {
-        EmAreaEntry* entry = &em_area_entry_tbl[0][0];
         s16 i;
+        EmAreaEntry* entry = &em_area_entry_tbl[0][0];
         for (i = 0; i < 128; i++, entry++) {
             if (entry->active != 0 && entry->order_0x16 == id) {
                 *mini = entry;

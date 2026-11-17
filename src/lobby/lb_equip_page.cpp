@@ -5317,9 +5317,9 @@ void LbEquipModelCallbackA::ExecCallbackA(nw4r::g3d::ChrAnmResult* pResult, nw4r
                                           nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
     nw4r::math::VEC3 v;
-    u32 node;
-    PlRigNodeRule* rules;
     PlRigNodeRule* rule;
+    PlRigNodeRule* rules;
+    u32 node;
     PlSeJointAdj* adj;
 
     node = pFuncObj->GetCallbackNodeID();

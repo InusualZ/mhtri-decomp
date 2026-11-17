@@ -7,8 +7,7 @@
  *   edge is the hash table (`DWCi/hashtable.c`, which calls every array function out of line).
  * FLAGS. `cflags_base` (-func_align 16): the retail functions start 16-byte aligned.
  * NAMES. GameSpy SDK names (`Array*`). The file name is the GameSpy SDK's `darray.c` (no `__FILE__` string).
- * RESIDUALS. `ArraySearch` saves from r22 where retail saves from r23 (`_savegpr_22`/`_restgpr_22`);
- *   `ArrayInsertSorted` differs in register colouring.
+ * RESIDUALS. `ArraySearch` saves from r22 where retail saves from r23 (`_savegpr_22`/`_restgpr_22`).
  * SHAPES. The bounds-checked element address and the insert are static inlines (retail expands them in every
  *   caller).
  */
@@ -96,13 +95,17 @@ void ArrayAppend(DArray array, const void* newElem) {
 /* 0x8050ADA0 (0x180): inserts a copy of `newElem` at its sorted place (binary search with `comparator`). */
 /* untyped: caller-owned payload - the element copied in */
 void ArrayInsertSorted(DArray array, const void* newElem, ArrayCompareFn comparator) {
-    char* base = (char*)array->list;
-    int elemsize = array->elemsize;
-    int low = 0;
-    int high = array->count - 1;
+    char* base;
+    int elemsize;
     int mid;
+    int high;
+    int low;
     int result;
     int n;
+    elemsize = array->elemsize;
+    base = (char*)array->list;
+    low = 0;
+    high = array->count - 1;
 
     while (low <= high) {
         mid = (low + high) >> 1;

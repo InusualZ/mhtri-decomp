@@ -48,7 +48,6 @@
  *    shift; `lb_name_tail_copy`: the word copies' load/store order (dump 03: the word loop is unrolled with one
  *    temporary per load; a struct assignment and pointer-walk spellings measure worse or equal, regsim's r42/r45
  *    temporaries are retail's r5 where ours stay r0);
- *  - `lb_act_entry_start`: the request's +0x18..+0x1B;
  *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
  *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
  *  - `lb_skill_unlock_announce`: retail walks `lb_skill_unlock_items` with two pointers (one for the `need_0x00` test,
@@ -1081,7 +1080,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
     if (work != NULL) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
-            if (companion->index_0x6A68 == 0) {
+            if (req->started_0x1B == 0) {
                 if (isReadyCountOne() != 0 && companion->started_0x6A40 == 0) {
                     ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x19);
                     cmd.value_0x04 = req->value_0x04;
@@ -1092,6 +1091,9 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
                     cmd.index_0x15 = req->index_0x15;
                     cmd.value_0x16 = req->value_0x16;
                     cmd.value_0x17 = req->value_0x17;
+                    cmd.value_0x18 = req->value_0x18;
+                    cmd.value_0x19 = req->value_0x19;
+                    cmd.value_0x1A = req->value_0x1A;
                     cmd.started_0x1B = 1;
                     broadcastSessionCommand(&cmd, 0x1C);
                     companion->started_0x6A40 = 1;
