@@ -89,6 +89,8 @@
  *            the shared slots (onEvent 0x805544CC in every handler table).
  * SHAPES.    The key table's group words are pointer variables, so the unit's static initialiser (0x80554600) patches
  *            them, as homebutton/hbm_anim_record.cpp's table does.
+ * RESIDUALS. hbmKbWidgetDestroy: `(*widget).~...`, a reference local and the qualified pointer call all keep the
+ *            inline destructor's own null test.
  */
 
 #include "types.h"

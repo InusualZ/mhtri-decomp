@@ -60,6 +60,9 @@
  *   take their floats where retail moves them); `s32` loop bounds where retail narrows the `u16` count at the call;
  *   `x = c ? v : K;` with a non-constant arm where retail emits `cmp; li K; b; mr`; `(f64)scale` at the pie call
  *   for retail's `frsp`.
+ * RESIDUALS. quest_targets_update_a/_b: the first PCode dump (backend-03) already holds `li r35,4` before `cmpi
+ *            cr11` in the block after quest_mark_visible_ck, and no source spelling of the helper (flag=0/if, early
+ *            returns, ?:) moves it after the compare (scheduler, not a source-visible pass).
  */
 
 #include "types.h"

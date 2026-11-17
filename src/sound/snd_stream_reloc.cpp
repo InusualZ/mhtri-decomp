@@ -505,7 +505,7 @@ extern "C" void fn_800E8698(void)
     SEQRunAudioFrame();
     SYNRunAudio();
     MIXUpdateSettings();
-    fn_800EDB74(snd_bank_table_get());
+    snd_voice_pool_frame_update(snd_bank_table_get());
     fn_800E7D34();
     snd_bank_select_pending();
     OSRestoreInterrupts(level);

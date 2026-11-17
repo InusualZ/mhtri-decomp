@@ -43,6 +43,9 @@
  *   and switch tables when it generates the function, after every global defined above it, so the counter's tables
  *   follow the SE callback (its jump table) and the trade tables follow the talk window (its 16-byte format buffer);
  *   the 16-byte `npc_talk_item_fmt` and 8-byte `npc_talk_str_fmt` buffers reproduce the retail padding.
+ * RESIDUALS. lb_screen26_picks_draw: dump 03 shows the backend temporary r37 is a copy of `work` strength-reduced by
+ *            2 per iteration with the +0x94 offset folded into each load (retail `lhz 0x94(r30)` with r30 stepping
+ *            by 2); a `u16* pick = work->picks` local gives `addi r30,r26,0x94` (98.5) and swaps the increments.
  */
 
 
@@ -2963,9 +2966,11 @@ void lb_server_select_title_draw(u16 str)
 /* 0x803C91B8 (0xEC): draws the help line for the screen's current step. */
 void lb_server_select_help_draw(LbServerSelWork* work)
 {
-    s8* text = NULL;
-    s16 x = get_wide_offset(4) + 0x170;
+    s16 x;
+    s8* text;
 
+    text = NULL;
+    x = get_wide_offset(4) + 0x170;
     draw_window_frame_preset(x, 0x14A, 0);
     font_set_size(16, 16);
     switch (work->list.mode_0x000) {

@@ -1,12 +1,14 @@
 /* sound/snd_voice_pool.cpp - the sound table object and its pool destructors
  *
- * `.text` 0x800ED780..0x800EE014, 22 functions written (the rest of the range is not decompiled yet).
+ * `.text` 0x800ED780..0x800EE014, 23 functions written (the rest of the range is not decompiled yet).
  * Name is a GUESS: the unit owns `lbl_8069A8E8` (0x6828 B `.bss`, the table `snd_bank1_install`/`fn_800EDD00` install into) and `dtor_800ED780`/`dtor_800ED7EC`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 
 #include "types.h"
 #include "sound/sound_work.h"
+#include "sound/sound_obj.h"
+#include "sound/snd_voice_list_end_ck.h"
 
 extern "C" void* dtor_800ED780(SndEdHost* self, s16 flags);
 extern "C" void* dtor_800ED7EC(void* self, s16 flags);
@@ -22,6 +24,15 @@ extern "C" SndNode2* fn_800EDF74(SndNode2* self);
 extern "C" SndPool2* fn_800EDFDC(SndPool2* self);
 
 extern "C" SndListNode* fn_800EDB48(SndVoiceMgr* self);
+
+/* The voice-player interface the stream manager and the sound object share (table slots 1 and 2 after the
+ * destructor); declared for the virtual calls only, so this unit emits no table. */
+class SndVoicePlayer {
+public:
+    virtual ~SndVoicePlayer();
+    virtual void update(SndNode2* node);
+    virtual u32 release(SndNode2** link);
+}; /* size: 0x4 (the interface view: the table pointer at +0x00) */
 
 #pragma peephole off
 
@@ -192,6 +203,32 @@ extern "C" void fn_800EDA10(SndNode2* list, SndNode2* src, u32 count)
         fn_800ED93C(list, node);
         node++;
         i++;
+    }
+}
+
+/* Runs one frame over the voice list: the node's player (the stream manager for kind 2, else the sound object)
+ * releases it when it is finished, and a flagged live node is updated. */
+extern "C" void snd_voice_pool_frame_update(struct StreamWork* table)
+{
+    SndNode2* node;
+    SndVoicePlayer* player;
+
+    for (node = (SndNode2*)snd_voice_first((SndVoiceMgr*)table);
+         snd_voice_list_end_ck((SndPool2*)table, node) != 1;) {
+        if (node->field_0x19 == 2) {
+            player = (SndVoicePlayer*)stream_mgr_get();
+        } else {
+            player = (SndVoicePlayer*)snd_obj_get();
+        }
+        if (player->release(&node) == 1) {
+            continue;
+        }
+        if (snd_slot_flag_test(node, 1) != 1) {
+            node = (SndNode2*)snd_voice_next(node);
+        } else {
+            player->update(node);
+            node = (SndNode2*)snd_voice_next(node);
+        }
     }
 }
 

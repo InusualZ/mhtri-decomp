@@ -3229,8 +3229,8 @@ void lb_title_frame_draw(LbList* list, u8* kinds)
     _mh_ivec2_ pos;
     const u16* lsp;
     s32 i;
-    bool sel;
     s32 color;
+    bool sel;
 
     font_flush();
     get_lsp_data(0x18B7, &pos);

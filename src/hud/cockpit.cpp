@@ -57,6 +57,9 @@
  *   `(s32)(screen.x / 2.0f)` (retail `extsh`es the s16); the pointer ray stages its forward scale in a float local and
  *   declares the scalars in retail's stack order; the trail loop starts with `i = 1, alpha = step`; the name tag's
  *   rank colour is a ternary; the guide width adds `w < 0 ? -w : w` (the `extsh` lands at the join).
+ * RESIDUALS. ainpc_page_select_button_ck: `else { down = 1; }`, `down != 1` and the ternary all collapse the
+ *            inversion (-20 B); only `else if (down == 0)` keeps retail's second branch, which then carries one
+ *            `cmpwi`/`bne` pair retail lacks.
  */
 
 #include "types.h"

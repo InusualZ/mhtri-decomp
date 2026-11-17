@@ -108,6 +108,9 @@
  *    `arg * N`: a row struct folds the index into one `mulli`.
  * RESIDUALS. fn_802D66B8: operand order of one `add` (`add r3,r0,r3` against ours `add r3,r3,r0`); regsim EXACT, the
  *            r35 temp (r0/r3) is not a target.
+ * RESIDUALS. fn_802D3398: `#pragma opt_common_subs off` re-reads *row in the second loop as retail does but also in
+ *            the first (224 B against 220 B); a `weight` local, a `while` form and `row[0]` indexing compile
+ *            identically.
  */
 
 #pragma optimization_level 4

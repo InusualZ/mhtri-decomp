@@ -29,6 +29,8 @@
  *   between the functions in retail order (the three action dispatchers' jump
  *   tables come before it, the motion-events table after it).  The `.bss` vector pair is built by MWCC's own
  *   `__sinit` from `Em030VecPair`'s constructor.
+ * RESIDUALS. em_area_engaged_ck: the positive-form `if ((u32)(team - 1) <= 1) {...} else switch` that lays the team
+ *            1/2 block first measures 39.8 B lower.
  */
 
 #include "types.h"

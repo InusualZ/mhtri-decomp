@@ -232,9 +232,7 @@ size_bytes,unit,function,match_percent,address
 220,ai/ai_npc,fn_802D3398,98.0909,0x802D3398
 220,draw_shape,drawshape_set_scale__FPC8_MH_VEC2PC8_MH_VEC2,98.8545,0x80053D9C
 220,homebutton/tiHKBManager,hkbManagerSetMap,98.7273,0x8056C3F4
-220,lobby/fn_801E7530,lb_farm_harvest_roll,99.2727,0x801EA1D8
 220,menu/menu_placeinfo,place_model_load,94.9091,0x8043CCBC
-220,sound/snd_voice_pool,fn_800EDB74,0.0,0x800EDB74
 224,ef/eft023_fx,fn_80116EEC,97.4464,0x80116EEC
 224,ef/eft052,eft052_box_cell_merge,96.1607,0x80359ED4
 224,enemy/em_common,em_team_member_claim,99.9107,0x8012C220
@@ -251,7 +249,6 @@ size_bytes,unit,function,match_percent,address
 228,ef/eft_res,eft_res_slot_get,94.5614,0x800F8788
 228,enemy/em020_prog,em020_arm_mot1_side_wait80,99.8246,0x80370FC8
 228,enemy/em_pop,em_set_move_start,97.9825,0x803B849C
-228,fn_8004CAD8,my_set_equip_id_swap,97.9825,0x8004DA5C
 228,menu/get_pop_dat_ptr,pop_dat_spare_load,97.6316,0x803BE4D4
 228,sound/sound_obj,snd_obj_play_chain,96.9298,0x800E6C60
 232,Network/NetworkWiiMediator,pushTransferRecord__18NetworkWiiMediatorFScPCUcl,98.7069,0x80416E38
@@ -264,15 +261,9 @@ size_bytes,unit,function,match_percent,address
 232,mh3_pad,stage_map_set,96.2069,0x80040DE8
 236,AX/AXOut,__AXOutInitDSP,87.7627,0x804701C0
 236,Pl/pl_act,fn_8027FB84,98.2203,0x8027FB84
-236,Pl/pl_hit,hit_id_list_absent_ck,99.6271,0x8029F084
 236,fn_8004CAD8,exportItemBoxPage,95.7288,0x8004FC80
-236,fn_8004CAD8,userdata_hunter_rank_info_get,96.5254,0x8004DF10
-236,lobby/fn_801E0ADC,lb_title_frame_draw,99.5763,0x801E68D8
-236,lobby/lb_server_sel_trans,lb_server_select_help_draw,99.2373,0x803C91B8
-236,menu/get_pop_dat_ptr,eft_em_model_pair_create,99.322,0x803C3424
 236,sound/fn_800D7F54,fn_800DBFAC,99.8305,0x800DBFAC
 236,sound/fn_800D7F54,se_frame_req,99.8305,0x800D9CC8
-240,Pl/pl_act,fn_8027A08C,96.6667,0x8027A08C
 240,ef/eft052,hud_msg_enqueue,96.9,0x8035ADA8
 240,enemy/enemy_control,emc_event_act_end,98.0,0x80145EF4
 240,hud/cockpit_quest,quest_targets_update_b,96.6667,0x802E8C8C
@@ -282,11 +273,9 @@ size_bytes,unit,function,match_percent,address
 244,enemy/em020_prog,lobby_net_leave_select,99.6721,0x80375C3C
 244,g3d/g3d_state,g3d_tex_obj_cache_load,98.2787,0x80085E48
 244,homebutton/hbm_value,fn_8055E194,0.0,0x8055E194
-244,lobby/fn_801E7530,lb_goods_sale_draw,99.9836,0x801E8348
 244,lobby/lb_npc,lb_act_carry_put,96.7213,0x8020E4F8
 244,lobby/lb_quest_screen,note_value_to_slot,98.5246,0x803A4F7C
 244,sound/fn_800D7F54,fn_800D9DB4,99.5902,0x800D9DB4
-248,enemy/em_prog_support,chat_log_scroll_get,96.8548,0x80383F0C
 248,homebutton/hbm_value,v_0x03C__14HbmPaneManagerFv,99.5484,0x8055C1D4
 248,homebutton/hkb_keyboard,DrawQuad__Q34nw4r3lyt6detailFRCQ34nw4r4math4VEC2RCQ34nw4r3lyt4SizeUcPCQ44nw4r3lyt6detail12TexCoordQuadPCQ34nw4r2ut5ColorUc,98.3871,0x80535CD4
 248,quest/quest_item_slot,quest_item_pair_copy_block,89.5968,0x803AA67C
@@ -309,7 +298,6 @@ size_bytes,unit,function,match_percent,address
 256,lobby/fn_80212810,lb_text_center_print,93.0625,0x8021555C
 256,lobby/lb_companion_ui,lb_s13_entry_list_draw,93.75,0x8033E21C
 256,lobby/lb_npc,lb_npc_walk_blend_set,99.9219,0x8020A058
-256,menu/multi_result,pig_dress_list_build,98.3594,0x803A2BB8
 256,stage/shell,pull_shell_work__FUl,97.3438,0x802AA764
 256,userdata_item,userdata_item_consume,96.875,0x8004B200
 260,NCD/ncdsystem,NCDGetLinkStatus,98.3077,0x8051C7A4
@@ -317,7 +305,6 @@ size_bytes,unit,function,match_percent,address
 260,enemy/em016_prog,em016_strafe_point_get,96.4615,0x80182C40
 260,font/flfnt,flfntUtf8Decode,92.0769,0x8005BD3C
 260,lobby/lb_companion_ui,lb_act_award_handover,96.9231,0x80338D00
-264,Pl/pl_motion,quest_scene_res_load,99.3182,0x8028C468
 264,ef/system_core,work_stack_alloc,99.5455,0x800CFDD0
 264,enemy/em_common,em_nearest_area_get,96.8939,0x801271BC
 264,menu/multi_result,name_menu_page_build,97.7273,0x803A2FD8

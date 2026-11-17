@@ -13,7 +13,7 @@ extern "C" {
 #endif
 void snd_voice_free(SndNode2* list, SndNode2* node);
 void* snd_voice_first(SndVoiceMgr* self);
-void fn_800EDB74(void* table);
+void snd_voice_pool_frame_update(struct StreamWork* table);
 void snd_bank1_install(struct StreamWork* table, u32 id);
 void fn_800EDD00(void* table, u32 id, u32 idx);
 void snd_bank2_install(struct StreamWork* table, u32 id);

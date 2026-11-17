@@ -40,12 +40,14 @@
  *  - `lb_count_add_cap99`: retail returns through `ble` + `clrlwi`, ours through `blelr`;
  *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
  *    `lb_farm_box_page_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
- *    `lb_farm_harvest_roll`, `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
- *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`, `lb_trade_list_step`, `lb_goods_sale_draw`: register colouring;
+ *    `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
+ *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`, `lb_trade_list_step`: register colouring;
  *  - flipcheck: `.data` (2344 B) and `.sdata` (232 B) are claimed but not emitted (the tables are declared, not
  *    defined), including `lb_kujira_gift_items`, which `lobby/fn_802FA9A0` references.
  * SHAPES. The free-hunt point rows are written through a flat u16 index (`n * 3`): retail's `slwi`/`subf`/`slwi` is that
  *   index, not a 6-byte struct `mulli`.
+ * RESIDUALS. lb_farm_seed_ck: regsim volatile targets r34(level)/r37 backend temporary differ at cost 0 (no
+ *            declaration order moves them).
  */
 #include "types.h"
 
@@ -714,7 +716,7 @@ void lb_goods_sale_draw(LbMenuWork* self)
         break;
     case 1:
         a = 9;
-        lb_panel_yes_no_draw(0x1879, self->data_0x1C);
+        lb_panel_yes_no_draw(0x1879, self->yes_no_0x18);
         break;
     case 2:
         a = 0xA;
@@ -1570,6 +1572,7 @@ s16 lb_farm_harvest_rolls_get(const LbFarmPlot* plot)
 void lb_farm_harvest_roll(IdValue* out, const LbFarmHarvestRow* table, s16 rolls, s16 room, u16 rng)
 {
     const LbFarmHarvestRow* row;
+    IdValue* p;
     u32 sum;
     s16 i;
 
@@ -1577,7 +1580,6 @@ void lb_farm_harvest_roll(IdValue* out, const LbFarmHarvestRow* table, s16 rolls
         if (rolls > room) {
             rolls = room;
         }
-        IdValue* p;
 
         for (i = 0, p = out; i < rolls; i++) {
             u32 roll;

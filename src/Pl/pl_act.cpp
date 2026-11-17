@@ -252,6 +252,8 @@
  *            declaration order reaches both. fn_802693C4: `work` (r35) is r3 in ours and r4 in retail.
  * RESIDUALS. Pl_chr_set_attr / fn_8026A178: the `mr r9,r31` argument copy is scheduled before the motion-id call in
  *            ours and after it in retail (regsim EXACT).
+ * RESIDUALS. fn_8027FB84: retail masks the u8 `cap` (`clrlwi r0,r29,24`) before the final `cmpwi`; `cap` as u32/s32
+ *            or a `(u8)` compare measure lower or equal.
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -6921,10 +6923,10 @@ extern "C" void fn_8027A08C(_PLW* self, s8 arg1)
     v = (f32)self->shell_ang_s_0x583 / lbl_8079A0D0;
     if (self->shell_ang_s_0x583 >= 0) {
         v = lbl_8079A0E0 * v * lbl_8079A0DC / lbl_8079A0E4 + lbl_8079A088;
-        self->unk5E8 = (s16)(u16)v;
+        self->unk5E8 = (s16)(u16)(s32)v;
     } else {
         v = lbl_8079A0E8 * v * lbl_8079A0DC / lbl_8079A0E4 + lbl_8079A088;
-        self->unk5E8 = (s16)(u16)v;
+        self->unk5E8 = (s16)(u16)(s32)v;
     }
 }
 

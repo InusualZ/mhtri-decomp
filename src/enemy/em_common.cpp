@@ -168,6 +168,8 @@
  * RESIDUALS. em_delay_act_set (148 B, ours 140 B): retail keeps `li r0,0; mulli r0,r0,20; add r31,r3,r0` and
  *            addresses the fields with 0xAF0 displacements; ours folds index 0 into `addi r31,r3,0xAF0`. Direct
  *            indexing, `global_optimizer off` (+0.1 %) and optimization levels 0/1 do not reproduce it.
+ * RESIDUALS. em_team_member_claim: a `u8 area_no` local, `(state_sub & 0xFF)` and a `u32` local all still store the
+ *            masked copy (-4.8 to -13 B); retail stores the raw r30.
  */
 
 /* Names the included headers declare with the callers' older signatures, hidden while they are read. */

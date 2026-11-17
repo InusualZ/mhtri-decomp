@@ -83,6 +83,8 @@
  *            (u32) selector keeps the size (98.54), an (s32) selector and an if-chain score 93.66 and 87.56.
  * FLAGS. scoped `#pragma optimization_level 4` around note_slot_to_value (retail's counter-loop shape; -O3 scores
  *        90.97).
+ * RESIDUALS. note_value_to_slot: regsim volatile targets r39/r41/r42 (backend temporaries of the table pointer, row
+ *            pointer and masked value) swap; a `row` local and a pointer-walked table measure lower.
  */
 
 #include "types.h"

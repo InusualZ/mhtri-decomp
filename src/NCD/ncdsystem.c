@@ -29,6 +29,8 @@
  *   an inline predicate, a declaration reorder and a volatile view were measured, none moves it).
  *   `NCDGetLinkStatus` branches `blt`+`b` around its `result = -1` where ours emits one `bge` (five spellings of the
  *   negative-status test measured identical).
+ * RESIDUALS. NCDGetLinkStatus: retail tests `reply[1] < 0` with `blt` over a `b`, ours with `bge`; the ternary, an
+ *            empty-if/else and an else-less form compile identically.
  */
 
 #include "NCD/ncdsystem.h"

@@ -35,7 +35,6 @@
  *   `eft013_target_set` (0x80107914), `eft020_actor_spawn` (0x80114D28), `pl_sharpness_add` (0x80278674),
  *   `pl_class7_meter_add` (0x8027CA48).
  * RESIDUALS. Every row is written; the partial rows:
- *  - `hit_id_list_absent_ck`: retail bumps the dead `+9` accumulator before the list pointer, ours after;
  *  - `hit_registry_update`: register permutation (retail keeps the hit in r29 and the NPC record in r31);
  *  - `hit_life_update`: retail reads the second motion pair through a `+4` base register (an unrolled four-entry loop
  *    over a `u16[4]` view, inline or not, measures worse);
@@ -2411,10 +2410,10 @@ u16 get_hit_id(void)
 extern "C" u32 hit_id_list_absent_ck(u16* ids, u16 id)
 {
     s32 i;
+    u16* p = ids;
 
-    for (i = 0; i < 20; i++) {
-        u16 entry = ids[i];
-        if (entry == id) {
+    for (i = 0; i < 20; i++, p++) {
+        if (*p == id) {
             return 0;
         }
     }

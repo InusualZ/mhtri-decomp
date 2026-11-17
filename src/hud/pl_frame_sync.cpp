@@ -43,6 +43,10 @@
  *   `(u32)(step - 2) > 1` range test; `(i * 240) / 2` for the frame records' key frames; local-declaration
  *   order for `pl_frame_hit_set`/`pl_act_hit_react`'s registers; the act tables are each handler's own local
  *   statics and the step tables are defined after `Pl_act_frame_dispatch` (the `.data` emission order).
+ * RESIDUALS. pl_act_attr_stage_set: regsim EXACT at rewrite cost 0, so the row is the call-argument narrowing
+ *            (`clrlwi r4,r31,16` before Pl_chr_set_attr_default), not colouring; `motion` as s32/u32/s16 measures
+ *            equal or lower. em_net_parts_unpack: retail indexes `in->value[part]` through the masked r4, ours
+ *            through r0 (backend temporary; an `idx` or value local compiles identically).
  */
 
 #include "types.h"

@@ -73,6 +73,8 @@
  * SHAPES. `Em020UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
+ * RESIDUALS. lobby_net_leave_select: regsim EXACT needs `r46` (the u16 conversion of stage_entry_angle_get's u32
+ *            result) folded into `angle`; a `u32 angle` with a `(u16)` at the call measures 5 B lower.
  */
 
 #include "types.h"

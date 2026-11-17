@@ -927,8 +927,7 @@ extern "C" void pig_dress_list_build(LbPigMenuWork* w) {
     memset(w->dress_ids_0x4C, 0xFF, sizeof(w->dress_ids_0x4C));
     count = 0;
     worn = 0;
-    i = 0;
-    do {
+    for (i = 0; i < 8; i++) {
         if (i == ((Q_UserData*)lobby_world_block)->pig_dress_0x483B) {
             worn |= (u16)(1 << count);
         }
@@ -939,8 +938,7 @@ extern "C" void pig_dress_list_build(LbPigMenuWork* w) {
             w->dress_ids_0x4C[count] = i;
             count++;
         }
-        i++;
-    } while (i < 8);
+    }
     lb_list_init(&w->dress_0x2C, (s16)count, 0, 459, -1, worn, 0, 3, 0);
 }
 

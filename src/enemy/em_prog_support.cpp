@@ -29,7 +29,7 @@
  *  - `note_page_draw`, `lb_screen16_step`: retail lowers the 0..1 / 0..2 case ranges to one `cmplwi` and the other
  *    cases to `cmpwi`; ours either keeps `cmpwi 0; blt` (int switch) or `cmplwi` throughout (the `(u32)` switch kept,
  *    95.00 against 92.78); `lb_screen16_step` keeps a branch where retail if-converts `off_mask |= 2`.
- *  - `chat_log_lines_draw`, `chat_log_scroll_get`, `note_slot_find` (`want` takes r3 where retail has r0 and the three
+ *  - `chat_log_lines_draw`, `note_slot_find` (`want` takes r3 where retail has r0 and the three
  *    state/kind byte temporaries r0 where retail has r3; regsim's decl-order plans do not reach them), `chat_log_page_draw`: register colouring only
  *    (declaration orders searched with `permdecl`/`hill`).
  *  - `note_work_frame`: retail stores the ground height to +0x1A4 and then `frsp`s it for +0x174 (an f64 view puts
@@ -695,10 +695,12 @@ extern "C" void chat_log_line_add(u8 kind, s8 member, s32 color, const char* nam
 
 /* 0x80383F0C (0xF8): the scroll position `delta` lines from the current one, or -1 when it cannot move. */
 extern "C" s16 chat_log_scroll_get(ChatLog* log, s16 delta) {
-    s16 pos = -1;
+    u8 count;
     s16 base;
-    u8 count = log->count_0x05;
+    s16 pos;
     u8 lines;
+    pos = -1;
+    count = log->count_0x05;
 
     if (count == 96) {
         base = (count - 1) - log->write_0x04;

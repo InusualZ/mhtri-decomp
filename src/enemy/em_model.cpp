@@ -56,6 +56,8 @@
  *   `em_roster_pop_entry_add` and `em_drop_item_spawn`; `opt_common_subs off` on `em_weight_table_pick` (the weight
  *   reload); `opt_propagation off` on `em_roster_spare_draw`.  `x / 2.0f` (not `x * 0.5f`) keeps retail's
  *   `fmuls x, 0.5` operand order; `rec = recs; rec += index;` keeps the result out of r3 (`em_roster_record_get`).
+ * RESIDUALS. em_pop_work_alloc: regsim plan 1 declares the `new` temporary as a local first; `cb = new ...` before
+ *            or after `work` measures 8.2 B lower.
  */
 
 

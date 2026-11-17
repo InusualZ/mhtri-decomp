@@ -67,6 +67,12 @@
  * RESIDUALS. se_talk_point_set: retail keeps `self + 0x30000` (`addis r31,r3,3`) in a saved register across the VEC3
  *            assignment and addresses every field off it; ours keeps `self` in r31 and rebuilds the addis after the
  *            call (dump: r33 self r31 vs r3, r36 r5 vs r3).
+ * RESIDUALS. fn_800DBFAC: mwcc-debugger regsim finds no declaration order (lw and work coalesce into r31 where
+ *            retail keeps lw in r30; a direct `lobby_w.field` read measures 82.9, a split `work` declaration is
+ *            unchanged).
+ * RESIDUALS. se_frame_req, fn_800D9DB4: retail keeps `param & 0xFFFFFF` in the parameter's own register (regsim:
+ *            `lo` r5 vs retail r29, params swap in fn_800D9DB4); the in-place `param &= 0xFFFFFF` form measures 96.5
+ *            / 96.4.
  */
 #pragma optimization_level 4
 #pragma peephole off

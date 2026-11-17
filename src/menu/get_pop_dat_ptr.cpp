@@ -38,8 +38,7 @@
  *    lower);
  *  - `__sinit_\get_pop_dat_ptr_cpp`: our second load is scheduled before the `li`, retail's after it;
  *  - the rest (`lb_screen30_step`, `lb_room_slot_release`, `lb_room_box_list_set`, `lb_room_move_open`,
- *    `lb_room_place_put`, `lb_pop_peer_*`, `pop_dat_place_load`, `lb_name_entry_screen_step`, `lb_screen24_step`,
- *    `eft_em_model_pair_create`): register numbering or one scheduling swap.
+ *    `lb_room_place_put`, `lb_pop_peer_*`, `pop_dat_place_load`, `lb_name_entry_screen_step`, `lb_screen24_step`): register numbering or one scheduling swap.
  *   Data: `.data`, `.sdata`, `.sdata2`, `.sbss`, `.bss` are byte-identical to the target (the definitions sit where
  *   the retail emission order puts them: the `.data` tables after the pop file loads, the small tables beside their
  *   draws; the tables `lb_room_lock_draw` and `lb_pop_peer_list_draw` read are defined after those draws, which keeps
@@ -3025,9 +3024,9 @@ void eft_em_model_pair_update(_EFT* self)
 /* Creates the effect's models at the variant's scale and colour, then places them. */
 void eft_em_model_pair_create(_EFT* self)
 {
+    s32 i;
     PopEftModels* models = (PopEftModels*)self->work_0x38;
     f32 scale = eft_em_model_pair_scales[self->type_0x02];
-    s32 i;
 
     self->state_0x05++;
     for (i = 0; i < models->count_0x00; i++) {

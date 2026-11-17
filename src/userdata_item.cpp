@@ -36,6 +36,8 @@
  *            returns `subf r3` directly; `room = ...; return room` is unchanged and a flag with `break` scores 89.35.
  * RESIDUALS. userdata_equip_box_add: regsim's EXACT plan folds the `user + i * 12` intermediate (r40) into `rec`;
  *            retail adds in place (`add r31,r28,r0; addi r31,r31,3584`); a block-local `rec` scores 98.66.
+ * RESIDUALS. userdata_item_consume: retail masks the id (`clrlwi r3,r4,16`) after the first `neg`/`extsh` of the
+ *            amount; a named negated local compiles identically.
  */
 
 #pragma peephole off

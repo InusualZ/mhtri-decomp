@@ -25,7 +25,7 @@
  *   with a constructor; the shared nw4r::math::VEC3 here is a plain struct of floats (a 399-includer header).
  *   hunter_rank_points_get hoists
  *   the 10000000 return above the loop; set_mydata2vs ORs the tick first (`or r0,r4,r0`); lobby_friend_list_sort,
- *   userdata_hunter_rank_info_get, userdata_size_records_update, monster_size_crown_get, my_set_equip_id_swap,
+ *   userdata_size_records_update, monster_size_crown_get,
  *   my_set_gun_id_swap, userdata_item_row_push, exportEquipRecord, userdata_worn_refresh: register order.
  *   exportItemBoxPage writes `(u16)(page * 50)` (the cast keeps retail's two multiplies; retail has no clrlwi).
  *   userdata_hunter_points_apply reads hunter_points_0x3DE0 as u32 (retail compares it unsigned; the shared field is s32).
@@ -699,13 +699,14 @@ extern "C" void box_index_swap(u16* slot, u16 a, u16 b)
 /* 0x8004DA5C (0xE4): swaps box indices `a` and `b` in every equipment set. */
 extern "C" void my_set_equip_id_swap(Q_UserData* user, u16 a, u16 b)
 {
+    Q_MySet* set;
+    u16* part;
     int i;
     int j;
-    Q_MySet* set;
     for (i = 0, set = user->my_set_0x3380; i < 20; set++, i++) {
         box_index_swap(&set->weapon_0x00, a, b);
-        for (j = 0; j < 2; j++) {
-            box_index_swap(&set->parts_0x02[j], a, b);
+        for (j = 0, part = set->parts_0x02; j < 2; part++, j++) {
+            box_index_swap(part, a, b);
         }
         box_index_swap(&set->armour_0x06[3], a, b);
         box_index_swap(&set->armour_0x06[4], a, b);
@@ -885,8 +886,10 @@ extern "C" void userdata_hunter_rank_info_get(u16* rank, u32* points, u32* next)
         *next = 0;
         return;
     }
+    u32 cap;
     *points = userdata_block()->hunter_points_0x3DE0;
-    if (userdata_block()->hunter_points_0x3DE0 >= hunter_rank_points_get(999)) {
+    cap = hunter_rank_points_get(999);
+    if (userdata_block()->hunter_points_0x3DE0 >= cap) {
         *rank = 999;
         *next = 0;
         return;

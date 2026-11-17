@@ -29,6 +29,9 @@
  * SHAPES. The tail-called table lookups (snd_line_*_get) are 4/8-byte wrappers over separate 0x38-byte helpers; the
  *   voice keys are `key = global ? 255 : line` then one expression; snd_voice_volume_calc returns an s16 assigned
  *   from the float product without a cast.
+ * RESIDUALS. snd_obj_play_chain: regsim colours `cfg` r31 / `line` r30 (retail r30 / r31) for every declaration
+ *            order, and retail masks `cfg->next_cue` with `clrlwi r4,r0,16` at the second cue lookup (a `(u16)` cast
+ *            compiles identically).
  */
 
 #include "sound/sound_obj_types.h" /* SndBase, SndPlayerBase (rule 1) */

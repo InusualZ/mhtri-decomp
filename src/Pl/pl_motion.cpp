@@ -27,7 +27,7 @@
  *    end's case 2 reuses case 99's leave block) - a `goto` shape (rule 8); the source repeats the tail.
  *  - field_scene_main: the post-exit block sits after the switch in retail; the source keeps it in case 0.
  *  - quest_scene_load, scene_area_change_step: a `case 0: case 1:` pair compares `cmplwi 1`/`cmpwi 2` in retail; the
- *    `(u32)` switch gets `cmplwi` for both.  quest_scene_res_load: the `release`/`param` registers swap.
+ *    `(u32)` switch gets `cmplwi` for both.
  *  - net_error_dialog_draw: the button x (`x + 526`) is rematerialised at each call instead of kept in r31, and the
  *    two `0.5f` products swap their `fmuls` operands.
  *  - data: the class-7 step/row tables, the stage tables and the `.sdata` stage records are `extern` map symbols the
@@ -1920,9 +1920,11 @@ void quest_scene_boot(_PL_ROOT* root) {
 /* 0x8028C468 (0x108): loads the quest scene's resources: the player data, the AI NPC, the common effects, the area
  * the quest starts in, and releases the stage's enemy kinds (or the quest's monsters). */
 void quest_scene_res_load(_PL_ROOT* root, u8 kind) {
-    u8* release = 0;
-    LbParamWork* param = &lb_param_w;
+    LbParamWork* param;
+    u8* release;
 
+    release = 0;
+    param = &lb_param_w;
     if (param->field_0x00 == 0) {
         release = quest_stage_table[root->stage_no_0x120]->release_kinds;
     }
