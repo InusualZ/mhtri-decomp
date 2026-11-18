@@ -818,14 +818,17 @@ extern "C" void fn_800D9DB4(_se_w* work, s32 id, u32 param, s32 id2, s32 id3) {
  * the work object's owner, remap the id for the "loud" case, then claim a slot and start it.
  */
 void se_req_pos_ps(_se_w* work, s32 id, s32 param, nw4r::math::VEC3* pos) {
+    s32 bank;
     s32 p = 0;
+    SeSlot* s;
+    u32 hi;
     if (work == NULL) {
         return;
     }
     if (se_disabled_ck() == 1) {
         return;
     }
-    s32 bank = snd_chunk_handle_get(work->field_0x0C);
+    bank = snd_chunk_handle_get(work->field_0x0C);
     if (bank == -1) {
         return;
     }
@@ -837,11 +840,11 @@ void se_req_pos_ps(_se_w* work, s32 id, s32 param, nw4r::math::VEC3* pos) {
     if (fn_800F2890(bank, id) == 0) {
         return;
     }
-    SeSlot* s = fn_800D8E58(work, id);
+    s = fn_800D8E58(work, id);
     if (s == NULL) {
         return;
     }
-    u32 hi = (param & 0xFF000000) >> 24;
+    hi = (param & 0xFF000000) >> 24;
     if (id == 36) {
         p = 8;
     }
@@ -1213,27 +1216,31 @@ extern "C" void fn_800DB974(_se_w* work, nw4r::math::VEC3* pos) {
  * stripped off and recorded as "no owner".
  */
 extern "C" SeSlot* se_slot_req_pos(s32 kind, s32 id, nw4r::math::VEC3* pos) {
+    SeWork* w;
+    _se_w* work;
+    SeSlot* s;
+    s32 loud;
     if (se_disabled_ck() == 1) {
         return NULL;
     }
-    s32 loud = 0;
+    loud = 0;
     if (id & 0x80000000) {
         id &= 0x7FFFFFFF;
         loud = 1;
     }
-    SeWork* w = get_move_work_adrs__FUc(0);
+    w = get_move_work_adrs__FUc(0);
     if (w == NULL) {
         return NULL;
     }
     if (kind == 46) {
         kind = 2;
     }
-    _se_w* work = w->se[kind];
+    work = w->se[kind];
     if (work == NULL) {
         return NULL;
     }
     work->field_0x08 = 6;
-    SeSlot* s = fn_800D8E58(work, id);
+    s = fn_800D8E58(work, id);
     if (s == NULL) {
         return NULL;
     }

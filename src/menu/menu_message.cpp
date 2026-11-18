@@ -2003,14 +2003,14 @@ extern "C" void menu_entry_window_draw(u16 id, u32* frame_ids, u32* cursor_ids, 
     _SPR_DATA_ spr;
     _SPR_DATA_* lsp;
     u16* frame = (u16*)frame_ids;
-    s32 i;
-    u32 color;
     u32 flags;
+    u32 color;
+    s32 i;
 
     lsp = get_lsp_data(id, &box);
     draw_window_box(box.x, box.y, lsp->width, lsp->height, 0, 0);
     get_lsp_data(frame[0], &row);
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < count; i++, rows++) {
         draw_sprite_ary(&frame[2], &row);
         flags = 1;
         color = rows->field_0x0C;
@@ -2033,7 +2033,6 @@ extern "C" void menu_entry_window_draw(u16 id, u32* frame_ids, u32* cursor_ids, 
             put_menu_cursor((u16*)cursor_ids, 0, &row);
         }
         row.y += 30;
-        rows++;
     }
 }
 

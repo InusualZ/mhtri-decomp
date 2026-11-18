@@ -2462,13 +2462,13 @@ s16 fn_8013FD98(_ENEMY_WORK* self, u8* in) {                    /* 0x59 */
         u8 found = 0;
         if (self->team != 0x12 || self->field_0x360 <= 0) {
             u16 count = get_move_work_max(2);
+            u16 i;
             EmAreaWork* rec = (EmAreaWork*)get_move_work_adrs(2);
-            for (u16 i = 0; i < count; i++) {
+            for (i = 0; i < count; i++, rec++) {
                 if (rec->active != 0 && rec->area_no == self->area_no && pl_act_grabbed_ck((_PLW*)rec) != 0) {
                     found = 1;
                     break;
                 }
-                rec++;
             }
         }
         if (found == 0) {
@@ -2767,11 +2767,14 @@ u8 fn_80140768(u8* in) {
 }
 
 s16 fn_80140778(u8* in, u8 code, u8 mode) {
-    s32 stop;
     s16 pos;
     s16 prev;
     s16 result;
     u8 want;
+    s32 skip;
+    s16 off;
+    u8 skip2;
+    s32 stop;
 
     pos = 0;
     prev = 0;
@@ -2785,8 +2788,8 @@ s16 fn_80140778(u8* in, u8 code, u8 mode) {
         }
         if (in[0] == want) {
             if (in[1] == 0) {
-                s32 skip = ((s32 (*)(u8*))fn_80140768)(in) + 1;
-                s16 off = fn_80140778(in + (u8)skip, code, 1) + (u8)skip;
+                skip = ((s32 (*)(u8*))fn_80140768)(in) + 1;
+                off = fn_80140778(in + (u8)skip, code, 1) + (u8)skip;
                 pos += off;
                 in += off;
             } else {
@@ -2813,9 +2816,9 @@ s16 fn_80140778(u8* in, u8 code, u8 mode) {
             }
         }
         if (stop == 0) {
-            u8 skip = fn_80140768(in) + 1;
-            pos += skip;
-            in += skip;
+            skip2 = fn_80140768(in) + 1;
+            pos += skip2;
+            in += skip2;
         }
     }
     return result;

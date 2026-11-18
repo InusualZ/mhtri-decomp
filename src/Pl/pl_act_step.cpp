@@ -68,8 +68,6 @@
  *    `R_PPC_ADDR32` names dtk's `@etb_80011EFC` where MWCC writes its own local, which no source reaches;
  *  - `pl_act_step_pitfall_arm`: one extra `clrlwi r0,r0,24` on the case-0 store, the `u8` local's own conversion; the
  *    local is what gives retail's three-instruction range test (`addi r0,r3,-1; cmplwi r0,1; ble`);
- *  - `pl_act_step_pitfall_hold`: 8 B short - MWCC removes the loop counter retail keeps (`li r4,0`/`addi r4,r4,1`);
- *    the shape that keeps it (`u16*` plus `i`) re-bases the address and scores lower;
  *  - `fn_8025FF0C`, `fn_80260198`: the `pl_move_work` scan keeps a dead loop counter and adds the row base before
  *    the entry offset (row-pointer and pointer-plus-index spellings measured equal);
  *  - `pl_act_stun`: retail sign-extends the doubled shake count (`extsb`) where ours masks it; an `s8` local
@@ -109,7 +107,7 @@
  *  - a `switch`'s bodies are emitted in source order (a shared `case 1: case 2:` body included), so the cases are
  *    written in the order the target's bodies sit in `.text`, `default:` first where its body is (playbook 37); a range
  *    tested ahead of the other cases (`subi`; `cmplwi`; `ble`) is a case group of the same switch, not an `if` around it;
- *  - the callees `fn_8025E298` and `cockpit_ticket_acquire` are called through per-call-site views (`<name>_viewN` cast macros,
+ *  - the callee `fn_8025E298` is called through per-call-site views (`<name>_viewN` cast macros,
  *    the same direct call), and the header declarations of `fn_8025E298`, `get_move_work_adrs`,
  *    `get_move_work_max` and `em_land_data_init` that disagree with a view are renamed away around their `#include`;
  *  - a case that retail enters by branching forward into a later case's code is written case-label-free: the
@@ -287,8 +285,6 @@
 #include "Pl/pl_stick_window_gated_ck.h"
 #include "Pl/pl_stick_window_level_ck.h"
 #include "Pl/pl_stick_window_ck.h"
-/* fn_802DE578_view1: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
-#define fn_802DE578_view1 ((void (*)(_PLW*, u16*))cockpit_ticket_acquire)
 /* `pl_facing_turn_set` as `pl_act_knockback_enter` calls it: retail narrows the turn to a halfword at the call
  * (`clrlwi`) while the definition masks its own word again. */
 #define pl_facing_turn_set_h ((void (*)(_PLW*, u16))pl_facing_turn_set)
@@ -3873,7 +3869,7 @@ extern "C" void pl_act_gather(_PLW* self, s32 variant) {
     s32 taken;
     u16 item;
 
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     pl_model_set_state(self, 2);
     pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
@@ -4233,7 +4229,7 @@ extern "C" void fn_8024CA50(_PLW* self, s32 arg1) {
  * variants, repeats the carve (skill 0xB1) and speeds it up (skills 0xAF/0xB0) inside the carve window; the
  * master chains into the result act when the motion ends. */
 extern "C" void pl_act_carve(_PLW* self, s32 variant) {
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -5170,7 +5166,7 @@ extern "C" void pl_act_net_hook_d(_PLW* self) {
 /* The item-use act: acquires the item ticket, arms the use motion and (for the master) applies the item at once,
  * then returns to the kind's slot when the motion ends. */
 extern "C" void pl_act_item_use(_PLW* self, s32 variant) {
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
@@ -5449,7 +5445,7 @@ extern "C" void pl_act_step_pitfall_arm(_PLW* self)
 {
     u8 step;
 
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     pl_act_set_step_time(self, 2);
     step = self->act_step_0x05;
     switch (step) {
@@ -5486,9 +5482,9 @@ extern "C" void pl_act_step_pitfall_arm(_PLW* self)
  * motion words select, and stops for the frame window that the work record's own data names. */
 extern "C" void pl_act_step_pitfall_hold(_PLW* self)
 {
-    s32 i;
+    s16 i;
 
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     pl_act_set_step_time(self, 2);
     switch (self->act_step_0x05) {
     case 0:
@@ -5540,7 +5536,7 @@ extern "C" s32 pl_act_armed_motion_count(_PLW* self)
 extern "C" void pl_act_combine(_PLW* self, s32 variant) {
     s32 count;
 
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     pl_act_set_step_time(self, 2);
     pl_act_set_gauge_arm(self, 2);
     switch (self->act_step_0x05) {
@@ -5596,7 +5592,7 @@ extern "C" void pl_act_combine(_PLW* self, s32 variant) {
 /* The book act: reads (and, for `variant` 0, spends) the item at frame 120 and raises its model state, then
  * returns to the idle slot. */
 extern "C" void pl_act_book_read(_PLW* self, s32 variant) {
-    fn_802DE578_view1(self, &self->field_0x598);
+    cockpit_ticket_acquire(self, &self->field_0x598);
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;

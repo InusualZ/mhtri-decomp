@@ -15,9 +15,11 @@
  *   emc_joint_cache_fill (the "found" exit of the joint search goes straight to the next set: a jump out of the inner
  *   loop no goto-free shape reaches - the inline-helper form measured 90.0 against 90.9), em_sub_buffer_claim (the
  *   retry `c = 2` jumps into the else branch's `li r30,2`: a cross-jump into another branch, idea 213),
- *   em_stat_level_pick (retail reloads `weight` in both roll loops and keeps a dead counter in the arena scan;
- *   `opt_common_subs off` gives the reloads but loses the hoisted `variant * 4`: 89.7 against 91.4),
- *   em_size_scale_pick (`mr r4,r29` before `li r3,0` for the roll walk), emc_status_report (`clrlwi r4,r7` /
+ *   em_stat_level_pick (retail reloads `weight` in both roll loops (the `s16` arena counter gives the dead increment);
+ *   `opt_common_subs off` gives the reloads but loses the hoisted `variant * 4`: 89.7 against 91.4; the plan-1
+ *   declaration order with the block locals hoisted measures lower),
+ *   em_size_scale_pick (`mr r4,r29` before `li r3,0` for the roll walk; declaring `roll` before `pct`, with or without
+ *   the block locals hoisted, shortens the row to 304 B), emc_status_report (`clrlwi r4,r7` /
  *   `extsb r4,r4` where ours narrows through r0).
  *  - flipcheck: `.bss` 2 and `.sdata2` 4 tail-padding bytes short of the claim; `.text` 16 bytes long (the rows above).
  *  - `EmUserDataObj` is `enemy/fn_80138074.cpp`'s `ResUserDataAc` (two definitions until that unit exports it).
@@ -1014,7 +1016,7 @@ u8 em_stat_level_pick(u8 base, u8 variant, u16 seed) {
     s16 level;
 
     if (isServerSelectState() == 0) {
-        s32 i;
+        s16 i;
         for (i = 0; i < 4; i++) {
             if (lb_param_w.slots_0x16[i] == 25) {
                 roll = em_stat_roll_arena_tbl[variant];
@@ -2189,21 +2191,23 @@ void pl_ride_move(_PLW* pl) {
 u32 em_ride_hit_check(nw4r::math::VEC3* pos, u8 area, _ENEMY_WORK** out, u32* joint, f32* height) {
     EmcJointCache* cache = &emc_work.joint_cache[0];
     _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
+    u8 index;
+    _ENEMY_WORK* work;
+    EmJointPoints* set;
+    u32 i;
     nw4r::math::VEC3 probe;
     f32 hit_height;
     u32 hit_joint;
-    u32 i;
     f32 lift;
     f32 radius;
     i = 0;
     lift = 200.0f;
     radius = -400.0f;
     do {
-        u8 index = cache->enemy_index;
+        index = cache->enemy_index;
         if (index != 0xFF) {
-            _ENEMY_WORK* work = &works[index];
+            work = &works[index];
             if (work->active != 0 && work->area_no == area) {
-                EmJointPoints* set;
                 work = &work[index];
                 set = (EmJointPoints*)em_data_word_get(work);
                 if (set != NULL) {
@@ -2568,10 +2572,12 @@ void emc_event_hold_release(u8 event) {
 
 /* Moves every live enemy (and waiting area record) of `kind` that is not in area `area` there. */
 void emc_area_move_kind(u8 kind, u8 area) {
+    s32 n;
     s16 i;
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
     s16 max = get_move_work_max(3);
     EmAreaEntry* entry = &em_area_entry_tbl[0][0];
+    u8 state;
     for (i = 0; i < max; i++, work++) {
         if (work->active != 0 && work->team == kind && work->area_no != area &&
             em_area_enter_ck(work, work->field_0x1E0, area) == 1) {
@@ -2581,9 +2587,7 @@ void emc_area_move_kind(u8 kind, u8 area) {
         }
     }
     if (entry != NULL) {
-        s32 n;
         for (n = 0; n < 128; n++, entry++) {
-            u8 state;
             if (entry->active != 0 && ((state = entry->state_0x08) == 0 || state == 2) && entry->monster_0x02 == kind &&
                 entry->area_0x0A != area && em_area_entry_enter_ck(entry, get_now_mapno(), area) == 1) {
                 entry->area_0x0A = area;

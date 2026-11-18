@@ -18,6 +18,7 @@
  * SHAPES. The tables are defined before the functions (that order emits `.data`/`.sdata`/`.bss`/`.sbss` byte for byte);
  *   callers that pass a wider or narrower type than the callee's declaration go through `_c1` cast views.
  * FLAGS. `#pragma optimization_level 4` scoped to `player_move_start_ck` (same size, raises its row).
+ * FLAGS. `pl_players_ready_ck` takes a scoped `#pragma opt_propagation off` (98.9, same size; its locals are hoisted in the regsim plan order).
  * RESIDUALS. `pl_part_model_bind` and `pl_part_load_request`: retail keeps `part * 4` and the record-plus-index
  *   pointers in saved registers for the whole body, ours recomputes them after calls (no source order found that keeps
  *   them). `player_move_start_ck`, `pl_players_ready_ck`, `pl_net_slot_ready_ck`, `pl_parts_load_step`,
@@ -201,18 +202,26 @@ void pl_res_loaded_set(u8 index) {
     pl_res_loaded_flags[index] = 1;
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x802673E8 - every player the session expects has finished its first lobby frame. */
 s32 pl_players_ready_ck(void) {
+    s32 ready;
+    s32 i;
+    u8* flags;
+    s32 loaded;
+    s32 ready2;
+    s32 i2;
+    _PLW* plw;
+    s32 expected;
+
     if (pl_global == NULL) {
         return 0;
     }
     if (isServerSelectState() == 0) {
-        s32 ready;
-        s32 expected = NetCtrlWk::countValidServerIndexes();
-        s32 i;
-        u8* flags = pl_res_loaded_flags;
-        s32 loaded = 0;
-        _PLW* plw;
+        expected = NetCtrlWk::countValidServerIndexes();
+        flags = pl_res_loaded_flags;
+        loaded = 0;
 
         if (flags[0] == 1) {
             loaded = 1;
@@ -240,23 +249,23 @@ s32 pl_players_ready_ck(void) {
             return 1;
         }
     } else {
-        s32 ready = 0;
-        _PLW* plw = (_PLW*)get_move_work_adrs(2);
-        s32 i;
+        ready2 = 0;
+        plw = (_PLW*)get_move_work_adrs(2);
 
-        for (i = 0; i < 4; i++, plw++) {
-            if (plw->slot_active == 0 || isServerSlotOccupied(i) == 0) {
-                ready++;
+        for (i2 = 0; i2 < 4; i2++, plw++) {
+            if (plw->slot_active == 0 || isServerSlotOccupied(i2) == 0) {
+                ready2++;
             } else if (plw->field_0x267 != 0) {
-                ready++;
+                ready2++;
             }
         }
-        if (ready == 4) {
+        if (ready2 == 4) {
             return 1;
         }
     }
     return 0;
 }
+#pragma pop
 
 /* 0x80267548 - allocates the player-global record, the player works and the part records, reserves every
  * player's part and motion resource memory, and returns the player works. */

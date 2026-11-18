@@ -39,6 +39,7 @@
  *   `place_rec_zenny_set`, `lb_npc_choice_draw`, `ai_npc_behaviour_get`, `lb_npc_entry_flag_set`, `lb_screen13_draw`,
  *   `ai_npc_skill_group_get`, `ai_npc_pair_values_get`, `ai_npc_level_rank_get`.
  * FLAGS. `lb_entry_flags_clear` takes a scoped `#pragma opt_propagation off`.
+ * FLAGS. `lb_s13_dance_values_draw` takes a scoped `#pragma opt_strength_reduction off` (99.0, same size).
  * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
@@ -3214,6 +3215,8 @@ void lb_s13_dance_pick_draw(LbScreen13Work* work) {
     }
 }
 
+#pragma push
+#pragma opt_strength_reduction off
 /* Draws the dance pair's four values with their ranks and the two group colours of each. */
 void lb_s13_dance_values_draw(LbScreen13Work* work) {
     _mh_ivec2_ base;
@@ -3242,6 +3245,7 @@ void lb_s13_dance_values_draw(LbScreen13Work* work) {
         draw_sprite_idx_color(0x1FB1, lb_group_color_get(second), &pos);
     }
 }
+#pragma pop
 
 /* Puts screen 13's help line for its state on panel 0x1877 (and the warning line, or the yes/no choice, when one
  * applies). */

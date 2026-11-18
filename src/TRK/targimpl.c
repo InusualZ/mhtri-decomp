@@ -17,6 +17,7 @@
  *    state, `gTRKState`, `gTRKCPUState`), `.sbss` 0x80794E78 / 0x80794E80 and `.rodata` 0x805734A8..0x80573530
  *    are read by functions on both sides of every internal candidate boundary, so the run is one TU unless a
  *    boundary moves the globals.
+ * FLAGS. `TRKTargetAccessExtended1` takes a scoped `#pragma opt_common_subs off` (row at 100 %, same size).
  * RESIDUALS. TRKTargetAccessFPRegister: the target stores the first template word right after its `lwzu` (first template
  *    copy scheduling; declaration order of the locals has no effect). TRKTargetAccessExtended1:
  *    the second flag test recomputes `slwi` of the count, ours reuses the stored byte count (`+=`, statement order, signed
@@ -295,6 +296,8 @@ s32 TRKTargetAccessFP(u32 first, u32 last, TRKBuffer* message, u32* count, s32 i
     return err;
 }
 
+#pragma push
+#pragma opt_common_subs off
 s32 TRKTargetAccessExtended1(u32 first, u32 last, TRKBuffer* message, u32* count, s32 is_read)
 {
     TRKExceptionStatus saved;
@@ -332,6 +335,7 @@ s32 TRKTargetAccessExtended1(u32 first, u32 last, TRKBuffer* message, u32* count
     gTRKExceptionStatus = saved;
     return err;
 }
+#pragma pop
 
 s32 TRKTargetAccessExtended2(u32 first, u32 last, TRKBuffer* message, u32* count, s32 is_read)
 {

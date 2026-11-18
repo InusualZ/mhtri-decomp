@@ -1331,6 +1331,7 @@ extern "C" void draw_shape_stage_load(u8 stage) {
 /* 0x80055534 (0x140): the cockpit pack's load callback: fills slots 13..18. */
 /* untyped: byte range - the loaded file image */
 extern "C" void cockpit_tex_load_cb(char* name, void* data) {
+    u32 slot;
     u32 file;
     u32 tex;
     u32 pltt;
@@ -1339,6 +1340,7 @@ extern "C" void cockpit_tex_load_cb(char* name, void* data) {
     u32 pltt_tmp;
     char** names;
     u32 i;
+    ResEntry* entry;
 
     res_file_ctor(&file, 0);
     res_tex_ctor(&tex, 0);
@@ -1349,11 +1351,11 @@ extern "C" void cockpit_tex_load_cb(char* name, void* data) {
         names = cockpit_tex_name_tbl;
     }
     nwAddResource(name, data);
-    ResEntry* entry = ckResourceName(name);
+    entry = ckResourceName(name);
     if (entry != NULL) {
         res_file_assign(&file, res_file_ctor(&file_tmp, (u32)entry->data));
         for (i = 0; i <= 5; i++) {
-            u32 slot = i + 13;
+            slot = i + 13;
             if (names[i] == NULL) {
                 break;
             }

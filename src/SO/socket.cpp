@@ -28,8 +28,7 @@
  *   the struct (request net-so#2).
  * RESIDUALS. Register allocation only: `SOGetSockName` /
  *   `SOGetPeerName` (the `NETMemCpy` argument moves ordered `r4`, `r5`, `r3` in retail; three spellings of the
- *   copy measured identical), `RecvFrom`, `SendTo`, `SOGetHostByName` (`result` and the text block swap r29/r31;
- *   a pairwise declaration-order search and reusing `result` for the length measured identical),
+ *   copy measured identical), `RecvFrom`, `SendTo`,
  *   `SOGetInterfaceOpt` (parameter registers swapped), `RecvFrom` / `SendTo` (the parameters sit two / one
  *   registers lower than retail's r25-r30; a pairwise declaration-order search on `RecvFrom` measured identical).
  * SHAPES. `RecvFrom` names the argument record (`args = &block->args`), which is what makes retail address the
@@ -660,13 +659,13 @@ SOHostEnt* SOGetHostByName(const char* name) {
     s32 device;
     s32 length;
     s32 result;
-    SOHostBuffer* buffer;
-    char* text;
     s32 size;
     SOHostEnt* entry = NULL;
-    SOHostEnt* answer;
     u32* host;
+    char* text;
+    SOHostEnt* answer;
     s32 shift;
+    SOHostBuffer* buffer;
 
     result = SOiPrepare(NULL, &device);
     if (result == 0) {

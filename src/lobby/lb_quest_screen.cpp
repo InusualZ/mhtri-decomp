@@ -180,6 +180,7 @@
 #include "main.h"
 #include "sound/set_zmode__FbUcb.h"
 #include "sound/fn_800E3CBC.h"
+extern u16 note_slot_flat_table[4];
 
 /* The quest tail's own rows other units do not call (address order below). */
 extern "C" {

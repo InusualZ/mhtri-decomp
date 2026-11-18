@@ -23,11 +23,11 @@
  *   `lb_item_box_*_sprites`, `move_work_name_sprites`, `lb_room_lock_row_modes`, the fields `LbRoomWork::source_0x03`,
  *   `gifts_0x108`, `zenny_0x148`, `PopEftModels::phase_0x24`, and the types `PopFile`, `PopFilePoint`, `LbPopWork`,
  *   `LbRoomWork`, `LbScreen30Work`, `LbScreen34Work`, `PopEftModels`.
+ * FLAGS. `entry_list_update` takes a scoped `#pragma opt_lifetimes off` (row at 100 %, same size).
  * RESIDUALS. Every function is written.  Partial rows:
  *  - `lb_pop_room_enter`: retail leaves the peer search with no `i < 4` test after the loop (`b` to the end), ours
  *    tests `i` again (+4 B); the `while`/`return` shapes measure lower;
- *  - `entry_list_update`: `note_slot_flat_table` is declared 4 entries long (`lobby/lb_quest_screen.h`), so ours
- *    reaches it through `@sda21` where retail uses `lis`/`addi`;
+ *  - `entry_list_update`: the second loop's pointer sits in r29 where retail keeps r28 (`goods` is reused);
  *  - `lb_pop_screen_draw`: retail range-checks steps 0/1 with `cmplwi` and compares 2/3/4 signed; the `(u32)` switch
  *    makes every compare unsigned (97.5), the plain switch and the if/else shapes measure 82-95;
  *  - `move_work_name_draw`: ours keeps an `extsh` before the `sth` of `pos.x += get_wide_offset(4)` (the file's
@@ -1830,20 +1830,21 @@ s32 lb_room_move_step(LbRoomWork* work)
 
 extern "C" {
 
+#pragma push
+#pragma opt_lifetimes off
 /* Lists the placeable models the item box holds (the note goods first, then the flat list) in the hold strip. */
 void entry_list_update(LbRoomWork* work)
 {
     CockpitHoldEntry entry;
     u16* goods;
     s32 kind;
-    s16 count;
     s32 i;
+    s16 count;
 
     memset(work->items_0xAC, 0, sizeof(work->items_0xAC));
     count = 0;
     for (kind = 0; kind < 4; kind++) {
-        goods = note_slot_table[kind];
-        for (i = 0; i < 6; i++, goods++) {
+        for (i = 0, goods = note_slot_table[kind]; i < 6; goods++, i++) {
             if (userdata_item_count_total(*goods, (u8*)lobby_world_block) != 0) {
                 work->items_0xAC[count] = *goods;
                 count++;
@@ -1868,6 +1869,7 @@ void entry_list_update(LbRoomWork* work)
     entry.kind_0x18 = 0;
     eft052_hold_entry_set(&entry, 0);
 }
+#pragma pop
 
 /* The free spots of this room. */
 s16 lb_room_place_count_get(void)

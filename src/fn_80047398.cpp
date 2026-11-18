@@ -20,9 +20,8 @@
  *   line, named in the `dbgGX*`/`fntGX*` scheme), `m_face_file_tbl`/`f_face_file_tbl`/`skin_file_tbl` (draw_shape's).
  * RESIDUALS. Register allocation only: `face_draw` (f28/f29/f27 hold 1.0/0.25/0.125 in retail, ours 1.0 in f29;
  *   the makeup block re-derives `work + i` through r4 where retail reads r27); `face_tex_bind` (the second loop's
- *   texobj pointer takes r26 where retail reuses r28); `face_buf_reset`, 8 bytes short (retail hoists the unrolled loop's trip
- *   count `li r28,2` out of the outer loop and saves r28, ours rematerialises `li r0,2` per pass).
- * FLAGS. `face_draw` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
+ *   texobj pointer takes r26 where retail reuses r28).
+ * FLAGS. `face_draw` and `face_buf_reset` take a scoped `#pragma optimization_level 4` (same size).
  */
 
 #include "types.h"
@@ -581,6 +580,8 @@ void face_buf_init(void)
     memset(face_buf_tbl[1], 0, sizeof(FaceSprBuf));
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x8004882C (0x138): clears both face-sprite buffers and marks every texture run free (-1). */
 void face_buf_reset(void)
 {
@@ -594,3 +595,4 @@ void face_buf_reset(void)
         }
     }
 }
+#pragma pop

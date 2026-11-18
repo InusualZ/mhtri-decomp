@@ -170,7 +170,7 @@ extern "C" {
  * continue into (both 0-terminated), in this unit's `.data`/`.sdata` claims. */
 extern u16* note_slot_table[4];
 
-extern u16 note_slot_flat_table[4];
+extern u16 note_slot_flat_table[];
 
 /* The note trade (screen 0x17) and its item box (GUESS names). */
 void note_trade_open(struct _PLW* player, struct _LB_NPC* npc);

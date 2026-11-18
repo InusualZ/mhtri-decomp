@@ -2662,8 +2662,8 @@ extern "C" void stage_part_joints_hide(StageWork* w, MHchar* chr, u8* ids)
 {
     nw4r::g3d::ResNode node(0);
     VEC3 v;
-    u8 k;
     u32 i;
+    u8 k;
     u8 j;
 
     k = 0;
