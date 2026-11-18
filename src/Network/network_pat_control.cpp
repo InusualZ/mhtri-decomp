@@ -46,6 +46,7 @@
  *   (0x80428208/0x80428218, `msg_state_0xC300`), `pat_crypt_key_table` (.bss 0x806D3670, the Camellia key schedule
  *   `PatCryptSetKey` fills), `net_slot_initial_value` (.sdata2 0x8079C888, 10.0f, `resetSlotTable`'s seed).
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
+ * FLAGS. `#pragma opt_common_subs off` scoped to updateMessagePool (94.103 to 94.147, same size).
  * RESIDUALS. The map row `__arraydtor$9639` (0x80431D80, 0x1C) is the compiler's array destructor for
  *   `net_profile_table`, named with this source's own counter: a change to the declarations this unit sees renumbers
  *   it, and the row then stops pairing until the map follows (`nm` on the object prints the live name).
@@ -1141,6 +1142,8 @@ static inline void sendFirstChatEntry(NetCtrlWk* work, s32& command)
 /* 0x80425790 (0x1580): the per-frame message pump: posts the member join/leave notices, sends the first queued chat
  * entry, hands the arena blocks to the lobby, then steps every queued command - it sends the layer request, waits for
  * its result word and answers the caller's result byte (1, a negative failure, or a layer entry's depth). */
+#pragma push
+#pragma opt_common_subs off
 void updateMessagePool(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
@@ -1862,6 +1865,7 @@ void updateMessagePool(void)
     }
     refreshServerScreen(work);
 }
+#pragma pop
 #pragma pop
 
 /*

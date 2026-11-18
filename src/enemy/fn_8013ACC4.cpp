@@ -7,6 +7,7 @@
  *   `field_0x95C` (`jumptable_805A15A0`, 12 entries), 0x39 is empty and 0x6D-0xFE are the default.
  * NAMES. The map stem; the dump answers only `zz_` placeholders for the three symbols.
  *   em_userdata_script_run is a GUESS (0x8013ACC4: it interprets the user-data command stream through fn_8013BDE4).
+ * FLAGS. `#pragma optimization_level 4` scoped to em_userdata_script_run (100 % at the same 4356 B; -O3 is 99.79).
  * RESIDUALS. Every row is written.
  *  - `em_userdata_script_run`: the `field_0x95C` dispatch (cases 3-5 and 6) is `lbz r3` + `subi r0,r3,3` +
  *    `cmplwi r0,2` + `ble` in retail, a two-sided `cmpwi 3`/`blt` + `cmpwi 5`/`ble` chain in ours (one instruction
@@ -289,6 +290,8 @@ s32 ran_suu(long index);
 /* 0x8013ACC4 - the interpreter.                                                                      */
 /* ----------------------------------------------------------------------------------------------- */
 
+#pragma push
+#pragma optimization_level 4
 extern "C" u32 em_userdata_script_run(EmWork* self) {
     u32 finished = 0;
     u32 aborted = 0;
@@ -872,6 +875,7 @@ extern "C" u32 em_userdata_script_run(EmWork* self) {
     }
     return 0;
 }
+#pragma pop
 
 /* ----------------------------------------------------------------------------------------------- */
 /* 0x8013BDC8 - the 8-byte record copier.                                                             */

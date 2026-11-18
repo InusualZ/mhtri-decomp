@@ -20,6 +20,7 @@
  *   `pl_coll_body_shape(_alt)`, and the registry names `floorf_thunk`, `sqrtf_thunk`, `stage_area_bit_get`,
  *   `calc_xz_angle`; the GUESS class `PlCollSphere` (0x8029573C's own constructor), the rows `pl_land_data_reset`,
  *   `pl_ground_check_all_layers`.
+ * FLAGS. `#pragma optimization_level 4` scoped to pl_wall_resolve (93.14 to 94.65, same size).
  * RESIDUALS.
  *  - `GetGroundHit2`, `hit_ground_comon`: the five-hit cap leaves both loops with one branch in retail (`goto`-shaped);
  *    the conformant double `break` costs three instructions in each (100 % with a `goto`, refused by rule 8). An
@@ -800,6 +801,8 @@ void pl_hit_box_set(PlCollPoly* dst, PlCollPoly* src) {
 /* 0x802929DC (0xB28): resolves the hit boxes the sweep recorded into one push of `pos`: face hits push along their
  * normals, edge hits are dropped when a face hit shares their plane or a corner they lie behind, the per-axis
  * pushes are merged and the total is capped at 1.8 sweep lengths; returns the number of hits. */
+#pragma push
+#pragma optimization_level 4
 s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
     VEC3 push;
     s8 faces[10];
@@ -1061,6 +1064,7 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
     }
     return pl_coll_hit_count;
 }
+#pragma pop
 
 /* 0x80293504 (0x578): the push hit-box `slot` asks for: a face hit pushes the sweep end out along the normal (when
  * sliding, flattened and kept off the face's edges), an edge hit pushes away from the touch point; 0 when the push

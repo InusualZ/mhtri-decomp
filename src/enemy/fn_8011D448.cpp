@@ -15,6 +15,7 @@
  *   `em_event_settle_kindN` (the handler of reaction kind N at +0x82C; kinds 1/27 keep `em_event_settle`, `_kindN_ck`
  *   the hook slots 0xF/0x10/0x12/0x13 those kinds test), `em_kill_sub_kind_ck` (enemy/em_common.cpp's lane proposal),
  *   `em_seq_*` (the 8-byte {code, argument} action script).
+ * FLAGS. `#pragma opt_common_subs off` scoped to em_seq_exec (99.121 to 99.128, same size).
  * RESIDUALS. All 81 rows written; partial rows:
  *  - `em_damage_eval`: register colouring only.  The mwcc-debugger dump plus the colouring model reproduce retail's
  *    registers when `damage` and the `em_part_limit_get` result (`rec`) are numbered as late webs (above the `@`
@@ -2908,6 +2909,8 @@ extern "C" u32 em_seq_cond_ck(_ENEMY_WORK* self, EmSeqCond* cond)
 
 /* 0x801236D0 - runs the action script from its current record until a motion record starts (0), the script ends
  * (1) or hands the enemy to another state (2). */
+#pragma push
+#pragma opt_common_subs off
 extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
 {
     EmSeqCmd* cmd = &seq[self->seq_index_0x8D0];
@@ -3232,6 +3235,7 @@ extern "C" u8 em_seq_exec(_ENEMY_WORK* self, EmSeqCmd* seq, u8 reverse)
     }
     return 1;
 }
+#pragma pop
 
 /* 0x80124150 - moves the enemy by the current motion record's move kind and re-applies the per-frame calls the
  * script armed; returns the axes whose speed changed sign (1/2/4) and the height crossings (8/0x10). */

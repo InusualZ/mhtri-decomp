@@ -18,6 +18,7 @@
  *   em007_model_npc_positions, the eft033_* tables, the lb_eqshop_* tables, lb_title_frame_sprites/_rows.  Foreign
  *   names this unit proposed are in the name registry (GUESS: ai_npc_joint_mtx_get, eft013_npc_place, eft025_npc_set,
  *   chacha_mask_se00/01/16/17_req).
+ * FLAGS. `#pragma opt_loop_invariants off` scoped to em007_model_eft_update (98.47 to 99.52, same size).
  * RESIDUALS. Every row is written.  `Em007ModelCopy` is declared in enemy/em007_act.h; MaskEftView is this unit's view
  *   of `Em007EftWork` (enemy/em007_act.cpp, request lobby-801e0adc#4).
  *   - em007_model_eft_update: register colouring only - retail gives the hoisted zero copies r21-r31/r14 and the
@@ -558,6 +559,8 @@ void em007_model_eft_sparks(_EFT* eft)
 /* Steps the Cha-Cha mask models: follows the companion (its kind's glow, steam, fire and spark effects and sounds, the
  * dance and hold poses) or the lobby NPC (its unlocked mask placed at the kind's spot), moves and draws each model, and
  * springs the mask on the companion's head. */
+#pragma push
+#pragma opt_loop_invariants off
 void em007_model_eft_update(_EFT* eft)
 {
     MaskEftView* work = (MaskEftView*)eft->work_0x38;
@@ -867,6 +870,7 @@ void em007_model_eft_update(_EFT* eft)
         break;
     }
 }
+#pragma pop
 #pragma opt_strength_reduction reset
 
 /* Bumps the counter byte at +0x5 of the record the caller passes. */

@@ -1223,7 +1223,6 @@ size_bytes,unit,function,match_percent,address
 4168,ef/system_core,loading_disp_draw,99.4904,0x800D104C
 4224,WPAD/wpad,WPADControlDpd,99.2585,0x804F14A0
 4352,Network/net_session_close,sessionReflectCallback,99.9954,0x80432154
-4356,enemy/fn_8013ACC4,em_userdata_script_run,99.7888,0x8013ACC4
 4616,Network/NetworkSessionManagerPat,networkSessionReflect1,99.6603,0x803DC548
 4900,MSL_C/strtold,__strtold,97.8947,0x8045F9E8
 4968,Network/NetworkSessionStable,move__20NetworkSessionStableFv,99.037,0x803CFEEC

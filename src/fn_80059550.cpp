@@ -17,6 +17,7 @@
  *   save_sys_file_read, save_data_file_index, save_msg_blink_count, save_msg_blink_spare, save_msg_tex_rect,
  *   save_msg_size, save_msg_button_pos, save_msg_text_pos, save_error_enter, return_to_data_manager.
  *   The file keeps the map's stem; a unit-rename to `strap_task.cpp` is requested.
+ * FLAGS. `#pragma opt_common_subs off` scoped to strap_task (92.34 to 92.67, same size).
  * RESIDUALS. strap_task (0xD94 B against 0xD88 B; the `goto` spelling measures 100.00, rule 8 refuses the case labels
  *   inside a loop/`if (0)` that measured 95.99): retail's sub-state 1 failure arm holds the save-error entry
  *   (0x80059A2C) before sub-state 1's draw and jumps over the draw into sub-state 2; the failing steps of sub-states
@@ -168,6 +169,8 @@ static inline void return_to_data_manager(void) {
  * the options and starts the arena task. */
 #pragma push
 #pragma optimization_level 2
+#pragma push
+#pragma opt_common_subs off
 void strap_task(TaskSlot* task) {
     u32 args[2];
     s32 result;
@@ -635,6 +638,7 @@ void strap_task(TaskSlot* task) {
         break;
     }
 }
+#pragma pop
 #pragma pop
 
 /* The texel rectangles (s0, t0, s1, t1) of the message box's four sprites. */
