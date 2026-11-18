@@ -74,6 +74,7 @@
  *   `_PLW::tail_slot_0x300` and `_PLW::bind_reset_0x00B`.
  *   The rig's implicit members are the compiler's: `__ct__7PlSeRigFv`, `__dt__7PlSeRigFv` and the callback classes'
  *   `__ct__21LbEquipModelCallbackA/BFv` (`Pl/pl_se_rig.h` holds the classes by value; `PlSeRig` is the GUESS name).
+ * RESIDUALS. fn_8026A068: retail divides `(id - 1000) / 100` before it loads the kind row; a hoisted group local and an inline index do not reorder the loads.
  * RESIDUALS. Every function is written.
  *  - flipcheck: the object emits no `.rodata` (0x40 claimed), `.sbss` (0x8) or `.sdata` (0x48); `.text` 0x1AD38,
  *    `.data` 0x27C, `.sdata2` 0x10, extab 0x930 and extabindex 0xD5C against the claims 0x1AD18, 0x2178, 0x1D8, 0x928 and

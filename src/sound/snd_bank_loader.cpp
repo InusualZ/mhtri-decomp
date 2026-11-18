@@ -24,6 +24,7 @@
  *   snd_chunk_install (quest_snd), snd_stream_buffers_init (fn_800E46E8), snd_audio_init, snd_fx_hooks_set,
  *   snd_output_mode_set (snd_stream_reloc).
  * FLAGS. pl_weapon_se_bank_load takes a scoped `#pragma optimization_level 4`.
+ * FLAGS. `snd_area_bank_load` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %).
  * RESIDUALS. snd_area_bank_load: dump 03 `lwzx r34,r38,r36` then `add r34,r34,r40` reuses r34 for the table entry and the pointer (coloured r5);
  *   retail loads into r3 and adds into r4 (colouring).
  * RESIDUALS. fn_800F0F9C (692 B): retail's shared load tail sits between the `kind == 1` and `kind == 2` bodies,
@@ -1154,6 +1155,8 @@ extern "C" u32 fn_800F04FC(s32 idx)
     return snd_wk->chunk_ready[idx] - 1 == 0;
 }
 
+#pragma push
+#pragma optimization_level 4
 extern "C" void snd_area_bank_load(u8 kind, u8 index)
 {
     const u8* p = lbl_805978E8[kind];
@@ -1164,6 +1167,7 @@ extern "C" void snd_area_bank_load(u8 kind, u8 index)
     p += index * 2;
     fn_800F0560(p[0], p[1]);
 }
+#pragma pop
 
 /* The "no bank" SE state: bank 0, 30 voices. */
 extern "C" void snd_bank_loader_reset(void)

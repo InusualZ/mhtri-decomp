@@ -12,7 +12,6 @@ size_bytes,unit,function,match_percent,address
 32,ai/ai_npc,ai_taru_move_ck__FP8_AINPC_W,98.75,0x802D7EB0
 32,lobby/fn_801E7530,lb_count_add_cap99,97.5,0x801E936C
 36,homebutton/hkb_widget_tail,hkbKbdInputConstruct,0.0,0x8056D814
-36,userdata_item,__as__8_GXColorFRC8_GXColor,0.0,0x8004C4F0
 40,MSL_C/file_io,__prep_buffer,95.5,0x8045AB58
 40,ai/ai_npc,fn_802D6690,99.0,0x802D6690
 40,ai/ai_npc,fn_802D77DC,78.8,0x802D77DC
@@ -21,12 +20,9 @@ size_bytes,unit,function,match_percent,address
 48,menu/menu_item_sub,menu_item_sub_page14_draw,90.0,0x8036BB1C
 52,homebutton/hkb_keyboard,__ct__12HkbKeyButtonFUlP11HkbKeyboardP16HbmSoundListener,98.1539,0x8053E1B4
 52,menu/menu_plsearch,resetPatTermsState,83.8461,0x80450FF0
-52,mh3_pad,kpad_obj_copy,81.5385,0x80045C10
-52,sound/fn_800D7F54,se_slot_kind_dispatch,81.9231,0x800D8404
 56,ef/eft052,eft052_item_half_get,99.2857,0x80358FF4
 56,enemy/em_common,em_delay_act_tick,74.2857,0x80128308
 56,g3d/g3d_anmscn,light_setting_get_light_set,91.7857,0x8006522C
-56,sound/snd_bank_loader,snd_area_bank_load,97.8571,0x800F051C
 60,menu/menu_row,menu_row_clear,85.6667,0x8034C4B4
 64,homebutton/hkb_keyboard,fn_8053658C,0.0,0x8053658C
 64,menu/menu_plsearch,initPatTerms,93.4375,0x80450F8C
@@ -38,7 +34,6 @@ size_bytes,unit,function,match_percent,address
 80,lobby/lb_companion_ui,lb_entry_flags_clear,79.95,0x80338A84
 84,OS/OSPlayRecord,__OSStartPlayRecord,90.4762,0x804D62D0
 84,SO/socket,SOAddressToString,80.1429,0x80520604
-84,ai/ai_npc,fn_802D3F1C,99.0476,0x802D3F1C
 84,lobby/fn_802FA9A0,lb_barter_price_scale,98.5714,0x802FF928
 84,sound/fn_800D7F54,se_torch_slot_req,90.4762,0x800DD3B8
 88,enemy/em_common,em_fx_scale_get,99.5455,0x80135998
@@ -63,7 +58,6 @@ size_bytes,unit,function,match_percent,address
 100,enemy/em_common,em_key_curve_eval,99.6,0x80135644
 100,homebutton/hbm_value,__ct__14SysKbdVuObjectFP12MEMAllocatorPQ34nw4r3lyt16ResourceAccessorP17SysKbdHandlerBase,0.0,0x8055CAD0
 100,homebutton/hbm_value,getPaneVisible__14HbmPaneManagerFPCcPUc,91.48,0x8055BFB8
-100,lobby/fn_80219260,lb_screen07_step,98.8,0x8021CE0C
 100,lobby/lb_npc,fn_801FC810,95.8,0x801FC810
 100,mh3_pad,pad_acc_y_delta,99.6,0x80043A80
 100,mh3_pad,pad_fs_acc_y_delta,99.6,0x80043AE4
@@ -83,7 +77,6 @@ size_bytes,unit,function,match_percent,address
 116,ef/system_core,resident_file_load,98.6207,0x800CFBF0
 116,enemy/em_common,em_part_slot_get,98.7931,0x80126690
 116,enemy/em_prog_support,note_slot_find,97.2414,0x803850A4
-116,lobby/lb_companion_ui,lb_name_tail_copy,85.5172,0x80339330
 116,userdata_item,userdata_save_import,93.1034,0x80049F08
 120,ef/eft018,eft_light_dispatch,96.0,0x8010D8B0
 120,ef/fn_8030681C,eft042_dispatch,96.0,0x80306FF0

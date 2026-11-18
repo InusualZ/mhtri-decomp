@@ -19,6 +19,7 @@
  *   GUESS (from each body and its callers): `effect_layer_reset`, `eft_rand_unit`, `eft_rand_signed_half`,
  *   `eft_shape_init`.
  * FLAGS. fn_800F9E04 takes scoped `#pragma opt_propagation off` + `opt_loop_invariants off`.
+ * RESIDUALS. effect_retire: calling `nw4r::ef::Effect::Calc` through `ef/ef_effect.h` does not compile here (`ef.h` carries the stub `Effect`).
  * RESIDUALS. 5 partial rows:
  *  - `fn_800F9E04` (-4 B): retail hoists the address of `setMatColor`'s by-value colour copy (`addi r31,r1,8`)
  *    out of the material loop and keeps the loop index in r28, and builds `change_color_eff`'s colour argument

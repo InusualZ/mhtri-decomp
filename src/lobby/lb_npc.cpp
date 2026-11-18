@@ -68,6 +68,7 @@
  *   Foreign names proposed through the registry (GUESS; the evidence is in `config/RMHE08/name_registry.jsonl`):
  *   the leaf headers this file includes after `Network/network_pat_control.h` and before the class group, and
  *   `npc_model_res_ids`.
+ * RESIDUALS. fn_801FC810: the `extsh` before the halfword store stays with `(s16)` removed; declaring `ran_suu` as `u16` in this file moves lb_npc_act_set up and fn_80203664/fn_80203A24 down (net worse).
  * RESIDUALS. `_LB_NPC`, `LbNpcChar` and `LbNpcMatCallback` are classes (lobby/lb_npc.h): the `lb_npc` array is a static
  *   object, so the compiler emits `__sinit`, the array destructor and the whole constructor/destructor chain; the
  *   body's constructor (`MHchar::MHchar`) builds its vectors, resource file handle and `ResMdl` as members (pl.h).

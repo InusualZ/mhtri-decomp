@@ -50,6 +50,7 @@
  *   ai_npc_spawn_pos_tbl, ai_npc_hand_reach_dist_sq, ai_npc_f32_0_7; the record types AINPCBehaviour, AINPCTuning,
  *   AINPCSetup, AINPCStatus, EmWeakPoint, AINPCTimeChance, AINPCSpawnPos, ResultRankPoints; the view's fields
  *   `drift_vel`/`drift_active`, `phase`, `timer_0x1AC`, `hold_kind_0x492`/`hold_time_0x4C0` (`_PLW`).
+ * FLAGS. `fn_802D3F1C` takes a scoped `#pragma opt_lifetimes off` (same size, row at 100 %).
  * RESIDUALS. ai_taru_move_ck: dump 03 loads straight into r3 (`lbz r3,..; extsb r3,r3`) where retail loads r0 and extends into r3; `(s8)`, `s8`/`s32`
  *   locals and an `s8` return all measure equal or lower.  fn_802D6690: frontend `add r33,r37,r35` puts the table base first, retail the
  *   scaled index.  fn_802D77DC: dump 03 compares the narrowed byte with `cmpi` (signed) in a chain of blocks that ends in `b B6`; retail
@@ -10353,6 +10354,8 @@ u32 fn_802D3F08(struct _AINPC_W* self)
 
 /* 0x802D3F1C - the highest weak-point rate of the two hit entries. */
 #pragma opt_propagation off
+#pragma push
+#pragma opt_lifetimes off
 u8 fn_802D3F1C(struct _AINPC_W* self)
 {
     u8 value;
@@ -10369,6 +10372,7 @@ u8 fn_802D3F1C(struct _AINPC_W* self)
     }
     return highest;
 }
+#pragma pop
 #pragma opt_propagation reset
 
 /* 0x802D3F70 - the percentage roll the +0x339 progress interpolates between `high` and `low`. */

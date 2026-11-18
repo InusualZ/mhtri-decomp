@@ -32,6 +32,7 @@
  *   group, `_a<A>`/`_k<K>` an area or key, `_programs` its program table; `eft_slot_roam_tables_g<G>_m<M>_r<R>_k<K>`
  *   likewise (`_m` mode, `_r` row).  `enemy_data_find`/`enemy_data_grp` are named for the enemy band's callers.
  *   `__sinit_\eft_slot_cpp` and `__ct__7EftSlotFv` are the compiler's.
+ * RESIDUALS. eft_slot_counters_step: ours extends the third counter (`extsh` before the `sth`, 72 B against 68 B); `+= 1` re-reads the halfword unsigned (68 B at 84.7 %), an `s32` timer and a `timer += 1` copy keep the `extsh`.
  * RESIDUALS. Partial rows (register assignment unless noted):
  *  - `eft_slot_counters_step`: ours sign-extends the incremented resend timer (`extsh`) before its `sth`; an `s16`/`s32`
  *    local, `+= 1`, `++timer`, a cast and the direct `field = field + 1` all keep it or lose the compare (regsim: exact);

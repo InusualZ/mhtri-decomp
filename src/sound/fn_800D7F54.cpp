@@ -7,6 +7,7 @@
  * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
  *
  * NAMES. GUESS (from each body and its callers): se_entry_request
+ * FLAGS. `se_slot_kind_dispatch` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %).
  * RESIDUALS. se_slot_level_calc: `a`/`b`/`mode` take other callee-saved GPRs than retail (r27/r28/r25 against r20/r26/r28; regsim: no
  *   plan reproduces all callee-saved targets).
  * RESIDUALS. se_slot_kind_dispatch: dump 03 builds `cmpi 3; blt; cmpi 4; ble` for the 3..4 arms and no `subi; cmplwi` range test;
@@ -2969,6 +2970,8 @@ extern "C" void sound_frame_entry(void) {
     snd_stream_bank_reset();
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Dispatches a slot to its per-kind handler by the slot's `kind` byte. */
 extern "C" void se_slot_kind_dispatch(SeSlot* slot) {
     switch (slot->kind) {
@@ -2986,6 +2989,7 @@ extern "C" void se_slot_kind_dispatch(SeSlot* slot) {
         return;
     }
 }
+#pragma pop
 
 /* Non-zero while sound effects must stay silent: no work object, the work object's disable byte set, a
  * `GameMode_ck` state of 3, the system's demo flag, or a fade state of 2. */

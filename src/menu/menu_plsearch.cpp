@@ -32,6 +32,7 @@
  *   GUESS (P-Mic): `patTermsPmicCallback`, `setPatTermsResult`, `patTermsEndThread`, `clearPatTerms`,
  *   `resetPatTermsState`.  `plsearch_page11_*`/`plsearch_page19_*`/`plsearch_page22_*` are the map's names (the
  *   page-table entries `menu/menu_item.cpp` calls through their leaf headers).
+ * RESIDUALS. initPatTerms: retail tests the buffer with `bne; blr` (64 B) where ours folds it into `beqlr` (60 B); the early-return and `&&` spellings are equal.
  * RESIDUALS. resetPatTermsState: dump 03/16 place `li r33,0` first in the block before `lbz`/`cmpli`; retail has `li r0,0` after the compare
  *   (scheduler order inside the block); ternary and if/else spellings lower the row.  initPatTerms: retail's `bne; blr` against our
  *   `beqlr` (dump 03 has the same `bf`/`bt` block pair; the cause is not isolated); nested `if` spellings are measured equal.

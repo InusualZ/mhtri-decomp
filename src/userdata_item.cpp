@@ -22,6 +22,7 @@
  *   sys_tex_obj_get, nw_res_view_mtx_apply, prim_list_exec, prim_queue_draw); the Q_UserData / NetUserProfile /
  *   SystemWork field names added for this range.  `userdata_item_total_count` is the map's older name for a pouch-room
  *   query (the sibling of `userdata_item_room_get`), kept.
+ * FLAGS. `equip_record_register` and `equip_worn_color_set` take a scoped `#pragma dont_inline on`: the `GXColor` assignment stays a call to the implicit `_GXColor::operator=`, whose kept copy is `__as__8_GXColorFRC8_GXColor` (0x8004C4F0, emitted here).
  * RESIDUALS. register allocation or scheduling only (no source shape found): item_box_take, item_box_store, item_slots_store,
  *   userdata_item_consume, userdata_equip_box_rec_get/set/add/add_new, userdata_new_game_init (the arena-row loop's
  *   registers and the flag-bit loop's test), item_room_get/item_room_or_full_get (retail keeps the found count in r31),
@@ -223,8 +224,6 @@ s32 item_pair_index_find(u16 id, const IdValue* table, s32 count);
 s16 item_take(u16 id, s16 count, IdValue* table, s32 n, u8 seen, s16 max);
 u32 item_pair_clear(IdValue* entry);
 u32 item_slots_store(IdValue* table, u16 n, u16 id, u32 count, u16* slot);
-/* free: retail C linkage evidenced (unmangled map name) */
-void color_rgba_copy(u8* dst, const u8* src);
 u16 userdata_equip_box_add_new(Q_UserData* user, u8 kind, u16 item_id);
 s32 userdata_equip_box_worn_ck(Q_UserData* user, u16 index);
 void face_spr_gx_end(void);
@@ -1969,6 +1968,7 @@ extern "C" u16 userdata_equip_box_count(u8 kind, u16 item_id)
     return count;
 }
 
+#pragma dont_inline on
 /* Registers a record newly filed in the box: its "new" flag, the progress flags its kind, colour tier and dye raise,
  * and a dyeable piece's colour set to its colour-table entry. */
 extern "C" void equip_record_register(_EQUIP* rec)
@@ -1988,20 +1988,11 @@ extern "C" void equip_record_register(_EQUIP* rec)
     if ((u8)equip_kind_table_class(rec->kind) == 0 && EnableChangeColor(rec) == 1) {
         userdata_progress_flag_set(16);
         rgba = equip_color_rgba_get(equip_color_index_get(rec));
-        color_rgba_copy((u8*)&color, (const u8*)&rgba);
+        color = *(GXColor*)&rgba;
         equip_color_set(rec, ((color.r & 0xF8) << 8) | ((color.g & 0xFC) << 3) | ((color.b & 0xF8) >> 3));
     }
 }
-
-/* Copies one 4-byte RGBA colour byte by byte. */
-/* free: retail C linkage evidenced (unmangled map name) */
-extern "C" void color_rgba_copy(u8* dst, const u8* src)
-{
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-    dst[3] = src[3];
-}
+#pragma dont_inline reset
 
 /* Files a new record of `kind`/`item_id` in the first empty equipment-box record; its index, or 0xFFFF when the box
  * is full. */
@@ -2110,6 +2101,7 @@ extern "C" s32 userdata_equip_box_worn_ck(Q_UserData* user, u16 index)
     return user->box_parts_0x008E[1] == index;
 }
 
+#pragma dont_inline on
 /* Dyes worn armour piece `kind` (1-5) and its equipment-box record: `color` as given, or the piece's own colour-table
  * entry when `use_table` is 1. */
 extern "C" void equip_worn_color_set(Q_UserData* user, u8 kind, u16 color, u8 use_table)
@@ -2146,13 +2138,14 @@ extern "C" void equip_worn_color_set(Q_UserData* user, u8 kind, u16 color, u8 us
     if (EnableChangeColor(rec) == 1) {
         if (use_table == 1) {
             rgba = equip_color_rgba_get(equip_color_index_get(rec));
-            color_rgba_copy((u8*)&rgba_color, (const u8*)&rgba);
+            rgba_color = *(GXColor*)&rgba;
             color = ((rgba_color.r & 0xF8) << 8) | ((rgba_color.g & 0xFC) << 3) | ((rgba_color.b & 0xF8) >> 3);
         }
         rec->color_rgb565 = color;
         equip_color_set(&user->equip_box_0x0E00[index], color);
     }
 }
+#pragma dont_inline reset
 
 /* --- the unit's own .bss / .sbss (`splits.txt` `.bss 0x806699B8..0x80669F68`, `.sbss 0x80794878..0x80794884`) ---- */
 

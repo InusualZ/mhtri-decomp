@@ -38,6 +38,7 @@
  *   the `lb_s13_*` draw helpers and tables.  Registry GUESSes for other units' rows: `place_rec_item_set`,
  *   `place_rec_zenny_set`, `lb_npc_choice_draw`, `ai_npc_behaviour_get`, `lb_npc_entry_flag_set`, `lb_screen13_draw`,
  *   `ai_npc_skill_group_get`, `ai_npc_pair_values_get`, `ai_npc_level_rank_get`.
+ * FLAGS. `lb_entry_flags_clear` takes a scoped `#pragma opt_propagation off`.
  * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
@@ -45,9 +46,7 @@
  *    folding, not the allocator);
  *  - `lb_act_award_handover`: ours emits a `clrlwi` or `extsb` retail does not;
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
- *    shift; `lb_name_tail_copy`: the word copies' load/store order (dump 03: the word loop is unrolled with one
- *    temporary per load; a struct assignment and pointer-walk spellings measure worse or equal, regsim's r42/r45
- *    temporaries are retail's r5 where ours stay r0);
+ *    shift;
  *  - `lb_combo_rate_get`: the `get_move_work_adrs` result and the row pointer swap r29/r31 (colouring only);
  *  - `lb_s13_dance_values_draw`: retail keeps the pair index in its own register beside the `lb_s13_value_pairs` base,
  *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
@@ -482,6 +481,8 @@ void lb_act_announce(u8 unused, LbActReq* req) {
     }
 }
 
+#pragma push
+#pragma opt_propagation off
 /* Zeroes the two 8-entry per-entry byte arrays `lbl_80794B90`/`lbl_80794B98`; no caller in this file. */
 void lb_entry_flags_clear(void) {
     u8* seen = lbl_80794B90;
@@ -504,6 +505,7 @@ void lb_entry_flags_clear(void) {
     seen[7] = 0;
     handled[7] = 0;
 }
+#pragma pop
 
 /* Sends the index-selected sub-0x0A command with a u8 payload.  GUESS name: the caller is unwritten, so the protocol
  * slot is the evidence. */
@@ -778,9 +780,8 @@ void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src) {
     for (i = 0; i < 8; i++) {
         dst->bytes_0x00[i] = src->bytes_0x00[i];
     }
-    for (i = 0; i < 6; i++) {
-        dst->words_0x08[i] = src->words_0x08[i];
-    }
+    dst->first_0x08 = src->first_0x08;
+    dst->second_0x14 = src->second_0x14;
 }
 
 /* The link-down half of act 15: hands the packet's own fields straight to the text writer `em_small_spawn_stat`. */

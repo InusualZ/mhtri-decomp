@@ -13,6 +13,7 @@
  *   `menu_item_sub_page14_title_draw`, `menu_item_sub_page09_rows_build`, `menu_item_sub_comment_text`,
  *   `menu_item_sub_team_text`, and the registry names `lb_title_owned_ck`, `lb_title_range_find`, `net_entry_post`,
  *   `menu_entry_window_draw` (lane menu-item-sub).
+ * RESIDUALS. menu_item_sub_page14_draw: retail compares the 2 and 3 arms with signed `cmpwi` after the unsigned `cmplwi 1; ble`; the plain `u8` switch (56 B), an if-chain (44 B) and the pragma sweep measure lower.
  * RESIDUALS. menu_item_sub_page14_draw: dump 03 lowers the switch to an `cmpli` (unsigned) chain; retail compares signed (`cmpwi`); `(s32)` and
  *   plain operand spellings lower the row.
  * RESIDUALS. `menu_item_sub_page14_draw`: retail tests 0..1 unsigned (`cmplwi`) and 2/3 signed (`cmpwi`); an `int` switch

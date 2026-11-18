@@ -206,12 +206,17 @@ typedef struct LbCmdSub0E {          /* sub 0x0E: two halfwords */
     /* +0x0A */ u8 unused_0x0A[0x2];
 } LbCmdSub0E; /* size: 0xC */
 
-/* The 0x20-byte text block `lb_name_tail_copy` copies whole: MWCC copies its first 8 bytes a byte at a
- * time and the rest word-wise, which is what a plain struct assignment emits for this layout.
+/* The 0x20-byte text block `lb_name_tail_copy` copies: its first 8 bytes a byte at a time, then two 3-word
+ * records by struct assignment (retail pairs the loads of each).
  * size: 0x20 */
+typedef struct LbWord3 {
+    /* +0x00 */ u32 words[3];
+} LbWord3; /* size: 0xC */
+
 typedef struct LbNameTail {
     /* +0x00 */ u8 bytes_0x00[8];
-    /* +0x08 */ u32 words_0x08[6];
+    /* +0x08 */ LbWord3 first_0x08;
+    /* +0x14 */ LbWord3 second_0x14;
 } LbNameTail; /* size: 0x20 */
 
 typedef struct LbCmdSub0F {          /* sub 0x0F: the text/name command (0x2C bytes) */

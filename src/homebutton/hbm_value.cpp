@@ -42,6 +42,7 @@
  * SHAPES.    hbmVuDispatchPointer / hbmVuDispatchInput OR the results as `list | panel | wrapped | mode` (the only order of
  *            24 that reproduces retail's two-pair tree); hbmVuApplyAspectRatio's body is an inline create also uses.
  * SHAPES.    hbmTextAppendChar's character buffer is `u16[12]` (retail's 0x30-byte frame).
+ * FLAGS. `HbmPaneManager::getPaneVisible` takes a scoped `#pragma peephole off` (same size, raises its row).
  * RESIDUALS. HbmTextBuffer duplicates the HbmU16Array and HbmTextValue views of homebutton/hbm_widget.h (same object; only
  *            this unit uses them); the merge is a header change outside this unit.
  * SHAPES.    HbmPaneCursor (the manager's +0x8C) declares `reset` first with no body, so its table 0x80651814 is
@@ -1703,6 +1704,8 @@ void HbmPaneManager::setPaneVisible(const char* name, s32 visible) {
     }
 }
 
+#pragma push
+#pragma peephole off
 /* 0x8055BFB8 (0x64): Reads whether the pane called `name` is shown; 0 when there is no such pane. */
 s32 HbmPaneManager::getPaneVisible(const char* name, u8* visible) {
     nw4r::lyt::Pane* pane = mpLyt->mpRootPane->FindPaneByName(name, true);
@@ -1712,6 +1715,7 @@ s32 HbmPaneManager::getPaneVisible(const char* name, u8* visible) {
     *visible = pane->mFlag & 1;
     return 1;
 }
+#pragma pop
 
 /* 0x8055C01C (0xCC): Sets the text of the text box called `name`. */
 void HbmPaneManager::setPaneText(const char* name, const wchar_t* text) {

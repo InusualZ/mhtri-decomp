@@ -28,6 +28,7 @@
  *   `rso_path_table`, `stage_map_rso_table`, `rso_boot_name`) and `game_mode_nop` (an empty game-mode entry
  *   between `field_game_task_start` and `ArenaSelExec`).  Registry proposal for the
  *   foreign callee `face_buf_reset` (0x8004882C).  `SystemWork.language_0x01`, `pause_0x10` and `pad_lock_ck_0x8d8` are GUESS field names.
+ * FLAGS. `kpad_obj_copy` copies the pointer centre through an 8-byte word struct (retail pairs the two GPR loads); a `Vec2` assignment copies through `lfs`/`stfs`.
  * RESIDUALS. lang_index_set: the frontend emits `add base, idx*2` (dump 03 `add r38,r37,r35`, base first) where retail adds the index first;
  *   `+`, `(u32)` integer and index-first spellings compile to the same object.  kpad_obj_copy: the copy of `center` goes through
  *   `u32` words (retail's lwz/lwz/stw/stw); retail loads both words before the stores, this unit's dump has no scheduling pass
@@ -2417,8 +2418,10 @@ extern "C" s8 kpad_select_2obj_continue(KpadWork* kp)
 /* Copies the pointer object `src` into `dst`. */
 extern "C" void kpad_obj_copy(KPADObj* dst, const KPADObj* src)
 {
-    ((u32*)&dst->center)[0] = ((const u32*)&src->center)[0];
-    ((u32*)&dst->center)[1] = ((const u32*)&src->center)[1];
+    struct CenterWords {
+        /* +0x0 */ u32 bits[2]; /* the two float words, copied raw */
+    }; /* size: 0x8 */
+    *(CenterWords*)&dst->center = *(const CenterWords*)&src->center;
     dst->error_fg = src->error_fg;
     dst->state_fg = src->state_fg;
     dst->pad_0x0A[0] = src->pad_0x0A[0];

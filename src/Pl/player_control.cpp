@@ -17,6 +17,7 @@
  *   that `pl_part_load_request`/`pl_part_model_bind` hoist into a saved register; retail reloads each table by name.
  * SHAPES. The tables are defined before the functions (that order emits `.data`/`.sdata`/`.bss`/`.sbss` byte for byte);
  *   callers that pass a wider or narrower type than the callee's declaration go through `_c1` cast views.
+ * FLAGS. `#pragma optimization_level 4` scoped to `player_move_start_ck` (same size, raises its row).
  * RESIDUALS. `pl_part_model_bind` and `pl_part_load_request`: retail keeps `part * 4` and the record-plus-index
  *   pointers in saved registers for the whole body, ours recomputes them after calls (no source order found that keeps
  *   them). `player_move_start_ck`, `pl_players_ready_ck`, `pl_net_slot_ready_ck`, `pl_parts_load_step`,
@@ -621,6 +622,8 @@ void player_init_data_load(void) {
     pl_global->state = 1;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802681EC - every live player's 11 state slots have left the "not yet started" value. */
 u32 player_move_start_ck(void) {
     _PLWORK* work = pl_global->objects;
@@ -640,6 +643,7 @@ u32 player_move_start_ck(void) {
     }
     return pending == 0;
 }
+#pragma pop
 
 /* 0x80268260 - starts the move for one player (`-1` = every live player). */
 void player_move_start(s32 index) {

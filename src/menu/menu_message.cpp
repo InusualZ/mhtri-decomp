@@ -23,6 +23,7 @@
  *   `put_message_window`, `menu_select_window_draw`, `menu_choice_window_draw`, `menu_entry_window_draw`,
  *   `menu_pad_map_set`, `menu_yes_no_draw`, `draw_sprite_blink` (alpha scaled by `cockpit_blink_get`),
  *   `menu_item_pages_resort` (re-sorts the pages and re-points the pick and the selected slot), `MenuRowLayout`.
+ * RESIDUALS. GetMenuFontColor: the same conditional-return merge (retail `bne` over a separate `blr`, ours `bnelr`, 108 B against 104 B); the pragma sweep does not move it.
  * RESIDUALS. 9 rows below 100 %, register allocation or branch layout only:
  *  - `menu_list_fill`: retail keeps the call result unextended (`mr r28,r3`), the s8 prototype adds an `extsb` (index as
  *    s32/s16/u16/s8 all measured the same; u8/u32 move it to `clrlwi`/`extsb`); `self` and the record pointer in r29/r30 swapped, each `id` extension before the record test (an `s32 id` with `(s8)` casts at the compares measures worse);

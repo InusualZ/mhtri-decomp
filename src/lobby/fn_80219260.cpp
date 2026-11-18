@@ -18,6 +18,7 @@
  *   `lb_menu_actor_angle_get` and the data rows `lb_equip_bg_ids` ... `lb_talk_reward_equips`, `lb_talk_state`;
  *   `lb_title_range_find`/`lb_title_owned_ck` are menu_item_sub's names.
  * FLAGS. lb_award_check_all and lb_npc_talk_screen_open take a scoped `#pragma optimization_level 4`.
+ * FLAGS. `lb_screen07_step` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
  * RESIDUALS.
  *  - `lb_award_hunt_bits_count` (89.6) and `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
  *    counts and the `1` shift base out of the loops into saved registers; ours rebuilds them per loop.
@@ -2195,6 +2196,8 @@ void lb_talk_tag_replace(LbTalkWordList* list, char* text, const char* tag) {
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* Runs the talk state's tick: the first tick plays the window sound, the second ends the talk once the page step
  * reports a choice. */
 void lb_screen07_step(void) {
@@ -2212,6 +2215,7 @@ void lb_screen07_step(void) {
         break;
     }
 }
+#pragma pop
 
 /* Gives the talk's reward (points, an item into or out of the pouch, or an equipment piece) and unlocks the
  * entry's progress flag; returns 0 when the reward could not be given. */
