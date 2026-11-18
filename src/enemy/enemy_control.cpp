@@ -29,10 +29,8 @@
  *   of ENEMY_WORK.h/ENEMY_MINI_WORK.h.  The record constructors are `inline` under
  *   `#pragma dont_inline on` so MWCC emits the implicit `EmcWork` ctor and the member ctors as weak functions after
  *   `__sinit_\enemy_control_cpp`.
- * RESIDUALS. mwcc-debugger dump, `emc_event_hold_release`: regsim 2/2 callee-saved, 17/19 volatile, best plan cost
- *            9; first divergence insn 11: retail `extsh r10, r3` vs ours `extsh r7, r3`
- * RESIDUALS. mwcc-debugger dump, `emc_event_act_end`: regsim 7/7 callee-saved, 8/8 volatile, best plan cost 11;
- *            first divergence insn 7: retail `mr r26, r3` vs ours `mr r29, r3`
+ * RESIDUALS. emc_event_hold_release: every local sits at function scope in regsim's plan order; the hold-table base and the
+ *            hold pointer swap r5/r6 (a `recs` base local costs 4 B).
  * RESIDUALS. mwcc-debugger dump, `emc_joint_cache_fill`: regsim 4/4 callee-saved, 9/10 volatile, best plan cost 0;
  *            first divergence insn 26: retail `<DIFF_INSERT>` vs ours `mr r7, r5`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `em_variant_element_pick`: regsim 7/7 callee-saved, 18/18 volatile (EXACT); first
@@ -2538,16 +2536,23 @@ void emc_event_hold_set(u8 event) {
 
 /* Releases event `event`'s holds. */
 void emc_event_hold_release(u8 event) {
-    _ENEMY_WORK* works = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s16 max = get_move_work_max(3);
+    _ENEMY_WORK* works;
+    u8 n;
+    s32 k;
+    EmcHoldRec* hold;
+    u8 i;
+    _ENEMY_WORK* work;
+    s16 max;
+
+    works = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     if (emc_event_hold.event == event) {
-        u8 n = 0;
-        s32 k;
+        n = 0;
         for (k = 5; k != 0; k--, n++) {
-            EmcHoldRec* hold = &emc_event_hold.rec[n];
+            hold = &emc_event_hold.rec[n];
             if (hold->active != 0) {
-                u8 i = 0;
-                _ENEMY_WORK* work = works;
+                i = 0;
+                work = works;
                 for (; i < max; i++, work++) {
                     if (work->active != 0 && work->field_0x01A == hold->order) {
                         work->freeze_0x46A = 0;
@@ -2741,10 +2746,15 @@ void emc_event_act_end_request(void) {
 
 /* Ends the event's actions: every enemy given one gets its end action and is handed back to the demo control. */
 void emc_event_act_end(void) {
-    _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    s16 max = get_move_work_max(3);
+    s16 max;
     s16 j;
+    EmcEventAct* act;
+    _ENEMY_WORK* target;
     u32 i;
+    _ENEMY_WORK* work;
+
+    work = (_ENEMY_WORK*)get_move_work_adrs(3);
+    max = get_move_work_max(3);
     for (j = 0; j < max; j++, work++) {
         if (work->active != 0) {
             work->visible_0x001 = 1;
@@ -2752,9 +2762,8 @@ void emc_event_act_end(void) {
     }
     i = 0;
     do {
-        EmcEventAct* act = &emc_event_act_tbl[(u8)i];
+        act = &emc_event_act_tbl[(u8)i];
         if (act->active != 0) {
-            _ENEMY_WORK* target;
             act->active = 0;
             target = act->work;
             if (target != NULL) {

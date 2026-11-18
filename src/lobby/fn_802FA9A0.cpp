@@ -22,10 +22,9 @@
  *   em023_demo5_keys_a..f, em023_se_ofs_a/b, lb_barter_* tables, lb_kujira_stay_ranges.
  * FLAGS. em023_stage_actor_busy_ck takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS. lb_barter_stock_add: retail advances one `page` pointer (`addi r3,r3,0x454`) across the four tail tests; ours folds the
- *   offsets into `work` (a `page++` pointer measures the same, a counted loop is unrolled by two: 94.9 %, 208 B).
- * RESIDUALS. Every row is written; 13 rows are short of 100:
- *   - em023_stage_actor_busy_ck: retail narrows the area parameter in place in r31 before the loop and colours max/i
- *     r29/r28; every parameter/local order tried leaves the narrowing in the loop;
+ *   offsets into `work` (a `page++` pointer measures the same, a counted loop is unrolled by two: 94.9 %, 208 B; with `page++` in the loop header 96.0 %: the first compare is
+ *   folded and the pointer is advanced after it).
+ * RESIDUALS. Every row is written; 12 rows are short of 100:
  *   - lb_barter_entry_flags: retail keeps `index * 12` live across the calls, ours keeps `index` and re-multiplies;
  *   - lb_barter_step: the tab switch is lowered as an unsigned range test then a signed `cmpwi 2` in retail (ours a
  *     signed binary search), and `3 - (ok == 0)` is `neg`+`addi` there (ours `subfic`);
@@ -2602,9 +2601,9 @@ void em023_action_rearm(_ENEMY_WORK* self) {
 #pragma optimization_level 4
 /* Whether a live em015 or em018 in area `area` is in the first five sub-states of its action 13. */
 u32 em023_stage_actor_busy_ck(u32 area) {
-    s32 i;
     _ENEMY_WORK* work;
     u16 max;
+    s32 i;
 
     max = get_move_work_max(3);
     work = (_ENEMY_WORK*)get_move_work_adrs(3);

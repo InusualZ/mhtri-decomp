@@ -24,8 +24,6 @@
  *   `gifts_0x108`, `zenny_0x148`, `PopEftModels::phase_0x24`, and the types `PopFile`, `PopFilePoint`, `LbPopWork`,
  *   `LbRoomWork`, `LbScreen30Work`, `LbScreen34Work`, `PopEftModels`.
  * RESIDUALS. Every function is written.  Partial rows:
- *  - `pop_dat_spare_load`: `em_pop_spare_push` is declared with a `u8` area (`enemy/em_model.h`), so ours keeps a
- *    `clrlwi` the retail call (an unnarrowed `lhz`) does not have;
  *  - `lb_pop_room_enter`: retail leaves the peer search with no `i < 4` test after the loop (`b` to the end), ours
  *    tests `i` again (+4 B); the `while`/`return` shapes measure lower;
  *  - `entry_list_update`: `note_slot_flat_table` is declared 4 entries long (`lobby/lb_quest_screen.h`), so ours
@@ -450,8 +448,8 @@ void pop_dat_spare_load(Q_MoveWork* work, char* path)
 {
     PopFile* file;
     EmPopSpare* spare;
-    s32 count;
     s32 i;
+    s32 count;
     u16 slot;
 
     em_pop_spare_init();

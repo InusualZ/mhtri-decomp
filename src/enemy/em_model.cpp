@@ -2346,7 +2346,7 @@ void em_pop_spare_init(void) {
 
 #pragma pop
 /* Pushes the spare record `spare` into the work's spare table and its index into the free-hunt list of `slot`. */
-void em_pop_spare_push(EmPopSpare* spare, u8 area, s32 slot) {
+void em_pop_spare_push(EmPopSpare* spare, s32 area, s32 slot) {
     EmPopWork* work;
     s32 list;
     s32 n;

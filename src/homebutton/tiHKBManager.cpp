@@ -57,16 +57,15 @@
  *            pointer out of a register, so the loop reloads it and indexes with `lhzx` as retail.
  * SHAPES.    hkbGuiPaneComponentDraw halves the size with `/ 2.0f` (retail's fmuls operand order).
  * FLAGS. hkbGuiSetBoundingTriggerTargets takes a scoped `#pragma opt_loop_invariants off`.
+ * SHAPES. hkbManagerSetMap indexes `self->channels[i]` at each use (a `ch` local takes r29 where retail has r27);
+ *            hkbGuiSetBoundingTriggerTargets holds the pane (`n->mKey`) in a function-scope local declared first.
  * RESIDUALS. fn_8056A638: retail schedules `lfs f31,4(r4)` before `mr r28,r4`; every declaration order tried keeps the
  *            move first.
  * RESIDUALS. HkbManagerNode::onDisconnect: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
  * RESIDUALS. hkbSetModifierState: the first statement's and/andc/or and the channel pointer take other registers
  *            (retail r0/r4/r7, ours r4/r5/r0).
- * RESIDUALS. hkbManagerSetMap: the channel pointer is r27 in retail (r29 ours); an inline setMap member scores lower.
  * RESIDUALS. hkbChannelUpdate: register numbering of the bit/index/usage-pointer triple in the edge loops.
  * RESIDUALS. hkbGuiDrawLine: retail reloads the colour word before each FIFO write (also hbm_gui_draw's residual).
- * RESIDUALS. hkbGuiSetBoundingTriggerTargets: ours guards the loop entry (`lhz; cmpwi; beq`), retail does not (an int
- *            or u16 index, a named pane or cast local measured no better).
  * RESIDUALS. hkbGuiPaneComponentContains: stack slots of the point, the rectangle and the local point.
  * RESIDUALS. hkbGuiPaneManagerWalkInChildren: retail stops inlining the iterator at the third level and calls
  *            hkbPaneListGetBeginIter / hkbPaneIterNotEqual; ours inlines all three levels (inline_depth,
@@ -79,8 +78,6 @@
  *            inline destructor is emitted as a weak 0x40-byte copy retail's object does not carry.
  * RESIDUALS. datagap: the claimed `.data` 0x80658290..0x80658458 spans at least 3 TUs (emission-order seams at
  *            0x806583A0 and in [0x80658408, 0x80658440)) - a seam question for the registration.
- * RESIDUALS. mwcc-debugger dump, `hkbManagerSetMap`: regsim 6/6 callee-saved, 11/11 volatile, best plan cost 4;
- *            first divergence insn 9: retail `add r27, r3, r0` vs ours `add r29, r3, r0`
  * RESIDUALS. mwcc-debugger dump, `hkbGuiPaneManagerWalkInChildren`: regsim 1/9 callee-saved, 0/0 volatile, best plan
  *            cost 4; first divergence insn 0: retail `stwu r1, -0x40(r1)` vs ours `stwu r1, -0x30(r1)`; size differs
  *            from retail
@@ -948,9 +945,12 @@ extern "C" Component* fn_8056B760(PaneManager* self, void* pane) {
 #pragma opt_loop_invariants off
 /* 0x8056B7D8 (0xD4): Makes every bounding-pane component take the trigger, or none of them. */
 extern "C" void hkbGuiSetBoundingTriggerTargets(PaneManager* self, u32 bTarget) {
+    nw4r::lyt::Pane* pane;
+
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
         Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
-        if (nw4r::ut::DynamicCast<nw4r::lyt::Bounding>((nw4r::lyt::Pane*)n->mKey) != NULL) {
+        pane = (nw4r::lyt::Pane*)n->mKey;
+        if (nw4r::ut::DynamicCast<nw4r::lyt::Bounding>(pane) != NULL) {
             ((HkbGuiComponent*)n->mValue)->setTriggerTarget(bTarget);
         }
     }
@@ -1340,13 +1340,14 @@ u32 hkbGetModifierState(HkbManager* self)
 /* 0x8056C3F4 (0xDC): Selects the key map of the channel and re-sends its LEDs. */
 void hkbManagerSetMap(HkbManager* self, s32 mapIndex)
 {
-    for (u8 i = 0; i < 1; i++) {
-        HkbChannel* ch = &self->channels[i];
-        if (mapIndex != ch->mapIndex) {
-            ch->mapIndex = mapIndex;
+    u8 i;
+
+    for (i = 0; i < 1; i++) {
+        if (mapIndex != self->channels[i].mapIndex) {
+            self->channels[i].mapIndex = mapIndex;
             KBDSetChannelMap(i, mapIndex);
         }
-        ch->sendLeds();
+        self->channels[i].sendLeds();
     }
 }
 

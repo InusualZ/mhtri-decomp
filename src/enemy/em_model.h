@@ -91,7 +91,7 @@ EmPopRec* em_roster_spare_entry_add(struct EmPopSpare* src, s32 area, s32 slot);
 /* 0x803BD9F8 / 0x803BDBDC / 0x803BDD28 - the spare-record pool: reset it, push one record into a list, and
  * spawn the drawn spares.  GUESS names. */
 void em_pop_spare_init(void);
-void em_pop_spare_push(struct EmPopSpare* spare, u8 area, s32 slot);
+void em_pop_spare_push(struct EmPopSpare* spare, s32 area, s32 slot);
 void em_pop_spare_spawn(void);
 /* 0x803BE128 - releases kind `kind`'s resources.  GUESS name. */
 void em_kind_res_release(u8 kind);

@@ -81,6 +81,11 @@
  *            hbm_kb_list.cpp defines out of line; HbmKeyboard / the text panel's class over intermediate tables) and
  *            createRoot builds tiHKBManager's component manager, whose tables that unit stores by hand: each needs
  *            its owner's class model first.
+ * RESIDUALS. Unwritten: fn_8055E4D8 (0xC4, the HbmKbSelector factory: `new` of 0xD8 bytes, HbmKbChildBase's inline constructor,
+ *            HbmPaneManager's constructor with the layout name `fs_prdicSelWidw_a.brlyt`, then the three table stores 0/+0x1C/
+ *            +0xC4 of `__vt__13HbmKbSelector`).  HbmKbChild has no constructor and HbmKbChildBase's table 0x80651C1C is
+ *            this unit's (its slots are the free fn_8055E59C/fn_8055E834/fn_8055E838 rows, not members of a class), so the
+ *            factory needs those rows turned into HbmKbChildBase members and an inline constructor on HbmKbChild first.
  * RESIDUALS. 11 functions (2436 bytes) are unwritten, the largest __dt__14SysKbdVuObjectFv (492); the list
  *            is `python tools/units/sweepcomments.py --unit homebutton/hbm_value`.
  * SHAPES.    The text writer: hbmTextWriterDrawLine / hbmTextWriterDraw take a typed HbmTextCaret* (a cast local puts

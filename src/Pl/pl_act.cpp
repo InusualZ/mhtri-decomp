@@ -90,8 +90,6 @@
  *  - `pl_input_refresh`: the Classic Controller arm's held/alt/pressed locals take r3/r6 where retail has r6/r3 (block
  *    locals and every declaration order measured);
  *  - `pl_stg_weapon_near_find`: the second loop's index and row pointer sit in r28/r27 where retail has r27/r28;
- *  - `fn_802753E4`: retail keeps an `extsh r31,r0` after the first `lha` (`value +=`, `value = (s16)(value + x)` and a
- *    plain store measured; the Wii/1.3 dump's regsim plan is exact on the named locals);
  *  - `fn_8026A068`: retail divides the id before it loads the work's byte (`kind` local, no local, a pre-computed
  *    quotient, the swapped subscript, a pointer-to-array cast and `#pragma scheduling off` all measured; the order is
  *    fixed before scheduling; the Wii/1.3 dump's regsim plan is exact on the named locals and leaves the unnamed `@`
@@ -139,7 +137,8 @@
  *    test measured);
  *  - `Get_pl_type`: retail materialises the light/medium threshold (`li r0,30; xoris; subi`) where ours folds it into
  *    `subfic` (`<`, `<=`, `>=`, `30 >`, a `+ 5` sum and an `s16` local measured);
- *  - `equip_defense_get`: the slot, step-row and bound locals are coloured r30/r29/r26 where retail has r29/r27/r30;
+ *  - `equip_defense_get`: the bound (`end`) takes r29 and the slot r30 where retail has r30/r29, and retail adds the
+ *    `+ 1` after the step table is set up (declaration orders, the `for` header init and a `count` local measured lower);
  *  - `pl_parts_set`: retail keeps the global in r6 and builds the record base in r7 (the sibling `fn_802693C4`'s spelling,
  *    a block-local reload and the declaration orders measured);
  *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
@@ -150,7 +149,6 @@
  *    returning `u32`);
  *  - `pl_weapon0_hit_feedback`: the self/quake callee-saved registers are swapped (r31/r30), every spelling tried;
  *  - `pl_weapon_parts_refresh`: the weapon pointer and the variant sit in r26/r29 where retail has r27/r27 (98.5 %);
- *  - `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
  *  - the other partial rows have no recorded cause.
  *  - `fn_8026CC7C` is byte-identical; its switch table relocation goes through MWCC's local `@NNNN` where the target
  *    names `jumptable_805C5FA0` (same address).  The extab record names agree (`@etb_800126CC` is in both objects).
@@ -256,8 +254,6 @@
  *            or a `(u8)` compare measure lower or equal.
  * RESIDUALS. mwcc-debugger dump, `Get_pl_type`: regsim 2/2 callee-saved, 8/8 volatile (EXACT, colouring is not the
  *            cause); first divergence insn 39: retail `extsh r4, r31` vs ours `extsh r0, r31`
- * RESIDUALS. mwcc-debugger dump, `fn_8027D40C`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 1; first
- *            divergence insn 0: retail `li r6, 0x0` vs ours `li r5, 0x0`
  * RESIDUALS. mwcc-debugger dump, `pl_attack_range_tier_get`: regsim 1/1 callee-saved, 17/19 volatile, best plan cost
  *            0; first divergence insn 14: retail `lwzx r5, r3, r0` vs ours `lwzx r4, r3, r0`
  * RESIDUALS. mwcc-debugger dump, `fn_8027FB84`: regsim 6/6 callee-saved, 7/7 volatile (EXACT, colouring is not the
@@ -276,6 +272,8 @@
  *            + i` as a named local, which is pointer arithmetic (apply-local refuses an `add`)
  * RESIDUALS. mwcc-debugger dump, `fn_8027AF88`: regsim 3/3 callee-saved, 24/24 volatile (EXACT); first divergence
  *            insn 55: retail `extsb r4, r0` vs ours `extsb r0, r0`
+ * SHAPES. `fn_802753E4` sums the three flag/value pairs in a `for (j < 3)` loop (MWCC unrolls it; unrolled by hand the first
+ *            `lha` folds its `extsh`); `fn_8027D40C` declares `i` before `n`.
  * SHAPES. `equip_gun_level_bonus_get` steps `i++, row++` in the for header (retail's remainder-loop increment
  *            order).
  * RESIDUALS. equip_skill_tree_has_ck: an if chain `(u8)(kind - 7) > 8 / (u8)(kind - 1) <= 4 / kind == 6` measured worse than the
@@ -5422,18 +5420,15 @@ extern "C" s16 fn_802753E4(struct _PLW* plw, u16 id)
     }
     {
         s32 key;
+        s32 j;
         LbParamWork* param;
         param = &lb_param_w;
         key = id;
 
-        if (key == param->flag_0x0C[0]) {
-            value = (s16)(value + param->value_0x10[0]);
-        }
-        if (key == param->flag_0x0C[1]) {
-            value += param->value_0x10[1];
-        }
-        if (key == param->flag_0x0C[2]) {
-            value += param->value_0x10[2];
+        for (j = 0; j < 3; j++) {
+            if (key == param->flag_0x0C[j]) {
+                value += param->value_0x10[j];
+            }
         }
     }
     return value;
@@ -7266,8 +7261,11 @@ extern "C" u8 pl_hit_result_best_get(_PLW* self)
 /* 0x8027D40C: the number of set bits in the actor's action-lock word. */
 extern "C" s32 fn_8027D40C(_PLW* self)
 {
-    s32 n = 0;
-    for (s32 i = 0; i < 32; i++) {
+    s32 i;
+    s32 n;
+
+    n = 0;
+    for (i = 0; i < 32; i++) {
         if (self->unk3AC & (1 << i)) {
             n++;
         }
@@ -10613,22 +10611,24 @@ u8 equip_level_stage_get(_EQUIP* equip, u8 level)
  * (or the piece's top step). */
 s32 equip_defense_get(_EQUIP* equip)
 {
+    s32 end;
     PlSlotRec* slot;
-    s32 i;
     _EQUIP* piece;
     s16 total;
     s16* steps;
-    s32 end;
+    s32 i;
     u8 stage;
+    PlArmorLevelRec* rec;
 
     piece = equip;
     if (piece->kind == 6) {
         return 0;
     }
     slot = (PlSlotRec*)equip_slot_rec_get(piece);
-    steps = &pl_armor_defense_steps[0][((PlArmorLevelRec*)equip_armor_ex_rec_get(piece))->step_row * 5];
-    total = 0;
+    rec = (PlArmorLevelRec*)equip_armor_ex_rec_get(piece);
     end = piece->deco_count + 1;
+    steps = &pl_armor_defense_steps[0][rec->step_row * 5];
+    total = 0;
     for (i = 1; i < end; i++) {
         stage = equip_level_stage_get(piece, i);
         if (stage == 5) {

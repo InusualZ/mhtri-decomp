@@ -24,8 +24,8 @@
  *   `cockpit_menu_0x5C0`, and `_AINPC_W::digit_state_0x3C4`.  The registry names this unit proposed for
  *   foreign rows are GUESS too (the `pl_item_*`, `pl_*_ck`, `ai_npc_*_ck`, `draw_*`, `cockpit_*_ids` rows in
  *   config/RMHE08/name_registry.jsonl under lane hud-cockpit-quest).
- * RESIDUALS. register colouring or scheduling only (same instructions): `quest_mark_draw` (the hoisted alpha,
- *   rgb and 1/255 magic: retail numbers the alpha below the magic), `cockpit_ammo_gauge_draw`/
+ * RESIDUALS. register colouring or scheduling only (same instructions): `quest_mark_draw` (`mullw` operand order: both
+ *   source orders give `mullw r0,r30,r0`, retail `r0,r0,r30`), `cockpit_ammo_gauge_draw`/
  *   `cockpit_split_ammo_gauge_draw` (`icons` is a backend temporary of the table address and colours before
  *   `step`), `cockpit_supply_box_draw`, `cockpit_item_tag_update` (the second search loop's counters),
  *   `cockpit_split_item_ring_draw`, `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
@@ -2831,6 +2831,8 @@ void quest_mark_append(CockpitWork* work, const _mh_ivec2_* pos, u8 tex_idx, u32
 /* 0x802EA278.  Draws the mark's sprites: every id of the icon list (the hold list when `mode` is 0) at `pos`,
  * animated to `frame`, with the colour's alpha scaled by the sprite's own. */
 void quest_mark_draw(const _mh_ivec2_* pos, u8 mode, u32 color, u16 frame) {
+    u32 alpha;
+    u32 rgb;
     const u16* ids;
     _SPR_DATA_ rec;
 
@@ -2839,10 +2841,12 @@ void quest_mark_draw(const _mh_ivec2_* pos, u8 mode, u32 color, u16 frame) {
     } else {
         ids = quest_view_icon_ids;
     }
+    alpha = (u8)color;
+    rgb = color & 0xFFFFFF00;
     while (*ids != 0xFFFF) {
         spr_data_copy(&rec, get_lsp_data(*ids, 0));
         sprite_frame_apply(&rec, *ids, frame, 0);
-        rec.color = (color & 0xFFFFFF00) + (u8)(((u8)color * (u32)(u8)rec.color) / 255);
+        rec.color = rgb + (u8)((alpha * (u32)(u8)rec.color) / 255);
         draw_sprite(rec, pos);
         ids++;
     }

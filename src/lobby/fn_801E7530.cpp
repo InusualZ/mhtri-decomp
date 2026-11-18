@@ -23,7 +23,8 @@
  * FLAGS. lb_hunt_info_draw takes a scoped `#pragma opt_loop_invariants off`.
  * FLAGS. lb_farm_seed_ck takes a scoped `#pragma opt_common_subs off`.
  * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
- *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B).
+ *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B) and an
+ *   inline `kind == 1` predicate measures equal.
  * RESIDUALS. lb_count_add_cap99: dump 03 adds into its own vreg (`add r34,r35,r36`, coloured r0) where retail adds back into r3; ternary, `u16` and
  *   in-place spellings lower the row.
  * RESIDUALS. Every row is written.
@@ -31,7 +32,8 @@
  *    the offset to the base each pass; ours stores one zero through a strength-reduced pointer (struct copy, inline
  *    setter, chained stores and a flat u16 index measured, none closer);
  *  - `lb_farm_seed_ck`: ours folds `seed >= 8 && seed < 12` into one `subi`/`cmplwi` range test; retail keeps two
- *    compares (nested ifs, an else-if chain and `<= 11` measured, none closer);
+ *    compares (nested ifs, an else-if chain, `<= 11`, `||` early-out and `u32` compares measured, none closer; the
+ *    `level` join also keeps an extra `clrlwi` before the `cmplw`);
  *  - `lb_hunt_day_roll`: retail lowers `roll % 100 < 80` with the two-register signed-less-than idiom where ours folds
  *    the constant (`andi.`), plus register colouring;
  *  - `lb_deli_screen_draw`: retail loads the hold count after the panel/string arguments of `lb_help_num_put`;
@@ -44,7 +46,7 @@
  *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
  *    `lb_farm_box_page_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
  *    `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
- *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`, `lb_trade_list_step`: register colouring;
+ *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`: register colouring;
  *  - flipcheck: `.data` (2344 B) and `.sdata` (232 B) are claimed but not emitted (the tables are declared, not
  *    defined), including `lb_kujira_gift_items`, which `lobby/fn_802FA9A0` references.
  * SHAPES. The free-hunt point rows are written through a flat u16 index (`n * 3`): retail's `slwi`/`subf`/`slwi` is that
@@ -441,8 +443,8 @@ s32 lb_trade_list_step(LbMenuWork* self)
         result = 2;
         sysSE_req(1);
     } else if (lb_cmd_repeat_ck(0xC) != 0) {
-        /* The string block's first halfword receives the moved mask; the cast emits nothing. */
-        value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, lb_cmd_repeat_get(), 4, 8, (u16*)&self->list_0x24.cursor_0x00);
+        /* The step writes its moved flag into the work's halfword at +0x12. */
+        value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, lb_cmd_repeat_get(), 4, 8, &self->item_id_0x12);
         self->list_mode_0x0C = value;
         lb_trade_list_build(self, value);
     } else if (lb_cmd_repeat_ck(3) != 0) {

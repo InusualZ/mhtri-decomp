@@ -29,12 +29,9 @@
  * SHAPES. The tail-called table lookups (snd_line_*_get) are 4/8-byte wrappers over separate 0x38-byte helpers; the
  *   voice keys are `key = global ? 255 : line` then one expression; snd_voice_volume_calc returns an s16 assigned
  *   from the float product without a cast.
- * RESIDUALS. snd_obj_play_chain: regsim colours `cfg` r31 / `line` r30 (retail r30 / r31) for every declaration
- *            order, and retail masks `cfg->next_cue` with `clrlwi r4,r0,16` at the second cue lookup (a `(u16)` cast
- *            compiles identically).
- * RESIDUALS. mwcc-debugger dump, `snd_obj_play_chain`: regsim 2/3 callee-saved, 4/4 volatile, best plan cost 0;
- *            first divergence insn 10: retail `addi r31, r3, 0x90` vs ours `addi r30, r3, 0x90`; size differs from
- *            retail
+ * RESIDUALS. snd_obj_play_chain: `line` is declared before `cfg` (regsim's plan, registers now retail's); retail masks
+ *            `cfg->next_cue` with `clrlwi r4,r0,16` at the second cue lookup (a `(u16)` cast compiles identically, and a
+ *            `u16` `idx` on `snd_line_cue_get` adds a mask at the first lookup and a word to the row).
  */
 
 #include "sound/sound_obj_types.h" /* SndBase, SndPlayerBase (rule 1) */
@@ -954,9 +951,10 @@ extern "C" u32 snd_obj_play_pos_reset(Sound* snd, u32 line, u32 id, u32 pos, u32
 /* Plays a slot chain through one of the object's delay lines. */
 extern "C" u32 snd_obj_play_chain(Sound* snd, u32 a, u32 b, SndPlayParam* c)
 {
+    ReverbLine* line;
     VoiceCfg* cfg;
-    ReverbLine* line = &snd->lines[a];
 
+    line = &snd->lines[a];
     cfg = (VoiceCfg*)snd_line_cue_get(line, b);
 
     if (cfg == 0) {

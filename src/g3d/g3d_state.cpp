@@ -93,7 +93,7 @@
  *   The map splits 0x800884AC, 0x80088560 and 0x80088700 out of their callers' rows: each is a static function its
  *     caller tail-branches into, and dtk's analysis had merged it into the caller.
  *   g3d_tex_obj_cache_load, g3d_tlut_obj_cache_load: retail recomputes the copied entry's address (`slwi`/`mulli`)
- *     where ours reuses the compare's offset register; tlut also swaps the index and TLUT registers.
+ *     where ours reuses the compare's offset register (tlut's `pTlut`, `i` and `bit` are function-scope locals in regsim's plan order, which fixes its registers).
  *   extab: the records differ only where the register saves do (SetNrmMapMtx).  The object also carries the weak copies of LightObj's constructor/destructor, LightSetting's
  *     destructor and G3dLightTable's implicit destructor (no static-destructor registration, as retail); the link
  *     keeps g3d_light.cpp's and g3d_scnroot.cpp's copies.
@@ -1507,11 +1507,15 @@ void g3d_state_load_tlut_obj(nw4r::g3d::ResTlutObj tlutObj) {
 
 /* Loads each valid TLUT that is not already cached, and invalidates the texture cached for that slot. */
 void g3d_tlut_obj_cache_load(G3dTlutObjCache* pSelf, nw4r::g3d::ResTlutObj tlutObj) {
-    u32 i = 0;
+    const GXTlutObj* pTlut;
+    u32 i;
+    u16 bit;
+
+    i = 0;
     do {
         if (tlutObj.IsValidTlut((_GXTlut)i)) {
-            const GXTlutObj* pTlut = static_cast<const nw4r::g3d::ResTlutObj&>(tlutObj).GetTlut((_GXTlut)i);
-            u16 bit = 1 << i;
+            pTlut = static_cast<const nw4r::g3d::ResTlutObj&>(tlutObj).GetTlut((_GXTlut)i);
+            bit = 1 << i;
             if ((pSelf->validMask & bit) == 0 || !fn_80086154((const StateWord3*)pTlut,
                                                              (const StateWord3*)&pSelf->tlut[(_GXTlut)i])) {
                 pSelf->validMask |= bit;
