@@ -20,6 +20,7 @@
  *   names after `Em015ProgTbl`'s scheme, the action groups by motion and purpose); the data rows eft036_spheres_*,
  *   eft038_torch_pos, lb_unlock_cond_tbl0/1, em023_turn_seq_a/b, em023_se_seq_*, em023_se_alt_seq_*, em023_route_*,
  *   em023_demo5_keys_a..f, em023_se_ofs_a/b, lb_barter_* tables, lb_kujira_stay_ranges.
+ * FLAGS. em023_stage_actor_busy_ck takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS. lb_barter_stock_add: retail advances one `page` pointer (`addi r3,r3,0x454`) across the four tail tests; ours folds the
  *   offsets into `work` (a `page++` pointer measures the same, a counted loop is unrolled by two: 94.9 %, 208 B).
  * RESIDUALS. Every row is written; 13 rows are short of 100:
@@ -2597,6 +2598,8 @@ void em023_action_select(_ENEMY_WORK* self, u8* action, u8* sub) {
 void em023_action_rearm(_ENEMY_WORK* self) {
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Whether a live em015 or em018 in area `area` is in the first five sub-states of its action 13. */
 u32 em023_stage_actor_busy_ck(u32 area) {
     s32 i;
@@ -2623,6 +2626,7 @@ u32 em023_stage_actor_busy_ck(u32 area) {
     }
     return 0;
 }
+#pragma pop
 
 /* Whether the whale-event work's countdown byte has gone negative. */
 u32 kujira_event_over_ck(void) {

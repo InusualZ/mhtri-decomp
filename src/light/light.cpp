@@ -15,10 +15,10 @@
  *   `root_light_setting_get`), the record types `LightPoint`, `LightSpot`, `LightFlare`, `LightPointWork` (their
  *   never_inline constructors are the map's `__ct__` rows after `__sinit`), the copy view `LightPointCopy`, and the
  *   record views `LightSceneRoot`, `LightPlayerView`, `LightNpcView`.
+ * FLAGS. light_em_slot_find_free takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS. LightFlare(): `MHchar`'s implicit constructor constructs its +0x04 VEC3 before the explicit
  *   `mhchar_construct` (retail calls only that, which is MHchar's own constructor; request vec3-world#3).
- *   light_update, light_point_nearest_get, light_set_default_select,
- *   light_em_slot_find_free: retail's `(u8)i` index and the loaded slot byte take r4 where
+ *   light_update, light_point_nearest_get, light_set_default_select: retail's `(u8)i` index and the loaded slot byte take r4 where
  *   ours take r0 (regsim's plan leaves r39/r41/r42 on r0; named locals for them measure equal). light_init: the light-setting/object registers and one `addi`
  *   scheduled late. light_flare_update: the camera temporary's stack slot. light_point_scale_set: `mode`'s copy
  *   scheduled one instruction early. light_point_param_get: one dead `b` of an empty case.
@@ -852,6 +852,8 @@ extern "C" void light_set_default_select(s32 index)
 /* enemy light slots                                                                                 */
 /* ------------------------------------------------------------------------------------------------ */
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802C0504 (0xCC): the lowest light slot no enemy holds (3 when all are taken). */
 extern "C" u8 light_em_slot_find_free(void)
 {
@@ -876,6 +878,7 @@ extern "C" u8 light_em_slot_find_free(void)
     }
     return slot;
 }
+#pragma pop
 
 /* 0x802C05D0 (0x13C): selects the enemy's light set and, for a lit enemy, takes a light slot; returns the light set
  * number. */

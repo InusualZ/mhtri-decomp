@@ -37,6 +37,7 @@
  *   `setPatReflectPageRange` (the body installs handler 0 and resets the login state), `PatInterface::clear`,
  *   `PatInterface::isReady`, `getPatServerTime`, `setPatBuffer`, `setPatRange`, `getPatAccountName`,
  *   `setPatReflectField30/34/38`, `setPatReflectName3C/5C`, `setPatField854/860`.
+ * FLAGS. sendReqLoginInfo takes a scoped `#pragma peephole off`.
  * RESIDUALS. Every row has a body; the open ones, in address order:
  *  - signature-bound (the declarations other units call through; a retype measured at 100 % is filed as a request):
  *    `getSomething4` (the `s8` return adds an `extsb`), `sendNtcLayerUserPosition`, `sendNtcCircleChat`,
@@ -1993,6 +1994,8 @@ s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u
     return (u16)ret;
 }
 
+#pragma push
+#pragma peephole off
 s32 sendReqLoginInfo(NetworkInstance* self)
 {
     u8 block[16];
@@ -2018,6 +2021,7 @@ s32 sendReqLoginInfo(NetworkInstance* self)
     encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
+#pragma pop
 
 s32 sendReqChargeInfo(NetworkInstance* self, s32 mode)
 {

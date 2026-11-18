@@ -12,6 +12,7 @@
  * NAMES. The file name is a GUESS (the next family number after `ef/eft022_fx.cpp`).  The map has only `fn_` stems,
  *   so plain definitions are `extern "C"`.  GUESS: `eft024_job_start`/`eft024_job_step` (the file-local state-0/1
  *   bodies at 0x80117018/0x80117050).
+ * FLAGS. fn_80116EEC takes a scoped `#pragma opt_strength_reduction off`.
  * RESIDUALS.
  *  - `fn_80116EEC`: retail unrolls the slot scan with the table base in r3; ours keeps a separate base;
  *  - `fn_80117120`: retail keeps the dead loop counter's increment in both unrolled halves.
@@ -365,6 +366,8 @@ extern "C" void fn_80116E1C(_EFT* self, s16 type, s32 unused_arg)
     work->total++;
 }
 
+#pragma push
+#pragma opt_strength_reduction off
 /* Finds the first free slot in the eft024 job's 32-slot table. */
 extern "C" s16 fn_80116EEC(_EFT* self)
 {
@@ -384,6 +387,7 @@ extern "C" s16 fn_80116EEC(_EFT* self)
     }
     return -1;
 }
+#pragma pop
 
 /* Releases the eft024 job's character handles. */
 extern "C" void fn_80116FCC(_EFT* self)

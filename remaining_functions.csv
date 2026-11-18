@@ -186,7 +186,6 @@ size_bytes,unit,function,match_percent,address
 204,enemy/fn_802F5138,em032_act0_idle_swim,97.5686,0x802F5C58
 204,fn_8004CAD8,monster_size_crown_get,99.7647,0x8004E634
 204,hud/pl_frame_sync,em_net_send_count,99.4118,0x80336F84
-204,light/light,light_em_slot_find_free,95.9216,0x802C0504
 208,Pl/pl_act,fn_802753E4,96.9231,0x802753E4
 208,Pl/pl_act,pl_weapon_class_refresh,98.9615,0x802744A0
 208,enemy/em005_act,em005_route_point_pick,98.5577,0x801D67D8

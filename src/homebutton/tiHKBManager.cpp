@@ -56,6 +56,7 @@
  * SHAPES.    HkbManager::filterAllowed tests the allow-list pointer through the inline getAllowedChars: that keeps the
  *            pointer out of a register, so the loop reloads it and indexes with `lhzx` as retail.
  * SHAPES.    hkbGuiPaneComponentDraw halves the size with `/ 2.0f` (retail's fmuls operand order).
+ * FLAGS. hkbGuiSetBoundingTriggerTargets takes a scoped `#pragma opt_loop_invariants off`.
  * RESIDUALS. fn_8056A638: retail schedules `lfs f31,4(r4)` before `mr r28,r4`; every declaration order tried keeps the
  *            move first.
  * RESIDUALS. HkbManagerNode::onDisconnect: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
@@ -943,6 +944,8 @@ extern "C" Component* fn_8056B760(PaneManager* self, void* pane) {
     return 0;
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x8056B7D8 (0xD4): Makes every bounding-pane component take the trigger, or none of them. */
 extern "C" void hkbGuiSetBoundingTriggerTargets(PaneManager* self, u32 bTarget) {
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
@@ -952,6 +955,7 @@ extern "C" void hkbGuiSetBoundingTriggerTargets(PaneManager* self, u32 bTarget) 
         }
     }
 }
+#pragma pop
 
 /* 0x8056B8AC (0x128): Returns whether the point (x, y) lies on the component's pane. */
 extern "C" u32 hkbGuiPaneComponentContains(Component* self, f32 x, f32 y) {

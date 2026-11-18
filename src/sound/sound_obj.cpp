@@ -17,6 +17,7 @@
  *   snd_voice_setup, snd_obj_play_regions and snd_obj_voice_limit); the registry names of the sound/fn_800E8E60 callees
  *   (`snd_listener_polar`, `snd_distance_atten`, `snd_pan_calc`, `snd_span_calc`, `snd_distance_volume`,
  *   `snd_distance_priority`, `snd_ref_table_count`).
+ * FLAGS. snd_obj_play_chain takes a scoped `#pragma opt_common_subs off`.
  * RESIDUALS. snd_obj_play_chain: retail passes the chained cue id through `clrlwi r4,r0,16` - the cue id is a u16 from
  *   snd_stream_reloc's wrappers through snd_obj_play_pan/pos/pos_reset and snd_line_cue_get, which this unit cannot
  *   retype alone (its header's callers pass u32); the line/cue registers also swap (r31/r30). The play functions
@@ -948,6 +949,8 @@ extern "C" u32 snd_obj_play_pos_reset(Sound* snd, u32 line, u32 id, u32 pos, u32
     return snd_obj_play_chain(snd, line, id, &param);
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* Plays a slot chain through one of the object's delay lines. */
 extern "C" u32 snd_obj_play_chain(Sound* snd, u32 a, u32 b, SndPlayParam* c)
 {
@@ -973,6 +976,7 @@ extern "C" u32 snd_obj_play_chain(Sound* snd, u32 a, u32 b, SndPlayParam* c)
     } while (cfg->next_cue != 255);
     return snd->field_78;
 }
+#pragma pop
 
 /* Dispatches a voice to the handler its kind selects. */
 extern "C" void snd_obj_play_cue(Sound2* self, ReverbLine* a, VoiceCfg* cfg, u32 c, SndPlayParam* d)

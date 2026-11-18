@@ -21,6 +21,7 @@
  *   `lb_farm_box_page_draw` (both lose a few bytes at 4); `#pragma opt_unroll_loops off` around `lb_daily_menu_roll`
  *   (retail keeps its 17-row clear as a `mtctr` loop).
  * FLAGS. lb_hunt_info_draw takes a scoped `#pragma opt_loop_invariants off`.
+ * FLAGS. lb_farm_seed_ck takes a scoped `#pragma opt_common_subs off`.
  * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
  *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B).
  * RESIDUALS. lb_count_add_cap99: dump 03 adds into its own vreg (`add r34,r35,r36`, coloured r0) where retail adds back into r3; ternary, `u16` and
@@ -1468,6 +1469,8 @@ u16 lb_farm_seed_price_get(u8 seed)
     return 0;
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x801E9E50 (0xE8): whether `plot` can take seed `seed`: -1 when it cannot, 2 when the money does not reach its
  * price, else 0. */
 s8 lb_farm_seed_ck(const LbFarmPlot* plot, u8 seed)
@@ -1504,6 +1507,7 @@ s8 lb_farm_seed_ck(const LbFarmPlot* plot, u8 seed)
     }
     return result;
 }
+#pragma pop
 
 /* 0x801E9F38 (0x90): opens the farm screen (lobby screen 5) with its plots. */
 void lb_screen05_open(struct _PLW* player, struct _LB_NPC* npc)
