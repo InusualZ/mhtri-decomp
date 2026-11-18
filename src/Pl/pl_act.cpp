@@ -277,6 +277,8 @@
  *            insn 55: retail `extsb r4, r0` vs ours `extsb r0, r0`
  * SHAPES. `equip_gun_level_bonus_get` steps `i++, row++` in the for header (retail's remainder-loop increment
  *            order).
+ * RESIDUALS. equip_skill_tree_has_ck: an if chain `(u8)(kind - 7) > 8 / (u8)(kind - 1) <= 4 / kind == 6` measured worse than the
+ *            switch.
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */

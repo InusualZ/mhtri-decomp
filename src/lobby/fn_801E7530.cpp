@@ -55,6 +55,8 @@
  *            divergence insn 0: retail `stwu r1, -0x30(r1)` vs ours `stwu r1, -0x20(r1)`
  * RESIDUALS. mwcc-debugger dump, `lb_farm_seed_list_draw`: regsim 3/7 callee-saved, 12/12 volatile, best plan cost
  *            3 EXACT; first divergence insn 5: retail `mr r29, r3` vs ours `mr r28, r3`
+ * RESIDUALS. lb_hunt_day_roll: `and r0,r0,x` where ours folds `andi. r0,r0,0x50`; `80 > roll`, `!(roll >= 80)` and a named `s32 roll`
+ *            all fold the same way.
  */
 #include "types.h"
 
@@ -1136,6 +1138,7 @@ u16 lb_count_add_cap99(u16 a, u16 b)
 void lb_hunt_day_roll(u8* monsters, u16* variant, u16* flag)
 {
     u8 pool[14];
+    u8 j;
     const LbHuntMonsterRow* row;
     u16 top;
     u16 v;
@@ -1143,6 +1146,7 @@ void lb_hunt_day_roll(u8* monsters, u16* variant, u16* flag)
     u8 n;
     u8 idx;
     u8 i;
+    u8 first;
 
     row = (const LbHuntMonsterRow*)lbl_805B7A88;
     memset(monsters, 0, 2);
@@ -1172,9 +1176,6 @@ void lb_hunt_day_roll(u8* monsters, u16* variant, u16* flag)
     for (i = 0; i < count; i++) {
         monsters[i] = lb_rand_pick_take(pool);
         if ((u16)ran_suu(1) % 100 < 80) {
-            u8 first;
-            u8 j;
-
             n = 0;
             j = 0;
             first = monsters[i];

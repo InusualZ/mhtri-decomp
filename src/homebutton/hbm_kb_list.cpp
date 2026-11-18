@@ -29,6 +29,7 @@
  *            object emits its own weak copies (and HbmEventHandler's/HbmPaneHandler's inline destructors) besides.
  * RESIDUALS. HbmKbList::create: `this` and the allocator take r18/r19 where retail has r19/r20 (retail keeps the
  *            animation count in r18); the declaration orders tried move the count above them.
+ * RESIDUALS. create: colouring only (regsim: no plan reproduces every callee-saved target; `this` takes r18 where retail has r19).
  */
 
 #include "types.h"

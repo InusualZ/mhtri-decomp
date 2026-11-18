@@ -46,6 +46,8 @@
  * SHAPES. A `get_move_work_max` count is held in a `u32` and narrowed at the loop compare (`(u16)max`), which keeps the
  *   retail late `clrlwi` (playbook 168); `(u32)` on `em_work_die_ck`/`em_action_mid_ck` results gives retail's
  *   `cmplwi`; the two-value tests `x == 1 || x == 2` are `(u32)(x - 1) <= 1`.
+ * RESIDUALS. eft_slot_work_update: regsim plan 1 wants a zero local (`li r40,0`) declared after `record`; `u8 zero` assigned at the
+ *            top or before the scan is folded away (no change).
  */
 
 #include "enemy/em_area_entry_tbl.h" /* em_area_entry_tbl (rule 2: the owner's header) */
@@ -1522,18 +1524,21 @@ extern "C" void eft_slot_enemy_rank(EftSlot* slot, _ENEMY_WORK** works, s32 n)
  * enemies and handing them to the distance sort. */
 extern "C" void eft_slot_track_recount(void)
 {
-    EftSlot* slot = eft_slot_pool;
+    EftSlot* slot;
     EftTargetRecord* record;
-    u8 done[10];
     s32 i;
-    _ENEMY_WORK* base = (_ENEMY_WORK*)get_move_work_adrs(3);
-    _ENEMY_WORK* list[32];
-    u16 max = get_move_work_max(3);
+    _ENEMY_WORK* base;
+    u16 max;
     _ENEMY_WORK* work;
+    u8 key;
     EftSlot* other;
     s32 j;
-    u8 key;
     s32 k;
+    slot = eft_slot_pool;
+    u8 done[10];
+    base = (_ENEMY_WORK*)get_move_work_adrs(3);
+    _ENEMY_WORK* list[32];
+    max = get_move_work_max(3);
 
     for (i = 0; i < 10; i++) {
         done[i] = 0;

@@ -717,9 +717,9 @@ extern "C" void userdata_new_game_init(s32 kind)
     user->state_0x3E02 = 0;
     user->zenny_0x18 = 0;
     user->pig_name_0x483A = 0x24;
-    user->cat_name_0x3F95[0] = 0x2C;
-    user->cat_name_0x3F95[1] = 9;
-    user->cat_name_0x3F95[2] = 0x10;
+    user->name_by_kind_0x3F81[0x14] = 0x2C;
+    user->name_by_kind_0x3F81[0x15] = 9;
+    user->name_by_kind_0x3F81[0x16] = 0x10;
     user->pig_dress_0x483B = 0;
     user->state_0x3E03 = 0;
     user->timer_0x519C = 60;

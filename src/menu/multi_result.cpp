@@ -45,6 +45,8 @@
  *            EXACT; first divergence insn 22: retail `addi r31, r3, name_menu_row_tbl@l` vs ours `addi r30, r3,
  *            name_menu_row_tbl@l`
  * SHAPES. `pig_dress_list_draw` declares `i`, `color`, then `sel` and `cur` (the regsim plan order).
+ * RESIDUALS. name_menu_step: retail adds the kind to the block base as `add r3,kind,base`, ours `add r3,base,kind` (the
+ *            only difference; `kind[...]` and a named picked-name local measure the same).
  */
 
 #include "types.h"
@@ -1020,7 +1022,7 @@ extern "C" void name_menu_open(struct _PLW* player, struct _LB_NPC* npc) {
             w->current_0x0E = ((Q_UserData*)lobby_world_block)->pig_name_0x483A;
         }
     } else {
-        w->current_0x0E = ((Q_UserData*)lobby_world_block)->cat_name_0x3F95[cat];
+        w->current_0x0E = ((Q_UserData*)lobby_world_block)->name_by_kind_0x3F81[cat + 0x14];
     }
     name_menu_page_build(w, 0);
     lb_menu_open(npc);
@@ -1118,7 +1120,7 @@ extern "C" void name_menu_step(void) {
                     lb_npc_motion_restart(w->npc_0x28, 50);
                 }
             } else {
-                ((Q_UserData*)lobby_world_block)->cat_name_0x3F95[kind - 0x14] = w->row_ids_0x10[w->cursor_0x02];
+                ((Q_UserData*)lobby_world_block)->name_by_kind_0x3F81[kind] = w->row_ids_0x10[w->cursor_0x02];
             }
             break;
         case 2:

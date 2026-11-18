@@ -16083,8 +16083,8 @@ extern "C" s32 pl_guard_ck(_PLW* self, s32 angle)
     s32 auto_guard;
     u32 rows;
     PlScanEntry* row;
-    u16* remap;
     u32 mode;
+    u16* remap;
     s32 key;
     s32 kind;
     u8 weapon;

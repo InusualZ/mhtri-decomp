@@ -1654,14 +1654,14 @@ u8 em033_roster_pick(_ENEMY_WORK* self, u8 a) {
     nw4r::math::VEC3 hit;
     nw4r::math::VEC3 diff;
     u8* p;
-    nw4r::math::VEC3* aim;
     s32 i;
+    u8 n;
     s32 area;
     f32 len;
-    u8 n;
-    u8 type;
     u8 best;
+    u8 type;
     u8 prev;
+    nw4r::math::VEC3* aim;
 
     best = 0xFF;
     n = em_roster_kind_collect(self->area_no, buf, 0x10);

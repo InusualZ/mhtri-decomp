@@ -1858,10 +1858,10 @@ void movie_page04_split_draw(MenuSlot* slot) {
     _mh_ivec2_ at;
     u16* names;
     u16* values;
-    s32 i;
     _SPR_DATA_* anchor;
-    MenuEntry* row;
     s32 color;
+    MenuEntry* row;
+    s32 i;
     u16** sprites;
 
     get_lsp_data(((u16*)get_menu_lsp_tbl(0x18A))[slot->pad_no], &pos);

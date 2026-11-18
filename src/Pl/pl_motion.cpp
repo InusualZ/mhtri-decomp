@@ -37,6 +37,8 @@
  * SHAPES. Callees whose owner header types a parameter or return differently from the retail call are called through a
  *   `_c1` cast view.  The exit points are a `VEC3(x, y, z)`-constructed `nw4r::math::VEC3`, so MWCC's `__sinit` builds them
  *   (`.ctors`).  The scene inits clear the root counters with unrolled loops; the network slot loops count in an `int`.
+ * RESIDUALS. scene_area_change_step: the sub-step `switch` measured as `(u32)`, plain `u8`, `(s32)` and an if chain: none gives
+ *            retail's `cmplwi 1; cmpwi 2` pair.
  */
 
 #include "types.h"

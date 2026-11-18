@@ -85,6 +85,8 @@
  *            + `b` where ours emits two `b`, and builds the s16 argument in r4 (`lwz r4; extsh r4,r4`) where ours loads r0
  * SHAPES. `fn_800DBE94` declares `work` and `s` ahead of `lw` (regsim plan order); `se_item_pickup_play` keeps
  *            `fn_800F2680`'s result in a `u8` local and folds cases 139 and 395 into one return.
+ * RESIDUALS. se_hit_bank_req: colouring only (regsim plan 1 folds `louder`'s temporary into the local, which no spelling
+ *            tried reaches: `louder = f(pos) == 1`, a two-step form and a split `bank` declaration measure equal or worse).
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -2360,7 +2362,7 @@ extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamV
     }
 
     alt = 0;
-    if ((u8)(plw->field_0x002 - 4) <= 2) {
+    if ((u8)(plw->field_0x002 + 0xFC) <= 2) {
         if ((s8)my_player_no() == plw->field_0x008) {
             alt = 1;
         }

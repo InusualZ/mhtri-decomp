@@ -3017,9 +3017,9 @@ extern "C" void menu_lobby_exit_draw(MenuSlot* slot)
     _SPR_DATA_* rec;
     u16* ids;
     u16 text;
-    u16 title;
     s32 i;
     bool selected;
+    u16 title;
     char message[0x100];
 
     switch (slot->field_0x001) {

@@ -454,8 +454,8 @@ struct Q_UserData {
     /* +0x3F0E */ u8 pad_0x3F0E[0x3F28 - 0x3F0E];
     /* +0x3F28 */ Q_QuestStat quest_stat;  /* the stat `quest_init` copies into the work block's own */
     /* +0x3F38 */ u8 record_0x3F38[0x24];    /* a record a new game clears */
-    /* +0x3F5C */ u8 pad_0x3F5C[0x3F95 - 0x3F5C];
-    /* +0x3F95 */ u8 cat_name_0x3F95[3];   /* the name index of each of the three kitchen Felynes (NPC kinds 0x14..0x16) */
+    /* +0x3F5C */ u8 pad_0x3F5C[0x3F81 - 0x3F5C];
+    /* +0x3F81 */ u8 name_by_kind_0x3F81[0x17];   /* the name index by NPC kind; the three kitchen Felynes (kinds 0x14..0x16) use it */
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
     /* +0x406E */ u8 pad_0x406E[0x4078 - 0x406E];
     /* +0x4078 */ Q_ItemRow item_rows_0x4078[8];  /* the item menu's eight row records (`userdata_item_rows_get`) */

@@ -1550,12 +1550,21 @@ extern "C" void mhchar_res_bank_set(s32 kind, s32 index, nw4r::g3d::ResFile* fil
     nw4r::g3d::ResAnmChr anm;
     u16* tbl;
     s32 size;
+    s32 i;
+    const char* p;
+    u16 group;
+    u16 start;
+    u16 slot;
+    s32 num;
+    s32 no;
+    s32 motion;
+    s32 hundred;
     res_anm_chr_ctor(&anm, 0);
 
     if (res_file_has_anm_chr(file)) {
-        u16 start = 0;
-        u16 slot = 0;
-        u16 group = 0;
+        start = 0;
+        slot = 0;
+        group = 0;
         switch (kind) {
         case 0:
             res_file_assign((u32*)&mhchar_bank0_file, (u32*)file);
@@ -1582,15 +1591,15 @@ extern "C" void mhchar_res_bank_set(s32 kind, s32 index, nw4r::g3d::ResFile* fil
             return;
         }
         memset(tbl, 0, size * 2);
-        int num = res_file_get_res_anm_chr_num(file);
-        for (int i = 0; i < num; i++) {
+        num = res_file_get_res_anm_chr_num(file);
+        for (i = 0; i < num; i++) {
             u32 entry = res_file_get_res_anm_chr(file, i);
             res_anm_chr_assign(&anm, &entry);
-            const char* p = strstr(res_anm_chr_get_name(&anm), "_");
+            p = strstr(res_anm_chr_get_name(&anm), "_");
             if (p) {
-                int no = atoi(p + 1);
-                int motion = no % 1000;
-                int hundred = motion / 100;
+                no = atoi(p + 1);
+                motion = no % 1000;
+                hundred = motion / 100;
                 for (;;) {
                     if (group == hundred) {
                         break;

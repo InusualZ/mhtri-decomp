@@ -386,16 +386,16 @@ void lb_smith_rows_clear(LbSmithWork* self, s16 page)
 /* 0x8035FE04 (0x24C): builds page `page` of the make goods of the current kind. */
 void lb_smith_make_page_build(LbSmithWork* self, s16 page)
 {
-    LbSmithRecipe* table;
-    s32 n;
-    LbSmithRecipe* gun_table;
-    s32 idx;
-    s32 gun;
-    s32 last;
-    s32 plain;
-    u16 item;
-    u8 flags;
     s32 first;
+    s32 n;
+    s32 last;
+    s32 idx;
+    LbSmithRecipe* table;
+    LbSmithRecipe* gun_table;
+    s32 plain;
+    u8 flags;
+    s32 gun;
+    u16 item;
     LbSmithGoods* goods;
 
     userdata_equip_box_free_count();

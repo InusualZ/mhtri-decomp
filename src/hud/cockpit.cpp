@@ -63,6 +63,8 @@
  * RESIDUALS. mwcc-debugger dump, `ainpc_page_select_button_ck`: regsim 4/4 callee-saved, 13/13 volatile (EXACT,
  *            colouring is not the cause); first divergence insn 48: retail `<DIFF_INSERT>` vs ours `cmpwi r31, 0x0`;
  *            size differs from retail
+ * RESIDUALS. ainpc_page_label_draw: the step switch measured with the 2/3 case pair first, last, and as an if chain with a
+ *            `(u8)(step - 2) > 1` test: no spelling gives the single range test.
  */
 
 #include "types.h"

@@ -2074,13 +2074,13 @@ void quest_list_load_hunt(void) {
 /* Loads the quest list (the hunt lists for `kind` 0, else the arena list), clears the quest work block and
  * fills it: the eight per-category id stacks, the result record, the save block mirror and the timers. */
 QuestWork* quest_init(u8 kind) {
-    QuestRecord** items;
     QuestRecord* rec;
     QuestEntrySlot* block;
-    u16 id;
     s32 i;
     s32 j;
     u8 category;
+    u16 id;
+    QuestRecord** items;
 
     if (kind == 0) {
         quest_list_load_hunt();

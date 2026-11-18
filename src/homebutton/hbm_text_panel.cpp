@@ -106,6 +106,9 @@
  * RESIDUALS. mwcc-debugger dump, `fn_8054CF38`: regsim None callee-saved, None volatile (the Wii/1.3 stand-in
  *            compiles it differently from the unit's compiler: a hint only); first divergence insn 10: retail `<DIFF_INSERT>`
  *            vs ours `beq 0xa9c0`; size differs from retail (308 B vs 312 B)
+ * RESIDUALS. hbmPanelClearText, Reset, Relayout, SetWordWrap: the one non-register difference of the four is the
+ *            free-list index after the inlined unlink (retail `slwi r0,rN,3`, ours `clrlslwi r0,rN,16,3`: retail
+ *            reloads the count where ours reuses the masked loop counter); the rest is volatile-register numbering.
  */
 
 #include "types.h"

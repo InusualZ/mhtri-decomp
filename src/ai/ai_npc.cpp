@@ -5287,10 +5287,10 @@ u8 ai_npc_enemy_scan(_AINPC_W* self, u8 flags, u8* out)
 
     f32 dist;
     f32 nearest;
-    s16 max;
-    _ENEMY_WORK* enemy;
-    u8 count;
     u8 i;
+    _ENEMY_WORK* enemy;
+    s16 max;
+    u8 count;
 
     enemy = (_ENEMY_WORK*)::get_move_work_adrs(3);
     max = ::get_move_work_max(3);

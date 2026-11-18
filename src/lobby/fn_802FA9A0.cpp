@@ -2712,14 +2712,15 @@ void lb_kujira_seed_roll(LbKujiraWork* work) {
 /* Opens the trade screen (lobby screen 11): clears its work, rolls the price rate of every goods row from the seed's
  * mood table and picks one to four wanted goods. */
 void lb_barter_open(s32 arg_a, s32 arg_b) {
-    LbBarterWork* work = lobby_w.menu_0x0AC;
+    LbBarterWork* work;
     u16 seed;
     u8* weights;
     u8 i;
     s16 n;
     s16 j;
-    s16 count;
     u8 k;
+    s16 count;
+    work = lobby_w.menu_0x0AC;
     u16 list[192];
 
     memset(work, 0, 0x2000);

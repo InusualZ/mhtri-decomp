@@ -933,18 +933,18 @@ extern "C" void em016_frame_em017(_ENEMY_WORK* self) {
         }
         if (self->field_0x43B != 1 && self->field_0x011 == 0) {
             if ((system_w.field_0x0c & 0x1F) == self->group) {
-                _ENEMY_WORK* rec;
-                s32 found;
-                u16 max;
                 u8 i;
+                s32 found;
+                _ENEMY_WORK* rec;
+                u32 max;
                 f32 limit;
-                max = (u16)get_move_work_max(3);
+                max = get_move_work_max(3);
                 rec = (_ENEMY_WORK*)get_move_work_adrs(3);
                 found = 0;
                 self->em017_0x328.ally_near_0x329 = 0;
                 i = 0;
                 limit = 4000000.0f;
-                for (; i < max; i++, rec++) {
+                for (; i < (u16)max; i++, rec++) {
                     if (rec->active != 0 && (rec->field_0x1C8 & 1) != 0 && self->area_no == rec->area_no) {
                         if (rec->team == 0x10) {
                             u32 stance;
@@ -981,17 +981,14 @@ extern "C" void em016_frame_em017(_ENEMY_WORK* self) {
                     em_motion_kind_set(self, 0, 0);
                 }
             }
-            switch (self->field_0x43B) {
-            case 2:
+            if (self->field_0x43B == 2) {
                 if (self->field_0x440 > 0x1C2) {
                     em_motion_kind_set(self, 3, 0);
                 }
-                break;
-            case 3:
+            } else if (self->field_0x43B == 3) {
                 if (self->em017_0x328.ally_near_0x329 == 1 && self->em017_0x328.alert_0x328 == 1) {
                     em_motion_kind_set(self, 2, 0);
                 }
-                break;
             }
         }
     }

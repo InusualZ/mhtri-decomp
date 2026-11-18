@@ -2198,7 +2198,7 @@ void lb_screen26_box_draw(Eft052ItemBox* box)
             picked = 1;
             uv_pair_copy(&picked_at, &at);
         }
-        if ((u8)(box->state_0x00 - 1) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
+        if ((u8)(box->state_0x00 + 0xFF) <= 1 && chk_pointer() == 0 && box->hover_0x10 == i) {
             spr_data_copy(&cursor, get_lsp_data(0x1304, NULL));
             cursor.pos.x += at.x;
             cursor.pos.y += at.y;

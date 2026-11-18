@@ -71,6 +71,8 @@
  * RESIDUALS. pl_rig_model_color_set: regsim's EXACT plan gives the `slot * 2` index temp (@5396) its own local, kept
  *            in saved r30 across the first setMatColor; the 2-D `color_mat_0x9CD[slot]` indexing has no source
  *            spelling that names it.
+ * RESIDUALS. pl_rig_slot_bind, pl_rig_model_setup: regsim plans need an unnamed temporary declared as a local (the
+ *            tool refuses: the temporary is not a local plus field offset); register colouring is the only difference.
  */
 #include "types.h"
 #include "nw4r/math.h"

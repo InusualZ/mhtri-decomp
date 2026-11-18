@@ -51,6 +51,8 @@
  *            not the cause); first divergence insn 34: retail `clrlwi r4, r31, 16` vs ours `<DIFF_DELETE>`
  * RESIDUALS. mwcc-debugger dump, `em_net_parts_unpack`: regsim 6/6 callee-saved, 14/15 volatile, best plan cost 0;
  *            first divergence insn 29: retail `clrlwi r4, r30, 24` vs ours `clrlwi r0, r30, 24`
+ *   - `pl_act_handler_11`/`_21` measured: a single `pl_act_enter` after an if/else with `return` exits is 24 B worse in
+ *     both rows than the two calls.
  */
 
 #include "types.h"
