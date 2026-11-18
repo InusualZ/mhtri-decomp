@@ -77,6 +77,17 @@ def test_matches(c):
     c.check("the selector survives the JSON hop to gdb", funcspec.Selector.from_dict(keypad.to_dict()), keypad)
 
 
+def test_plain_rows(c):
+    """A C-linkage row (its name is its own plain name) selected by size or address resolves without recursing."""
+    rows = [("hunter_roll", 0x80001000, 0x40), ("hunter_roll", 0x80002000, 0x60), ("lone", 0x80003000, 0x20)]
+    by_size = funcspec.parse("hunter_roll", rows, 0x60)
+    c.check("a plain row picked by --size", (by_size.name, by_size.scope, by_size.address, by_size.size),
+            ("hunter_roll", (), 0x80002000, 0x60))
+    by_addr = funcspec.parse("0x80003000", rows)
+    c.check("a plain row picked by address", (by_addr.name, by_addr.address, by_addr.size), ("lone", 0x80003000, 0x20))
+    c.check("a plain row alone with a size", funcspec.parse("lone", rows, 0x20).address, 0x80003000)
+
+
 def test_scope_chain(c):
     words = {0x100: 0x200, 0x104: 0x300, 0x200: 0x400, 0x204: 0x310, 0x400: 0, 0x404: 0}
     strings = {0x300 + 0xA: "Klass", 0x310 + 0xA: "ns"}

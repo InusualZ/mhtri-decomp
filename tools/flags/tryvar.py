@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """Try source rewrites of a unit and report the official per-function score of each. Spec: docs/tools/spec/tryvar.md.
 CLI: python tools/flags/tryvar.py [-u U] [names] [--variants F.py|.txt|.json] [--permute F] [--symbol S] [--rename-map F] [--json] [--list]
-[--apply NAME | --apply-best] | --permdecl FN[,FN] [--lines A-B] [--max-perms N] [--plain-only] [--apply] | --hill FN [--lines A-B] [--max-evals N] [--apply]."""
+[--apply NAME | --apply-best] | --permdecl FN[,FN] [--lines A-B] [--max-perms N] [--max-orders N] [--plain-only] [--apply] | --hill FN [--lines A-B] [--max-evals N] [--apply]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import importlib.util
 import itertools
 import json
 import os
+import signal
+from contextlib import contextmanager
 
 from tools.lib import declperm, pendingmap, repo, report, text, units
 
 #: The marker that starts a block in a text variants file (`//@@ old`, `//@@ variant <name>`, `//@@ permute`,
 #: `//@@ item`).
 MARKER = "//@@"
+#: `--max-orders`: the most orders `--permdecl` compiles for one function (7 declarations are 5040 compiles).
+DEFAULT_MAX_ORDERS = 120
 #: The name of the unmodified source in a ranking.
 AS_IS = "(as-is)"
 
@@ -169,6 +173,30 @@ def divergence_of(data: dict, symbol: str):
     return "?"
 
 
+#: Signals a killed run is turned into an exit by, so the `finally` that removes the probe runs (SIGBREAK: a console
+#: Ctrl-Break / close on Windows; SIGHUP: a hung-up terminal elsewhere).
+_EXIT_SIGNALS = tuple(getattr(signal, n) for n in ("SIGTERM", "SIGBREAK", "SIGHUP") if hasattr(signal, n))
+
+
+@contextmanager
+def exit_on_signal():
+    """Inside the block a SIGTERM/SIGBREAK/SIGHUP raises `SystemExit`, so a `finally` (the probe's removal) runs; the
+    earlier handlers come back on exit. A no-op off the main thread (Python allows handlers there only)."""
+    saved = []
+    try:
+        def die(signum, _frame):
+            raise SystemExit(128 + signum)
+        for sig in _EXIT_SIGNALS:
+            try:
+                saved.append((sig, signal.signal(sig, die)))
+            except (ValueError, OSError):
+                break
+        yield
+    finally:
+        for sig, old in saved:
+            signal.signal(sig, old)
+
+
 def rewrite(src, repls):
     """`(text, None)` with the rewrite applied, or `(None, why)`. A callable rewrite returns the text (None: it did
     not apply); each `(old, new)` pair must occur exactly once in the text as it stands after the earlier pairs -
@@ -208,17 +236,20 @@ def try_variant(unit, tokens, name, repls, symbol=None, score=None, diverge=None
         return res
     ext = os.path.splitext(unit.source)[1]
     probe_src = os.path.join(os.path.dirname(unit.source), unit.file + "_probe" + ext)
+    if os.path.exists(probe_src):        # left by an earlier run that was killed outright (nothing could clean it)
+        os.remove(probe_src)
     try:                                 # the write is inside: an interrupt mid-write still removes the probe
-        with open(probe_src, "w", encoding="utf-8", errors="surrogateescape") as f:
-            f.write(new)
-        rc, log, obj = units.run_tokens(tokens, unit.root, scratch_dir=scratch(unit), src=probe_src)
-        if rc != 0:
-            res.update(status="compile-failed", log=units.quiet(log)[:600])
-            return res
-        pcts = score(obj, unit.obj_target)
-        res["text_size"] = units.text_size(obj)
-        if symbol and pcts and symbol in pcts:
-            res["first_divergence"] = None if pcts[symbol][0] >= 100.0 else diverge(obj, unit.obj_target, symbol)
+        with exit_on_signal():
+            with open(probe_src, "w", encoding="utf-8", errors="surrogateescape") as f:
+                f.write(new)
+            rc, log, obj = units.run_tokens(tokens, unit.root, scratch_dir=scratch(unit), src=probe_src)
+            if rc != 0:
+                res.update(status="compile-failed", log=units.quiet(log)[:600])
+                return res
+            pcts = score(obj, unit.obj_target)
+            res["text_size"] = units.text_size(obj)
+            if symbol and pcts and symbol in pcts:
+                res["first_divergence"] = None if pcts[symbol][0] >= 100.0 else diverge(obj, unit.obj_target, symbol)
     finally:
         if os.path.exists(probe_src):
             os.remove(probe_src)
@@ -297,11 +328,12 @@ def find_block(src, function, max_lines, initialised=True, line_range=None):
 
 
 def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diverge=None, out=None,
-                 initialised=True, line_range=None):
+                 initialised=True, line_range=None, max_orders=None):
     """Permute `function`'s leading declarations (or the block `line_range`): `{function, status, run, orders,
     sampled, tried, table, best}`. Every order is compiled as a probe (the source is only read) and ranked by the
     function's official score; the as-is source is tried first and wins every tie, and the search ends at the first
-    100 %."""
+    100 %. With `max_orders`, a run that would compile more orders than that is refused (`status` `too-many`) before
+    any compile."""
     src = open(unit.source, encoding="utf-8", errors="surrogateescape").read()
     rec = {"function": function, "status": "ok", "run": [], "orders": 0, "sampled": False, "tried": 0,
            "table": [], "best": None, "best_order": None, "range": list(line_range) if line_range else None}
@@ -315,6 +347,11 @@ def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diver
         return rec
     ords, sampled = declperm.orders(len(run.lines), cap, seed, run.deps)
     rec.update(run=[l.strip() for l in run.lines], orders=len(ords), sampled=sampled)
+    if max_orders is not None and len(ords) > max_orders:
+        rec.update(status="too-many", error="%d declarations give %d orders to compile, above --max-orders %d: lower "
+                   "--max-perms (a fixed-seed sample), cut the block with --lines or raise --max-orders"
+                   % (len(run.lines), len(ords), max_orders))
+        return rec
     by_name = {declperm.name_of(o): o for o in ords}
     results = try_all(unit, tokens, declperm.variants(run, ords), function, score, diverge, as_is=True, out=out,
                       stop=lambda r: (r.get("symbol_percent") or 0.0) >= 100.0)
@@ -363,7 +400,7 @@ def write_source(unit, transform, root):
 
 def print_permdecl(rec) -> None:
     fn = rec["function"]
-    if rec["status"] in ("ambiguous", "no-run"):
+    if rec["status"] in ("ambiguous", "no-run", "too-many"):
         print("%s: %s" % (fn, rec.get("error") or "no run of two or more leading declarations"))
         return
     print("%s: %d declaration(s), %d order(s)%s, %d tried" % (
@@ -388,7 +425,8 @@ def run_permdecl(args, unit, tokens, root, score=None, diverge=None):
     scorers = {k: v for k, v in (("score", score), ("diverge", diverge)) if v is not None}
     for fn in [f for f in args.permdecl.split(",") if f]:
         rec = permdecl_one(unit, tokens, fn, args.max_lines, args.max_perms, args.seed,
-                           initialised=not getattr(args, "plain_only", False), line_range=line_range, **scorers)
+                           initialised=not getattr(args, "plain_only", False), line_range=line_range,
+                           max_orders=getattr(args, "max_orders", None), **scorers)
         records.append(rec)
         if not args.json:
             print_permdecl(rec)
@@ -403,7 +441,7 @@ def run_permdecl(args, unit, tokens, root, score=None, diverge=None):
               else "nothing to apply: the source's own orders are the best found")
     elif any(r.get("best") for r in records):
         print("source untouched; --apply writes the best order of each function")
-    return 0
+    return 1 if any(r["status"] == "too-many" for r in records) else 0
 
 
 def hill_one(unit, tokens, function, line_range=None, max_lines=64, max_evals=200, score=None, diverge=None,
@@ -600,6 +638,9 @@ def main(argv=None):
     ap.add_argument("--max-perms", type=int, default=120,
                     help="--permdecl: compile at most this many orders per function; more are a fixed-seed "
                          "sample (default %(default)s)")
+    ap.add_argument("--max-orders", type=int, default=DEFAULT_MAX_ORDERS,
+                    help="--permdecl: refuse a function whose orders to compile (after --max-perms) exceed this, "
+                         "before compiling any (default %(default)s)")
     ap.add_argument("--plain-only", action="store_true",
                     help="--permdecl: permute only declarations without an initialiser (initialised ones are "
                          "otherwise members of the run, kept after the declarations their initialiser uses)")

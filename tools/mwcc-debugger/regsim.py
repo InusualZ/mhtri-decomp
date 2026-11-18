@@ -230,6 +230,8 @@ def cmd_search(args) -> int:
             print("\nno plan reproduces every callee-saved target")
     if getattr(args, "apply_local", False) and plans:
         return cmd_apply_local(args, g, plans[0], s.base, want, mapping, path, text)
+    if getattr(args, "apply_order", False) and plans:
+        return cmd_apply_order(args, g, plans, s.base, mapping, text)
     if args.tryvar and plans:
         return hand_to_tryvar(args, g, plans[0], s.base, mapping, path, text)
     if args.require_exact:
@@ -275,8 +277,8 @@ def search_namespace(args, dump: Path, symbol: str, ours: str) -> argparse.Names
         dir=str(dump), pass_no=args.pass_no, json=False, unit=args.unit, symbol=symbol, ours=ours, retail=None,
         source=None, function=None, params=args.params, want=args.want, saved_only=args.saved_only,
         no_edits=args.no_edits, max_evals=args.max_evals, top=args.top, seed=args.seed, require_exact=False,
-        tryvar=args.tryvar, keep=args.keep, apply_local=args.apply_local, local_name=args.local_name,
-        dry_run=args.dry_run)
+        tryvar=args.tryvar, keep=args.keep, apply_local=args.apply_local, apply_order=args.apply_order,
+        local_name=args.local_name, dry_run=args.dry_run)
 
 
 def cmd_run(args) -> int:
@@ -437,9 +439,10 @@ def unmet_temps(g, plan, want: dict) -> list[int]:
 
 
 def cmd_apply_local(args, g, plan, base, want, mapping, path, text) -> int:
-    """`search --apply-local`: write the local the best plan asks for (a walking pointer for a declared temp, a hoisted
-    call result for a value held across a call), measure it with unittry and keep it only when it wins; a plan it
-    cannot write unambiguously is refused with the edit to make by hand (exit 3, nothing written)."""
+    """`search --apply-local`: write the local the best plan asks for (for a declared temp by what defines it: a walking
+    pointer for `addi`, a constant for `li`, a call result for `mr T,r3`, a sum for `add`; a hoisted call result for a
+    value held across a call), measure it with unittry and keep it only when it wins; a plan it cannot write
+    unambiguously is refused with the edit to make by hand (exit 3, nothing written)."""
     if not args.unit or text is None:
         raise fail("--apply-local needs -u UNIT")
     root = repo.repo_root()
@@ -454,8 +457,9 @@ def cmd_apply_local(args, g, plan, base, want, mapping, path, text) -> int:
         if edit and edit.kind == "fold":
             localedit.fold(g, edit)
         if edit:
-            change = localedit.walker(g, edit, instrs, text, fn, path, src_root, mapping, plan.layout.decl)
-            runs = rewrite_runs(plan, base, mapping, text, {edit.vreg: change.new_local}) + change.blocks
+            change = localedit.declare(g, edit, instrs, text, fn, path, src_root, mapping, plan.layout.decl, ours,
+                                       symbol, args.local_name)
+            runs = change.blocks + rewrite_runs(plan, base, mapping, text, {edit.vreg: change.new_local})
         else:
             if plan.exact:
                 print("\napply-local: the best plan is exact with no edit - nothing to write")
@@ -487,6 +491,35 @@ def cmd_apply_local(args, g, plan, base, want, mapping, path, text) -> int:
         print("apply-local: --dry-run, nothing written or measured")
         return 0
     return run_unittry(args, g, runs, "%s-local" % (g.function or "function"), restore=False)
+
+
+def cmd_apply_order(args, g, plans, base, mapping, text) -> int:
+    """`search --apply-order` (idea 324): the best plan that lists block-scope locals and needs no edit, spelled with\n    those locals declared at function scope in the plan's order (`localedit.hoist_order`), measured with unittry and\n    kept only when it wins; refused with the reason when no plan can be written (exit 3, nothing written)."""
+    if not args.unit or text is None:
+        raise fail("--apply-order needs -u UNIT")
+    candidates = [p for p in plans if not p.layout.edits and any(mapping[v].scope > 0 for v in p.layout.decl if v in mapping)]
+    if not candidates:
+        print("\napply-order: REFUSED - no plan lists block-scope locals without an edit of its own (%s)"
+              % ("every plan needs an edit: --apply-local" if any(p.layout.edits for p in plans) else
+                 "the order alone is --tryvar's"))
+        return 3
+    fn = args.function or g.function
+    plan = candidates[0]
+    try:
+        change = localedit.hoist_order(plan.layout.decl, mapping, text, fn)
+    except localedit.Refused as r:
+        print("\napply-order: REFUSED - %s" % r.reason)
+        if r.manual:
+            print("  by hand: %s" % r.manual)
+        return 3
+    print("\napply-order: plan %d: %s" % (plans.index(plan) + 1, change.summary))
+    for old, new in change.blocks:
+        print("  --- old\n%s\n  +++ new\n%s" % ("\n".join("  - " + x for x in old.split("\n")),
+                                                "\n".join("  + " + x for x in new.split("\n"))))
+    if args.dry_run:
+        print("apply-order: --dry-run, nothing written or measured")
+        return 0
+    return run_unittry(args, g, change.blocks, "%s-order" % (g.function or "function"), restore=False)
 
 
 # --- the command line -------------------------------------------------------------------------------------------
@@ -522,13 +555,19 @@ def main(argv=None) -> int:
             p.add_argument("--keep", action="store_true", help="with --tryvar: keep the rewrite when it scores better")
             p.add_argument("--apply-local", action="store_true",
                            help="write the best plan's named local into the source, measure it, keep it only if it wins")
-            p.add_argument("--local-name", help="with --apply-local: the name of a hoisted call result's local")
-            p.add_argument("--dry-run", action="store_true", help="with --apply-local: print the edit, write nothing")
+            p.add_argument("--apply-order", action="store_true",
+                           help="a plan that lists block-scope locals: declare them at function scope in the plan's "
+                                "order (idea 324), measure it, keep it only if it wins")
+            p.add_argument("--local-name", help="with --apply-local: the name of the new local")
+            p.add_argument("--dry-run", action="store_true",
+                           help="with --apply-local/--apply-order: print the edit, write nothing")
     run = sub.add_parser("run", help="dump one function of a unit, verify the replay and search, in one command")
     run.add_argument("unit", help="the unit (`fn_8004CAD8`, `homebutton/tiHKBManager`, a path)")
     run.add_argument("function", help="a plain name, a mangled name, Class::method or an address (0x8004DA5C)")
     run.add_argument("--search", action="store_true", help="search the plan (the default; kept for the spelling)")
-    run.add_argument("--no-search", action="store_true", help="stop after the dump and `verify`")
+    run.add_argument("--no-search", action="store_true",
+                     help="stop after the dump and `verify`: prints no plans (and so ignores --tryvar, --apply-local "
+                          "and --apply-order)")
     run.add_argument("--gdb", help="the gdb to use (default: this tree's .pi/tmp/mwcc-dbg, PATH, else fetched)")
     run.add_argument("--size", help="the symbols.txt size that picks one of several functions of a name")
     run.add_argument("--timeout", type=float, default=900.0, help="seconds the debugger session may take")
@@ -544,8 +583,12 @@ def main(argv=None) -> int:
     run.add_argument("--keep", action="store_true", help="with --tryvar: keep the rewrite when it scores better")
     run.add_argument("--apply-local", action="store_true",
                      help="write the best plan's named local into the source, measure it, keep it only if it wins")
-    run.add_argument("--local-name", help="with --apply-local: the name of a hoisted call result's local")
-    run.add_argument("--dry-run", action="store_true", help="with --apply-local: print the edit, write nothing")
+    run.add_argument("--apply-order", action="store_true",
+                     help="a plan that lists block-scope locals: declare them at function scope in the plan's order "
+                          "(idea 324), measure it, keep it only if it wins")
+    run.add_argument("--local-name", help="with --apply-local: the name of the new local")
+    run.add_argument("--dry-run", action="store_true",
+                     help="with --apply-local/--apply-order: print the edit, write nothing")
     args = ap.parse_args(argv)
     if args.cmd == "run":
         return cmd_run(args)

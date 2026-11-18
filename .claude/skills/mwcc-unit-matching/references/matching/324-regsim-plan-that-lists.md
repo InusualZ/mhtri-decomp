@@ -18,6 +18,9 @@ swapped (the diff is a pure r29/r30 or r26/r27 rename).
 declared inside a loop or `if` block takes its number after every function-scope local, so a plan that wants it
 earlier is unreachable from inside the block.
 
+**By tool.** `mt.py regsim run <unit> <fn> --apply-order [--dry-run]` writes this edit for the best plan that
+lists block-scope locals (names declared in two blocks stay in their blocks), measures it and keeps it only on a gain.
+
 **How to work it.** Declare every named entry of the plan at function scope in the plan's order (initialisers become
 assignments at the old position, `T x = f();` keeps its call order), then measure. A local that appears twice
 (two blocks both name an `i`) stays in its blocks. `.pi` helpers are not needed: the edit is the declaration list

@@ -680,8 +680,28 @@ class Measurer:
     """One compile of the unit's real source into the scratch directory, then one score. The object is deleted
     before the compile and must be newer than the trial's start, so a stale object is never scored."""
 
-    def __init__(self, cmd: list[str], cwd: str, objdir: str, target: str, score, sdata2: bool = False):
+    def __init__(self, cmd: list[str], cwd: str, objdir: str, target: str, score, sdata2: bool = False,
+                 real_obj: str | None = None, report_out: str | None = None, objdiff: str | None = None,
+                 root: str | None = None):
         self.cmd, self.cwd, self.objdir, self.target, self.score, self.sdata2 = cmd, cwd, objdir, target, score, sdata2
+        self.real_obj, self.report_out, self.objdiff, self.root = real_obj, report_out, objdiff, root
+
+    def refresh(self, regenerate=report.regenerate_project) -> list[str]:
+        """After a kept edit: compile the unit into its real object (`real_obj`, the one `mt.py diff` reads) and, when
+        the project report exists, rewrite it from the objects on disk, so neither describes the source as it was
+        before the run. -> lines saying what was done (a failure is a line, never an exception)."""
+        if not self.real_obj:
+            return []
+        os.makedirs(os.path.dirname(self.real_obj), exist_ok=True)
+        rc, log, _obj = units.run_tokens(self.cmd, self.cwd, expect=self.real_obj)
+        if rc != 0:
+            return ["refresh: the kept source does not compile into %s (rc %d): %s" % (
+                self.real_obj, rc, units.quiet(log).strip()[-200:])]
+        lines = ["refresh: compiled %s" % self.real_obj]
+        if self.report_out and os.path.exists(self.report_out) and self.objdiff:
+            why = regenerate(self.root or self.cwd, self.objdiff, self.report_out)
+            lines.append("refresh: " + (why or "rewrote %s" % self.report_out))
+        return lines
 
     def __call__(self) -> Measurement:
         t0 = time.time()
@@ -1029,7 +1049,10 @@ def build_measurer(unit, root: str, args, out=print) -> tuple[Measurer, str]:
         target = pending
     score = report_score(target, unit.report_name, os.path.join(scratch, "report"),
                          report.objdiff_cli(root, main), root)
-    return Measurer(dry["command"], main, os.path.join(scratch, "obj"), target, score, args.sdata2), target
+    report_out = os.path.join(root, "build", "RMHE08", "report.json")
+    return Measurer(dry["command"], main, os.path.join(scratch, "obj"), target, score, args.sdata2,
+                    real_obj=dry["object"], report_out=report_out, objdiff=report.objdiff_cli(root, main),
+                    root=root), target
 
 
 def main(argv=None) -> int:
@@ -1072,6 +1095,8 @@ def _main(argv=None) -> int:
     run = ap.add_argument_group("the run")
     run.add_argument("--restore", action="store_true",
                      help="put every file back as it was at the end (a measuring run; the table says what won)")
+    run.add_argument("--no-refresh", action="store_true",
+                     help="do not rebuild the unit's object and build/RMHE08/report.json after a kept edit")
     run.add_argument("--sdata2", action="store_true",
                      help="check .sdata2 against the target's bytes; refuse a candidate that breaks a same order")
     run.add_argument("--shared-header", action="store_true",
@@ -1101,6 +1126,11 @@ def _main(argv=None) -> int:
         base.fuzzy or 0.0, base.matched, len(base.functions), ", .sdata2 %s" % base.sdata2 if args.sdata2 else "",
         base.seconds))
     interrupted = runner.execute(trials, restore=args.restore)
+    refreshed = []
+    if not args.restore and not args.no_refresh and ws.changed():
+        refreshed = measure.refresh()
+        for line in refreshed:
+            out(line)
     print_table(runner.rows, out, args.top, args.sdata2)
     kept = [r for r in runner.rows if r.verdict == "KEPT"]
     final = runner.cur
@@ -1114,7 +1144,8 @@ def _main(argv=None) -> int:
             "fuzzy": base.fuzzy, "matched": base.matched, "sdata2": base.sdata2},
             "final": {"fuzzy": final.fuzzy, "matched": final.matched, "sdata2": final.sdata2},
             "rows": [r.to_json() for r in runner.rows], "kept": [r.name for r in kept],
-            "written": [] if args.restore else changed, "interrupted": interrupted}, indent=2))
+            "written": [] if args.restore else changed, "refresh": refreshed, "interrupted": interrupted},
+            indent=2))
     return 130 if interrupted else 0
 
 

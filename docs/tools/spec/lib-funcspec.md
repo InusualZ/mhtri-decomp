@@ -30,6 +30,8 @@ class's function, and a mangled name never matched and ran the compile to its en
 
 * The owner-scope parse of a mangled name is `lib.names.split_member` (the same walk as `owner_stem`); this module holds no
   second copy of the mangling grammar.
+* A resolved row becomes its `Selector` through `_row_selector`, never by re-parsing the row's name: a plain (C-linkage) row
+  selected by `--size` or an address used to recurse forever (`regsim run --size N`).
 * A plain name keeps its old meaning (the first function of that name); the ambiguity is reported, never silently resolved.
 * The scope record layout (`+0x08` of the Wii/1.3 object record) was read from the live compiler (2026-11-12:
   `ResUserDataAc`, `nw4r::g3d::ICalcWorldCallback`, the global scope with no name and no parent); the GC rows do not expose it.
@@ -40,7 +42,7 @@ names, project (`SymbolMap`).
 
 ## Test contract
 
-Tier: fixture - `tools/tests/mwcc-debugger/test_funcspec.py` (41 checks): every selector form, the ambiguity and no-row
+Tier: fixture - `tools/tests/mwcc-debugger/test_funcspec.py` (44 checks): every selector form, the ambiguity and no-row
 refusals, `matches` on class chains and cached link names, the scope walk (parent order, global scope skipped, cycle
 bound) and the map rows; `test_selector_cli` in `test_mwcc_debugger.py` drives the launcher's refusals without a compiler.
 

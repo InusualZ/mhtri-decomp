@@ -4,7 +4,7 @@ CLI: none (a library; `tools/mwcc-debugger/mwcc_debugger.py` takes the selector 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 
 from tools.lib import names
 
@@ -103,6 +103,16 @@ def _listed(found) -> str:
     return ", ".join(shown) + (", ... %d more" % (len(found) - MAX_LISTED) if len(found) > MAX_LISTED else "")
 
 
+def _row_selector(row, text: str) -> Selector:
+    """The `Selector` of one resolved map row `(symbol, address, size)`: a mangled name keeps its owner chain, a plain
+    (C-linkage) name has none. Never re-enters `parse`, so a row whose name is its own plain name cannot loop."""
+    sym, address, size = row
+    got = names.split_member(sym)
+    if got is not None:
+        return Selector(text, got[0], got[1], True, sym, size, address)
+    return Selector(text, sym, (), False, "", size, address)
+
+
 def parse(text: str, rows=(), size=0) -> Selector:
     """The `Selector` for `text` (a mangled name, `Class::method`, an address `0x8009792C`, or a plain name).
 
@@ -120,7 +130,7 @@ def parse(text: str, rows=(), size=0) -> Selector:
         if not hit:
             raise SelectorError("no function row at 0x%08X in the symbol map%s" % (
                 address, "" if rows else " (no map given: pass --symbols)"))
-        return replace(parse(hit[0][0], rows, hit[0][2]), address=address, text=text)
+        return _row_selector(hit[0], text)
     if "::" in text:
         name, scope = _member_text(text)
         found = _rows_named(rows, name, scope)
@@ -130,7 +140,7 @@ def parse(text: str, rows=(), size=0) -> Selector:
             raise SelectorError("%s names %d functions: %s - pass the mangled name, an address or --size" % (
                 text, len(found), _listed(found)))
         if found:
-            return replace(parse(found[0][0], rows, found[0][2]), text=text)
+            return _row_selector(found[0], text)
         return Selector(text, name, scope, False, "", size, 0)
     got = names.split_member(text)
     if got is not None:
@@ -142,7 +152,7 @@ def parse(text: str, rows=(), size=0) -> Selector:
             raise SelectorError("%s with size 0x%X names %d functions: %s - pass the mangled name or an address" % (
                 text, size, len(pick), _listed(pick)))
         if pick:
-            return replace(parse(pick[0][0], rows, pick[0][2]), text=text)
+            return _row_selector(pick[0], text)
         raise SelectorError("no function named %s has size 0x%X in the symbol map" % (text, size))
     notes = ()
     if len(wide) > 1:

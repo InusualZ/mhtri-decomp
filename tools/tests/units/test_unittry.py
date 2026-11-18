@@ -312,5 +312,52 @@ def test_real_measurer_compiles_into_its_scratch(c):
         c.check("the unit's real object was never written", os.path.exists(unit.obj_ours), False)
 
 
+def test_refresh_rebuilds_the_real_object_and_report(c):
+    """After a kept edit the unit's real object holds the kept source and the project report is rewritten; a
+    refresh whose compile fails says so and leaves the report alone."""
+    with testing.FixtureTree() as tree:
+        tree.add_unit("demo/unit.cpp", source=SOURCE, ranges={".text": (0x80004000, 0x80004100)})
+        stub = tree.write("stub_cc.py", STUB_CC)
+        unit = units.Unit.resolve("demo/unit", str(tree.root))
+        objdir = str(tree.path("build/tmp/unittry/demo_unit/obj"))
+        real_dir = os.path.dirname(unit.obj_ours)
+        report_out = str(tree.write("build/RMHE08/report.json", "{}"))
+        calls = []
+
+        def score(obj):
+            return scores_of(Elf.read(obj).section_bytes(".note.src").decode()), None, None
+
+        def regenerate(root, objdiff, out):
+            calls.append((root, objdiff, out, Elf.read(unit.obj_ours).section_bytes(".note.src").decode()))
+            return ""
+
+        m = tv.Measurer([sys.executable, str(stub), "-o", real_dir, "-c", unit.source], str(tree.root), objdir,
+                        "unused", score, real_obj=unit.obj_ours, report_out=report_out, objdiff="objdiff-cli",
+                        root=str(tree.root))
+        os.environ["TRYVAR_TOOLS_ROOT"] = str(testing.LIVE_ROOT)
+        try:
+            ws = tv.Workspace({os.path.normpath(unit.source): "source"})
+            runner = tv.Runner(ws, m, unit, str(tree.root), out=lambda _s: None)
+            runner.baseline()
+            runner.execute(tv.parse_blocks("//@@ replace count=2\n            return;\n//@@ with\n            break;\n"))
+            c.check("the win was kept", [r.verdict for r in runner.rows], ["KEPT"])
+            c.check("before the refresh the real object does not exist", os.path.exists(unit.obj_ours), False)
+            lines = m.refresh(regenerate)
+            kept = pathlib.Path(unit.source).read_text(encoding="utf-8")
+            c.check("the real object is the kept source's", Elf.read(unit.obj_ours).section_bytes(".note.src").decode(),
+                    kept)
+            c.check("the report was regenerated from that object, in this tree",
+                    [(x[0], x[2], x[3]) for x in calls], [(str(tree.root), report_out, kept)])
+            c.check("it says what it did", [l.split(":")[0] for l in lines], ["refresh", "refresh"])
+            pathlib.Path(unit.source).write_text(kept.replace("return 1;", "BROKEN"), encoding="utf-8")
+            calls.clear()
+            bad = m.refresh(regenerate)
+            c.check("a compile failure is reported, the report left alone", (len(bad), "does not compile" in bad[0], calls),
+                    (1, True, []))
+            c.check("without a real object there is nothing to refresh", tv.Measurer([], "", "", "", score).refresh(), [])
+        finally:
+            del os.environ["TRYVAR_TOOLS_ROOT"]
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

@@ -18,8 +18,9 @@ python tools/mwcc-debugger/regsim.py verify DIR [--pass N] [--all] [--json]
 python tools/mwcc-debugger/regsim.py want   DIR -u UNIT [--symbol S] [--ours OBJ --retail OBJ] [--json]
 python tools/mwcc-debugger/regsim.py search DIR -u UNIT [--symbol S] [--source F] [--function F] [--params N]
                                        [--want rV=rP,...] [--saved-only] [--no-edits] [--max-evals N] [--top N]
-                                       [--seed N] [--require-exact] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]] [--json]
+                                       [--seed N] [--require-exact] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]] [--apply-order [--dry-run]] [--json]
 python tools/mwcc-debugger/regsim.py run UNIT FUNCTION [--no-search] [--gdb G] [--size N] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]]
+                                       [--apply-order [--dry-run]]
 ```
 
 `run` (usage line for lanes: `python .claude/skills/mwcc-unit-matching/scripts/mt.py regsim run <unit> <function>`):
@@ -27,13 +28,22 @@ compiles the unit with its own compiler and, when that is not Wii/1.3, with Wii/
 dropped, named), dumps `FUNCTION` (plain, mangled, `Class::method` or address) with the unit's real command line
 (`-pragma "cats off"` quoted), into `.pi/tmp/regsim-run/<unit>/<function>/`, finds or fetches gdb into `.pi/tmp/mwcc-dbg`,
 prints `stand-in check: IDENTICAL` (trust the dump) or `DIFFERS` (a hint only), then `verify` and `search`
-(`--search` is accepted, searching is the default; `--no-search` stops after `verify`). `--ours` for the search is the
+(`--search` is accepted, searching is the default; `--no-search` stops after `verify` and prints no plans, so it ignores `--tryvar`, `--apply-local` and
+`--apply-order`). `--size N` is the `symbols.txt` size that picks one of several functions of a name (decimal or `0x`). `--ours` for the search is the
 stand-in's object so the instruction counts agree with the dump.
 
-`--apply-local` (search/run) writes the best plan's local - a walking pointer for a declared `addi T,L,K` temp, or a
-hoisted call result for a temp held across a call that retail computes after it (`spec/lib-localedit.md`) - runs it as a
+`--apply-local` (search/run) writes the best plan's local - for a declared temp by what defines it: a walking pointer
+for `addi T,L,K`, a named constant for `li T,K`, a call's result for `mr T,r3`, a sum for `add T,A,B`; or a hoisted
+call result for a temp held across a call that retail computes after it (`spec/lib-localedit.md`) - runs it as a
 unittry trial and keeps it only when the unit's matched bytes rise with no row down. A shape it cannot identify
 unambiguously is refused (exit 3, nothing written) with the edit to make by hand; `--dry-run` prints the edit only.
+
+`--apply-order` (search/run, idea 324) takes the best plan that lists block-scope locals (`other line N, block K`) and
+needs no edit, declares every local it names at function scope in the plan's order (`localedit.hoist_order`: initialisers
+become assignments in place, a name declared in two blocks stays), runs it as one unittry trial and keeps it only when
+the unit's matched bytes rise with no row down. No such plan, or a shape it cannot write, is refused (exit 3);
+`--dry-run` prints the edit only. A kept trial rebuilds the unit's object and `build/RMHE08/report.json`
+(`spec/unittry.md`), so `mt.py diff` reads the kept source.
 
 `DIR` is a `mwcc_debugger.py` output directory (`regalloc-gpr-pass-N-all.txt`, `-assigned.txt`, the `backend-*`
 dumps). Get one with `python tools/mwcc-debugger/mwcc_debugger.py --gdb GDB -a '<unit command line>' FUNCTION DIR`
@@ -66,7 +76,7 @@ Exit 2 (SystemExit) when the dump is missing, the symbol is not in an object, or
 
 ## Inputs and outputs
 
-Reads the dump directory, the two objects and the unit's source; prints to stdout. Writes only the `--tryvar`/`--apply-local` spec
+Reads the dump directory, the two objects and the unit's source; prints to stdout. Writes only the `--tryvar`/`--apply-local`/`--apply-order` spec
 (`.pi/tmp/regsim/<function>.spec`); unittry then edits and restores the unit's source as its own spec says.
 
 ## Invariants and rules
@@ -88,7 +98,8 @@ Tier: fixture - `tools/tests/mwcc-debugger/test_regsim.py`: `verify` exits 0 on 
 register is corrupted; `search --want` on the fixture names the `@4192` edit and exits 0, `--no-edits` exits 0
 saying no plan is exact and 1 with `--require-exact`, a target that is no node of the graph is a note, not a crash; the
 `--tryvar` spelling splits an initialiser off a reordered run, writes nothing for the source's own order and refuses
-a plan with an edit; the run writes nothing into the repository. Measured by hand: a `--tryvar` run on
+a plan with an edit; `test_apply_order` (`--apply-order`'s plan choice and refusals, `--dry-run`, and `run --help` saying
+`--no-search` prints no plans); the run writes nothing into the repository. Measured by hand: a `--tryvar` run on
 `ef/ef_drawsmoothstripestrategy` scored the rewrite (one row 100 -> 99.89), reverted it and restored the file.
 
 Real rows (2026-11-17): `run fn_8004CAD8 my_set_equip_id_swap --apply-local` writes `u16* part`, the order set/part/i/j

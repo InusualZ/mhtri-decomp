@@ -12,7 +12,7 @@ Usage:
     python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [--only-open] [--one] [--json] [versions...]
     python scripts/mt.py sweep  [-u <unit>] [subs...]
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
-    python scripts/mt.py permdecl <unit> <fn[,fn...]> [--lines A-B] [--max-perms N] [--plain-only] [--apply]   (tryvar --permdecl: declaration orders)
+    python scripts/mt.py permdecl <unit> <fn[,fn...]> [--lines A-B] [--max-perms N] [--max-orders N] [--plain-only] [--apply]   (tryvar --permdecl: declaration orders)
     python scripts/mt.py hill <unit> <fn> [--lines A-B] [--max-evals N] [--apply]   (tryvar --hill: climb a long declaration block)
     python scripts/mt.py tryvar <unit> --spec F | --replace OLD NEW [--count N|--all] | --sites RE REPL [--guard return-break] | --permute FN [--split-init] [--hill]   (units/unittry: edit the real files, keep a win, restore a loss)
     python scripts/mt.py rawsame <unit>... [--report [R]] [--min-percent P]   (every 100 % row, raw bytes + reloc types)
@@ -21,7 +21,7 @@ Usage:
     python scripts/mt.py slots  [-u <unit>] <symbol> [--map] [--slot 0x64]
     python scripts/mt.py sections [-u <unit>]                           (elfsect: section table)
     python scripts/mt.py dwarf  <obj> <function>                        (dwarfmap: var -> slot)
-    python scripts/mt.py regsim run <unit> <function> [--tryvar [--keep]] [--apply-local [--dry-run]]   (dump + verify + search, one command)
+    python scripts/mt.py regsim run <unit> <function> [--tryvar [--keep]] [--apply-local | --apply-order] [--dry-run]   (dump + verify + search, one command)
     python scripts/mt.py regsim verify DIR | want DIR -u <unit> | search DIR -u <unit> [--tryvar]   (mwcc-debugger regsim: GPR colouring)
     python scripts/mt.py ideas  find <words>|show N|where N|new ...|check [--demos]|demo-check (the playbook's ideas)
 
@@ -54,7 +54,7 @@ TOOLS = {
 
 
 #: tryvar options that take a value, so `permdecl_argv` does not mistake the value for the unit or the function
-_VALUED = frozenset(("-u", "--unit", "--permdecl", "--hill", "--max-perms", "--max-lines", "--seed", "--flags-extra",
+_VALUED = frozenset(("-u", "--unit", "--permdecl", "--hill", "--max-perms", "--max-orders", "--max-lines", "--seed", "--flags-extra",
                      "--symbol", "--variants", "--lines", "--max-evals", "--rename-map"))
 
 

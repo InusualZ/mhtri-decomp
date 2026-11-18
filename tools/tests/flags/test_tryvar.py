@@ -236,6 +236,54 @@ def test_permdecl(c):
             del os.environ["TRYVAR_TOOLS_ROOT"]
 
 
+def test_permdecl_cap_and_probe_cleanup(c):
+    """`--max-orders` refuses before any compile; a stale probe is removed; SIGTERM mid-probe removes it and restores the handler."""
+    import signal, types
+    with testing.FixtureTree() as tree:
+        tree.add_unit("demo/unit.cpp", source=PERM_SOURCE, ranges={".text": (0x80004000, 0x80004010)})
+        tree.write("build/RMHE08/obj/demo/unit.o", b"ELF")
+        stub = tree.write("stub_cc.py", STUB_CC)
+        unit = units.Unit.resolve("demo/unit", str(tree.root))
+        tokens = [sys.executable, str(stub), "-o", "unused", "-c", unit.source]
+        os.environ["TRYVAR_TOOLS_ROOT"] = str(testing.LIVE_ROOT)
+        compiled = []
+
+        def counting(obj, _target):
+            compiled.append(obj)
+            return score(obj, _target)
+
+        try:
+            big = tryvar.permdecl_one(unit, tokens, "g", 6, 120, 0, score=counting, diverge=lambda *_a: 0,
+                                      initialised=False, max_orders=2)
+            c.check("above --max-orders: refused with the count, nothing compiled",
+                    (big["status"], "--max-orders 2" in big["error"], compiled), ("too-many", True, []))
+            ok = tryvar.permdecl_one(unit, tokens, "g", 6, 120, 0, score=counting, diverge=lambda *_a: 0,
+                                     initialised=False, max_orders=5)
+            c.check("at the cap the run goes ahead", (ok["status"], len(compiled) > 0), ("no-gain", True))
+            args = types.SimpleNamespace(permdecl="g", max_lines=6, max_perms=120, max_orders=2, seed=0, apply=False,
+                                         json=False, plain_only=True)
+            import contextlib, io
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                rc = tryvar.run_permdecl(args, unit, tokens, str(tree.root))
+            c.check("run_permdecl exits 1 and says why", (rc, "above --max-orders 2" in out.getvalue()), (1, True))
+            probe = os.path.join(os.path.dirname(unit.source), "unit_probe.cpp")
+            pathlib.Path(probe).write_text("stale")
+            tryvar.try_variant(unit, tokens, "x", [("int k = 1;", "int k = 2;")], "f", score, lambda *_a: 0)
+            c.check("a probe left by a killed run is gone", sorted(os.listdir(os.path.dirname(unit.source))), ["unit.cpp"])
+            before = signal.getsignal(signal.SIGTERM)
+
+            def terminate(_obj, _target):
+                signal.raise_signal(signal.SIGTERM)
+
+            c.raises("SIGTERM mid-probe becomes an exit", SystemExit, tryvar.try_variant, unit, tokens, "x",
+                     [("int k = 1;", "int k = 2;")], "f", terminate, lambda *_a: 0)
+            c.check("... with no probe left and the handler restored",
+                    (sorted(os.listdir(os.path.dirname(unit.source))), signal.getsignal(signal.SIGTERM) == before),
+                    (["unit.cpp"], True))
+        finally:
+            del os.environ["TRYVAR_TOOLS_ROOT"]
+
+
 def test_specs_multi_pair_and_exact(c):
     """A variant is a list of exact replacements: a marker name repeated after a later `old` block adds a pair, a
     JSON spec names its pairs, and an `old` that occurs twice is refused rather than applied at the first one."""

@@ -368,5 +368,56 @@ def test_cli(c):
                  ["search", str(ok), "--want", "r32=r30"])
 
 
+BLOCKS = """extern "C" void take(int* p);
+extern "C" void o(int n)
+{
+    int a;
+    int b = n;
+
+    for (a = 0; a < n; a++) {
+        int other = a;
+        take(&other);
+    }
+    take(&b);
+}
+"""
+
+
+def test_apply_order(c):
+    """`--apply-order`: the best plan that lists block-scope locals is spelled at function scope; a plan with an edit or a
+    plan of function-scope locals only is refused; --dry-run writes and measures nothing."""
+    import argparse
+    g = regsim.Graph({32: regsim.Node(32, 31, "n"), 35: regsim.Node(35, 30, "a"), 34: regsim.Node(34, 29, "b"),
+                      33: regsim.Node(33, 28, "other")})
+    mapping = regsim.map_locals(g, 1, regsim.source_locals(BLOCKS, "o"))
+    base = regsim.Layout([32], [35, 34, 33], [])
+    hoist = regsim.Plan(base.with_decl([33, 35, 34]), (3, 3), (0, 0), {}, [], 2)
+    plain = regsim.Plan(base.with_decl([34, 35]), (3, 3), (0, 0), {}, [], 1)
+    edited = regsim.Plan(regsim.Layout([32], [33, 35], [], ("declare r40(-) as a local at declaration position 1",)),
+                         (3, 3), (0, 0), {}, [], 3)
+    args = argparse.Namespace(unit="x/y", function="o", dry_run=True)
+    rc, out = testing.capture(cli.cmd_apply_order, args, g, [hoist, plain], base, mapping, BLOCKS)
+    c.check("a hoistable plan is written to the screen with --dry-run, exit 0", rc, 0)
+    c.contains("the summary names the hoisted local", out, "hoist `other` to function scope and declare 3 local(s)")
+    c.contains("the new order is shown", out, "+     int other;\n  +     int a;\n  +     int b;")
+    c.contains("... and the block keeps the use as an assignment", out, "+         other = a;")
+    c.contains("--dry-run says nothing was measured", out, "--dry-run, nothing written or measured")
+    rc, out = testing.capture(cli.cmd_apply_order, args, g, [plain], base, mapping, BLOCKS)
+    c.check("a plan of function-scope locals only is refused with exit 3", rc, 3)
+    c.contains("... saying the order alone is --tryvar's", out, "--tryvar's")
+    rc, out = testing.capture(cli.cmd_apply_order, args, g, [edited], base, mapping, BLOCKS)
+    c.check("a plan that needs an edit is refused", (rc, "every plan needs an edit" in out), (3, True))
+    c.raises("it needs a unit", SystemExit, cli.cmd_apply_order, argparse.Namespace(unit=None, function="o", dry_run=True),
+             g, [hoist], base, mapping, BLOCKS)
+    import contextlib, io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        try:
+            cli.main(["run", "--help"])
+        except SystemExit:
+            pass
+    c.contains("run --help says --no-search prints no plans", " ".join(buf.getvalue().split()), "prints no plans")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

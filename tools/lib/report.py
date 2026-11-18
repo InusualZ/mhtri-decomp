@@ -572,6 +572,21 @@ def score(target: str, base: str, unit_name: str | None = None, tmpdir: str | No
         return Report(json.load(fh), out)
 
 
+def regenerate_project(root: str | os.PathLike, objdiff: str, out: str, *, runner: Callable = subprocess.run) -> str:
+    """Rewrite the project report `out` (`build/RMHE08/report.json`) from the objects on disk: `objdiff report generate`
+    in `root` (its `objdiff.json`), written beside `out` and moved over it, so a failed run keeps the old report.
+    Returns `""` on success, else the failure text."""
+    tmp = os.fspath(out) + ".new"
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    p = runner([objdiff, "report", "generate", "-o", tmp], cwd=os.fspath(root), capture_output=True, text=True,
+               encoding="utf-8", errors="replace")
+    if p.returncode != 0 or not os.path.exists(tmp):
+        return "objdiff report generate failed: " + ((p.stdout or "") + (p.stderr or ""))[-400:]
+    os.replace(tmp, out)
+    return ""
+
+
 def first_unit(report: Report) -> dict:
     """The one unit of a one-unit report (an empty dict when it has none)."""
     units = report.data.get("units") or []

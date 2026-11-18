@@ -29,7 +29,7 @@ python tools/units/unittry.py <unit> --permute FN [--block-file F | --lines A-B]
 python .claude/skills/mwcc-unit-matching/scripts/mt.py tryvar <unit> ...    # the same
 ```
 
-Run options: `--restore` (put every file back at the end: a measuring run whose table says what would be kept),
+Run options: `--no-refresh` (skip rebuilding the unit's object and `report.json` after a kept edit), `--restore` (put every file back at the end: a measuring run whose table says what would be kept),
 `--sdata2` (compare `.sdata2` with the target's bytes; refuse a candidate that breaks a target-identical one),
 `--shared-header` (allow a header other units include - they are **not** re-measured), `--rename-map F` (score against
 the target with pending map edits, `lib.pendingmap`), `--top N` (ranking rows), `--json`.
@@ -83,7 +83,7 @@ template (`\1`). `permute` options: `function=FN` (required), `lines=A-B`, `spli
 Reads the unit's source and its include closure (`lib.report.source_closure`), the unit's compile command and target.
 Writes only the files the trials name (the source, its own headers) and `build/tmp/unittry/<unit>/` (`obj/` the
 compiled object, `report/` the one-unit objdiff project and its `unitutil_report.json`, `target.pending.o` with
-`--rename-map`). `build/RMHE08/src/<unit>.o` and `build/RMHE08/report.json` are neither read nor written.
+`--rename-map`). The trials never read or write `build/RMHE08/src/<unit>.o` or `build/RMHE08/report.json`; **after a run that kept an edit** (not `--restore`, not `--no-refresh`) `Measurer.refresh` compiles the kept source into the unit's real object and, when `build/RMHE08/report.json` exists, rewrites it with `lib.report.regenerate_project` (`objdiff report generate` in this tree, moved over the old file only on success), so `mt.py diff`, `ledger.py` and `report.json` readers see the kept source without a hand-run `recompile.py --measure`. A failed compile is a `refresh:` line, the report is left alone. `--json` carries the lines under `refresh`.
 
 ## Invariants and rules
 
@@ -149,7 +149,7 @@ bytes and the mtime unchanged;
 a twice-occurring OLD refused by the default count and accepted with `count=2`; the guarded sweep compiling only the
 safe site; the best split order kept; Ctrl-C mid-candidate leaving the kept edit and reverting the in-flight one;
 `--restore`; an own header allowed, a shared one refused, one trial spanning source and header; the real `Measurer`
-compiling a stub compiler into the scratch directory and never writing `build/RMHE08/src`. Each of these mutants fails
+compiling a stub compiler into the scratch directory and never writing `build/RMHE08/src`. `test_refresh_rebuilds_the_real_object_and_report`: after a kept edit the real object is the kept source's and the report is regenerated in this tree from it; a failing compile is reported and leaves the report alone. Each of these mutants fails
 it: no mtime restore (1 check), the guard off (2), row drops ignored (4), a counted replace at the first occurrence
 only (2), no restore on interrupt (2), the split identity order left out (3). The `mt.py tryvar` route is pinned in
 `tools/tests/flags/test_mt_permdecl.py` (smoke).

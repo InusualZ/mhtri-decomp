@@ -210,5 +210,224 @@ def test_hoist(c):
                  "g", seq, "g", str(src), str(Path(tmp) / "src"))
 
 
+CONST = """extern "C" void put(int v);
+extern "C" void c(int* p, int* q, int n)
+{
+    int total;
+    int i;
+
+    total = 0;
+    for (i = 0; i < n; i++) {
+        p[i] = 0;
+        if (n > 4) {
+            q[i] = 0;
+        }
+    }
+    put(total);
+}
+"""
+
+
+def _const_graph(extra_def: str = "li r40,0"):
+    return regsim.Graph({33: regsim.Node(33, 31, "p"), 34: regsim.Node(34, 30, "q"), 35: regsim.Node(35, 29, "n"),
+                         36: regsim.Node(36, 28, "total"), 37: regsim.Node(37, 27, "i"), 40: regsim.Node(40, 26, "")},
+                        defs={40: extra_def})
+
+
+def test_constant_local(c):
+    g = _const_graph()
+    mapping = regsim.map_locals(g, 3, regsim.source_locals(CONST, "c"))
+    e = localedit.Edit("declare", 40, "r40(-)", position=1)
+    instrs = [("li", ("r40", "0")), ("stw", ("r40", "0(r33)")), ("stw", ("r40", "0(r34)"))]
+    ch = localedit.constant_local(g, e, instrs, CONST, "c", mapping, [36, 40, 37])
+    c.check("the local is an s32 named for the value", (ch.new_local.name, ch.new_local.line), ("zero", "s32 zero;"))
+    old, new = ch.blocks[0]
+    c.check("the block starts with the assignment of the constant", new.splitlines()[:2],
+            ["    zero = 0;", "    total = zero;"])
+    c.contains("the assignment precedes the first use", new, "    zero = 0;\n    total = zero;")
+    c.contains("a later `= 0;` in a nested block too", new, "            q[i] = zero;")
+    c.contains("... and the loop's own", new, "        p[i] = zero;")
+    c.check("the old block is the original lines", old.splitlines()[0], "    total = 0;")
+    named = localedit.constant_local(g, e, instrs, CONST, "c", mapping, [36, 40, 37], "nil")
+    c.contains("--local-name picks the name", named.blocks[0][1], "    nil = 0;")
+    loop = [("li", ("r40", "0")), ("addi", ("r40", "r40", "0x60")), ("stw", ("r40", "0(r33)"))]
+    c.raises("a temp written again is a counter, not a constant", localedit.Refused, localedit.constant_local, g, e,
+             loop, CONST, "c", mapping, [36, 40, 37])
+    c.raises("no `= K;` statement: nothing to name", localedit.Refused, localedit.constant_local,
+             _const_graph("li r40,7"), e, instrs, CONST, "c", mapping, [36, 40, 37])
+    cases = CONST.replace("    for (i = 0; i < n; i++) {\n", "    switch (n) {\n    case 1:\n").replace(
+        "        if (n > 4) {\n            q[i] = 0;\n        }\n", "    case 2:\n            q[i] = 0;\n")
+    c.raises("a case label between the uses is refused", localedit.Refused, localedit.constant_local, g, e, instrs,
+             cases, "c", _mapping_for(cases, g), [36, 40, 37])
+    nested = CONST.replace("    total = 0;\n", "    total = 5;\n").replace("        p[i] = 0;\n", "        p[i] = 1;\n") \
+        .replace("    put(total);\n", "    p[1] = 0;\n    put(total);\n")
+    c.raises("a use outside the block of the first one (inside a nested block) is refused", localedit.Refused,
+             localedit.constant_local, g, e, instrs, nested, "c", mapping, [36, 40, 37])
+
+
+def _mapping_for(text, g):
+    return regsim.map_locals(g, 3, regsim.source_locals(text, "c"))
+
+
+SUM = """extern "C" void use(int v);
+extern "C" void s(int a, int b, int* out)
+{
+    int k;
+
+    k = 3;
+    use(a + b);
+    *out = (a + b) * k;
+    out[1] = a * 2 + b;
+}
+"""
+
+
+def test_sum_local(c):
+    g = regsim.Graph({33: regsim.Node(33, 31, "a"), 34: regsim.Node(34, 30, "b"), 35: regsim.Node(35, 29, "out"),
+                      36: regsim.Node(36, 28, "k"), 40: regsim.Node(40, 27, "")}, defs={40: "add r40,r33,r34"})
+    mapping = regsim.map_locals(g, 3, regsim.source_locals(SUM, "s"))
+    e = localedit.Edit("declare", 40, "r40(-)", position=1)
+    ch = localedit.sum_local(g, e, SUM, "s", mapping, [36, 40])
+    c.check("an s32 local named sum", (ch.new_local.name, ch.new_local.line), ("sum", "s32 sum;"))
+    old, new = ch.blocks[0]
+    c.contains("assigned before the first statement that writes the sum", new, "    sum = a + b;\n    use(sum);")
+    c.contains("a parenthesised sum is a whole operand", new, "    *out = (sum) * k;")
+    c.contains("`a * 2 + b` is not `a + b` and stays (two sites, not three)", ch.summary, "2 use(s)")
+    c.check("the old block starts at the first use", old.splitlines()[0], "    use(a + b);")
+    pointer = SUM.replace("int a, int b", "int* a, int b")
+    c.raises("a pointer operand is address arithmetic, refused", localedit.Refused, localedit.sum_local,
+             g, e, pointer, "s",
+             mapping, [36, 40])
+    written = SUM.replace("    out[1] = a * 2 + b;\n", "    a++;\n    out[1] = a + b;\n")
+    g2 = regsim.Graph({33: regsim.Node(33, 31, "a"), 34: regsim.Node(34, 30, "b"), 35: regsim.Node(35, 29, "out"),
+                       36: regsim.Node(36, 28, "k"), 40: regsim.Node(40, 27, "")}, defs={40: "add r40,r33,r34"})
+    c.raises("a first use that is a function-scope initialiser is the declaration run's: refused", localedit.Refused,
+             localedit.sum_local, g2, e, SUM.replace("    k = 3;\n", "    int t = a + b;\n"), "s", mapping, [36, 40])
+    c.raises("an operand written between the uses is refused", localedit.Refused, localedit.sum_local, g2, e, written,
+             "s", mapping, [36, 40])
+    c.raises("no `a + b` in the source is refused", localedit.Refused, localedit.sum_local, g2, e,
+             SUM.replace("a + b", "a - b"), "s", mapping, [36, 40])
+
+
+def test_call_result_local(c):
+    with testing.temp_dir() as tmp:
+        src = Path(tmp) / "src" / "h.cpp"
+        src.parent.mkdir()
+        src.write_text(HOIST, encoding="utf-8", newline="\n")
+        b = ElfBuilder().section(".text", bytes(4 * 6)).symbol("g", ".text", 0, 24, bind="global", type="func")
+        b.symbol("blk").symbol("pts")
+        for off, name in ((0, "blk"), (4, "pts"), (12, "pts")):
+            b.reloc(".text", off, name, "R_PPC_REL24")
+        objfile = Path(tmp) / "h.o"
+        objfile.write_bytes(b.build())
+        g = regsim.Graph({32: regsim.Node(32, 31, "out"), 40: regsim.Node(40, 30, "@7"), 41: regsim.Node(41, 29, "k")},
+                         defs={40: "mr r40,r3"})
+        mapping = regsim.map_locals(g, 1, regsim.source_locals(HOIST, "g"))
+        e = localedit.Edit("declare", 40, "r40(@7)", position=0)
+        instrs = [("bl", ()), ("lwz", ("r0", "0(r3)")), ("bl", ()), ("mr", ("r40", "r3")), ("cmplw", ("cr0", "r0", "r40")),
+                  ("bl", ())]
+        ch = localedit.call_result_local(g, e, instrs, str(objfile), "g", HOIST, "g", str(src), str(Path(tmp) / "src"),
+                                         mapping, [40])
+        c.check("a local of the callee's return type, for the plan's temp", (ch.new_local.vreg, ch.new_local.line),
+                (40, "u32 pts_value;"))
+        old, new = ch.blocks[0]
+        c.contains("the call is assigned before its statement", new, "    pts_value = pts(999);\n    if (*blk() >= pts_value) {")
+        c.check("the declaration is not in the block (it goes to the run)", "u32 pts_value" in new, False)
+        own = HOIST.replace("    if (*blk() >= pts(999)) {\n        return;\n    }\n",
+                            "    u32 v;\n    v = pts(999);\n    if (*blk() >= v) {\n        return;\n    }\n")
+        twice = localedit.call_result_local(g, e, instrs, str(objfile), "g", own, "g", str(src), str(Path(tmp) / "src"),
+                                            mapping, [40])
+        c.contains("a call already assigned to a local still gets its own, and says so", twice.summary,
+                   "a second local beside `v`")
+        c.contains("... `pts_value = pts(999);` then `v = pts_value;`", twice.blocks[0][1],
+                   "    pts_value = pts(999);\n    v = pts_value;")
+        init = HOIST.replace("    if (*blk() >= pts(999)) {", "    u32 w = pts(999);\n    if (*blk() >= w) {")
+        c.raises("a call that initialises a declaration is refused (the run's lines would be edited twice)",
+                 localedit.Refused, localedit.call_result_local, g, e, instrs, str(objfile), "g", init, "g", str(src),
+                 str(Path(tmp) / "src"), mapping, [40])
+        c.raises("r3 rewritten after the call: refused", localedit.Refused, localedit.call_result_local, g, e,
+                 [("bl", ()), ("li", ("r3", "0")), ("mr", ("r40", "r3"))], str(objfile), "g", HOIST, "g", str(src),
+                 str(Path(tmp) / "src"), mapping, [40])
+        c.raises("a copy that follows no call is refused", localedit.Refused, localedit.call_result_local, g, e,
+                 [("mr", ("r40", "r3"))], str(objfile), "g", HOIST, "g", str(src), str(Path(tmp) / "src"), mapping, [40])
+
+
+def test_call_symbols_skip_save_restore_helpers(c):
+    """`_savegpr_N`/`_restgpr_N` are relocated `bl`s of the prologue and epilogue, not calls of the source: counting them
+    made the dump's `bl` count disagree with the object's on every function that saves many registers."""
+    with testing.temp_dir() as tmp:
+        b = ElfBuilder().section(".text", bytes(4 * 4)).symbol("g", ".text", 0, 16, bind="global", type="func")
+        b.symbol("_savegpr_27").symbol("callee").symbol("_restgpr_27").symbol("_savefpr_14")
+        for off, name in ((0, "_savegpr_27"), (4, "callee"), (8, "_savefpr_14"), (12, "_restgpr_27")):
+            b.reloc(".text", off, name, "R_PPC_REL24")
+        (Path(tmp) / "s.o").write_bytes(b.build())
+        c.check("only the source's call is listed", localedit.call_symbols(str(Path(tmp) / "s.o"), "g"), ["callee"])
+
+
+def test_declare_dispatch(c):
+    g = _const_graph("lwz r40,4(r33)")
+    mapping = regsim.map_locals(g, 3, regsim.source_locals(CONST, "c"))
+    e = localedit.Edit("declare", 40, "r40(-)", position=1)
+    try:
+        localedit.declare(g, e, [], CONST, "c", "x.cpp", "src", mapping, [36, 40, 37], "x.o", "c")
+    except localedit.Refused as r:
+        c.contains("a load temp is refused, naming the definitions that are written", r.reason, "`li`, `mr T,r3`")
+    else:
+        c.check("refused", False, True)
+    c.check("`li` goes to the constant", localedit.declare(_const_graph(), e, [("li", ("r40", "0"))], CONST, "c", "x.cpp",
+                                                          "src", mapping, [36, 40, 37], "x.o", "c").new_local.name, "zero")
+
+
+ORDER = """extern "C" void take(int* p);
+extern "C" void o(int n)
+{
+    int a;
+    int b = n;
+
+    for (a = 0; a < n; a++) {
+        int other = a;
+        int level;
+        take(&other);
+        level = other;
+        take(&level);
+    }
+    if (b) {
+        int other2 = b;
+        take(&other2);
+    }
+}
+"""
+
+
+def test_hoist_order(c):
+    g = regsim.Graph({32: regsim.Node(32, 31, "n"), 37: regsim.Node(37, 30, "a"), 36: regsim.Node(36, 29, "b"),
+                      35: regsim.Node(35, 28, "other"), 34: regsim.Node(34, 27, "level"),
+                      33: regsim.Node(33, 26, "other2")})
+    mapping = regsim.map_locals(g, 1, regsim.source_locals(ORDER, "o"))
+    c.check("the block locals are mapped with their scopes", {v: m.scope for v, m in mapping.items()},
+            {37: 0, 36: 0, 35: 1, 34: 1, 33: 2})
+    ch = localedit.hoist_order([34, 35, 37, 36, 33], mapping, ORDER, "o")
+    old, new = ch.blocks[0]
+    c.check("the plan's order at function scope, the initialiser kept as an assignment",
+            new.splitlines()[:6], ["    int level;", "    int other;", "    int a;", "    int b;", "    int other2;", "    b = n;"])
+    c.contains("a block initialiser becomes an assignment in place", new, "        other = a;")
+    c.contains("a block declaration without one is removed", new, "        other = a;\n        take(&other);")
+    c.contains("the later block's too", new, "        other2 = b;")
+    c.check("the old block spans the first declaration to the last block local", (old.splitlines()[0], old.splitlines()[-1]),
+            ("    int a;", "        int other2 = b;"))
+    dup = ORDER.replace("int other2 = b;", "int other = b;").replace("take(&other2)", "take(&other)")
+    g2 = regsim.Graph({**g.nodes, 33: regsim.Node(33, 26, "other")})
+    kept = localedit.hoist_order([34, 35, 37, 36, 33], regsim.map_locals(g2, 1, regsim.source_locals(dup, "o")), dup, "o")
+    c.check("the two blocks' `other` stay, `level` still moves",
+            ("    int level;" in kept.blocks[0][1], "int other;" in kept.blocks[0][1], "        int other = a;" in kept.blocks[0][1]),
+            (True, False, True))
+    c.contains("... and the summary says which stay", kept.summary, "`other`, `other` stay in their blocks")
+    flat = {v: m for v, m in mapping.items() if m.scope == 0}
+    c.raises("a plan with no block-scope local is --tryvar's", localedit.Refused, localedit.hoist_order, [37, 36], flat,
+             ORDER, "o")
+    c.raises("a plan naming an unmapped local is refused", localedit.Refused, localedit.hoist_order, [37, 99], mapping,
+             ORDER, "o")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
