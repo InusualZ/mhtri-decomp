@@ -3245,7 +3245,7 @@ extern "C" void se_item_pickup_play(u16 code) {
         return;
     }
     u8 level = fn_800F2680(handle, 0);
-    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)level));
+    fn_800E8354(voice, (s16)(lbl_807963E4 * (f32)level));
 }
 
 /* --- the two-voice crossfade helper ---------------------------------------------------------------- */

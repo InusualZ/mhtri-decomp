@@ -27,7 +27,7 @@
  *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
  *    pointers) where ours hoists the load into r4 (a late `kind = ...` turns the range tests into signed compares).
  *  - `lb_equip_detail_blade_draw` (98.0): retail tests the 15/16 case range with `subi`+`cmplwi`, ours with two
- *    signed compares.  `lb_equip_detail_item_draw` (98.5): retail masks the ternary anchor (`clrlwi r7,r7,16`).
+ *    signed compares.
  *  - `lb_award_rows_apply` (98.3), `lb_menu_row_insert` (99.1), `lb_talk_reward_give` (99.1): register order only.
  *  - `lb_screen07_step` (98.8): the base and byte registers swap (r4/r3).
  *  - `lb_menu_angle_rank_get` (99.9): our frame is 0x40 against 0x30 (the conversion slots are not shared).
@@ -40,9 +40,8 @@
  * SHAPES. Locals are declared in the order retail allocates their saved registers (first declared, highest);
  *   switch cases are written in the order retail lays out their bodies (single cases before a case range);
  *   `lb_talk_state` is defined at the foot so every use keeps its own `lis`/`addi`.
- * RESIDUALS. mwcc-debugger dump, `lb_equip_detail_item_draw`: regsim 2/2 callee-saved, 4/4 volatile (EXACT); first
- *            divergence insn 25: retail `clrlwi r7, r7, 16` vs ours `<DIFF_DELETE>`; size differs from retail (272 B vs 268
- *            B)
+ *   `lb_equip_detail_item_draw` types the arms of its anchor ternary `(u16)`: the join then keeps retail's `clrlwi` before
+ *   the `u16` parameter.
  * RESIDUALS. mwcc-debugger dump, `lb_menu_row_insert`: regsim 5/5 callee-saved, 11/11 volatile (EXACT); first
  *            divergence insn 16: retail `mr r5, r27` vs ours `mr r6, r27`
  */
@@ -921,7 +920,7 @@ void lb_equip_detail_item_draw(LbScrollWork* self, _mh_ivec2_* ofs) {
 
     lb_equip_detail_draw(self, 0, self->left_rows_0x13[self->cursor_0x08], self->left_group_0x11, 0x19B1,
                          self->left_mode_0x04);
-    anchor = (s32)self->right_rows_0x1D[self->cursor_0x08] == 15 ? 0x1A7E : 0x19B2;
+    anchor = (s32)self->right_rows_0x1D[self->cursor_0x08] == 15 ? (u16)0x1A7E : (u16)0x19B2;
     lb_equip_detail_draw(self, 0, self->right_rows_0x1D[self->cursor_0x08], self->right_group_0x12, anchor,
                          self->right_mode_0x05);
     if (self->right_rows_0x1D[self->cursor_0x08] != 0) {

@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x80054058 - rotates the shape by `angle` and scales it uniformly by `scale` about the s16 position `pos`. */
-void drawshape_set_rot_scale_ivec2(const s16* pos, u16 angle, f32 scale);
+void drawshape_set_rot_scale_ivec2(const s16* pos, f32 scale, u16 angle);
 
 #ifdef __cplusplus
 }

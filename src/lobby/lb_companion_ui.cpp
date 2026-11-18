@@ -44,7 +44,6 @@
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
  *    not change it; regsim reports the colouring exact, so the difference is in the instruction selector's address
  *    folding, not the allocator);
- *  - `lb_act_award_handover`: ours emits a `clrlwi` or `extsb` retail does not;
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
  *    shift;
  *  - `lb_combo_rate_get`: the `get_move_work_adrs` result and the row pointer swap r29/r31 (colouring only);
@@ -76,11 +75,9 @@
  *            is not a regsim target.
  * RESIDUALS. mwcc-debugger dump, `lb_s13_entry_list_draw`: regsim 8/8 callee-saved, 7/7 volatile (EXACT, colouring
  *            is not the cause); first divergence insn 28: retail `<DIFF_INSERT>` vs ours `add r3, r29, r4`
- * RESIDUALS. mwcc-debugger dump, `lb_act_award_handover`: regsim 3/3 callee-saved, 5/5 volatile (EXACT, colouring is
- *            not the cause); first divergence insn 27: retail `<DIFF_INSERT>` vs ours `clrlwi r0, r0, 24`; size
- *            differs from retail
  * RESIDUALS. mwcc-debugger dump, `lb_s13_skill_list_draw`: regsim 4/6 callee-saved, 17/17 volatile, best plan cost
  *            4 EXACT
+ * SHAPES. `lb_act_award_handover` bumps the `u8` step with `++` (`step = step + 1` keeps a `clrlwi` before the `stb`).
  * SHAPES. `LbCmdSub19` carries the companion parameter bytes at +0x14..+0x1A in retail's order (the request side
  *            already reads them so); `started_0x6A40` is a byte; `lb_act_slot_write` tests the request's +0x9 sender marker.
  */
@@ -596,14 +593,14 @@ void lb_act_award_handover(u8 unused, LbActReq* req) {
                 if (req->sel_0x04.word_0x00 == 5) {
                     work->state_0xFA = 5;
                     companion->value_0x20 = companion->value_0x24;
-                    companion->step_0x2C = companion->step_0x2C + 1;
+                    companion->step_0x2C++;
                     quest_time_limit_set((s32)(lbl_8079B2B8 * Screen_w.scale_0x14));
                 }
                 if (req->sel_0x04.word_0x00 == 3) {
                     menu_item_close();
                     work->state_0xFA = 3;
                     companion->value_0x20 = companion->value_0x24;
-                    companion->step_0x2C = companion->step_0x2C + 1;
+                    companion->step_0x2C++;
                     quest_time_limit_set((s32)(lbl_8079B2BC * Screen_w.scale_0x14));
                     snd_quest_start_bgm_set();
                 }

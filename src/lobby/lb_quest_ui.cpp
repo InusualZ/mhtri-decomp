@@ -7,6 +7,7 @@
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail loads every table with its own `lis`/`addi`); `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
  *   `slwi` unfused; every written row measured better with it off); `#pragma optimization_level 4` around
  *   `lb_trade_msg_draw` (retail's subi + cmplwi switch-range lowering, playbook 108).
+ * FLAGS. `lb_kitchen_courses_roll` takes a scoped `#pragma opt_loop_invariants off` (size unchanged, raises its row).
  * FLAGS. `#pragma opt_common_subs off` scoped to `lb_kitchen_meal_serve` and `#pragma opt_lifetimes off` to `lb_kitchen_step` (same sizes, raise both rows).
  * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`lb_kitchen_*`, `lb_trade_*`,
  *   `lb_scene_eft_*`) and every data name are GUESSes from the bodies: the kitchen pays zenny or resource points for a
@@ -424,6 +425,8 @@ u32 lb_kitchen_course_ck(u8 course) {
     return ok;
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x8038F9A4 (0x120): Rolls course set `course`: steps the saved seed 37 times per set, then draws each of the four
  * courses and the extra one from its list's candidates that can be rolled now. */
 void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course) {
@@ -461,6 +464,7 @@ void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course) {
         }
     }
 }
+#pragma pop
 
 /* 0x8038FAC4 (0x5C): Empties both picks and shows the first ingredient page and the first course roll. */
 void lb_kitchen_pick_reset(LbKitchenWork* work) {

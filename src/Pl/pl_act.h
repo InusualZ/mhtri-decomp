@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 u32 pl_item_menu_open_ck(struct _PLW* plw);
-void pl_pos_blend_start(struct _PLW* self, s32 frames); /* 0x8027AE28 - starts the blend of the actor's position to `target_pos_0x090` over `frames` */
+void pl_pos_blend_start(struct _PLW* self, s16 frames); /* 0x8027AE28 - starts the blend of the actor's position to `target_pos_0x090` over `frames` */
 u32 Pl_motion_input_ck(s32 arg);
 
 /* The skill-slot and equipment helpers the lobby page, menu and cockpit units drive (0x802738B8-0x8027EB18). */

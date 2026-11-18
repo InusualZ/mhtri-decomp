@@ -491,7 +491,7 @@ u16 lb_npc_Get_motion_no(_LB_NPC* self);
 #ifdef __cplusplus
 struct PlayerPad;
 extern "C" {
-void lb_npc_walk_blend_set(_PLW* plw, s32 frames);
+void lb_npc_walk_blend_set(_PLW* plw, s16 frames);
 void lb_npc_act_req(_PLW* self, u32 kind, s32 act, s32 flags);
 s32 lb_npc_act_busy_ck(u8 kind, u16 act);
 void lb_npc_net_flag_on(void);

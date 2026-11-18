@@ -51,8 +51,7 @@
  *   order and a function-scope `item`/`level` leave it or move the frame);
  *   `wpadHidOpenCallback` (the push's `used` takes r28 for the original's r31, and the inlined pop's and peek's
  *   `level`/`used` swap r27/r28; a named `used`, split declarations and a caller-written push leave them); `wpadCountIdleReports` (`format` is a local or frontend temporary numbered below the
- *   backend `chan * 4`, which takes r3; the original gives r3 to `format`); `wpadFilterButtons` (the back-sample
- *   pointer takes r5 before the extension-code loads, the original r6); `wpadUpdateRadioSensitivity` (`average`
+ *   backend `chan * 4`, which takes r3; the original gives r3 to `format`); `wpadUpdateRadioSensitivity` (`average`
  *   takes r3, the original r5).
  *   `wpadSamplingFiber`: the loop's callee-saved registers and command stack slots are numbered differently.
  *   `wpadSampleChanged`: five callee-saved registers where the original uses four, and the original truncates `changed`
@@ -88,9 +87,8 @@
  *   two statements and `wpadInitSequence` picks `calSize` with `?:`.
  * RESIDUALS. mwcc-debugger dump, `wpadUpdateRadioSensitivity`: regsim 0/0 callee-saved, 27/28 volatile, best plan
  *            cost 0; first divergence insn 23: retail `clrlwi r5, r3, 16` vs ours `clrlwi r3, r3, 16`
- * RESIDUALS. mwcc-debugger dump, `wpadFilterButtons`: regsim 1/1 callee-saved, 23/26 volatile, best plan cost 0;
- *            first divergence insn 13: retail `add r6, r31, r0` vs ours `add r5, r31, r0`
  * FLAGS. `wpadSampleChanged` takes a scoped `#pragma opt_dead_assignments off` (size unchanged, raises its row).
+ * FLAGS. `wpadFilterButtons` takes a scoped `#pragma opt_common_subs off` (size unchanged; the back-sample pointer then takes r6 as retail).
  */
 
 #include "types.h"
@@ -1923,6 +1921,8 @@ s32 WPADGetLatestIndexInBuf(s32 chan)
     return index == -1 ? 0 : index;
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* Clears the button bits the remote reports when both halves of a pair are pressed. */
 void wpadFilterButtons(s32 chan)
 {
@@ -1956,6 +1956,7 @@ void wpadFilterButtons(s32 chan)
     }
     OSRestoreInterrupts(level);
 }
+#pragma pop
 
 /* Stores the newest sample in the auto sampling ring, calls the sampling callback and counts the report. */
 void wpadStoreSample(s32 chan)

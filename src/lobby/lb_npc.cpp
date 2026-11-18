@@ -92,7 +92,6 @@
  *  - `lb_npc_ground_drop`: the second `+= 48.0f` adds with the operands' registers swapped;
  *  - `lb_shop_sell_list_draw`: the arrow flags byte takes r29 where retail shares r26 with `picked`;
  *  - `lb_npc_map_setup`: retail loads the record's first byte into r3 for the loop test;
- *  - `lb_npc_walk_blend_set`: retail stores the raw frame count where ours reuses the `extsh` copy;
  *  - `lb_player_menu_area_return`: the strength-reduced peer pointer and the counter are stepped in the other order;
  *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata` claimed, not emitted; `.data` and `.sdata2` short of the claim (the
  *   tables and the float pool are written as literals and externs); `.text`/extab/extabindex short of the claim;
@@ -123,8 +122,7 @@
  *            `lbl_807998D8` where ours pools its own `@4432` (regsim EXACT).
  * RESIDUALS. mwcc-debugger dump, `lb_act_carry_put`: regsim 1/1 callee-saved, 5/5 volatile (EXACT, colouring is not
  *            the cause); first divergence insn 23: retail `<DIFF_INSERT>` vs ours `li r4, 0x0`
- * RESIDUALS. mwcc-debugger dump, `lb_npc_walk_blend_set`: regsim 2/2 callee-saved, 3/3 volatile (EXACT, colouring is
- *            not the cause); first divergence insn 27: retail `sth r31, 0xb4(r30)` vs ours `sth r0, 0xb4(r30)`
+ * SHAPES. `lb_npc_walk_blend_set` takes its frame count as `s16` (`lb_npc.h`): the `sth` then stores the raw register.
  * RESIDUALS. mwcc-debugger dump, `lb_npc_map_setup`: regsim 6/6 callee-saved, 12/13 volatile, best plan cost 0;
  *            first divergence insn 43: retail `lbz r3, 0x0(r30)` vs ours `lbz r0, 0x0(r30)`
  */
@@ -7500,7 +7498,7 @@ u32 lb_player_menu_area_ck(_PLW* self)
 
 /* 0x8020A058 - starts a `frames`-frame walk of the player to his move target (snaps there when it is 800 units
  * away or more, or for no frames). */
-void lb_npc_walk_blend_set(_PLW* self, s32 frames)
+void lb_npc_walk_blend_set(_PLW* self, s16 frames)
 {
     if (vec3_dist_sq(&self->vec_0x03C, &self->target_pos_0x090) >= 640000.0f || (s16)frames == 0) {
         self->blend_frames_0x0B4 = 0;
@@ -7978,7 +7976,7 @@ s32 ran_suu(s32 n);
 namespace s_802076D4 {
 extern "C" {
 void eft051_spawn(_PLW* self, u8 kind);
-void lb_npc_walk_blend_set(_PLW* plw, s32 frames);
+void lb_npc_walk_blend_set(_PLW* plw, s16 frames);
 u32 menu_busy_ck(void);
 s32 lobby_cmd_release_ck(u16 mask);
 s32 lb_cmd_pressed_ck(u16 mask);
@@ -8613,7 +8611,7 @@ u32 fn_80208AE8(_PLW* self);
 void fn_80208A3C(_PLW* self);
 void fn_80208A48(_PLW* self);
 void lb_player_latch_release(_PLW* self);
-void lb_npc_walk_blend_set(_PLW* plw, s32 frames);
+void lb_npc_walk_blend_set(_PLW* plw, s16 frames);
 LbSpot* lb_spot_find(_PLW* self, s16 kind, s16 id);
 void lb_act_idle(_PLW* self);
 void lb_act_bench(_PLW* self, s32 seated);

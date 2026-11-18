@@ -26,7 +26,7 @@
  *   one-expression and `s32` temp spellings measure equal.
  * RESIDUALS. note_box_size: one extra `extsh` after the `neg` (four source shapes reproduce it).
  * RESIDUALS. note_line_draw / note_text_draw: retail narrows the centre into a temporary, ours updates `x` in place.
- * RESIDUALS. draw_spin_icon: `li r4,0x4000` is scheduled before the `fmr f1` (retail after).
+ * SHAPES. `draw_spin_icon` passes `drawshape_set_rot_scale_ivec2` the scale before the angle (the parameter order of `drawshape_set_rot_scale_ivec2.h`): the float load is then scheduled ahead of the angle's `li`.
  * RESIDUALS. window_frame_tex_draw: frame 0x100 vs 0xA0 (96 bytes of retail locals no body reads) and a `cmpwi`
  *   where ours has `cmplwi` on `style == 1`.
  * RESIDUALS. draw_title_window: retail sign-extends `x` again before `x + 32`.
@@ -42,8 +42,6 @@
  *   is the OR order retail emits.
  * SHAPES. Vertex arrays are filled with chained assignments in retail's store order (the rightmost target is
  *   stored first); `cur`/`prev` in the animation steps are declared `prev` first.
- * RESIDUALS. mwcc-debugger dump, `draw_spin_icon`: regsim 3/3 callee-saved, 15/15 volatile (EXACT); first
- *            divergence insn 60: retail `<DIFF_INSERT>` vs ours `li r4, 0x4000`
  */
 
 #include "types.h"
@@ -1987,6 +1985,6 @@ void draw_spin_icon(s16 x, s16 y, s32 color)
     drawshape_set_vertex_rect(x, y, 18, 18);
     drawshape_set_flat_color(color);
     drawshape_set_texture_rect(5, &uv0, &uv1);
-    drawshape_set_rot_scale_ivec2(&center.x, 0x4000, scale);
+    drawshape_set_rot_scale_ivec2(&center.x, scale, 0x4000);
     drawshape_exec();
 }

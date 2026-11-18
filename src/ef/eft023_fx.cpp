@@ -15,18 +15,16 @@
  * FLAGS. fn_80116EEC takes a scoped `#pragma opt_strength_reduction off`.
  * RESIDUALS.
  *  - `fn_80116EEC`: retail unrolls the slot scan with the table base in r3; ours keeps a separate base;
- *  - `fn_80117120`: retail keeps the dead loop counter's increment in both unrolled halves.
  *   `.data` is declared, not emitted.  Relocation names that differ from retail: pool constants.
  * SHAPES. Functions are defined in retail's address order.  `fn_80116FDC` tail-calls two static functions for states 0
  *   and 1 (retail's `b` into the folded bodies after the exit `blr`).  `fn_801168D8` writes area 1/2 for map 6 as
  *   if/else and for map 17 as a ternary.  `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)`.
  *   `fn_80116B00` uses literal constants (the loop hoists them), converts the shifted angle through `(s32)(u16)`
  *   (signed int-to-float), declares `i` before `work`, and caches `tables[i]` only across the `sinf` call.
+ *   `fn_80117120` counts its slot scan with an `s16` variable: the dead counter then keeps its `li`/`addi` beside the
+ *   `bdnz` in both unrolled halves (`s32` drops it, `u8`/`u16` add a mask).
  * RESIDUALS. mwcc-debugger dump, `fn_80116EEC`: regsim 0/0 callee-saved, 3/4 volatile, best plan cost 0; first
  *            divergence insn 1: retail `lwz r3, 0x38(r3)` vs ours `lwz r5, 0x38(r3)`; size differs from retail
- * RESIDUALS. mwcc-debugger dump, `fn_80117120`: regsim 2/2 callee-saved, 17/17 volatile (EXACT); first divergence
- *            insn 41: retail `addi r7, r7, 0x1` vs ours `<DIFF_DELETE>`; size differs from retail (268 B vs 264 B); retail
- *            keeps the dead loop counter's increment in both unrolled halves
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -481,7 +479,7 @@ extern "C" void fn_80117120(_EFT* self)
 {
     _EFT_JOB2_WORK* work = (_EFT_JOB2_WORK*)self->work_0x38;
     _EFT* handle;
-    s32 i;
+    s16 i;
 
     if (++self->timer_0x0C >= 0x3C && work->total < 0x20) {
         fn_80116E1C(self, 1, 0);

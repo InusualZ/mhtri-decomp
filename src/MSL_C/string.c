@@ -4,6 +4,7 @@
  *
  * RANGE. .text 0x8045F554..0x8045F9E8 (9 functions in the map, 0x494 B); .sdata 0x80793CE8..0x80793CF0; .sdata2
  *    0x8079CA00..0x8079CA08.
+ * FLAGS. `strcmp` takes a scoped `#pragma opt_common_subs off` (same size, raises its row).
  * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi`; `#pragma ipa file` is what moves the pooled "" literal from
  *    `.rodata` to `.sdata2` (the target has no `.rodata`); code scores are the same with and without it.
  * NAMES. file name GUESS (MSL `string`); `strtok` is the map's name and a GUESS (the dump has a placeholder there); `strlen` is registered separately (`MSL/strlen.cpp`); the statics
@@ -124,6 +125,8 @@ char* strcat(char* dst, const char* src)
     return dst;
 }
 
+#pragma push
+#pragma opt_common_subs off
 int strcmp(const char* a, const char* b)
 {
     const u8* p = (const u8*)a;
@@ -198,6 +201,7 @@ int strcmp(const char* a, const char* b)
         }
     }
 }
+#pragma pop
 
 int strncmp(const char* a, const char* b, u32 n)
 {

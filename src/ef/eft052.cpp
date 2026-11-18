@@ -37,9 +37,10 @@
  *   `x / 2.0f` keeps retail's `fmuls x, 0.5` operand order where `x * 0.5f` swaps it.
  * RESIDUALS. mwcc-debugger dump, `hud_msg_enqueue`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 1; first
  *            divergence insn 5: retail `addi r6, r4, 0xbcc` vs ours `li r6, 0x0`
- * RESIDUALS. mwcc-debugger dump, `eft052_page_counts_get`: regsim 7/7 callee-saved, 1/2 volatile, best plan cost
- *            0; first divergence insn 11: retail `mr r29, r3` vs ours `extsh r29, r3`; size differs from retail (276 B vs 280
- *            B)
+ * RESIDUALS. `eft052_page_counts_get`: the final sum adds `r30 + r29` first where retail adds the pouch count to
+ *            `r29` (`d + b`, then `c`); every operand order of `b`, `c`, `d` measured (99.86).
+ * SHAPES. `eft052_page_counts_get` holds `userdata_box_capacity`'s `u16` result in a `u32` local before the call that
+ *            takes it as `u16` (the nested call otherwise copies it through r0 before the narrowing).
  * SHAPES. `eft_area_se_req` tests `(u32)(type - 9) <= 1` and `(s32)type == 1`; `eft052_box_menu_draw` writes the
  *            enable test as `if (total == 0 && i != 2) enabled = false; else enabled = true;` (retail's arm order).
  * FLAGS. `eft052_item_get_step` takes a scoped `#pragma optimization_level 4` (size unchanged, raises its row).
@@ -522,7 +523,8 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
     u32 a = userdata_item_slot_count(lobby_world_block);
     u32 b = item_count_find(id, userdata_equip_item_slots_get(lobby_world_block), a);
-    u32 c = item_slots_count_sum(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
+    u32 cap = userdata_box_capacity(lobby_world_block);
+    u32 c = item_slots_count_sum(id, &lobby_world_block->field_0x0180, cap);
     u32 d;
 
     if (userdata_gunner_ck(lobby_world_block) == 1)
@@ -535,7 +537,7 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
         *out2 = c;
     if (out3 != NULL)
         *out3 = d;
-    return c + (d + b);
+    return b + d + c;
 }
 
 /* 0x80359140 (0x24): Moves the item page's count for one id by `delta` (a negative `delta` adds). */

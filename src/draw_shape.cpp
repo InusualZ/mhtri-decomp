@@ -821,7 +821,7 @@ extern "C" void drawshape_set_scale_ivec2(const s16* pos, const f32* scale) {
 }
 
 /* 0x80054058 (0x78): rotates and scales uniformly about an s16 position. */
-extern "C" void drawshape_set_rot_scale_ivec2(const s16* pos, u16 angle, f32 scale) {
+extern "C" void drawshape_set_rot_scale_ivec2(const s16* pos, f32 scale, u16 angle) {
     f32 p[2];
     f32 s[2];
 

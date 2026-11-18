@@ -56,6 +56,7 @@
  * SHAPES.    HkbManager::filterAllowed tests the allow-list pointer through the inline getAllowedChars: that keeps the
  *            pointer out of a register, so the loop reloads it and indexes with `lhzx` as retail.
  * SHAPES.    hkbGuiPaneComponentDraw halves the size with `/ 2.0f` (retail's fmuls operand order).
+ * FLAGS. hkbSetModifierState takes a scoped `#pragma opt_dead_assignments off` (same size, raises its row).
  * FLAGS. hkbGuiSetBoundingTriggerTargets takes a scoped `#pragma opt_loop_invariants off`.
  * SHAPES. hkbManagerSetMap indexes `self->channels[i]` at each use (a `ch` local takes r29 where retail has r27);
  *            hkbGuiSetBoundingTriggerTargets holds the pane (`n->mKey`) in a function-scope local declared first.
@@ -1351,6 +1352,8 @@ void hkbManagerSetMap(HkbManager* self, s32 mapIndex)
     }
 }
 
+#pragma push
+#pragma opt_dead_assignments off
 /* 0x8056C4D0 (0x118): Sets the lock bits `mask` to `value` and re-sends the LEDs when they changed. */
 void hkbSetModifierState(HkbManager* self, u32 value, u32 mask)
 {
@@ -1367,6 +1370,7 @@ void hkbSetModifierState(HkbManager* self, u32 value, u32 mask)
         }
     }
 }
+#pragma pop
 
 /* 0x8056C5E8 (0xC): Sets channel 0's modifier override value and mask. */
 void hkbSetModifierOverride(HkbManager* self, u32 a, u32 b)

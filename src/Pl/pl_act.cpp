@@ -105,8 +105,6 @@
  *    which forms the row address offset-first as retail does;
  *  - `pl_area_stamina_drain_step`: retail's `self->unk37C -= v` subtracts the unextended `v` (r31) after the `extsh r0` compare;
  *    `-= (s16)v` reuses the extended copy (r3), and `-= v` moves the `extsh` ahead of the `sth`;
- *  - `pl_pos_blend_start`: retail stores the raw `arg1` (r31) to +0xB4 where ours reuses the `(s16)arg1` the
- *    condition extended (r0); the header's `s32` parameter fixes the spelling, and a `(u16)` store is worse;
  *  - `pl_sharpness_add`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
  *  - `fn_80278D1C`: retail branches every id range test forward to its block (8, then 2, then 4) with a fall-through
  *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
@@ -141,7 +139,7 @@
  *    `+ 1` after the step table is set up (declaration orders, the `for` header init and a `count` local measured lower);
  *  - `pl_parts_set`: retail keeps the global in r6 and builds the record base in r7 (the sibling `fn_802693C4`'s spelling,
  *    a block-local reload and the declaration orders measured);
- *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
+ *  - `pl_area_buff_apply`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `pl_item_now_usable_ck`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `pl_target_lock_ck`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *  - `pl_kind_item_equip_find`: one or two register or block choices around the id scans
@@ -259,13 +257,11 @@
  * RESIDUALS. mwcc-debugger dump, `fn_8027FB84`: regsim 6/6 callee-saved, 7/7 volatile (EXACT, colouring is not the
  *            cause); first divergence insn 47: retail `clrlwi r0, r29, 24` vs ours `<DIFF_DELETE>`; size differs
  *            from retail
- * RESIDUALS. mwcc-debugger dump, `pl_carry_item_get`: regsim 0/0 callee-saved, 7/7 volatile, best plan cost 5; first
- *            divergence insn 1: retail `subi r6, r4, 0x1` vs ours `subi r5, r4, 0x1`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `fn_802699C8`: regsim 0/0 callee-saved, 22/26 volatile, best plan cost 1; first
  *            divergence insn 3: retail `lwz r12, 0x10(r10)` vs ours `lwz r4, 0x10(r10)`
- * RESIDUALS. mwcc-debugger dump, `pl_pos_blend_start`: regsim 2/2 callee-saved, 3/3 volatile (EXACT); first
- *            divergence insn 30: retail `sth r31, 0xb4(r30)` vs ours `sth r0, 0xb4(r30)`; retail stores the raw `arg1` where
- *            ours reuses the extended copy
+ * SHAPES. `pl_pos_blend_start` takes its frame count as `s16` (`pl_act.h`): the store to +0xB4 is then the raw register where
+ *            an `s32` parameter reuses the `extsh` copy.  `pl_carry_item_get` counts with an `s16` variable (dead counter kept beside
+ *            the `bdnz`), declares `id`, `i`, `v` in that order and keeps `v` a `u32`.
  * RESIDUALS. mwcc-debugger dump, `pl_input_button_hold_count`: regsim 5/8 callee-saved, 15/15 volatile, best plan
  *            cost 5 EXACT; first divergence insn 9: retail `addi r30, r3, pl_input_button_masks@l` vs ours `addi r29, r3,
  *            pl_input_button_masks@l`; declaration order mask, i, buttons applied; the plan needs the frontend temporary `in
@@ -7315,7 +7311,7 @@ namespace s_80276B58 {
 
 /* 0x8027AE28: sets the actor's residual-velocity timer from a target position over the given
  * number of frames. */
-extern "C" void pl_pos_blend_start(_PLW* self, s32 arg1)
+extern "C" void pl_pos_blend_start(_PLW* self, s16 arg1)
 {
     if (vec3_distance((u8*)self + 60, (u8*)self + 144) >= lbl_8079A0F4 || (s16)arg1 == 0) {
         self->blend_frames_0x0B4 = 0;
@@ -7527,12 +7523,14 @@ extern "C" void pl_skill_update2(_PLW* self, s32 arg1)
 extern "C" u32 pl_carry_item_get(_PLW* self)
 {
     s32 id;
-    u16 v = 0xFFFF;
-    for (s32 i = 0; i < 24; i++) {
+    s16 i;
+    u32 v;
+    v = 0xFFFF;
+    for (i = 0; i < 24; i++) {
         if (self->slot_id[i].value > 0) {
             id = self->slot_id[i].item_id;
             if ((u32)(id - 381) <= 1 || id == 139 || id == 395) {
-                v = (u16)id;
+                v = id;
             }
         }
     }
