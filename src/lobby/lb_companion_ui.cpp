@@ -3392,8 +3392,8 @@ void lb_s13_option_draw(s8* text, bool sel, bool enabled, _mh_ivec2_* pos) {
 void lb_s13_slot_list_draw(LbScreen13Work* work, u32 active) {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    s16 i;
     u16* layout;
+    s16 i;
     u8 slots;
     bool sel;
     s32 on_confirm;

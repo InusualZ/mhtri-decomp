@@ -583,8 +583,9 @@ void bgm_quest_clear_frame(void) {
         work->clear_phase++;
         break;
     case 2: {
+        s32 i;
         s32 stopped = 0;
-        for (s32 i = 0; i < 3; i++) {
+        for (i = 0; i < 3; i++) {
             if (GetStreamStatus(i) == 0) {
                 stopped++;
             }

@@ -926,8 +926,11 @@ extern "C" void em026_act3_lurk(_ENEMY_WORK* self)
         break;
     case 1:
         if ((self->timer_0x020 & 0xF) == 0) {
+            u8 i;
             s32 torch = 0;
             u32 found = 0;
+            u32 max;
+            _PLW* pl;
             struct _AINPC_W* companion = &ainpc_w;
 
             if (companion->active != 0 && self->area_no == companion->field_0x1A4 &&
@@ -936,9 +939,8 @@ extern "C" void em026_act3_lurk(_ENEMY_WORK* self)
             }
             if (torch == 0) {
                 f32 nearest = 800.0f;
-                u32 max = get_move_work_max(2);
-                _PLW* pl = (_PLW*)get_move_work_adrs(2);
-                u8 i;
+                max = get_move_work_max(2);
+                pl = (_PLW*)get_move_work_adrs(2);
 
                 for (i = 0; i < (u16)max; i++, pl++) {
                     if (pl == NULL || pl->slot_active == 0 || em_pl_target_ck(self, pl) == 0) {

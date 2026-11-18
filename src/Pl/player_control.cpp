@@ -358,9 +358,13 @@ _PLW* player_work_array_get(s32 count) {
 /* 0x80267874 - clears every player work and binds it to its network slot and model rig. */
 void init_player_work(void) {
     s32 i;
-    _PLGLOBAL* global = pl_global;
-    _PLW* plw = (_PLW*)get_move_work_adrs(2);
-    u16 max = get_move_work_max(2);
+    u16 max;
+    _PLW* plw;
+    _PLGLOBAL* global;
+
+    global = pl_global;
+    plw = (_PLW*)get_move_work_adrs(2);
+    max = get_move_work_max(2);
 
     if (system_w.field_0x7d3 == 0) {
         for (i = 0; i < max; i++, plw++) {

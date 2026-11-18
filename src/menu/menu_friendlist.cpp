@@ -1168,8 +1168,8 @@ static void friend_card_equip_page_draw(FriendCardView* view, _EQUIP* equip, u8 
 static void friend_card_skills_draw(u16 id, u16* skills) {
     _mh_ivec2_ origin;
     _mh_ivec2_ pos;
-    s32 count;
     s32 i;
+    s32 count;
     s32 ofs;
     u16 skill;
     u32 color;

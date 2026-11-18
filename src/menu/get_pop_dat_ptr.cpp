@@ -1591,8 +1591,8 @@ void lb_room_slot_release(LbRoomWork* work)
 void lb_room_move_open(LbRoomWork* work)
 {
     u16 off_mask = 0;
-    u8 others;
     u8 room;
+    u8 others;
     u8 base;
     u8 count;
     u8 i;

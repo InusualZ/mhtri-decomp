@@ -20,7 +20,9 @@
  * RESIDUALS.
  *  - `lb_award_hunt_bits_count` (89.6) and `lb_award_check_all` (93.6): retail hoists the bit loops' `li rN,2` ctr
  *    counts and the `1` shift base out of the loops into saved registers; ours rebuilds them per loop.
- *  - `lb_scroll_side_stage` (92.0): the `memcpy` targets' registers differ (472 B against 496 B).
+ *  - `lb_scroll_side_stage` (98.3): kinds 1/2 copy only, 5/6/10 take the second-page test and every other kind copies
+ *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
+ *    pointers) where ours hoists the load into r4 (a late `kind = ...` turns the range tests into signed compares).
  *  - `lb_equip_detail_blade_draw` (98.0): retail tests the 15/16 case range with `subi`+`cmplwi`, ours with two
  *    signed compares.  `lb_equip_detail_item_draw` (98.5): retail masks the ternary anchor (`clrlwi r7,r7,16`).
  *  - `lb_award_rows_apply` (98.3), `lb_menu_row_insert` (99.1), `lb_talk_reward_give` (99.1): register order only.
@@ -391,12 +393,11 @@ _EQUIP* lb_scroll_equip_rec_get(LbScrollWork* self, u8 kind) {
 /* Stages `src` on side `page` of the scroll list: its triple of records is filled from the source record, from
  * the player's own set, or from a pair of empty gunner parts. */
 void lb_scroll_side_stage(LbScrollWork* self, _EQUIP* src, u8 page) {
+    _PLW* plw = self->owner_0x34;
     u8 kind = self->kind_0x00;
-
     _EQUIP* a;
     _EQUIP* b;
     _EQUIP* c;
-    _PLW* plw = self->owner_0x34;
 
     if (page == 0) {
         a = &self->base_0x5C[0];
@@ -411,12 +412,11 @@ void lb_scroll_side_stage(LbScrollWork* self, _EQUIP* src, u8 page) {
     switch (kind) {
     case 1:
     case 2:
+        memcpy(a, src, 12);
+        break;
     case 5:
     case 6:
     case 10:
-        memcpy(a, src, 12);
-        break;
-    default:
         if (pl_item_page2_ck(plw) == 1) {
             switch (src->kind) {
             case 11:
@@ -450,6 +450,9 @@ void lb_scroll_side_stage(LbScrollWork* self, _EQUIP* src, u8 page) {
         } else {
             memcpy(a, src, 12);
         }
+        break;
+    default:
+        memcpy(a, src, 12);
         break;
     }
 }

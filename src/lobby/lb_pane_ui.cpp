@@ -7838,11 +7838,11 @@ void lb_dye_inner_draw(LbChgColorWork* self)
 {
     _mh_ivec2_ origin;
     _mh_ivec2_ pos;
-    u32 i;
     u16 count;
     s16 value;
     s32 color;
     s32 selected;
+    u32 i;
     bool active;
 
     get_lsp_data(0x1C61U, &origin);

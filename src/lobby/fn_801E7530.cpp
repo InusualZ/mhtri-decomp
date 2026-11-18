@@ -1616,16 +1616,16 @@ void lb_farm_harvest(LbFarmWork* self)
 {
     LbUserDataView* user;
     IdValue* out;
-    LbFarmPlot* plot;
     const LbFarmHarvestRow* table;
+    s32 base;
     const LbFarmHarvestRow* extra;
     s32 i;
-    s32 base;
-    u8 k;
+    LbFarmPlot* plot;
     s32 j;
     u32 found;
-    u32 tier;
     s16 rolls;
+    u32 tier;
+    u8 k;
     s16 mult;
     u16 rng;
     u8 count;

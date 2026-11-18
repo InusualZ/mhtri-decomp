@@ -2126,8 +2126,11 @@ void pl_ride_move(_PLW* pl) {
     nw4r::math::MTX34 mtx;
     f32 height;
     u32 joint;
-    s32 hit;
+    _ENEMY_WORK* work;
+    EmJointPoints* set;
     u32 i;
+    u8 index;
+    s32 hit;
     f32 lift;
     f32 radius;
     setVector3(&pl->ride_ofs_0x588, 0.0f, 0.0f, 0.0f);
@@ -2136,10 +2139,9 @@ void pl_ride_move(_PLW* pl) {
     lift = 30.0f;
     radius = -60.0f;
     do {
-        u8 index = cache->enemy_index;
+        index = cache->enemy_index;
         if (index != 0xFF) {
-            _ENEMY_WORK* work = &works[index];
-            EmJointPoints* set;
+            work = &works[index];
             if (work->active != 0 && em_pl_target_ck(work, pl) != 0 &&
                 (set = (EmJointPoints*)em_data_word_get(work)) != NULL) {
                 if (pl->field_0x585 != 0 && pl->ride_enemy_0x595 == index &&

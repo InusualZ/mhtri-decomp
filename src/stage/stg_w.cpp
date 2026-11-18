@@ -2164,11 +2164,13 @@ extern "C" void stage_parts_check(StageWork* w, u8 areano)
 {
     StagePartDef** defs = stage_part_defs_get(w, areano);
     u8 j;
+    s16 prev;
+    u8 b;
+    u32 forced;
 
     for (j = 0; j < 4; j++) {
         if (defs[j] != 0) {
-            u8 b = defs[j]->body;
-            u32 forced;
+            b = defs[j]->body;
 
             if (stg_area_flag_ck(areano, j) == 1 && w->bodies[b].active == 1)
                 forced = 1;
@@ -2176,7 +2178,7 @@ extern "C" void stage_parts_check(StageWork* w, u8 areano)
                 forced = 0;
             if (w->areano == w->bodies[b].area) {
                 if ((w->bodies[b].hit != 0 && w->bodies[b].active == 1) || forced == 1) {
-                    s16 prev = w->parts[j].damage;
+                    prev = w->parts[j].damage;
                     if (w->bodies[b].damage >= defs[j]->hp || forced == 1) {
                         w->bodies[b].active = 0;
                         if (forced == 0)

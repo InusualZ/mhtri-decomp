@@ -2836,14 +2836,14 @@ u16 lb_barter_row_price_get(LbBarterWork* work, u16 price, u16 index) {
 /* Fills the five-row page `page` of the current tab: the offer rows the reference table lists (tab 1) or the stock
  * rows that have goods (tab 0), with their prices at the rolled rates in the selling mode. */
 void lb_barter_page_fill(LbBarterWork* work, s16 page) {
-    LbBarterEntry* out = work->page_0x448;
     LbBarterRef* ref;
-    s32 rows;
-    s32 limit;
+    LbBarterEntry* out = work->page_0x448;
+    LbBarterSrc* srcs;
     s16 first;
     s16 last;
+    s32 rows;
+    s32 limit;
     s16 i;
-    LbBarterSrc* srcs;
 
     if (work->tab_0x030 == 0) {
         rows = 5;

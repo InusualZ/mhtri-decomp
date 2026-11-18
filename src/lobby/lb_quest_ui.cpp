@@ -2124,16 +2124,19 @@ void lb_trade_frame_draw(void) {
 void lb_trade_list_draw(LbTradeWork* work) {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    u16 item;
-    s32 box_mark = 0;
-    s32 pouch_mark = 0;
-    bool active = work->state == 2;
     u32* notice;
-    s32 i;
     LbTradeOffer* offer;
-    s32 cursor;
     s32 enabled;
+    s32 cursor;
+    bool active;
+    s32 i;
+    s32 box_mark;
+    s32 pouch_mark;
+    u16 item;
 
+    box_mark = 0;
+    pouch_mark = 0;
+    active = work->state == 2;
     get_lsp_data(0x21B1, &base);
     draw_sprite_anim_ary(lb_trade_list_ids, 5, &base);
     draw_sprite_idx(lb_trade_label_ids[1], &base);

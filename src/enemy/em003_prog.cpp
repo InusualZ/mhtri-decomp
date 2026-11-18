@@ -4853,15 +4853,15 @@ void em003_spawn_rec_set(EmSpawnRec* out, u8 kind, u16 angle_a, u16 angle_b) {
 u8 em003_call_group_pick(_ENEMY_WORK* self) {
     s32 k;
     const Em003CallPair* tbl;
-    u8 pick;
-    s32 count;
     s32 i;
     s32 j;
-    const Em003CallPair* pair;
-    _ENEMY_WORK* work;
+    s32 count;
+    u8 pick;
     const Em003CallPair* work_pair;
+    _ENEMY_WORK* work;
     u32 max;
     EmAreaEntry* entry;
+    const Em003CallPair* pair;
 
     tbl = em003_call_group_tbl;
     count = 0;

@@ -138,11 +138,11 @@
  *   * `fn_8003F58C` 94.05 % - 148 B both. One argument-setup order swap (`mr r5,r3` before `mr r6,r4`) and one
  *     coalesced `lis r9` where retail uses a scratch `r4`; the PCode after peephole-forward already has our
  *     order (mwcc-debugger dump 16), so the spelling of the call does not reach it.
- *   * `fn_8003F730` 96.25 % - 528 B both, 8 ARG rows and nothing else. All of them are the r30/r31 split
- *     between the `arg` parameter and the `_f_bss` base in the `arg != 0` body: retail keeps the argument in
- *     r30 and the base in r31, we do it the other way round (`mr r30,r3` vs `mr r31,r3`). Tried: a
- *     top-of-function `GXRenderModeObj* mode = (GXRenderModeObj*)_f_bss;` local (worse - 81.80 %, the base
- *     is hoisted and a third callee-saved register appears) and a `void*` parameter (no change).
+ *   * `fn_8003F730` 99.66 % - 528 B both, 9 ARG rows and nothing else. The PAL case reads the three mode fields
+ *     back through `Rmode` (retail reloads the global after the store; `GXPal528IntDf.field` here costs a
+ *     third callee-saved register: 97.50 -> 99.66 %); `fn_8003F9E4` keeps the direct spelling (the `Rmode`
+ *     one measures 97.86 there). What is left: the `Rmode = _f_bss` store goes through `r0`/`r4` where retail
+ *     keeps the base in `r3`, and the epilogue's `lbl_80794781` load takes `r3` where retail takes `r4`.
  *   * `fn_8003FC64` 99.58 % - one `lis r4` vs `lis r3` scratch-register choice on the warning-counter base -
  *     the same tie-break the pragma-region move flipped in `screen_aspect_get`/`fn_80040360`, but an off/reset
  *     pair placed at this function does not reach it (97.50 % with the pragma over its own body).
@@ -626,9 +626,9 @@ extern "C" void fn_8003F730(s32 arg)
             lbl_80794784 = 1;
             Rmode = &GXPal528IntDf;
             GXAdjustForOverscan(&GXPal528IntDf, _f_bss, 0, 40);
-            ((GXRenderModeObj*)_f_bss)->xfbHeight = GXPal528IntDf.xfbHeight;
-            ((GXRenderModeObj*)_f_bss)->viYOrigin = GXPal528IntDf.viYOrigin;
-            ((GXRenderModeObj*)_f_bss)->viHeight = GXPal528IntDf.viHeight;
+            ((GXRenderModeObj*)_f_bss)->xfbHeight = Rmode->xfbHeight;
+            ((GXRenderModeObj*)_f_bss)->viYOrigin = Rmode->viYOrigin;
+            ((GXRenderModeObj*)_f_bss)->viHeight = Rmode->viHeight;
             break;
         default:
             OSPanic(_f_data, 749, lbl_8057C82C);

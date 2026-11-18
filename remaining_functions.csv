@@ -621,7 +621,6 @@ size_bytes,unit,function,match_percent,address
 504,Network/net_session_close,onCircleListReceived,99.2064,0x8043390C
 504,hud/cockpit,ainpc_page_cursor_in_box_ck,99.6905,0x802DC568
 504,lobby/lb_companion_ui,lb_s13_slot_list_draw,97.9365,0x8033EDAC
-504,menu/menu_friendlist,friend_card_skills_draw__FUsPUs,99.3254,0x80441108
 504,menu/menu_infomation,weapon_affinity_compare,99.7222,0x80316780
 508,Pl/pl_act,pl_shell_ids_set,98.3071,0x8027AC2C
 508,enemy/em015_prog,em015_rest,98.7402,0x801795FC
@@ -629,8 +628,6 @@ size_bytes,unit,function,match_percent,address
 512,homebutton/hbm_text_panel,hbmKbWidgetUpdate,99.9375,0x8054D9F0
 512,lobby/fn_80212810,lb_seisan_row_flags_get,97.5781,0x80213870
 512,lobby/lb_server_sel_trans,lb_server_select_servers_draw,99.2969,0x803C92A4
-512,sound/fn_800F2A94,bgm_quest_clear_frame,99.6484,0x800F32EC
-516,Pl/player_control,init_player_work__Fv,99.6899,0x80267874
 516,WUD/wud,WUDiUpdateWiiFitSaveData,94.7287,0x804FB360
 516,enemy/em003_prog,em003_call_group_pick,98.6434,0x8015D288
 516,menu/get_pop_dat_ptr,lb_room_move_open,98.0233,0x803C01B4
@@ -640,7 +637,6 @@ size_bytes,unit,function,match_percent,address
 520,homebutton/hkb_keyboard,updateView__15HkbKeyboardBaseFv,84.0154,0x805366D0
 520,hud/cockpit_quest,cockpit_ammo_gauge_draw,99.6923,0x802ECA20
 520,hud/cockpit_quest,cockpit_hunt_log_draw,97.5308,0x802EF424
-520,stage/stg_w,stage_parts_check,99.6539,0x802B11A0
 524,BTE/uusb_ppc,UUSB_Write,99.2366,0x8047A060
 524,ef/eft052,eft052_box_list_draw,98.4733,0x8035A7D8
 524,enemy/em005_act,__sinit_\em005_act_cpp,90.7328,0x801D6FB8
@@ -662,7 +658,6 @@ size_bytes,unit,function,match_percent,address
 540,ef/system_core,loading_disp_reset,99.9852,0x800D0764
 540,enemy/em012_prog,em012_state_ck,99.4741,0x80175E74
 540,homebutton/hbm_kb_child,onPaneEvent__21HbmKbChildPaneHandlerFP12HbmComponentUlP14HbmPaneTrigger,99.4074,0x80556840
-540,lobby/fn_802FA9A0,lb_barter_page_fill,98.1111,0x802FF9BC
 540,lobby/lb_server_sel_trans,lb_server_select_rooms_draw,99.0741,0x803C94A4
 544,enemy/em_common,em_hate_update,98.8382,0x8012B64C
 544,sound/mhchar,mhchar_model_release,94.4338,0x800E26C4
@@ -693,7 +688,6 @@ size_bytes,unit,function,match_percent,address
 584,enemy/em007_act,em007_act7_10,99.9315,0x801D9CE4
 584,lobby/fn_801E7530,lb_daily_menu_roll,93.1781,0x801E9640
 588,DWCi/natneg,DWCi_natNegOnConnect,99.8639,0x80513C30
-588,enemy/enemy_control,pl_ride_move,98.2993,0x80144B5C
 588,lobby/fn_801E7530,lb_goods_slots_draw,97.7211,0x801E80FC
 588,lobby/lb_screen_step,lb_smith_make_page_build,99.3197,0x8035FE04
 592,RSO/runtime,RSORelocateSmallDataSection,99.5608,0x804DABF0

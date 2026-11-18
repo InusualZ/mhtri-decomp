@@ -3046,12 +3046,12 @@ void lb_server_select_rooms_draw(LbServerSelWork* work, bool active)
     s32 top;
     char text[0x20];
     bool picked;
+    s32 color;
     s32 shade;
     s16 i;
     s16 x;
     s16 x2;
     s16 y;
-    s32 color;
     char* name = work->list.views_0x4A4[work->list.cursor_0x49C].name_0x0C;
 
     name = *name != '\0' ? name : NetCtrlWk::getSelectedServerName();

@@ -2225,19 +2225,23 @@ void lb_eqshop_bought_equip(LbEquipShopWork* self)
  * and the box needing room for all of them. */
 void lb_eqshop_armor_page_build(LbEquipShopWork* self, s16 page)
 {
-    LbEftFlagBlock* user = lobby_world_block;
-    u16 free = userdata_equip_box_free_count();
-    s32 first = page * 8;
-    s32 last = first + 7;
-    u8 kind;
+    u16 free;
     u32 need;
-    LbShopGoods* goods;
-    LbIdRow6* table;
     s32 n;
-    s32 idx;
-    u16 id;
     s32 price;
+    s32 first;
+    s32 last;
+    LbEftFlagBlock* user;
+    u8 kind;
+    LbShopGoods* goods;
+    s32 idx;
+    LbIdRow6* table;
+    u16 id;
 
+    user = lobby_world_block;
+    free = userdata_equip_box_free_count();
+    first = page * 8;
+    last = first + 7;
     lb_eqshop_goods_clear(self, page);
     kind = lb_eqshop_armor_kinds[self->category_list_0x044.cursor_0x00];
     self->kind_0x064 = kind;
@@ -3039,9 +3043,9 @@ void lb_eqshop_goods_draw(LbEquipShopWork* self)
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     u16 title = lb_eqshop_goods_titles[self->kind_0x064];
-    s32 active;
-    s32 i;
     const u16* lsp;
+    s32 i;
+    s32 active;
     s32 open;
     s32 sel;
     _SPR_DATA_* spr;
