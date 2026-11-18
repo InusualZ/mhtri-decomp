@@ -2118,7 +2118,7 @@ void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
             marked = 1;
             uv_pair_copy(&mark, &cell);
         }
-        if ((u8)(box->state_0x00 - 1) <= 1U && chk_pointer() == 0 && box->cursor_0x10 == slot) {
+        if ((u8)(box->state_0x00 + 0xFF) <= 1U && chk_pointer() == 0 && box->cursor_0x10 == slot) {
             spr_data_copy((s16*)&cursor_spr, get_lsp_data(0x1304, NULL));
             cursor_spr.pos_0x00.x += cell.x;
             cursor_spr.pos_0x00.y += cell.y;
