@@ -804,7 +804,7 @@ public:
     /* slot +0x118 */ virtual void setTextSink(HkbTextSink* pSink);
     /* slot +0x11C */ virtual void setCursorSink(HkbTextSink* pSink);
     /* slot +0x120 */ virtual void setEnterKeyVisible(u32 bVisible);
-    /* slot +0x124 */ virtual void hideLineFeed();
+    /* slot +0x124 */ virtual void hideLineFeed(s32 bVisible);
     /* slot +0x128 */ virtual void setLanguageKeys(s32 bVisible);
     /* slot +0x12C */ virtual u32 updateComponents();
     /* slot +0x130 */ virtual s32 onKeyRelease(HkbManager* pManager);

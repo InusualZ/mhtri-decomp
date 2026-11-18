@@ -15,6 +15,7 @@
  *    AAN scale factors read as doubles; `.sdata2` 0x8079D3A8..0x8079D3BC are the inverse-DCT constants of the
  *    paired-single routines; the decoder uses the locked cache (`LCStoreData`, `LCQueueWait`, `PPCMfhid2`).
  *    `.bss` 0x8075AFC0 .. 0x8075B110 and `.sbss` 0x807954A0..0x807955C8 are read here only.
+ * FLAGS. THPParseHuffmanTable takes a scoped `#pragma opt_unroll_loops off`.
  * RESIDUALS. `THPVideoDecode` 0x804E1120: the marker switch's compare tree is `cmpwi` where the target has `cmplwi`
  *    (already `cmpi` in the first PCode dump; Wii/1.3 and every GC/Wii MWCC build lower a switch of 8 or more case
  *    labels to a signed tree whatever the selector type, while 7 or fewer keep `cmplwi`; a `u8`, `u32` or cast
@@ -327,6 +328,8 @@ u8 THPParseQuantTable(void)
     return 0;
 }
 
+#pragma push
+#pragma opt_unroll_loops off
 u8 THPParseHuffmanTable(void)
 {
     u8 selector;
@@ -396,6 +399,7 @@ u8 THPParseHuffmanTable(void)
     } while (remaining != 0);
     return 0;
 }
+#pragma pop
 
 void THPBuildLookupTables(void)
 {

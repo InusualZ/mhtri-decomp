@@ -80,7 +80,6 @@
  *  - `fn_802607C4`: the bearing's `addis` is scheduled after the `+0x058` load in retail, and `diff` lives in r4
  *    where ours uses r0;
  *  - `pl_act_weapon_follow_up`: retail scales `variant` before the row (`slwi r4,r30,1` first, `lhax r5,row,idx`);
- *  - `pl_act_paralysis`: the step switch compares `variant` signed (`cmpwi`); a `(s32)` switch scores lower;
  *  - `pl_act_walk`, `pl_act_weapon_thrust`: `fmuls` takes the motion frame first; the division spelling (playbook
  *    151) would pool its own constant instead of the band's `pl_float_0_5`/`pl_float_0_03125`.
  *  - `pl_carry_item_get` returns a halfword in retail (`clrlwi r0,r3,16` before every `0xFFFF` test) where
@@ -9643,13 +9642,13 @@ extern "C" void pl_act_sleep_fall(_PLW* self) {
  * with the paralysis spark every 32 frames for 150 frames (300 with skill 4), each input shake cutting a frame,
  * then recovers into the kind's slot. */
 #pragma optimization_level 4
-extern "C" void pl_act_paralysis(_PLW* self, u32 variant) {
+extern "C" void pl_act_paralysis(_PLW* self, s32 variant) {
     self->field_0x006++;
     switch (self->act_step_0x05) {
     case 0:
         self->act_step_0x05++;
         self->field_0x007 = 0;
-        if (variant <= 1) {
+        if ((u32)variant <= 1) {
             Pl_act_set_motion(self, 0, 0, 1);
         } else {
             Pl_act_set_motion(self, 3, 0, 1);
@@ -9717,7 +9716,7 @@ extern "C" void pl_act_paralysis(_PLW* self, u32 variant) {
         }
         if (--self->field_0x3FA <= 0) {
             self->act_step_0x05++;
-            if (variant <= 1) {
+            if ((u32)variant <= 1) {
                 Pl_chr_set_attr_default(self, 0xCF, 0, 0);
             } else {
                 Pl_chr_set_attr_default(self, 0x102, 0, 0);

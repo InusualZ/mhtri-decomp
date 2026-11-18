@@ -26,6 +26,7 @@
  *   GUESS (from each body and its callers): `eft_res_pool_reset`.
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
  *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
+ * FLAGS. eft_res_files_load takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS.
  *  - `eft_res_file_load`: retail tests the descriptor's size word in r4, ours in r0 (both branches);
  *  - `eft_res_models_spawn`: the texture loop loads the model's +0x118 before its +0x10C link in retail; ours loads
@@ -1376,6 +1377,8 @@ extern "C" void eft_res_load_callback(u8* name, void* data, EftLoadCtx* unused, 
 /* 0x800F7F18 (0x440): requests the load of every file of a descriptor run into the proID slots `ids` names: mode
  * 3 the `efm` models, mode 1 the effect projects, mode 2 the texture projects (mode 0 both of the last two, one
  * descriptor each); an area-tagged request (`flags` low half 2) loads into the area's enemy memory. */
+#pragma push
+#pragma optimization_level 4
 extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* ids) {
     EftControl* ctrl = &eft_control;
     u32 count = 0;
@@ -1541,6 +1544,7 @@ extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* id
         }
     }
 }
+#pragma pop
 
 /* 0x800F8358 (0x2DC): the archive-load callback: files every member of the loaded archive under the proID
  * slot `eft_common_load`'s run reserved for it (searched from the run's first ordinal) and registers it. */

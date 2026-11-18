@@ -18,13 +18,12 @@
  *   `eft050_rolls_school_0`/`_12`.  `CockpitSharedDb` +0x51A4/+0x51A5 are the two dances
  *   picked on screen 13 (`lobby/lb_companion_ui.cpp` copies them to and from `LbScreen13Work::dance_0x016` and hands
  *   the same pair to `ai_npc_pair_values_get`).
+ * FLAGS. eft050_kind_roll takes a scoped `#pragma opt_common_subs off` (retail reloads `tbl->weight` in the loop body).
  * RESIDUALS. 4 partial rows:
  *  - `lb_s13_status_skills_draw`: retail keeps the skill row address as base + offset (`add r25, r29, r30`, frame 0x30)
  *    where ours strength-reduces it to one pointer (frame 0x20); retail reads `lb_s13_status_skill_name_ids` `@sda21`
  *    (a 6-byte table; declaring it `[3]` gives the `@sda21` but scores lower, so the `[6]` spelling stays);
  *  - `eft050_fish_appear`: register assignment only (retail: the shared zero in r31, `work` r30, `self` r29);
- *  - `eft050_kind_roll`: retail reloads `tbl->weight` in both loop bodies (`lwz r0, 0(r3)`) where ours reuses the
- *    condition's load; `optimization_level` 2/3 and `while`/index forms do not reproduce it;
  *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16`; u16/s32 locals and a cast
  *    do not reproduce it.
  *   Data: `.sdata2` (0x50) is byte-identical to the claim; `.data` (0x670: the sprite-id and layout tables, the fish
@@ -1574,6 +1573,8 @@ static inline EftFishRoll* eft050_roll_table(_EFT* self, Eft050Work* work, u8 ma
 }
 
 /* Rolls the fish's kind: the weights of the spot's table summed, a random pick among them. */
+#pragma push
+#pragma opt_common_subs off
 extern "C" u32 eft050_kind_roll(_EFT* self)
 {
     Eft050Work* work = (Eft050Work*)self->work_0x38;
@@ -1664,6 +1665,7 @@ extern "C" u32 eft050_kind_roll(_EFT* self)
     }
     return 0;
 }
+#pragma pop
 
 /* Rolls a kind and shows its model joint (two kinds share a model). */
 extern "C" void eft050_fish_kind_set(_EFT* self, MHchar* model)

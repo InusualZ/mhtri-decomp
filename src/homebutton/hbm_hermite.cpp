@@ -15,6 +15,7 @@
  * SHAPES.    hbmKanaTogglePair tests `other != 0x3000` first; the toggles return `toggled` when it differs; hbmKanaCycle
  *            reads the table element twice and keeps the `else return c;` (retail's two return blocks).
  * SHAPES.    hbmVec4Set takes (y, w, z, x): the parameter order that reproduces retail's register assignment.
+ * FLAGS. hbmKanaToggleDakuten takes a scoped `#pragma opt_propagation off`.
  * RESIDUALS. hbmKanaToggleDakuten: r30/r31 swapped between the parameter and the inlined toggle's result (281
  *            instructions, 81 words differ); local declaration order, a parameter copy and return forms do not move it.
  * RESIDUALS. hbmHermite: same 20-instruction sequence, but retail keeps the quotient in f1 (`fdivs f1,f8,f0`) where
@@ -152,6 +153,8 @@ static inline u16 hbmKanaTogglePair(const HbmKanaPair* pair, u16 c)
 }
 
 /* 0x8055EC3C (0x464): toggles the voiced mark of a kana, first undoing a semi-voiced or small form. */
+#pragma push
+#pragma opt_propagation off
 u16 hbmKanaToggleDakuten(u16 c)
 {
     u16 plain;
@@ -175,6 +178,7 @@ u16 hbmKanaToggleDakuten(u16 c)
     }
     return hbmKanaTogglePair(&hbmKanaDakuten, c);
 }
+#pragma pop
 
 #pragma push
 #pragma auto_inline on

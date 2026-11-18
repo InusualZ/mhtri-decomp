@@ -948,7 +948,6 @@ size_bytes,unit,function,match_percent,address
 964,THP/THPDec,THPParseHuffmanTable,93.278,0x804E19F0
 964,ef/fn_800FD864_fx,fn_800FF8D4,98.7925,0x800FF8D4
 964,enemy/em007_act,em007_model_eft_create,99.5643,0x801E0574
-968,ef/eft050,eft050_kind_roll,99.1322,0x80341F94
 968,lobby/lb_companion_ui,lb_combo_rate_get,99.0496,0x8033AED0
 968,lobby/lb_equip_page,pl_rig_weapon_load,99.8636,0x80223EF0
 972,enemy/em007_act,em007_act7_8,98.9918,0x801D9918
@@ -956,19 +955,15 @@ size_bytes,unit,function,match_percent,address
 976,enemy/enemy_control,em_level_set,99.0287,0x801465A0
 976,menu/get_pop_dat_ptr,lb_name_entry_screen_step,97.9057,0x803BF294
 980,Pl/pl_act,pl_act_enter_raw,99.4694,0x802756F0
-984,sound/mhchar,mhchar_motion_start,99.5732,0x800E0DE0
 988,Pl/pl_coll,coll_wall_slide,99.7571,0x8029208C
 992,Network/PatInterface,handleNetworkState2Binary,88.4718,0x803FF994
 992,enemy/em001_prog,em001_spawn_step,97.4194,0x801493A8
 992,stage/stg_w,stage_parts_seat,98.8306,0x802B0C10
-996,enemy/em_common,em_fly_step,99.9598,0x80135000
 996,enemy/em_kind,fn_8013BE60,98.3133,0x8013BE60
 1004,enemy/em_model,em_roster_spare_draw,95.7888,0x803BA1B4
 1008,hud/lobby_hud,hud_key_table_draw,99.7817,0x803248D4
 1012,Pl/pl_act,pl_weapon_parts_refresh,98.9723,0x802695A4
-1016,enemy/em016_prog,em016_action_select,99.0551,0x80191598
 1020,DWCi/gt2Message,gti2ReceiveMessages,98.451,0x805104B0
-1020,lobby/fn_80219260,lb_npc_talk_screen_open,99.1569,0x8021B94C
 1024,lobby/lb_equip_page,pl_rig_kind0_allow_get,99.7656,0x80225734
 1028,ef/effect,fn_800F9E04,97.5409,0x800F9E04
 1028,lobby/lb_pane_ui,lb_box_top_draw,98.7354,0x801F55B4
@@ -1008,7 +1003,6 @@ size_bytes,unit,function,match_percent,address
 1136,ef/eft016,fn_8010C8F8,82.6373,0x8010C8F8
 1144,ef/eft052,fn_80358B40,97.3182,0x80358B40
 1144,menu/multi_result,lobby_flow_boot_step,81.8147,0x803A168C
-1148,Pl/pl_act_step,pl_act_paralysis,99.3728,0x80258508
 1148,g3d/g3d_scnmdlsmpl,SetAnmObj__Q34nw4r3g3d12ScnMdlSimpleFPQ34nw4r3g3d6AnmObjQ44nw4r3g3d12ScnMdlSimple10AnmObjType,89.4878,0x80080064
 1148,hud/cockpit,cockpit_msg_slot_update,99.2857,0x802DEC18
 1156,NAND/NANDLogging,asyncRoutine,96.4637,0x804C9A70
@@ -1017,7 +1011,6 @@ size_bytes,unit,function,match_percent,address
 1164,DWCi/gt2Message,gti2HandleMessage,96.1512,0x8050FCD0
 1172,WPAD/WPADHIDParser,wpadDecodeDpd,98.6962,0x804F5050
 1176,enemy/em019_ai,em019_act7_jump,99.2687,0x8037CD30
-1184,homebutton/hkb_keyboard,init__11HkbKeyboardFv,99.6622,0x80538D58
 1188,menu/menu_infomation,ammo_table_draw,99.1414,0x80313E24
 1192,MSL_C/strtoul,__strtoull,96.7181,0x80461120
 1192,Network/NetworkSessionStable,send__20NetworkSessionStableFScll,97.5336,0x803D2A9C

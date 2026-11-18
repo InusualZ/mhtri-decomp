@@ -23,6 +23,7 @@
  *   `res_file_handle_copy`, `pl_weapon_alt_form_ck`, `res_node_mtx_id_get`, `vec3_float_copy`, `equip_variant_get`,
  *   `pl_charge_cycle_get`, `anm_chr_result_rot_get`/`_rot_set`/`_mtx_get`/`_mtx_set`, `mtx34_rot_xyz_deg`,
  *   `mhchar_wld_mtx_array_get`, `pl_rig_hair_style_tbls`, `pl_rig_face_style_tbls`.
+ * FLAGS. pl_rig_weapon_load takes a scoped `#pragma opt_lifetimes off`.
  * RESIDUALS. pl_rig_slot_node_map: the `own`/`body` ResNode temporaries take the stack words 0x0C/0x08 where retail has 0x08/0x0C (a
  *   stack-slot order, not a colouring choice; the declaration orders measured the same).
  * RESIDUALS.
@@ -2419,6 +2420,8 @@ void pl_rig_weapon_kind_set(PlSeRig* rig)
 
 /* 0x80223EF0 (0x3C8): Loads sub-model `slot` from equipment file `file_id`, picks its attachment kind, hooks its
  * world callback and maps its dyed material. */
+#pragma push
+#pragma opt_lifetimes off
 void pl_rig_weapon_load(PlSeRig* rig, u8 slot, u8 file_id)
 {
     u32 res;
@@ -2531,6 +2534,7 @@ void pl_rig_weapon_load(PlSeRig* rig, u8 slot, u8 file_id)
         }
     }
 }
+#pragma pop
 #pragma optimization_level reset
 
 /* 0x802242B8 (0x1E0): Re-binds every loaded model's world callback after the actor changed. */

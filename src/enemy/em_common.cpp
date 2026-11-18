@@ -88,6 +88,7 @@
  *   vec3_segment_offset, vec3_segment_offset2, stg_area_ceiling_get, pl_box_point_dist_sq, pl_condition_ck_20000,
  *   em_break_part_data_get, mhchar_mat_hide_set, ef_inst_spawn_joint, em_user_data_items_get, em_char_pose_sync,
  *   eft_em_slot_attach, eft_em_model_fx_spawn (registry proposals)
+ * FLAGS. em_fly_step takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS. em_mot_speed_set: dump 03 `fmuls f1,f33,f32` multiplies the f32 parameter directly; retail's `frsp` + swapped operands is an `f64`
  *   parameter, which the 29-unit prototype (`enemy/em_mot_speed_set.h`) does not allow.  em_delay_act_tick: dump 03 folds the zero index
  *   into `addi r33,r32,0xaf0`; retail keeps `li; mulli` and adds 0xaf0 separately; a one-slot loop and direct indexing measure equal or lower.
@@ -9235,6 +9236,8 @@ extern "C" void em_fly_start(_ENEMY_WORK* self, EmFlyMotions* table)
 
 /* 0x80135000 (0x3E4): steers a flight towards the target: banks into the turn, pitches towards it (unless flag
  * 1), switches between flapping and gliding by the speed; 1 once the target has been passed. */
+#pragma push
+#pragma optimization_level 4
 extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
 {
     nw4r::math::VEC3 to_target;
@@ -9338,6 +9341,7 @@ extern "C" u32 em_fly_step(_ENEMY_WORK* self, u32 flags, EmFlyMotions* table)
     }
     return self->fly_state_0x786 != 0;
 }
+#pragma pop
 
 /* 0x801353E4 (0x14): clears the move vector. */
 extern "C" void em_move_vec_clr(_ENEMY_WORK* self)

@@ -18,11 +18,11 @@
  *   em016_walk_*, em016_swim_*, em016_guard_*, em016_atk_*, em016_sound_*, em016_route_*, em016_demo_*); the SE
  *   programs are named `<species>_se_seq_<sub>`/`_se_alt_seq_<sub>` after the first `state_sub` that plays them,
  *   their records `<table>_rec<N>`; `em017_0x328`'s alert pair and `EmActWork` are this unit's views.
+ * FLAGS. em016_action_select takes a scoped `#pragma optimization_level 4` (the 5/6/8 range test comes out as retail's `subi`+`cmplwi`).
  * RESIDUALS. 5 rows short of 100:
  *  - `em016_frame_em017`: self sits in r31 where retail has r29 (the loop's found/rec/max/i take r31..r27);
  *  - `em016_frame_effect`: retail masks the `calcVecAngX` result (`clrlwi r30,r3,16`), ours keeps the `u16` return
  *    unmasked (scoped `#pragma opt_common_subs off` gives retail's per-test `(u16)(angle + 0x8000)`, size equal);
- *  - `em016_action_select`: retail lowers the `act_id` 5/6/8 case group as a range test (`subi`+`cmplwi`);
  *  - `em016_strafe_point_get`: the selected offset lands in r4 where retail has r3 (`&v` computed late);
  *  - `em016_action_allow_ck`, `em016_swim_rest`: one scratch register coloured differently.
  *  `.ctors` is not emitted: `em016_static_init` is a plain function (a real `__sinit` needs the vector pair
@@ -7523,6 +7523,8 @@ s32 em016_effect_window_ck(_ENEMY_WORK* self, u8 arg1) {
 }
 
 /* Picks the caller's class/state pair from the work's team, map key and action id. */
+#pragma push
+#pragma optimization_level 4
 void em016_action_select(EmActWork* self, u8* out_class, u8* out_state) {
     switch (self->team) {
     case 16:
@@ -7663,6 +7665,7 @@ void em016_action_select(EmActWork* self, u8* out_class, u8* out_state) {
         break;
     }
 }
+#pragma pop
 
 /* Re-arms the action the work's map key and action id select. */
 void em016_action_rearm(EmActWork* self) {

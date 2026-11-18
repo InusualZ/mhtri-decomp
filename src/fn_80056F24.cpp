@@ -22,6 +22,7 @@
  *   screen_fade_alpha_update, draw_sprite_tick, screen_fade_start, screen_fade_ease, game_draw_sinit,
  *   game_draw_state_ctor, draw_sprite_slot_ctor; the GX inline copies `<glare|panel|screen>_gx_<SDK inline>`.
  * FLAGS. `cflags_main`; `#pragma peephole off` for the whole TU (the FIFO writers keep `clrlwi`/`extsh`).
+ * FLAGS. filter_panel_draw takes a scoped `#pragma opt_lifetimes off`.
  * RESIDUALS. The `.sdata2` pool is read through `extern` declarations of the map's rows, so the object emits
  *   no `.sdata2` of its own (target-extra 0x58 B) until the seam is redrawn and each TU emits its own pool.
  * RESIDUALS. `glare_filter_capture`'s unsigned-to-float conversion constant comes from our pool, not the
@@ -561,6 +562,8 @@ extern "C" void filter_panel_reset(void) {
 
 /* 0x800579A4 (0x414): the panel layer: two eight-vertex gradient quads over the upper and (in split-screen)
  * lower half of the screen. */
+#pragma push
+#pragma opt_lifetimes off
 extern "C" void filter_panel_draw(FilterPanel* panel) {
     Mtx44 proj;
     Mtx view;
@@ -672,6 +675,7 @@ extern "C" void filter_panel_draw(FilterPanel* panel) {
         }
     }
 }
+#pragma pop
 
 extern "C" void panel_gx_end(void) {
 }

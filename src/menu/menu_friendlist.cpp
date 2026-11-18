@@ -17,6 +17,7 @@
  *   `friend_card_*`, `card_equip_ids_build`, `page04_*`, `page17_*`, `option_value_step`, `option_value_sprite_draw`,
  *   `option_cursor_draw`, `arena_value_step`, `terms_progress_draw`, the types `FriendPickWork`, `FriendCardView`,
  *   and every foreign name this file spells from the name registry.
+ * FLAGS. movie_page17_draw takes a scoped `#pragma opt_common_subs off`.
  * RESIDUALS.
  *  - `friend_pick_step`: in the friend-request step retail's sub-step 0 jumps forward into sub-step 1's tail and
  *    sub-steps 0/1 into sub-step 2's tail, with five equality compares (0..4) dispatching.  Without a case label
@@ -2147,6 +2148,8 @@ static void terms_progress_draw(_mh_ivec2_* pos) {
 }
 
 /* 0x80443120 (0x434): draws page 17: the rows, their values, the cursor, the progress bar and the help text. */
+#pragma push
+#pragma opt_common_subs off
 void movie_page17_draw(MenuSlot* slot) {
     _mh_ivec2_ pos;
     _mh_ivec2_ at;
@@ -2257,3 +2260,4 @@ void movie_page17_draw(MenuSlot* slot) {
     }
     font_print_ex(pos.x + 24, pos.y + 16, 0, text);
 }
+#pragma pop

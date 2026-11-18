@@ -31,6 +31,7 @@
  *   GUESS (data): em007_turn_seq_0..6, em007_pick_tbl_0/1, em007_se_seq_<sub-state>, em007_se_alt_seq_<sub-state>
  *   and their em007_se_rec/pos records; the types Em007ProgTbl, Em007UserData, Em007EftWork, Em007ModelCopy,
  *   EmUserDataItemView.
+ * FLAGS. em007_act7_8 takes a scoped `#pragma opt_common_subs off`.
  * RESIDUALS. Partial rows (register colouring, scheduling or stack slots only): `em007_act7_8` (the angle's
  *   u16 result is coloured r3, retail keeps it in r27 with the s32 term; the shell call loads its table before the
  *   arguments, retail after), `em007_act9_1` (retail loads the 1.0f gauge argument after `mr r3,r30`, ours before),
@@ -1528,6 +1529,8 @@ extern "C" void em007_act7_6(struct _ENEMY_WORK* self, u8 arg1) {
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
     u32 var_r4;
     u32 var_r28;
@@ -1632,6 +1635,7 @@ extern "C" void em007_act7_8(struct _ENEMY_WORK* self, u8 arg1, u32 arg2) {
         break;
     }
 }
+#pragma pop
 
 extern "C" void em007_act7_10(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 sp14;

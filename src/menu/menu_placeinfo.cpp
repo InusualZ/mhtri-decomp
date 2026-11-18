@@ -27,6 +27,7 @@
  *   GUESS (pages and em003): `placeinfo_award_ck`, `placeinfo_world_draw`, `placeinfo_net_draw`,
  *   `placeinfo_server_info_draw`, `placeinfo_layer_info_draw`, `placeinfo_award_icons`, `em003_call_se_frames`,
  *   `em003_call_se_ids`.
+ * FLAGS. lb_city_select_draw takes a scoped `#pragma opt_loop_invariants off`.
  * RESIDUALS.
  *  - `lb_community_select_step`: retail keeps its page-count tail (pages = total / 8, cursor clamp) in state 8 step 2
  *    and reaches it by backward jumps from step 3 and from six places in states 4 and 3.  No loop can hold step 3
@@ -1569,6 +1570,8 @@ void lb_city_timer_draw(LbCitySelectWork* work) {
 #pragma push
 #pragma optimization_level 4
 /* 0x80439EF8 (0x414): draws the city select's current state. */
+#pragma push
+#pragma opt_loop_invariants off
 void lb_city_select_draw(void) {
     u8 state;
     LbCitySelectWork* work = (LbCitySelectWork*)lobby_w.menu_0xAC;
@@ -1671,6 +1674,7 @@ void lb_city_select_draw(void) {
         break;
     }
 }
+#pragma pop
 #pragma pop
 
 /* 0x8043A30C (0x54): clears the lobby screen work and opens the city screen for player `self` */

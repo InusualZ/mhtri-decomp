@@ -14,6 +14,7 @@
  *    0x80795468/0x8079546C is the init flag and the sequence list head read by 0x804DD430, 0x804DD450 and
  *    0x804DD460; `.sdata2` 0x8079D330..0x8079D350 are the tempo/tick constants of the per-frame runner; the
  *    callers are `sound/snd_stream_reloc.cpp` (init at 0x804DD430, per frame at 0x804DD460).
+ * FLAGS. SEQRunAudioFrame takes a scoped `#pragma opt_propagation off`.
  * RESIDUALS. `SEQRunAudioFrame` 0x804DD460: the .sdata2 pool is created in a different order (target 65536, 96,
  *    signed-int double, 1e6, 32000, unsigned-int double; ours 1e6, 65536, 96, 32000, ...), so seven pool relocations name
  *    other constants; an inline tempo-scale helper leaves it.  The tempo case's variable-length-quantity value is dead
@@ -158,6 +159,8 @@ void SEQQuit(void)
 
 void SEQSetState(SEQSequence* sequence, u32 state);
 
+#pragma push
+#pragma opt_propagation off
 void SEQRunAudioFrame(void)
 {
     SEQTrack* track;
@@ -246,6 +249,7 @@ void SEQRunAudioFrame(void)
         }
     }
 }
+#pragma pop
 
 void SEQSetState(SEQSequence* sequence, u32 state)
 {

@@ -18,6 +18,7 @@
  *   GUESS: `change_color_scale_eff` (0x800F99D4), `eft_water_state_ck` (0x800F9D80: the water-flag legality test).
  *   GUESS (from each body and its callers): `effect_layer_reset`, `eft_rand_unit`, `eft_rand_signed_half`,
  *   `eft_shape_init`.
+ * FLAGS. fn_800F9E04 takes scoped `#pragma opt_propagation off` + `opt_loop_invariants off`.
  * RESIDUALS. 5 partial rows:
  *  - `fn_800F9E04` (-4 B): retail hoists the address of `setMatColor`'s by-value colour copy (`addi r31,r1,8`)
  *    out of the material loop and keeps the loop index in r28, and builds `change_color_eff`'s colour argument
@@ -530,6 +531,9 @@ static inline void eft_color_from_u32(_GXColor* dst, u32 color) {
 #pragma push
 #pragma opt_optimizecontrolflow off
 /* 0x800F9E04 - colour/parameter update for one spawned effect. */
+#pragma push
+#pragma opt_propagation off
+#pragma opt_loop_invariants off
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag) {
     _GXColor out;
     union {
@@ -596,6 +600,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
         break;
     }
 }
+#pragma pop
 
 /* 0x800FA208 - test one effect emitter record against a world position. */
 extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {

@@ -36,7 +36,6 @@
  *   - `mhchar_layer_weight_update`/`mhchar_model_release`: retail hoists the motion-table walk's trip count into
  *     a saved register; ours reloads it (register colouring only).
  *   - `mhchar_motion_layer_set`: retail keeps `layer * 4` in a saved register across the calls (colouring).
- *   - `mhchar_motion_start`: retail rounds the layer-0 frame (`frsp`) before the previous-frame store.
  *   - The `res_file_*`/`nw_*`/`res_anm_chr_ctor`/`frame_ctrl_set_play_policy` callees are registry names; until
  *     they land in the map the relocations read as a name difference.
  */
@@ -561,7 +560,8 @@ extern "C" void mhchar_motion_start(MHchar* chr, nw4r::g3d::AnmObjChrRes* anm, s
         mhchar_layer_frame_range_set(chr, 0, 0, loop, looped);
         self->blend_time = self->blend_timer;
         self->blend->SetWeight(0, 1.0f);
-        self->prev_frame[0] = self->frame[0] = self->blend->GetFrame();
+        self->frame[0] = self->blend->GetFrame();
+        self->prev_frame[0] = self->frame[0];
         self->frame_set = 1;
         self->scn_mdl->SetAnmObj(self->blend, nw4r::g3d::ScnMdlSimple::ANMOBJTYPE_CHR);
     }

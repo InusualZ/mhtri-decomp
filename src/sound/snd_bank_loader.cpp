@@ -23,13 +23,14 @@
  *   Registry names for the band callees: snd_exp_heap, snd_heap_allocator, snd_heap_alloc, snd_heap_free,
  *   snd_chunk_install (quest_snd), snd_stream_buffers_init (fn_800E46E8), snd_audio_init, snd_fx_hooks_set,
  *   snd_output_mode_set (snd_stream_reloc).
+ * FLAGS. pl_weapon_se_bank_load takes a scoped `#pragma optimization_level 4`.
  * RESIDUALS. snd_area_bank_load: dump 03 `lwzx r34,r38,r36` then `add r34,r34,r40` reuses r34 for the table entry and the pointer (coloured r5);
  *   retail loads into r3 and adds into r4 (colouring).
  * RESIDUALS. fn_800F0F9C (692 B): retail's shared load tail sits between the `kind == 1` and `kind == 2` bodies,
  *   case 1 falling into it and case 2 branching back - a `goto` layout; rule 8 forbids it and the conformant shapes
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.
  *   snd_quest_bgm_set: register colouring only (retail keeps the three parameters in r25..r27, ours r27..r29).
- *   pl_weapon_se_bank_load (96.18) and snd_player_banks_load (97.08): register colouring and one scheduled load.
+ *   pl_weapon_se_bank_load (97.77) and snd_player_banks_load (97.08): register colouring and one scheduled load.
  *   snd_area_bank_load, fn_800F06AC, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
  *   retail loads and extends in the handle's own register, the plain s8 load measures worse), snd_area_env_bank_load,
  *   demo_bgm_load: register choice / operand order only.
@@ -956,6 +957,8 @@ extern "C" s32 fn_800EFD88(s32 id, s32 kind)
 }
 
 /* A player slot's files: the `com` pair plus up to three per-EQUIP `whd`s. */
+#pragma push
+#pragma optimization_level 4
 extern "C" void pl_weapon_se_bank_load(_PLW* work)
 {
     char name[0x88];
@@ -1047,6 +1050,7 @@ extern "C" void pl_weapon_se_bank_load(_PLW* work)
     }
     load_file_req(name, snd_wk->whd_ofs[next], *size, (u32)fn_800F0230, 3, args);
 }
+#pragma pop
 
 void title_snd_init(void)
 {

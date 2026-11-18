@@ -34,6 +34,7 @@
  *   `pl_defense_up_mark` (0x8027D6A4), `eft002_pair_spawn` (0x800FBE64), `eft002_model_spawn` (0x800FC1DC),
  *   `eft013_target_set` (0x80107914), `eft020_actor_spawn` (0x80114D28), `pl_sharpness_add` (0x80278674),
  *   `pl_class7_meter_add` (0x8027CA48).
+ * FLAGS. hit_registry_update takes a scoped `#pragma opt_lifetimes off`.
  * RESIDUALS. Every row is written; the partial rows:
  *  - `hit_registry_update`: register permutation (retail keeps the hit in r29 and the NPC record in r31);
  *  - `hit_life_update`: retail reads the second motion pair through a `+4` base register (an unrolled four-entry loop
@@ -356,6 +357,8 @@ extern "C" s32 body_hit_mask_ck(_BODY_W* body, _HIT_W* hit)
 
 /* 0x8029A358 (0x430): the frame's hit pass: resets the targets, counts the body slots' timers down, then pairs every
  * live attack of the registry with the players, enemies, the NPC and the body slots of its area that it has not hit. */
+#pragma push
+#pragma opt_lifetimes off
 extern "C" void hit_registry_update(void)
 {
     _HIT_W* hit;
@@ -460,6 +463,7 @@ extern "C" void hit_registry_update(void)
         }
     }
 }
+#pragma pop
 
 /* 0x8029A788 (0x18): whether bit 15 of the hit's +0x48 word is set. */
 extern "C" u32 hit_flag48_high_ck(_HIT_W* hit)

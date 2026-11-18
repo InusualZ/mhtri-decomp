@@ -20,6 +20,7 @@
  *   `lb_rand_pick_take`'s guarded unroll, `lb_farm_panel_draw`), back at 3 for `lb_farm_grow_marks_update` and
  *   `lb_farm_box_page_draw` (both lose a few bytes at 4); `#pragma opt_unroll_loops off` around `lb_daily_menu_roll`
  *   (retail keeps its 17-row clear as a `mtctr` loop).
+ * FLAGS. lb_hunt_info_draw takes a scoped `#pragma opt_loop_invariants off`.
  * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
  *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B).
  * RESIDUALS. lb_count_add_cap99: dump 03 adds into its own vreg (`add r34,r35,r36`, coloured r0) where retail adds back into r3; ternary, `u16` and
@@ -739,6 +740,8 @@ void lb_goods_sale_draw(LbMenuWork* self)
     }
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 void lb_hunt_info_draw(LbMenuWork* self)
 {
     LbSprData spr;
@@ -824,6 +827,7 @@ void lb_hunt_info_draw(LbMenuWork* self)
     pos.y += anchor.y;
     put_menu_cursor((u16*)lbl_805B7E00, 0, &pos);
 }
+#pragma pop
 
 void lb_hunt_day_copy(LbStrBlock* dst, const LbStrBlock* src)
 {

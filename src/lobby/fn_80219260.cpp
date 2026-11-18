@@ -17,8 +17,9 @@
  *   `lb_menu_row_insert`, `lb_menu_row16_copy`, `lb_cmd_repeat_ready_ck`, `lb_menu_angle_rank_get`,
  *   `lb_menu_actor_angle_get` and the data rows `lb_equip_bg_ids` ... `lb_talk_reward_equips`, `lb_talk_state`;
  *   `lb_title_range_find`/`lb_title_owned_ck` are menu_item_sub's names.
+ * FLAGS. lb_award_check_all and lb_npc_talk_screen_open take a scoped `#pragma optimization_level 4`.
  * RESIDUALS.
- *  - `lb_award_hunt_bits_count` (89.6) and `lb_award_check_all` (93.6): retail hoists the bit loops' `li rN,2` ctr
+ *  - `lb_award_hunt_bits_count` (89.6) and `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
  *    counts and the `1` shift base out of the loops into saved registers; ours rebuilds them per loop.
  *  - `lb_scroll_side_stage` (98.3): kinds 1/2 copy only, 5/6/10 take the second-page test and every other kind copies
  *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
@@ -1310,6 +1311,8 @@ s16 lb_award_hunt_bits_count(LbSaveView* save) {
 }
 
 /* Checks every guild card award not yet earned and sets the ones whose conditions now hold. */
+#pragma push
+#pragma optimization_level 4
 void lb_award_check_all(void) {
     LbSaveView* save = (LbSaveView*)lobby_world_block;
     s32 i;
@@ -1457,6 +1460,7 @@ void lb_award_check_all(void) {
         }
     }
 }
+#pragma pop
 
 /* Returns the title the hunter-rank rows give `value` (the last row whose range holds it), or, past the rank rows,
  * the hunt-count title `value` stands for. */
@@ -1604,6 +1608,8 @@ _EQUIP lb_talk_reward_equips[1] = { { 6, 0, 0x0014, { 0x0011 }, { 0, 0, 0 } } };
 
 /* Ends an NPC talk: advances the NPC's talk cursor, re-picks every NPC's talk entries and opens the screen the
  * NPC's kind runs, or closes the panel. */
+#pragma push
+#pragma optimization_level 4
 void lb_npc_talk_screen_open(void) {
     LbTalkState* state = &lb_talk_state;
     _LB_NPC* npc;
@@ -1759,6 +1765,7 @@ void lb_npc_talk_screen_open(void) {
     }
     lb_panel_close();
 }
+#pragma pop
 
 /* Whether the unlock conditions the bits of `mask` name all fail: bit 0/1 the item-list selection, bits 3-25 a
  * stage of the unlock ladder reached but the next one not, bits 22/26 the whale event's state. */

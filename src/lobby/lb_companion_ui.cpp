@@ -48,8 +48,7 @@
  *    shift; `lb_name_tail_copy`: the word copies' load/store order (dump 03: the word loop is unrolled with one
  *    temporary per load; a struct assignment and pointer-walk spellings measure worse or equal, regsim's r42/r45
  *    temporaries are retail's r5 where ours stay r0);
- *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
- *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
+ *  - `lb_combo_rate_get`: the `get_move_work_adrs` result and the row pointer swap r29/r31 (colouring only);
  *  - `lb_s13_dance_values_draw`: retail keeps the pair index in its own register beside the `lb_s13_value_pairs` base,
  *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
  *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
@@ -1772,7 +1771,7 @@ s8 lb_combo_rate_get(LbComboRecipe* recipe, s32 mode) {
                     count = userdata_pouch_size(1);
                     if (item_pair_index_find(*item, (IdValue*)userdata_pouch_get(lobby_world_block, 1), count) < 0 &&
                         (s32)item_slots_count_sum(*item, lobby_world_block->box_0x180,
-                                                  userdata_box_capacity(lobby_world_block)) <= 0) {
+                                                  (u16)userdata_box_capacity(lobby_world_block)) <= 0) {
                         break;
                     }
                 }

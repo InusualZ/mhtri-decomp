@@ -1749,7 +1749,7 @@ void HkbKeyboard::init() {
     ev.mode = mKeyState.getMode();
     sendEvent(0x12, &ev);
     setEnterKeyVisible(1);
-    hideLineFeed();
+    hideLineFeed(1);
     setLanguageKeys(1);
     getPaneAnim("P_key_SHIFT")->setState(0);
     getPaneAnim("P_key_CAPS")->setState(0);
@@ -2417,7 +2417,7 @@ void HkbKeyboard::setEnterKeyVisible(u32 bVisible) {
 }
 
 /* 0x8053C2B0 (0x1C): Hides the prediction language window. */
-void HkbKeyboard::hideLineFeed() {
+void HkbKeyboard::hideLineFeed(s32 bVisible) {
     setPaneVisible("W_USEU_prdc_lang", 0);
 }
 
