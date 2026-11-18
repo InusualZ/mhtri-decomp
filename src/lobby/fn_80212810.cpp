@@ -956,7 +956,7 @@ u16 lb_seisan_row_flags_get(u16 kind, u16 idx, u8 level)
         flags |= 0x10;
     }
     if (locked == 0 && (u8)equip_kind_table_class(kind) - 1 <= 1U) {
-        u8 cond;
+        u16 cond;
         equip_weapon_recs_find(kind, item, &blade, &gun);
         if (blade != NULL) {
             cond = ((LbBladeView*)blade)->unlock_0x14;

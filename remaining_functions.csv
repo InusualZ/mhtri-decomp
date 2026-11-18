@@ -481,7 +481,6 @@ size_bytes,unit,function,match_percent,address
 436,menu/menu_plsearch,plsearch_page22_draw,96.3119,0x8044DAC4
 440,WPAD/wpad,WPADiSendWriteData,99.9636,0x804F2B60
 440,lobby/fn_802FA9A0,lb_kujira_day_step,97.7182,0x802FF2C0
-440,menu/menu_friendlist,page17_rows_build__FP8MenuSlot,99.9091,0x80442BA8
 444,OS/OSPlayTime,__OSPlayTimeFadeCallback,97.8829,0x804D6A30
 444,ef/eft_slot,eft_slot_arena_state_change,98.1531,0x803482D4
 444,enemy/em_prog_support,lb_screen16_step,97.0721,0x803831B4
@@ -492,7 +491,6 @@ size_bytes,unit,function,match_percent,address
 448,homebutton/tiHKBManager,hkbGuiDrawLine,97.3214,0x8056A478
 448,menu/menu_message,menu_choice_window_draw,98.4196,0x802AA0DC
 448,menu/menu_placeinfo,pig_name_set,99.1518,0x8043CA1C
-452,MSL_C/file_io,_fseek,99.6903,0x8045B1DC
 452,lobby/lb_pane_ui,lb_count_box_draw,99.9557,0x801F5DEC
 452,menu/menu_plsearch,mailbox_reply_draw,99.646,0x8044E108
 456,Network/NetworkSessionStable,moveOutOfBand__20NetworkSessionStableFSc,99.6053,0x803D4690
@@ -508,8 +506,6 @@ size_bytes,unit,function,match_percent,address
 460,ef/effect,fn_800FA5D4,99.9652,0x800FA5D4
 460,ef/eft_res,eft_res_models_spawn,99.8,0x800F93D8
 464,Pl/pl_act,pl_hit_attack_build,97.1897,0x80277974
-464,hud/pl_frame_sync,pl_act_handler_10,96.5517,0x8033280C
-464,hud/pl_frame_sync,pl_act_handler_29,96.5517,0x80334398
 464,lobby/fn_80212810,lb_list_dialog_draw,97.9655,0x80214B30
 464,lobby/lb_equip_page,ExecCallbackB__21LbEquipModelCallbackBFPQ34nw4r3g3d13WorldMtxManipQ34nw4r3g3d6ResMdlPQ34nw4r3g3d16FuncObjCalcWorld,93.9483,0x80229698
 464,menu/menu_placeinfo,place_model_release,92.2845,0x8043CD98
@@ -537,7 +533,6 @@ size_bytes,unit,function,match_percent,address
 488,Pl/pl_act_step,pl_act_stun,99.5082,0x80257E88
 488,enemy/em016_prog,em016_frame_effect,95.9426,0x8018D370
 488,enemy/em_prog_support,lb_spot_save_step,67.9754,0x80383370
-488,font/flfnt,flfntStackReset__Fv,98.3607,0x8005B4C8
 488,hud/layout,window_body_draw,99.3443,0x802E3F28
 488,light/light,light_point_param_get,99.1803,0x802BF818
 488,lobby/lb_npc,fn_802050AC,98.2377,0x802050AC
@@ -553,7 +548,6 @@ size_bytes,unit,function,match_percent,address
 496,lobby/fn_80219260,lb_scroll_side_stage,92.0161,0x80219340
 496,lobby/lb_npc,lb_npc_act_set,95.4839,0x8020A3E4
 496,mh3_pad,pointer_smooth,99.0323,0x80043CB8
-496,sound/snd_bank_loader,snd_area_env_bank_load,99.7581,0x800F1700
 500,DWCi/natneg,DWCi_natNegSetSocket,99.84,0x80512C90
 500,homebutton/hbm_anim_record,updateLabels__12HbmAnimPanelFUsUs,99.6,0x805581C0
 500,menu/menu_plsearch,lb_plsearch_open,99.16,0x8044F530

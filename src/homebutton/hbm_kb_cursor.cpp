@@ -37,8 +37,8 @@
  * RESIDUALS. HbmKbCursorArrows::create: retail's cursor key is 0x2C bytes and its constructor stores no +0x2C word;
  *            homebutton/hbm_value.h's HbmKey is 0x30 with mState at +0x2C set by its constructor (one extra store, and
  *            the allocation is 0x30). The key group's table is __vt__19HbmKbCursorKeyGroup (hbm_value.cpp's row).
- * RESIDUALS. hbmKbCursorCreateMemoKeys hoists the component list's address into a saved register; retail recomputes it
- *            at the append (and keeps `this`/the allocator in r25/r26).
+ * RESIDUALS. hbmKbCursorCreateMemoKeys: only the callee-saved colouring differs (this/allocator r24/r25 against
+ *            retail's r25/r26, loop temporaries rotated by one).
  * RESIDUALS. hbmKbCursorUpdate: the text box button's half-height difference multiplies as `0.5 * d` against retail's
  *            `d * 0.5`, and the button origin's two stack copies sit at other offsets (29 of 631 words).
  * RESIDUALS. hbmKbCursorHandleTouchMessage: stack offsets of the returned origin and the point/line messages differ
@@ -56,6 +56,7 @@
  *            hbmKbCursorArrowGroupNames.
  * RESIDUALS. mwcc-debugger dump, `hbmKbCursorDrawFooter`: regsim 2/2 callee-saved, 2/2 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 18: retail `lfs f0, 0x50(r3)` vs ours `lfs f1, 0x50(r3)`
+ * FLAGS. hbmKbCursorCreateMemoKeys takes a scoped `#pragma opt_loop_invariants off` (same size, raises its row).
  */
 
 #include "types.h"
@@ -1092,6 +1093,8 @@ void hbmKbCursorCreate(HbmCursorInput* self, MEMAllocator* allocator, HbmTextBuf
     self->arrows->create(allocator, self->manager()->mpResAccessor);
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x80567014 (0x1F0): Creates the memo's body and portrait keys with their animations and lists them in the pane
  * manager. */
 void hbmKbCursorCreateMemoKeys(KbObject* self, MEMAllocator* allocator)
@@ -1118,6 +1121,7 @@ void hbmKbCursorCreateMemoKeys(KbObject* self, MEMAllocator* allocator)
         }
     }
 }
+#pragma pop
 
 void* fn_80567004(KbObject* self, void* value)
 {

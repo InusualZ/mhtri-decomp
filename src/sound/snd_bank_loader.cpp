@@ -48,6 +48,7 @@
  * RESIDUALS. demo_bgm_ready_ck: regsim is EXACT for the saved set; retail emits `li r29,0` before `li
  *            r31,demo_stream_slot@sda21`, ours the reverse (two constant vregs, instruction order).
  * FLAGS. snd_player_banks_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
+ * FLAGS. snd_area_env_bank_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  */
 
 #include "types.h"
@@ -1616,6 +1617,8 @@ extern "C" void se_slot_req(s32 id)
 
 const char* lbl_80791638[2] = {"M_TOWN_00", "M_MURA_00"};
 
+#pragma push
+#pragma optimization_level 4
 /* The quest map's `whd`/`tsb` pair, or the two demo movie streams. */
 extern "C" void snd_area_env_bank_load(u8 arg0, u8 arg1, u8 arg2)
 {
@@ -1652,6 +1655,7 @@ extern "C" void snd_area_env_bank_load(u8 arg0, u8 arg1, u8 arg2)
     sprintf(name, "16/tsb/%s.tsb", lbl_80791638[arg0 - 0x15]);
     load_file_req(name, snd_wk->tsb_ofs[0x2E], snd_wk->tsb_size[0x2E], (u32)fn_800F0230, 3, args);
 }
+#pragma pop
 
 void title_se_load(void)
 {

@@ -52,6 +52,7 @@
  * SHAPES. `lb_screen26_trade_commit` declares `roll`, `sum`, `pick`, `i` and assigns them in statements (split
  *            initialisers, regsim plan order).
  * FLAGS. lb_screen26_trade_tabs_draw takes a scoped `#pragma opt_strength_reduction off` (same size, raises its row).
+ * FLAGS. lb_server_select_types_draw and lb_server_select_servers_draw take a scoped `#pragma optimization_level 4` (same size, raises both rows).
  */
 
 
@@ -2931,6 +2932,8 @@ void lb_server_select_type_info_draw(LbServerSelWork* work, s16 index)
     font_print_ex(x + 20, 0x62, 0, (s8*)work->list.rows_0x00C[index].description_0x12);
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x803C8F94 (0x1E0): draws the server type list with each type's server count. */
 void lb_server_select_types_draw(LbServerSelWork* work, bool active)
 {
@@ -2969,6 +2972,7 @@ void lb_server_select_types_draw(LbServerSelWork* work, bool active)
         y += 0x1A;
     }
 }
+#pragma pop
 
 /* 0x803C9174 (0x44): draws the screen's title from lobby string `str`. */
 void lb_server_select_title_draw(u16 str)
@@ -3002,6 +3006,8 @@ void lb_server_select_help_draw(LbServerSelWork* work)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x803C92A4 (0x200): draws the server list of the picked type with each server's population. */
 void lb_server_select_servers_draw(LbServerSelWork* work, bool active)
 {
@@ -3043,6 +3049,7 @@ void lb_server_select_servers_draw(LbServerSelWork* work, bool active)
         y += 0x1A;
     }
 }
+#pragma pop
 
 /* 0x803C94A4 (0x21C): draws the room list of the picked server with each room's population. */
 void lb_server_select_rooms_draw(LbServerSelWork* work, bool active)

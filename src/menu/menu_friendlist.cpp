@@ -27,9 +27,6 @@
  *    spelling 99.66; sub-steps 0/1 merged with sub-step 2's tail repeated 95.81; every tail repeated 92.28.
  *  - `movie_page04_draw`: retail reloads `row->page_kind` after each call in the value switch; MWCC keeps it in a
  *    saved register.
- *  - `page17_rows_build` matches only with `#pragma opt_strength_reduction off` (retail indexes the option tables with
- *    the sign-extended row index each pass; the pragma over the whole file costs three rows); the
- *    `page17_value_max` address takes its `add` operands in the other order.
  *  - `movie_page04_draw`, `movie_page04_split_draw`, `movie_page17_draw`, `friend_card_equip_page_draw`,
  *    `friend_card_confirm_draw`: retail clears the loop counter between the table call and the copy of its result
  *    (`bl`, `li i,0`, `mr`); MWCC puts the `li` before the call or after the copy, whichever statement order is used.
@@ -38,6 +35,7 @@
  *  - `option_cursor_draw`: retail compares the value state before materialising 0xFFFF (`cmpwi` first); MWCC schedules
  *    the compare after it in every spelling tried (if/else, ternary, int locals).
  * FLAGS. `friend_pick_step` takes a scoped `#pragma opt_propagation off` (size unchanged, raises its row).
+ * FLAGS. page17_rows_build takes a scoped `#pragma opt_loop_invariants off` (same size, row 100 %).
  */
 
 #include "types.h"
@@ -1984,6 +1982,8 @@ static void page17_transfer_set(u8 row, u8 value) {
 
 /* 0x80442BA8 (0x1B8): fills page 17's rows of the page. */
 #pragma opt_strength_reduction off
+#pragma push
+#pragma opt_loop_invariants off
 static void page17_rows_build(MenuSlot* slot) {
     MenuEntry* row;
     s16 index;
@@ -2043,6 +2043,7 @@ static void page17_rows_build(MenuSlot* slot) {
         }
     }
 }
+#pragma pop
 
 #pragma opt_strength_reduction reset
 /* 0x80442D60 (0x1D4): steps page 17: the option rows and the transfer rows. */

@@ -32,7 +32,6 @@
  *     range tests on 17..19 and 1..2; `pos.y`'s load is scheduled before the 0.5f multiply.
  *   - `pl_act_handler_11`/`_21` (+24 B): retail shares one `pl_act_enter` block between the gauge-empty exit and
  *     the finisher exit (a jump back into the earlier branch); with no `goto` the two exits are two calls.
- *   - `pl_act_handler_10`/`_29`: the shell table pointer loads before `mr r3`/`li r4` (retail after).
  *   - `pl_act_attr_stage_set`: retail narrows the merged motion with `clrlwi` before `Pl_chr_set_attr_default`.
  *   - `em_net_send_count` (r0/r3 swap), `em_net_parts_pack`/`_unpack` (the part index re-derived into r0),
  *     `em_net_recv_target` (three temporaries' stack slots).
@@ -54,6 +53,7 @@
  *   - `pl_act_handler_11`/`_21` measured: a single `pl_act_enter` after an if/else with `return` exits is 24 B worse in
  *     both rows than the two calls.
  * FLAGS. `eft_frame_state_step` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
+ * FLAGS. pl_act_handler_10 and pl_act_handler_29 take a scoped `#pragma opt_common_subs off` (same size, both rows 100 %).
  */
 
 #include "types.h"
@@ -1513,6 +1513,8 @@ void pl_act_handler_09(_PLW* plw) {
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x8033280C (0x1D0): the shot act on motion slot 0: spawns the shot at its frame. */
 void pl_act_handler_10(_PLW* plw, s32 variant) {
     VEC3 pos;
@@ -1550,6 +1552,7 @@ void pl_act_handler_10(_PLW* plw, s32 variant) {
         break;
     }
 }
+#pragma pop
 
 /* 0x803329DC (0x284): the repeating combo act on motion slot 0. */
 void pl_act_handler_11(_PLW* plw, s32 variant) {
@@ -2230,6 +2233,8 @@ void pl_act_handler_28(_PLW* plw) {
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x80334398 (0x1D0): the shot act on motion slot 3. */
 void pl_act_handler_29(_PLW* plw, s32 variant) {
     VEC3 pos;
@@ -2267,6 +2272,7 @@ void pl_act_handler_29(_PLW* plw, s32 variant) {
         break;
     }
 }
+#pragma pop
 
 } /* extern "C" */
 

@@ -2656,7 +2656,7 @@ void lb_kujira_day_step(void) {
     LbKujiraWork* work = &lobby_world_block->work_0x4832;
     s32 step;
     u8 n;
-    s32 i;
+    s16 i;
     u8 lo;
     u8 hi;
     s8 cur;

@@ -606,7 +606,7 @@ extern "C" void hbmTextPutChar(HbmTextBuffer* self, u16 ch) {
     u16 chars[5];
     u32 first;
     u32 second;
-    u32 count;
+    s8 count;
     u8 i;
 
     if (ch == 0xFFFE) {

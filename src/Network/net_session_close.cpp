@@ -64,6 +64,7 @@
  *            first divergence insn 7: retail `mr r31, r3` vs ours `mr r29, r3`
  * RESIDUALS. mwcc-debugger dump, `sendProfileHead`: regsim 6/6 callee-saved, 11/11 volatile (EXACT); first
  *            divergence insn 19: retail `slwi r4, r0, 24` vs ours `slwi r0, r0, 24`
+ * FLAGS. onCircleListReceived takes a scoped `#pragma opt_common_subs off` (same size, raises its row).
  */
 
 #include "Network/net_session_close.h"
@@ -916,6 +917,8 @@ NetworkSessionCircleList* getCircleList(NetworkSessionManagerPat* manager)
     return &manager->circleList_AF0;
 }
 
+#pragma push
+#pragma opt_common_subs off
 /*
  * The circle list arrived (session command 39): copies every circle into its profile record (id, name, address,
  * size, options, comment and labels), then marks the list read.
@@ -980,6 +983,7 @@ void onCircleListReceived(s32 status, s32* values)
     }
     work->flag_0x82C4 = 2;
 }
+#pragma pop
 
 /*
  * Requests the circle list (session command 39); 0 when there is no session manager or a request is busy.

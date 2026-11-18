@@ -6268,7 +6268,7 @@ void em016_action_dispatch(_ENEMY_WORK* self) {
 void em016_frame_effect(_ENEMY_WORK* self) {
     VEC3 sp8;
     MTX34 sp18;
-    u16 ang;
+    s16 ang;
 
     if (em_alt_mode_ck_c1(self) != 0) {
         ang = calcVecAngX(&self->vec_0x76C);

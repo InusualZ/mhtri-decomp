@@ -25,7 +25,7 @@
  *   take r31/r30 swapped.  flfntDrawText: the second ASCII test re-reads wide_mode (retail jumps straight to
  *   the glyph path).  flfntColorPuts: retail keeps the `extsb` of both colour digits.  font_print_typed: the
  *   multibyte-next '\n' test branches to the '~' test (retail: straight to the newline block).
- *   flfntStackReset: the inner loop count `li r0,0x20` is not hoisted.  font_str_char_count: the byte and
+ *   font_str_char_count: the byte and
  *   `two` swap r4/r5.
  * RESIDUALS. font_str_char_count: regsim aims `two` (r35) at r4 and the @1828 temp at r5, ours the reverse;
  *            declaration permutations do not reach it.
@@ -35,6 +35,7 @@
  *            divergence insn 20: retail `ble 0xb2c` vs ours `<DIFF_DELETE>`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `flfntDrawText`: regsim 3/4 callee-saved, 6/6 volatile, best plan cost 0; first
  *            divergence insn 30: retail `bne 0xe14` vs ours `bne 0xdfc`; size differs from retail (308 B vs 316 B)
+ * FLAGS. flfntStackReset takes a scoped `#pragma optimization_level 4` (row 100 %).
  */
 
 #pragma peephole off
@@ -267,6 +268,8 @@ extern "C" void flfnt_frame_reset(void)
     state->size_x = 24;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x8005B4C8 (0x1E8): empties both layers' quad queues and the glyph cell cache. */
 void flfntStackReset(void)
 {
@@ -295,6 +298,7 @@ void flfntStackReset(void)
     state->field_0x15080 = 0;
     state->glyph_cur = state->glyphs[state->layer];
 }
+#pragma pop
 
 /* --- the font/debug-print accessors ---------------------------------------------------------------- */
 

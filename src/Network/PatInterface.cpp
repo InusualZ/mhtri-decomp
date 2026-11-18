@@ -105,6 +105,7 @@
  * RESIDUALS. mwcc-debugger dump, `sendReqLoginInfo`: regsim 3/3 callee-saved, 11/11 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 20: retail `li r0, 0x9` vs ours `li r30, 0x3`
  * FLAGS. recvAnsAgreementPageInfo takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
+ * FLAGS. pushStack takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  */
 
 #include "types.h"
@@ -572,6 +573,8 @@ u8* createStack(NetworkStateMachine* self, u32 size, u32* outSize)
 }
 
 #pragma pool_data off
+#pragma push
+#pragma optimization_level 4
 /* Takes `size` bytes off the call stack, first padding its top to a multiple of `*align` (the padding comes back in
  * `*align`); the granted size (at most what is free) comes back in `outSize`.  NULL when nothing can be taken. */
 u8* pushStack(NetworkStateMachine* self, u32 size, u32* outSize, u32* align)
@@ -615,6 +618,7 @@ u8* pushStack(NetworkStateMachine* self, u32 size, u32* outSize, u32* align)
     self->stackFree_8BD8 = self->stackFree_8BD8 - (*outSize + *align);
     return block;
 }
+#pragma pop
 #pragma pool_data reset
 
 /* Gives `size` bytes back to the call stack (at most what is in use). */

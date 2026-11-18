@@ -15,6 +15,7 @@
  *    nothing in the data proves the seams.
  * SHAPES. the stream record is a bitfield pair (`FileModes`, `FileState`) read through 32-bit loads; `__fwrite`
  *    copies into the buffer in chunks and flushes on a newline for line-buffered streams.
+ * FLAGS. _fseek takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
  */
 #include "MSL_C/file_io.h"
 #include "MSL_C/errno.h"
@@ -267,6 +268,8 @@ s32 ftell(FILE* file)
     return _ftell(file);
 }
 
+#pragma push
+#pragma opt_propagation off
 s32 _fseek(FILE* file, u32 offset, s32 mode)
 {
     u32 position = offset;
@@ -309,3 +312,4 @@ s32 _fseek(FILE* file, u32 offset, s32 mode)
     }
     return 0;
 }
+#pragma pop
