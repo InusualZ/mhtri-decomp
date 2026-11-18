@@ -1,8 +1,12 @@
 /* sound/snd_voice_pool.cpp - the sound table object and its pool destructors
  *
- * `.text` 0x800ED780..0x800EE014, 23 functions written (the rest of the range is not decompiled yet).
- * Name is a GUESS: the unit owns `lbl_8069A8E8` (0x6828 B `.bss`, the table `snd_bank1_install`/`fn_800EDD00` install into) and `dtor_800ED780`/`dtor_800ED7EC`.
+ * `.text` 0x800ED780..0x800EE014, 27 functions written (the rest of the range is not decompiled yet).
+ * Name is a GUESS: the unit owns `lbl_8069A8E8` (0x6828 B `.bss`, the table `snd_bank1_install`/`snd_bank1_install_idx` install into) and `dtor_800ED780`/`dtor_800ED7EC`.
  * Each function keeps the `#pragma` state it had in its retired source.
+ * RESIDUALS. flipcheck (not READY): the source's definition order is not the address order (.text is a permutation of
+ *            the target's); `.data` 0x18 is claimed but not emitted; extab/extabindex differ (0x98 against 0xD4; the pool
+ *            destructors' unwind records); `lbl_8069A8E8` (.bss, referenced from fn_800E46E8.o) is not defined here;
+ *            `dtor_800ED780` is force-active in retail's .comment and unreferenced in the link.
  */
 
 #include "types.h"
@@ -32,6 +36,10 @@ public:
     virtual ~SndVoicePlayer();
     virtual void update(SndNode2* node);
     virtual u32 release(SndNode2** link);
+    virtual void bankInstall0(SndNode2* node);
+    virtual void bankInstall1(SndNode2* node);
+    virtual void bankInstall2(SndNode2* node);
+    virtual void bankInstall3(SndNode2* node);
 }; /* size: 0x4 (the interface view: the table pointer at +0x00) */
 
 #pragma peephole off
@@ -228,6 +236,87 @@ extern "C" void snd_voice_pool_frame_update(struct StreamWork* table)
         } else {
             player->update(node);
             node = (SndNode2*)snd_voice_next(node);
+        }
+    }
+}
+
+/* Hands every voice of `kind` to the player's bank-1 slot (the stream manager for kind 2, else the sound
+ * object). */
+extern "C" void snd_bank1_install(struct StreamWork* table, s32 kind)
+{
+    SndVoicePlayer* player;
+    SndNode2* node;
+
+    if (kind == 2) {
+        player = (SndVoicePlayer*)stream_mgr_get();
+    } else {
+        player = (SndVoicePlayer*)snd_obj_get();
+    }
+    for (node = (SndNode2*)snd_voice_first((SndVoiceMgr*)table);
+         snd_voice_list_end_ck((SndPool2*)table, node) != 1;
+         node = (SndNode2*)snd_voice_next(node)) {
+        if (node->field_0x19 == kind) {
+            player->bankInstall1(node);
+        }
+    }
+}
+
+/* Hands the voices of `kind` whose index byte is `idx` to the player's bank-1 slot. */
+extern "C" void snd_bank1_install_idx(struct StreamWork* table, s32 kind, u32 idx)
+{
+    SndVoicePlayer* player;
+    SndNode2* node;
+
+    if (kind == 2) {
+        player = (SndVoicePlayer*)stream_mgr_get();
+    } else {
+        player = (SndVoicePlayer*)snd_obj_get();
+    }
+    for (node = (SndNode2*)snd_voice_first((SndVoiceMgr*)table);
+         snd_voice_list_end_ck((SndPool2*)table, node) != 1;
+         node = (SndNode2*)snd_voice_next(node)) {
+        if (node->field_0x19 == kind && node->field_0x1A == idx) {
+            player->bankInstall1(node);
+        }
+    }
+}
+
+/* Hands every voice of `kind` to the player's bank-2 slot. */
+extern "C" void snd_bank2_install(struct StreamWork* table, s32 kind)
+{
+    SndVoicePlayer* player;
+    SndNode2* node;
+
+    if (kind == 2) {
+        player = (SndVoicePlayer*)stream_mgr_get();
+    } else {
+        player = (SndVoicePlayer*)snd_obj_get();
+    }
+    for (node = (SndNode2*)snd_voice_first((SndVoiceMgr*)table);
+         snd_voice_list_end_ck((SndPool2*)table, node) != 1;
+         node = (SndNode2*)snd_voice_next(node)) {
+        if (node->field_0x19 == kind) {
+            player->bankInstall2(node);
+        }
+    }
+}
+
+/* Hands every voice of `kind` to the player's bank-3 slot. */
+extern "C" void snd_bank3_install(struct StreamWork* table, s32 kind)
+{
+    SndVoicePlayer* player;
+    SndNode2* node;
+
+    if (kind == 2) {
+        player = (SndVoicePlayer*)stream_mgr_get();
+    } else {
+        player = (SndVoicePlayer*)snd_obj_get();
+    }
+    for (node = (SndNode2*)snd_voice_first((SndVoiceMgr*)table);
+         snd_voice_list_end_ck((SndPool2*)table, node) != 1;
+         node = (SndNode2*)snd_voice_next(node)) {
+        if (node->field_0x19 == kind) {
+            player->bankInstall3(node);
         }
     }
 }

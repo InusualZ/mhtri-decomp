@@ -54,8 +54,7 @@
  *    `bge`/`b` pair around the minimum (regsim exact; ternary, `return value` pair and `>=` select spellings measure
  *    the same or worse); `fn_801EDA9C`: the box capacity's `clrlwi` scheduled late; `fn_801ED184` (the `db` temporary and `count` swap r30/r31; regsim's plan needs a named local for the unnamed
  *    `lobby_world_block` load and measures equal), `fn_801ED464` (the `id`/`limit` pair swaps r30/r31; regsim's EXACT plan needs the callee-result temporary `mr r41,r3` as a named local),
- *    `fn_801F86FC` (retail keeps the `flags` pointer in
- *    r30), `fn_801FB364` (frame 0x30 against 0x20 with the same local offsets), `lb_count_box_draw` (one `mr` source).
+ *    `fn_801FB364` (frame 0x30 against 0x20 with the same local offsets), `lb_count_box_draw` (one `mr` source).
  *   Data: the `.sdata` tables the code reads are defined here in address order (0x80791C58-0x80791C68 in the panes band,
  *   0x80791C70-0x80791D40 in the page band); `.sdata2` is the compiler's pool (0.0f and the signed int-to-float
  *   constant, 16 bytes like the target; the map names them `lb_icon_frame_z` and `lbl_80799878`); the `.data` tables
@@ -6936,7 +6935,7 @@ void lb_equip_set_pane_draw(::LbEquipPane* self, u32 id_a, void* page_b, u32 id_
 
 /* 0x801F86FC - set one icon record: copy the world's row for the id, or clear and label it when the id
  * is the "none" marker, then OR the record's bit into the caller's flag word. */
-void fn_801F86FC(LbIconRec* recs, u32 id, u32 sel, u32 kind, u32 mode, u16* flags)
+void fn_801F86FC(LbIconRec* recs, u32 id, u8 sel, u32 kind, u32 mode, u16* flags)
 {
     LbIconRec* src = lobby_world_block->entries_0x0E00;
     LbIconRec* rec;
@@ -6947,7 +6946,7 @@ void fn_801F86FC(LbIconRec* recs, u32 id, u32 sel, u32 kind, u32 mode, u16* flag
     } else {
         rec = &recs[(u8)kind];
         memset(rec, 0, sizeof(LbIconRec));
-        rec->kind_0x00 = (u8)sel;
+        rec->kind_0x00 = sel;
     }
     if ((u8)mode == 1) {
         *flags |= (u16)(1 << (u8)kind);

@@ -4,6 +4,7 @@
  *
  * RANGE. .text 0x8045B598..0x8045B9D8 (8 functions in the map, 0x440 B).
  * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi`.
+ * FLAGS. `__copy_longs_aligned` takes a scoped `#pragma opt_lifetimes off` (same size, 97.23 -> 97.34).
  * NAMES. file name GUESS (MSL `mem`); `memcpy` and `memset` are registered separately
  *    (`Runtime.PPCEABI.H/memcpy.c`, `memset.c`).
  * EVIDENCE. call-graph closure: `memmove` calls the four `__copy_longs` helpers, nothing else calls them; no data.
@@ -122,6 +123,8 @@ int memcmp(const void* a, const void* b, u32 n)
     return 0;
 }
 
+#pragma push
+#pragma opt_lifetimes off
 static void __copy_longs_aligned(u8* dst, const u8* src, u32 n)
 {
     u32 i = (-(u32)dst) & 3;
@@ -172,6 +175,7 @@ static void __copy_longs_aligned(u8* dst, const u8* src, u32 n)
         } while (--n != 0);
     }
 }
+#pragma pop
 
 static void __copy_longs_rev_aligned(u8* dst, const u8* src, u32 n)
 {

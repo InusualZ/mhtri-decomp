@@ -19,8 +19,9 @@
  *   `lb_title_range_find`/`lb_title_owned_ck` are menu_item_sub's names.
  * FLAGS. lb_award_check_all and lb_npc_talk_screen_open take a scoped `#pragma optimization_level 4`.
  * FLAGS. `lb_screen07_step` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
+ * FLAGS. `lb_award_hunt_bits_count` takes a scoped `#pragma optimization_level 4` (98.4; same size).
  * RESIDUALS.
- *  - `lb_award_hunt_bits_count` (89.6) and `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
+ *  - `lb_award_hunt_bits_count` (98.4) and `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
  *    counts and the `1` shift base out of the loops into saved registers; ours rebuilds them per loop.
  *  - `lb_scroll_side_stage` (98.3): kinds 1/2 copy only, 5/6/10 take the second-page test and every other kind copies
  *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
@@ -1292,6 +1293,8 @@ void lb_award_progress_ck(LbSaveView* save, s16 award) {
     userdata_award_bit_set(save, award);
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Counts the set bits of the save block's 64 hunt-bit bytes. */
 s16 lb_award_hunt_bits_count(LbSaveView* save) {
     s16 count = 0;
@@ -1310,6 +1313,7 @@ s16 lb_award_hunt_bits_count(LbSaveView* save) {
     }
     return count;
 }
+#pragma pop
 
 /* Checks every guild card award not yet earned and sets the ones whose conditions now hold. */
 #pragma push

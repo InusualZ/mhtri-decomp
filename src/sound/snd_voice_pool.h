@@ -14,11 +14,11 @@ extern "C" {
 void snd_voice_free(SndNode2* list, SndNode2* node);
 void* snd_voice_first(SndVoiceMgr* self);
 void snd_voice_pool_frame_update(struct StreamWork* table);
-void snd_bank1_install(struct StreamWork* table, u32 id);
-void fn_800EDD00(void* table, u32 id, u32 idx);
-void snd_bank2_install(struct StreamWork* table, u32 id);
-void snd_bank3_install(struct StreamWork* table, u32 id);
-extern u8 lbl_8069A8E8[0x6828]; /* the sound table `snd_bank1_install`/`fn_800EDD00` install into */
+void snd_bank1_install(struct StreamWork* table, s32 kind);
+void snd_bank1_install_idx(struct StreamWork* table, s32 kind, u32 idx);
+void snd_bank2_install(struct StreamWork* table, s32 kind);
+void snd_bank3_install(struct StreamWork* table, s32 kind);
+extern u8 lbl_8069A8E8[0x6828]; /* the sound table `snd_bank1_install`/`snd_bank1_install_idx` install into */
 #ifdef __cplusplus
 }
 #endif

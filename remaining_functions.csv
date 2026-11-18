@@ -82,7 +82,6 @@ size_bytes,unit,function,match_percent,address
 120,ef/fn_8030681C,eft042_dispatch,96.0,0x80306FF0
 120,enemy/enemy_control,emc_status_report,99.6667,0x8014450C
 120,homebutton/hbm_hermite,hbmToWideChar,0.0,0x8055EAF0
-120,lobby/fn_801E0ADC,lb_goods_hold_give,96.1667,0x801E732C
 120,lobby/lb_quest_screen,quest_arena_key_set,99.0,0x803A92C4
 120,menu/menu_message,menu_scroll_init,95.0,0x802A92F0
 124,lobby/fn_80212810,lb_scene_npc_refresh,99.6774,0x802178B8
@@ -103,7 +102,6 @@ size_bytes,unit,function,match_percent,address
 144,NHTTP/NHTTP_util,NHTTPi_strtonum,99.7222,0x805172FC
 144,homebutton/hkb_keyboard,findCommandByName__15HkbKeyboardBaseFPCc,93.3333,0x805368E4
 148,Pl/pl_act,pl_parts_set,93.6487,0x80269474
-148,enemy/em_common,em_delay_act_set,92.7568,0x80128274
 148,fn_8004CAD8,userdata_size_records_update,98.1081,0x8004E4D4
 148,lobby/lb_companion_ui,lb_act_best_keep,99.5946,0x803399B4
 148,main,fn_8003F58C,90.8108,0x8003F58C
@@ -124,7 +122,6 @@ size_bytes,unit,function,match_percent,address
 164,DWCi/gt2Connection,gti2AcceptConnection,89.4146,0x8050D940
 164,Pl/pl_act,Pl_chr_set_attr__FP4_PLWUsllUl,95.1219,0x8026A0D4
 164,ai/ai_npc,fn_802D66B8,99.7561,0x802D66B8
-164,ef/eft_res,eft_pro_slot_find_kind,85.0732,0x800F6AC8
 164,lobby/lb_quest_screen,note_trade_route_draw,98.5366,0x803A7208
 164,userdata_item,userdata_equip_box_add,99.7561,0x8004C5BC
 168,BTE/rfc_ts_frames,rfc_send_test,93.5714,0x8049DF6C
@@ -135,7 +132,7 @@ size_bytes,unit,function,match_percent,address
 168,quest/arenatask,arena_light_init,99.8809,0x80446B8C
 172,MSL_C/mem,__copy_longs_rev_unaligned,95.3488,0x8045B92C
 172,NHTTP/NHTTP_request,NHTTPi_SocSend,95.3488,0x80516B2C
-172,NHTTP/NHTTP_util,NHTTPi_containsString,85.814,0x8051738C
+172,NHTTP/NHTTP_util,NHTTPi_containsString,93.8372,0x8051738C
 172,Pl/pl_act,fn_8026A178,95.3488,0x8026A178
 172,ef/effect,effect_layer_reset,99.7674,0x800F9628
 172,enemy/fn_802F5138,em032_area_attacker_ck,94.0233,0x802F548C
@@ -147,21 +144,15 @@ size_bytes,unit,function,match_percent,address
 176,Pl/pl_act_step,fn_80260198,99.6591,0x80260198
 176,homebutton/hbm_kb_cursor,hbmKbCursorDestroy,0.0,0x80566440
 176,lobby/lb_equip_page,pl_rig_model_color_set,99.3182,0x80223658
-176,sound/snd_voice_pool,fn_800EDD00,0.0,0x800EDD00
-176,sound/snd_voice_pool,snd_bank1_install,0.0,0x800EDC50
-176,sound/snd_voice_pool,snd_bank2_install,0.0,0x800EDDB0
-176,sound/snd_voice_pool,snd_bank3_install,0.0,0x800EDE60
 180,BTE/l2c_link,l2c_link_sec_comp,95.2222,0x804952C8
 180,NHTTP/NHTTP_util,NHTTPi_compareToken,98.0,0x80517248
 180,enemy/enemy_control,em_res_buffers_free,99.2889,0x80146970
 180,g3d/g3d_state,g3d_fog_table_load,99.9333,0x8008819C
-180,lobby/lb_pane_ui,fn_801F86FC,97.0,0x801F86FC
-180,menu/menu_result,multi_box_grid_clear,99.7778,0x8039D490
 184,MSL_C/file_io,__flush_buffer,99.0217,0x8045AB80
 184,homebutton/hbm_value,fn_8055E5DC,0.0,0x8055E5DC
 184,lobby/lb_equip_page,pl_rig_slot_node_map,99.913,0x80224498
 188,HID/hid,hid_set_suspend,94.8936,0x805273E0
-188,MSL_C/mem,__copy_longs_aligned,97.234,0x8045B708
+188,MSL_C/mem,__copy_longs_aligned,97.3404,0x8045B708
 188,Pl/pl_act,equip_deco_slots_free,98.2979,0x8027F21C
 188,Pl/pl_act,equip_gun_clip_get,96.7021,0x8027F008
 188,WPAD/wpad,wpadCountIdleReports,99.3617,0x804EC3F0
@@ -169,7 +160,7 @@ size_bytes,unit,function,match_percent,address
 188,draw_shape,drawshape_set_tex_scale,98.8298,0x80054370
 188,hud/layout,note_line_draw,94.8936,0x802E41B4
 188,lobby/fn_80212810,lb_kakou_weapon_cost_flags_get,99.3191,0x80214078
-188,lobby/fn_80219260,lb_award_hunt_bits_count,89.5532,0x8021B088
+188,lobby/fn_80219260,lb_award_hunt_bits_count,98.4043,0x8021B088
 188,menu/menu_item,put_menu_cursor__FPUsUsPC10_mh_ivec2_,99.7872,0x802A2564
 192,MSL_C/mem,__copy_longs_unaligned,96.3542,0x8045B86C
 192,MSL_C/string,strcpy,94.1667,0x8045F554

@@ -3418,7 +3418,8 @@ void multi_box_grid_clear(_multi_result_work* box, _vs_user_data* user) {
     if (items != NULL) {
         for (i = 0; i < 16; i++, items++) {
             if (items->item_id != 0 && items->count > 0) {
-                score_add_clamped(GetItemData(items->item_id)->field_0x010 * items->count, &user->point_0x18);
+                u32 value = GetItemData(items->item_id)->field_0x010;
+                score_add_clamped(value * items->count, &user->point_0x18);
                 items->item_id = 0;
                 items->count = 0;
             }

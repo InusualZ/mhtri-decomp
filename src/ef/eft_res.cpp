@@ -35,8 +35,6 @@
  *    ours derives it with `addi` from `j`;
  *  - `eft_res_files_load`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
  *    r14); `eft_res_archive_load_callback`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
- *  - `eft_pro_slot_find_kind`: retail walks 0xCC records unrolled four-wide (`li r0,0x33`); ours unrolls the same count
- *    six-wide (`li r0,0x22`) for the pointer walk, the `while` form and the counter widths tried (u8/u16/s32/u32);
  *  - `eft_res_slot_get`: the search loop's natural exit runs the caller's NULL test (`li r31,0`; `cmpwi`) where
  *    retail returns at once (a jump past the tail); the inline `eft_res_slot_find` scores best of the goto-free
  *    forms (a `found` flag, a `break` plus an index test and the tail moved into the loop all score lower);
@@ -55,9 +53,6 @@
  *   `load_file_req`'s arguments are (name, data, size, callback, 4, ctx): the callback is the fourth.
  *   `eft_res_blocks_release` assigns the pointer difference to its `u32` index and shifts it in place (`index >>= 6`): the signed
  *   form emits `srawi` and a `clrrwi`, the one-expression form moves the index to another register.
- * RESIDUALS. eft_pro_slot_find_kind: the Wii/1.3 stand-in dump unrolls six-wide (`li r0,0x22`) like ours with regsim
- *            EXACT, so the unroll shape, not colouring, is the difference (retail: five compares per trip, count
- *            0x33, `addi r5,r5,4`).
  * RESIDUALS. mwcc-debugger dump, `eft_res_slot_get`: regsim 0/0 callee-saved, 7/7 volatile (EXACT, colouring is not
  *            the cause); first divergence insn 22: retail `b 0x22d4` vs ours `b 0x2308`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `eft_res_blocks_get`: regsim 0/0 callee-saved, 2/7 volatile, best plan cost 16;
@@ -464,11 +459,11 @@ extern "C" void eft_pro_slot_clear(u8 id) {
     slot->field_0x14 = 0;
 }
 
-/* 0x800F6AC8 - find the first of the table's 0x33 records whose key byte is `key`. */
+/* 0x800F6AC8 - find the first of the table's 0xFF records whose key byte is `key`. */
 extern "C" EftProSlot* eft_pro_slot_find_kind(u8 key) {
     EftProSlot* slot = eft_pro_slots();
 
-    for (s32 i = 0; i < 0xCC; i++, slot++) {
+    for (s32 i = 0; i < 0xFF; i++, slot++) {
         if (slot->kind_0x00 == key) {
             return slot;
         }

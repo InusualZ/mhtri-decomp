@@ -89,6 +89,7 @@
  *   em_break_part_data_get, mhchar_mat_hide_set, ef_inst_spawn_joint, em_user_data_items_get, em_char_pose_sync,
  *   eft_em_slot_attach, eft_em_model_fx_spawn (registry proposals)
  * FLAGS. em_fly_step takes a scoped `#pragma optimization_level 4`.
+ * FLAGS. em_delay_act_set takes a scoped `#pragma opt_propagation off` (retail keeps index 0 as `li r0,0; mulli`).
  * RESIDUALS. em_mot_speed_set: dump 03 `fmuls f1,f33,f32` multiplies the f32 parameter directly; retail's `frsp` + swapped operands is an `f64`
  *   parameter, which the 29-unit prototype (`enemy/em_mot_speed_set.h`) does not allow.  em_delay_act_tick: dump 03 folds the zero index
  *   into `addi r33,r32,0xaf0`; retail keeps `li; mulli` and adds 0xaf0 separately; a one-slot loop and direct indexing measure equal or lower.
@@ -166,9 +167,6 @@
  *   struct copy and 0x10 bytes of frame).
  * RESIDUALS. fn_8012D3E0: regsim EXACT; retail keeps `clrlwi r31,r3,16` (max) before `li r30,0`, the scheduler swaps
  *            them inside block B2 (dump 06 has retail's order); declaration order and init placement do not move it.
- * RESIDUALS. em_delay_act_set (148 B, ours 140 B): retail keeps `li r0,0; mulli r0,r0,20; add r31,r3,r0` and
- *            addresses the fields with 0xAF0 displacements; ours folds index 0 into `addi r31,r3,0xAF0`. Direct
- *            indexing, `global_optimizer off` (+0.1 %) and optimization levels 0/1 do not reproduce it.
  * RESIDUALS. em_team_member_claim: a `u8 area_no` local, `(state_sub & 0xFF)` and a `u32` local all still store the
  *            masked copy (-4.8 to -13 B); retail stores the raw r30.
  * RESIDUALS. mwcc-debugger dump, `em_team_member_claim`: regsim 3/3 callee-saved, 11/11 volatile (EXACT, colouring
@@ -2545,6 +2543,8 @@ inline EmDelayRec* em_delay_rec(_ENEMY_WORK* self, s32 index)
     return &self->delays_0xAF0[index];
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x80128274 (0x94): queues action `act`/`sub` with the current target after the control block's delay, unless one
  * is queued. */
 extern "C" void em_delay_act_set(_ENEMY_WORK* self, u8 act, u8 sub)
@@ -2566,6 +2566,7 @@ extern "C" void em_delay_act_set(_ENEMY_WORK* self, u8 act, u8 sub)
         }
     }
 }
+#pragma pop
 
 extern "C" void em_delay_act_fire(_ENEMY_WORK* self, EmDelayRec* rec);
 

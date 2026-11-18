@@ -3601,7 +3601,8 @@ void lb_goods_hold_give(LbTradeWork* self)
 
     eft052_hold_row_get(&id, &count);
     eft052_page_count_add(id, count);
-    userdata_zenny_add(item_price_get(id) * count);
+    s32 price = item_price_get(id);
+    userdata_zenny_add(price * count);
     if (item_bonus_class_get(id) != 0) {
         lb_act_latch_set(self->plw_0x01C, 5);
     }

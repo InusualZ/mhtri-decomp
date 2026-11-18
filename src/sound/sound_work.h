@@ -45,7 +45,8 @@ typedef struct SndNode2 {
     /* +0x014 */ u32 field_0x14;
     /* +0x018 */ u8 field_0x18;
     /* +0x019 */ u8 field_0x19;
-    /* +0x01A */ u8 pad_0x1A[0xF6];
+    /* +0x01A */ u8 field_0x1A;
+    /* +0x01B */ u8 pad_0x1B[0xF5];
 } SndNode2; /* size: 0x110 */
 
 /* The 96-node second pool (`fn_800EDF1C` constructs it). */

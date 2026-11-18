@@ -468,7 +468,7 @@ extern "C" void fn_800E4D60(u32 idx)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_800EDD00(snd_bank_table_get(), 2, idx);
+    snd_bank1_install_idx(snd_bank_table_get(), 2, idx);
     fn_800E4E38(fn_800E4C90(stream_mgr_get(), idx));
     fn_800E4E30(fn_800E4C90(stream_mgr_get(), idx));
     fn_800E4E28(fn_800E4C90(stream_mgr_get(), idx));
