@@ -4,12 +4,13 @@
  *   .data 0x8059E688-0x8059EB50, .sdata2 0x80796784-0x807967A8.  The seam is unproven (a discovery cut).
  * FLAGS. `cflags_main`; file-scope `#pragma peephole off` and `optimization_level 4` (retail's switch lowering; the
  *   O4 move lifted seven rows and lowered none once the sources were fixed).
+ * FLAGS. `#pragma optimization_level 3` scoped to `fn_801059E8` (same size, byte-identical row).
  * NAMES. The map has only `fn_` stems here apart from `eft_spawn_type10` and `eft_spawn_type11`, GUESSes from their
  *   bodies; plain definitions are `extern "C"` in a C++ unit.
  *   GUESS (from what they hold and their callers): `eft013_em_effect_ids`, `eft013_em_param_ids`, `eft013_spawn_offsets`
  *   and the callees `ef_effect_root_mtx`, `em_eft_active_ck`, `em018_glow_get`; the declaration of `setScaleMat34W`
  *   is a STOPGAP (ef-game3#78).
- * RESIDUALS. 2 partial rows: `fn_801059E8` and `fn_801063A8` assign their callee-saved registers in another order (the
+ * RESIDUALS. 1 partial row: `fn_801063A8` assigns its callee-saved registers in another order (the
  *   structure and every operand but the register numbers match; no declaration order reproduces retail's).
  *   `.data` emitted (the late tables defined before `fn_8010695C`, after the first jump tables, as retail places them);
  *   `.sdata2` short: retail keeps nine words (0.0 four times, 0.5 and 1.0 twice) where our literals pool four.
@@ -471,6 +472,8 @@ extern "C" void fn_801059AC(_EFT013* self) {
 /* State 0 of the enemy joint family: creates the type's pooled effects and places them - on the enemy's joint
  * matrix (with the type's offset table), at the work's offset or at the record's position - then runs state 1;
  * type 8 also plays its sound at the midpoint of the effect and the record. */
+#pragma push
+#pragma optimization_level 3
 extern "C" void fn_801059E8(_EFT013* self)
 {
     nw4r::math::MTX34 mtx;
@@ -618,6 +621,7 @@ extern "C" void fn_801059E8(_EFT013* self)
         se_req_pos_ps(enemy->se_handle_0xB14, 22, 2, &pos);
     }
 }
+#pragma pop
 
 /* 0x80105EFC (0x34): Dispatches on the type through a 33-entry jump table (`jumptable_8059E9AC`) with no default
  * body; the non-case values share `fn_80105F30`'s run. */

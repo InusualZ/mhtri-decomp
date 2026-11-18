@@ -74,8 +74,7 @@ struct EmSetWork {
     /* +0x0010 */ u32 frames_0x0010;           /* hunt frames, counted up to 25 minutes */
     /* +0x0014 */ u32 frames_long_0x0014;      /* the same, up to 99 minutes */
     /* +0x0018 */ s32 area_count_0x0018;
-    /* +0x001C */ s16 area_sets_0x001C[16];    /* per area, the set file to load (-1 none) */
-    /* +0x003C */ u8 unused_0x003C[0x20];
+    /* +0x001C */ s16 area_sets_0x001C[32];    /* per area, the set file to load (-1 none); only the first 16 are read */
     /* +0x005C */ EmSetEntry entries_0x005C[13];
     /* +0x0368 */ union {
         u16 hunted_0x0368[0x29];             /* kills per monster, capped at 99 */

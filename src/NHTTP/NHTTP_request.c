@@ -10,6 +10,7 @@
  * SOURCE FILE. GUESS `NHTTP_request.c`: no `__FILE__` string; the name follows the siblings' `NHTTP_` scheme
  *   and what the TU holds.
  * FLAGS. GC/3.0a5.2 with `cflags_nhttp`, plus `#pragma inline_max_size(8)` (as `d_nhttp.c`).
+ * FLAGS. `#pragma opt_common_subs off` scoped to `NHTTPi_createRequestObject` (same size, raises its row).
  * NAMES. GUESS, read off the bodies: `NHTTPi_createRequestObject`, `NHTTPi_cancelRequestById`,
  *   `NHTTPi_probeSocket`, `NHTTPi_openSocket`, `NHTTPi_SocConnect`, `NHTTPi_SocShutdown`,
  *   `NHTTPi_resolveHostName`, `NHTTPi_findHeaderField`.
@@ -77,6 +78,8 @@ const char NHTTPi_postDataRawCode[] = "--t9Sf4yfjf1RtvDu3AA";
  * inside the path), read out the scheme (http / https), host and port, and set up the response record
  * that hangs off it.  Answers the request, or null with the info block's error set (11 bad method, 1 no
  * memory, 4 bad URL). */
+#pragma push
+#pragma opt_common_subs off
 NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 method, u32 buffer,
                                          u32 bufferSize, u32 userData,
                                          NHTTPBufferFullCallback bufferFullCallback,
@@ -309,6 +312,7 @@ NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 m
     }
     return NULL;
 }
+#pragma pop
 
 /* Take the request object apart: its response, both field lists, the URL copies and the record. */
 void NHTTP_DestroyRequest(NHTTPInfo* info, NHTTPRequest* request) {

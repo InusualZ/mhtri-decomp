@@ -1041,9 +1041,7 @@ size_bytes,unit,function,match_percent,address
 1288,ef/ef_drawbillboardstrategy,ef_billboard_normal_quad,87.7547,0x800BA1E0
 1296,quest/quest_entry,quest_monsters_spawn,97.7315,0x803AE424
 1300,DWCi/natneg,DWCi_natNegTickSocket,93.1662,0x80513690
-1300,ef/fn_80105314,fn_801059E8,97.8308,0x801059E8
 1304,homebutton/hbm_kb_event,hkbKbAnimRewindPanes,97.2577,0x805638D4
-1312,ef/eft022_fx,fn_80115A80,92.5549,0x80115A80
 1312,fn_80056F24,glare_filter_capture,98.5518,0x800572F0
 1312,homebutton/hbm_kb_event,hkbVuEnterKanaState0,99.9116,0x805617B8
 1312,sound/fn_800D7F54,se_slot_level_calc,86.3842,0x800D92E4
@@ -1104,7 +1102,6 @@ size_bytes,unit,function,match_percent,address
 1596,ef/eft053,eft053_init,99.8747,0x80367124
 1596,quest/quest_entry,quest_successive_step,99.6993,0x803B177C
 1600,hud/cockpit_quest,cockpit_take_menu_draw,99.5,0x802E646C
-1608,sound/sound_obj,snd_voice_setup,99.0672,0x800E5720
 1620,Pl/pl_motion,quest_scene_end,99.2346,0x8028D778
 1624,camera/camera_main,camera_shoulder_update,99.8645,0x802B9C04
 1624,enemy/em019_ai,em019_act7_rush,99.9507,0x8037C6D8

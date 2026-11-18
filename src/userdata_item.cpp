@@ -8,6 +8,7 @@
  *   the sub-transfer code owns start.  `.data` and `.sdata2` are emitted byte-identical to the target.
  * FLAGS. `#pragma peephole off`: retail re-extends narrow parameters at entry (`clrlwi`/`extsh`) and keeps
  *   `addi`+`clrlwi` pairs.
+ * FLAGS. `#pragma optimization_level 4` scoped to `userdata_new_game_init` (same size, raises its row).
  * NAMES. Class 4: no `__FILE__` string and no runtime-dump name covers the range.  GUESS (from each body and its callers):
  *   the unit name; every own row renamed here (face_spr_*, subTransReset, frame_draw, scene_draw_single/split,
  *   scn_root_camera_id_get, scn_mdl_draw, userdata_init, userdata_pl_look_set, equip_record_validate*,
@@ -685,6 +686,8 @@ extern "C" void userdata_clear(void)
 
 /* Sets a new character's save up: clears the equipment, pouches, box and progress, files the starting weapon of
  * `kind` (0/2 male, 1 female, -1 the fourth set) and the starting items, and names the arena rows. */
+#pragma push
+#pragma optimization_level 4
 extern "C" void userdata_new_game_init(s32 kind)
 {
     Q_UserData* user = get_userdata();
@@ -824,6 +827,7 @@ extern "C" void userdata_new_game_init(s32 kind)
     }
     gallery_open(3);
 }
+#pragma pop
 
 /* Copies the save block out to `dst` (the save image), with `system_w`'s random ring and the profile word. */
 extern "C" void userdata_save_export(u8* dst)

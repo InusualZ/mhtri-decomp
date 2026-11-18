@@ -13,6 +13,7 @@
  *   still compile in the namespace `view_fn_802E4978` against `menu/fn_802E4978.h`'s older record view (`CockpitWork`
  *   with `CockpitMove`/`CockpitText`, whose layout drifts by 4 bytes past +0x180); everything else uses
  *   `hud/cockpit_quest.h` and `hud/cockpit_work_types.h`.  Folding that view removes the namespace.
+ * FLAGS. `#pragma optimization_level 4` and `#pragma opt_lifetimes off` scoped to `cockpit_item_tag_update` (same size, raises its row).
  * NAMES. GUESS (each read off its body and its callers): every `cockpit_*` and `quest_*` function of the unit,
  *   `pit_trap_construct`, the record types `CockpitItemTag`, `HuntLogEntry`, `CockpitSlotPair`, `CockpitWeaponIds`,
  *   `CockpitStaggerIds` and their fields, the `.data`/`.sdata` table names (`cockpit_act_mask_*`, `cockpit_split_*`,
@@ -665,6 +666,9 @@ void cockpit_timer_draw(void) {
 /* 0x802E4C5C (0x5C4): Updates the player's item tag from the act kind: the open, bob and flash frames, then the icon,
  * colour, count and usability - for the item-using kinds the first listed item the player holds (selected slot
  * first). */
+#pragma push
+#pragma optimization_level 4
+#pragma opt_lifetimes off
 void cockpit_item_tag_update(_PLW* plw, CockpitItemTag* tag) {
     u16 ids[10];
     u16* dst;
@@ -850,6 +854,7 @@ void cockpit_item_tag_update(_PLW* plw, CockpitItemTag* tag) {
         tag->unusable_0x16 = 1;
     }
 }
+#pragma pop
 
 /* 0x802E5220 (0x64): Sets the digit over the AI NPC from its digit state: none, a green 0x22 or a red 2. */
 void cockpit_npc_digit_update(CockpitWork* work) {
@@ -1113,17 +1118,18 @@ void cockpit_supply_box_draw(void) {
     char text[4];
     SysQuestMove* move;
     const u16* row;
-    CockpitWork* work;
+    s32 first;
     const u16* col;
     QuestWork* quest;
+    CockpitWork* work;
     const _SPR_DATA_* rec;
+    s32 one;
     const Q_ItemPair* pair;
     ItemDataRecord* data;
     u8** help;
+    s32 idx;
     s32 r;
     s32 c;
-    s32 first;
-    s32 idx;
     s32 warn;
     u32 color;
     s32 frame;
@@ -1202,7 +1208,8 @@ void cockpit_supply_box_draw(void) {
                 if (pl_item_room_get(plw, pair->id, (s16)pair->num) < (s16)pair->num) {
                     if (pl_item_slot_find(plw, pair->id) == 0xFFFF) {
                         draw_sprite_idx(0xE47, &base);
-                        warn = 1;
+                        one = 1;
+                        warn = one;
                     } else {
                         draw_sprite_idx(0xE48, &base);
                         warn = 2;

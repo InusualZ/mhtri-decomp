@@ -10,6 +10,7 @@
  *    16-aligned through `#pragma function_align 16` (redundant: the object is byte-identical without it under
  *    `cflags_base`), not the 4-byte packing `cflags_os` gives; `#pragma fp_contract off`
  *    (retail keeps `fmul`+`fsub`: 0 fused of 320 fp ops); `__fabs`/`__abs` are the compiler intrinsics.
+ * FLAGS. `#pragma opt_common_subs off` scoped to `refineAdpcmCodebook` (same size, raises its row).
  * NAMES. GUESS: getBytesForAdpcmSamples, encodeAdpcmSamples (map rows named from the dsptool formula and the
  *    body), encodeAdpcmFrames, encodeAdpcmFrame, computeAdpcmCoefs, refineAdpcmCodebook, levinsonDurbin2,
  *    adpcmReflection2, adpcmCovariance2, adpcmLuDecompose2, adpcmLuSolve2 (from what each body computes);
@@ -514,6 +515,8 @@ static inline f64 predictorDistance(f64* pred, f64* frame)
 }
 
 /* Runs two nearest-codebook / recentre passes over the frame vectors. */
+#pragma push
+#pragma opt_common_subs off
 void refineAdpcmCodebook(f64* codebook, s32 count, f64* frames, s32 frameCount)
 {
     s32 members[8];
@@ -563,6 +566,7 @@ void refineAdpcmCodebook(f64* codebook, s32 count, f64* frames, s32 frameCount)
         }
     }
 }
+#pragma pop
 
 /* Solves the order-2 normal equations of the autocorrelation vector `r` for the predictor `a`. */
 void levinsonDurbin2(f64* r, f64* k, f64* a)

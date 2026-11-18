@@ -7,6 +7,7 @@
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail loads every table with its own `lis`/`addi`); `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
  *   `slwi` unfused; every written row measured better with it off); `#pragma optimization_level 4` around
  *   `lb_trade_msg_draw` (retail's subi + cmplwi switch-range lowering, playbook 108).
+ * FLAGS. `#pragma opt_common_subs off` scoped to `lb_kitchen_meal_serve` and `#pragma opt_lifetimes off` to `lb_kitchen_step` (same sizes, raise both rows).
  * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`lb_kitchen_*`, `lb_trade_*`,
  *   `lb_scene_eft_*`) and every data name are GUESSes from the bodies: the kitchen pays zenny or resource points for a
  *   pair of ingredients (`lb_kitchen_pair_find` keys the pair tables on the two groups) and fills `lb_param_w`'s meal
@@ -909,6 +910,8 @@ void lb_kitchen_special_apply(LbKitchenWork* work) {
 
 /* 0x80390984 (0x59C): Serves the meal: pays for it, applies the pair's (or the special course's) skills, rolls the
  * bonus courses, hands the result to the cook and the meal parameters, and re-draws the roll seed. */
+#pragma push
+#pragma opt_common_subs off
 void lb_kitchen_meal_serve(LbKitchenWork* work) {
     u8 count = 0;
     u16* pair;
@@ -1074,9 +1077,12 @@ void lb_kitchen_meal_serve(LbKitchenWork* work) {
     }
     ((Q_UserData*)lobby_world_block)->kitchen_seed_0x484E = ran_suu(1);
 }
+#pragma pop
 
 /* 0x80390F20 (0x5B4): The kitchen screen's frame step: the opening talk page and choice, the pick and special pages,
  * the guest's wait for the host's meal, the eating motion with its messages, and the close; then the draw callback. */
+#pragma push
+#pragma opt_lifetimes off
 void lb_kitchen_step(void) {
     LbKitchenWork* work = (LbKitchenWork*)lobby_w.menu_0xAC;
     char text[0x40];
@@ -1243,6 +1249,7 @@ void lb_kitchen_step(void) {
         subTransSet((u32)lb_kitchen_draw_task, 0, NULL);
     }
 }
+#pragma pop
 
 /* The kitchen screen's sprite tables. */
 u16 lb_kitchen_frame_ids[6] = {0x20AF, 0x20B0, 0x20AD, 0x20AE, 0xFFFF, 0x0000};

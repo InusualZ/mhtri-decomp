@@ -2,6 +2,7 @@
  *   move start-up, the per-part model file loads and binds, and the parts' model release.
  * RANGE. .text 0x802673A4-0x802693C4 (28 functions); .data 0x805C5E58-0x805C5F30, .bss 0x806AB410-0x806AB810, .sdata
  *   0x80792068-0x80792140, .sbss 0x80794B28-0x80794B30, extab, extabindex.
+ * FLAGS. `#pragma optimization_level 4` scoped to `pl_part_model_bind` (same size, raises its row).
  * NAMES. `set_max_player`, `init_player_work`, `player_control_move`, `player_init_data_load`, `player_move_start_ck`,
  *   `player_move_start`, `player_control_release` and `parts_mdl_release_all` are the runtime dump's names; the file
  *   name follows them.
@@ -865,6 +866,8 @@ u32 pl_equip_file_get(s32 player, u8 part) {
 
 /* 0x802688B0 - binds a part's read file to the player's model: the old model goes, the file moves into the
  * player's own memory, the model is built from it, and the face/makeup textures are pointed at the face work. */
+#pragma push
+#pragma optimization_level 4
 void pl_part_model_bind(_PLW* plw, _PLOBJ* obj, u8 part, s32 unused) {
     nw4r::g3d::ResMdl mdl(NULL);
     nw4r::g3d::ResMat mat(NULL);
@@ -1019,6 +1022,7 @@ void pl_part_model_bind(_PLW* plw, _PLOBJ* obj, u8 part, s32 unused) {
         }
     }
 }
+#pragma pop
 
 /* 0x80268E38 - marks one part's file as read. */
 void pl_part_state_loaded_set(_PLW* plw, _PLOBJ* obj, u8 part) {

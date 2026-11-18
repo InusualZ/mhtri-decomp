@@ -5,6 +5,7 @@
  *   registers no destructor) over the file. The constructors after `__sinit` (the sound object's, the delay line's,
  *   the three part clears, snd_deg_to_rad and the two base constructors) are `inline` and `never_inline` (idea 242):
  *   MWCC emits them after `__sinit`, each callee after its caller's later callees, which is retail's order.
+ * FLAGS. `#pragma opt_lifetimes off` scoped to `snd_voice_setup` (same size, byte-identical row).
  * NAMES. GUESS, every name in the unit (no `__FILE__` string, no dump name): the module and file name from the 0xE60 B
  *   global sound object `g_snd_obj`; the function names from the bodies and the object's vtable at 0x80597DA8, whose
  *   slots are its destructor, update, release, voice_dropped, stop, pause, resume and start (the same interface as
@@ -20,8 +21,6 @@
  *   snd_stream_reloc's wrappers through snd_obj_play_pan/pos/pos_reset and snd_line_cue_get, which this unit cannot
  *   retype alone (its header's callers pass u32); the line/cue registers also swap (r31/r30). The play functions
  *   return the play counter (u32); `sound/sound_obj.h` keeps the `void*` its snd_stream_reloc callers store it into.
- * RESIDUALS. snd_voice_setup: the three aux-level products colour their float temporaries differently (f3/f4 vs
- *   f0/f2; the master level and the 127.0f constant).
  * RESIDUALS. Data: the three vtables are one slot long (0xC of 0x28 bytes each): the seven interface slots are this
  *   unit's C rows (snd_obj_update .. snd_obj_start), not yet `SoundObj` members, so `SndBase` declares only its
  *   destructor. `.bss` is 0xE58 of the 0xE60 the map gives `g_snd_obj`; `.sdata2` and `.rodata` are byte-identical up
@@ -455,6 +454,8 @@ extern "C" Sound* snd_obj_get(void)
 }
 
 /* Initialises a new voice's state block from its articulation, region, sample, cue and play parameters. */
+#pragma push
+#pragma opt_lifetimes off
 extern "C" void snd_voice_setup(AxVoiceBlock* ax, SndArtic* artic, SndRegion* region, SndSample* sample, VoiceCfg* cfg,
                             SndPlayParam* param, Sound* snd)
 {
@@ -581,6 +582,7 @@ extern "C" void snd_voice_setup(AxVoiceBlock* ax, SndArtic* artic, SndRegion* re
     }
     ax->max_dist = cfg->max_dist;
 }
+#pragma pop
 
 /* Scales the three global level factors and the config's own levels into a 0..127 voice volume. */
 extern "C" s16 snd_voice_volume_calc(AxVoiceBlock* ax)

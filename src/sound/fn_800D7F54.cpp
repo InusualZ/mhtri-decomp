@@ -7,6 +7,8 @@
  * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
  *
  * NAMES. GUESS (from each body and its callers): se_entry_request
+ * RESIDUALS. se_slot_level_calc: `a`/`b`/`mode` take other callee-saved GPRs than retail (r27/r28/r25 against r20/r26/r28; regsim: no
+ *   plan reproduces all callee-saved targets).
  * RESIDUALS. se_slot_kind_dispatch: dump 03 builds `cmpi 3; blt; cmpi 4; ble` for the 3..4 arms and no `subi; cmplwi` range test;
  *   all 24 case/default orders and `kind` locals (u8/s32/u32) measure equal or lower.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
@@ -2452,16 +2454,9 @@ extern "C" void se_hit_bank_req(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamV
 /* part e - the per-slot joint lookup (`fn_800D8EA8`), the per-slot sound-state update (`se_slot_level_calc`)
  * and the paralyze-trap request (`paralyzeTrap_SE_req__FUcUcPQ34nw4r4math4VEC3`).
  *
- * Measured with `.pi/scratch/measure_part.py` (fuzzy_match_percent):
- *   fn_800D8EA8                                   100.000  byte-exact (1084 B)
- *   paralyzeTrap_SE_req__FUcUcPQ34nw4r4math4VEC3  100.000  byte-exact (220 B)
- *   se_slot_level_calc                                    86.552  1268 B vs 1312 B: the bodies are
- *        instruction-for-instruction equal, but the allocator keeps 5 FPRs where retail keeps 8
- *        (f24/f25/f26): `(f32)` conversions pool their 2^52 double locally (`@410`) where retail
- *        references `lbl_80796400`/`lbl_80796408`, so one double web never exists for us, and the
- *        missing FPRs shift the GPR colouring. Same pooling note as b.cpp's header; reloc names do not
- *        affect the score. Tried: the `sys` global as a local vs a per-site deref (the local is +1.5),
- *        `mode * 100` hoisted vs in-loop (hoisted is worse), ids `s32` vs `u32` (`s32` is +1.2).
+ * `se_slot_level_calc` writes its constants as literals (`0.5f`, `0.8f`, ...): an `extern` pool word cannot be hoisted past
+ * the loop's calls, retail hoists the constants into FPRs, and the literals reproduce that (the unit claims `.sdata2`).
+ * Its locals `a`/`b` sit at function scope; the remaining difference is the GPR colouring of those two.
  *
  * OPTIMIZER LEVEL 4 IS REQUIRED FOR THIS UNIT'S SWITCHES (`#pragma optimization_level 4`).
  * At level 3 a switch whose case labels form a contiguous run is lowered to two compares
@@ -2842,8 +2837,10 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
     u8 levels[2];
     u16 params[2];
     f32 scale;
-    u32 mode;
     u32 i;
+    u32 mode;
+    u32 a;
+    u32 b;
 
     ids[0] = s->id;
     ids[1] = s->field_0x30;
@@ -2852,16 +2849,16 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
         if (ids[i] == -1) {
             continue;
         }
-        u32 a = fn_800F26B8(s->owner, ids[i], 0);
-        u32 b = fn_800F26B8(s->owner, ids[i], 1);
+        a = fn_800F26B8(s->owner, ids[i], 0);
+        b = fn_800F26B8(s->owner, ids[i], 1);
 
-        scale = lbl_807963D8;
+        scale = 1.0f;
         if (stage_water_area_ck() == 1) {
             if (camera_underwater_ck() == 1) {
                 a = 0;
-                if (s->pos.y >= lbl_807963E0) {
-                    b = (s32)(lbl_807963E8 * (f32)(u8)b);
-                    scale = lbl_807963E8;
+                if (s->pos.y >= 0.0f) {
+                    b = (s32)(0.5f * (f32)(u8)b);
+                    scale = 0.5f;
                 }
                 if (sys->field_0x2927D == 1) {
                     mode = 3;
@@ -2870,9 +2867,9 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
                 }
             } else {
                 b = 0;
-                if (s->pos.y < lbl_807963E0) {
-                    a = (s32)(lbl_807963EC * (f32)(u8)a);
-                    scale = lbl_807963F0;
+                if (s->pos.y < 0.0f) {
+                    a = (s32)(0.8f * (f32)(u8)a);
+                    scale = 0.6f;
                 }
                 if (sys->field_0x2927D == 1) {
                     mode = 1;
@@ -2922,34 +2919,34 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
             dist = vec3_distance(&w->field_0x018, &s->pos);
         }
         if (dist > near) {
-            s->field_0x1C = lbl_807963E0;
+            s->field_0x1C = 0.0f;
             continue;
         }
-        s32 index = (s32)(dist / (near / lbl_807963F4));
+        s32 index = (s32)(dist / (near / 100.0f));
         u8 volume = volumes[index];
 
         if (i == 0) {
-            s->field_0x1C = lbl_807963F8 * (f32)volume;
-            s->field_0x1C = s->field_0x1C * (lbl_807963F8 * (f32)levels[i]) * scale;
+            s->field_0x1C = 0.00787f * (f32)volume;
+            s->field_0x1C = s->field_0x1C * (0.00787f * (f32)levels[i]) * scale;
             if (s->field_0x4B != 0) {
-                s->field_0x1C = s->field_0x1C * (lbl_807963F8 * (f32)s->field_0x4E);
+                s->field_0x1C = s->field_0x1C * (0.00787f * (f32)s->field_0x4E);
             }
         } else {
-            s->field_0x20 = lbl_807963F8 * (f32)volume;
-            s->field_0x20 = s->field_0x20 * (lbl_807963F8 * (f32)levels[i]) * scale;
+            s->field_0x20 = 0.00787f * (f32)volume;
+            s->field_0x20 = s->field_0x20 * (0.00787f * (f32)levels[i]) * scale;
             if (s->field_0x4B != 0) {
-                s->field_0x20 = s->field_0x20 * (lbl_807963F8 * (f32)s->field_0x4E);
+                s->field_0x20 = s->field_0x20 * (0.00787f * (f32)s->field_0x4E);
             }
         }
     }
 
     if (s->field_0x24 != 0) {
         if (stage_water_area_ck() == 0) {
-            s->field_0x20 = lbl_807963E0;
-        } else if (s->pos.y >= lbl_807963E0) {
-            s->field_0x20 = lbl_807963E0;
+            s->field_0x20 = 0.0f;
+        } else if (s->pos.y >= 0.0f) {
+            s->field_0x20 = 0.0f;
         } else {
-            s->field_0x1C = lbl_807963E0;
+            s->field_0x1C = 0.0f;
         }
     }
 }

@@ -37,6 +37,7 @@
  *   `flipcheck.py` answers NOT READY: `.text` bytes, `.sbss`, `.sdata` (one pad byte), `.sdata2`
  *     and one extabindex byte (`arena_task`'s size, 4 B over); extab is byte-identical.
  *
+ * FLAGS. `#pragma opt_lifetimes off` scoped to `arena_result_next` (same size, raises its row).
  * NAMES: real names from the map/dump where they exist; the rest are GUESSES from the bodies -
  *   `arena_camera_vec`, `arena_light_vec`, `arena_user_data_buf` (0x100-byte records selected by
  *   `chunk_ofs << 8`), `arena_player_offset_table`, `arena_stage_config`, `arena_texture_names`,
@@ -1133,6 +1134,8 @@ extern "C" void arena_eqdata_setup(ArenaWork* params, u8 mode) {
 #pragma optimization_level 4
 /* Resets the arena work for the next round and builds its local (one- or two-player) or network setup,
  * then picks the stage's equip data. */
+#pragma push
+#pragma opt_lifetimes off
 extern "C" void arena_result_next(ArenaWork* work) {
     ArenaEqSlot* slot;
     ArenaEqSlot* slots;
@@ -1230,6 +1233,7 @@ extern "C" void arena_result_next(ArenaWork* work) {
     memset(arena_user_data_buf, 0, 0x100);
     memset(arena_user_data_buf + 0x100, 0, 0x100);
 }
+#pragma pop
 #pragma optimization_level reset
 
 /* Steps the arena's state machine one frame (equip picker, stage picker and start-up, network picker and

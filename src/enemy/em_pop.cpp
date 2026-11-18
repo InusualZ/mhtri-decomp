@@ -23,8 +23,8 @@
  *   GUESS: em_set_reward_item_add, em_set_kill_record, em_set_work_state_get, em_set_userdata_flag_ck
  *   GUESS: quest_pouch_items_settle, em_set_result_store, em_set_result_restore, em_set_enemy_detach
  * RESIDUALS. Every row is written.
- *  - em_set_work_init: retail clears the 16 area sets as a 2x8 unrolled loop over a byte offset, ours unrolls it
- *    fully (loop shapes, index types and the opt_* pragmas tried); opt_propagation off is its best;
+ *  - em_set_work_init: the 32-entry area-set clear is a 4x8 loop (`area_sets_0x001C` is s16[32], the old `unused_0x003C`
+ *    included); retail colours the byte offset r5 and the -1 r4, ours r3 and r5 (regsim: no local edit reaches it);
  *  - em_set_kill_record: register numbering, the `capped == 1` exit as `bne; b` in retail, a `mr` copy of the first
  *    reward rate, and `em_mini_kill_kind_get`'s s32 prototype (retail masks a u8 result at each use, request
  *    enemy-em-pop#2);
@@ -213,6 +213,7 @@ void em_set_work_init(void) {
     s32 i;
     s32 count;
     s32 ofs;
+    s32 j;
 
     work = (Q_MoveWork*)get_move_work_adrs(0);
     if (work != NULL) {
@@ -255,8 +256,10 @@ void em_set_work_init(void) {
                 }
             }
         }
-        for (i = 0; i < 16; i++) {
-            em_set_work_ptr.work->area_sets_0x001C[i] = -1;
+        for (i = 0; i < 4; i++) {
+            for (j = 0; j < 8; j++) {
+                em_set_work_ptr.work->area_sets_0x001C[i * 8 + j] = -1;
+            }
         }
         em_set_work_ptr.work->season_0x000B = em_set_work_ptr.work->userdata_0x04E4.em_set_0x3F98.season_0xD2;
         param = &lb_param_w;

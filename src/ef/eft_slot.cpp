@@ -11,6 +11,7 @@
  *   `eft_slot_live_ck` and the `cntlzw`/`srwi` of `eft_slot_persist_ck`; playbook 39); `#pragma optimization_level 4`
  *   around the slot programs whose switches retail lowers to range tests (`eft_slot_track_step`, `eft_slot_mode_rearm`,
  *   `eft_slot_unbound_step`, `eft_slot_roam_step`, `eft_slot_arena_state_change`..`eft_slot_arena_step`).
+ * FLAGS. `#pragma opt_lifetimes off` scoped to `eft_slot_unbound_step` (same size, raises its row).
  * NAMES. Every definition is a GUESS from its body (the dump has only placeholders here): the pool (`eft_slot_pool`,
  *   `eft_slot_clear`, `eft_slot_pool_clear`, `eft_slot_find_free`, `eft_slot_spawn`, `eft_slot_spawn_targets`), the
  *   definition table (`eft_def_table`, `eft_def_get`, `eft_def_flags`, `eft_def_handler`, `eft_def_model_block`), the
@@ -2488,6 +2489,8 @@ extern "C" s32 eft_slot_escape_time_get(EftSlot* slot)
 /* One frame of an unbound slot: gathers the enemies and records it tracks, follows a mode-3 area move, rates its area
  * (held, threatened, idle or gone), requests the new state and, after 600 frames of state 3, picks the area to flee
  * to. */
+#pragma push
+#pragma opt_lifetimes off
 extern "C" void eft_slot_unbound_step(EftSlot* slot)
 {
     _ENEMY_WORK* work;
@@ -2661,6 +2664,7 @@ extern "C" void eft_slot_unbound_step(EftSlot* slot)
         break;
     }
 }
+#pragma pop
 #pragma pop
 
 /* The definitions' state-change handler: state 3 arms its 900-frame countdown, states 4 and 5 pick the area to flee

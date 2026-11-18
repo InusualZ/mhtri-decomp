@@ -6,13 +6,14 @@
  *   0x801153D0 is `ef/fn_80114E34.cpp`; the eft023/eft024 job machines from 0x80116770 are `ef/eft023_fx.cpp` (their
  *   own `.sdata2` pool repeats this one's constants).
  * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39).
+ *   `#pragma optimization_level 4` scoped to `fn_80115A80` (retail's range-test switch lowering; same size).
  * NAMES. `eft022_set` is the runtime dump's own name; the map has only `fn_` stems for the rest, so plain definitions
  *   are `extern "C"`.
  *   GUESS: `EftModelCallback` and its `Attach` hook (the model object, an ICalcWorldCallback whose table is
  *   0x805A0360; the +0x18 slot runs right after the object is installed on the model).
  * RESIDUALS.
  *  - `EftModelCallback::ExecCallbackC`: the pose-blend loop's float scheduling;
- *  - `fn_80115A80`, `fn_801156A0`: register colouring and pool-order differences.
+ *  - `fn_801156A0`: register colouring and pool-order differences.
  *   `.data`/`.sdata` are still declared, not emitted.
  *   Relocation names that differ from retail: pool constants, save helpers, `fn_8050131C`/`MTX34Zero`.
  * SHAPES. The model object is built with placement `new` over `operator new` (no landing pad, as retail), and its
@@ -365,25 +366,21 @@ EftModelCallback::EftModelCallback()
 }
 
 /* Moves the eft021 record's models through their pose animation. */
+#pragma push
+#pragma optimization_level 4
 extern "C" void fn_80115A80(_EFT* self)
 {
-    _EFT_WORK_B* work;
     _PLW* plw;
-    _GXColor color;
-    s32 i;
-    s32 j;
     s32 moved;
-    u32 motion;
-    s16 t;
+    s32 i;
+    _EFT_WORK_B* work;
+    s32 j;
+    u16 motion;
     s8 r;
+    _GXColor color;
+    s16 t;
     f32 f0;
     f32 f1;
-    f32 f25 = -1.0f;
-    f32 f27 = 60.0f;
-    f32 f28 = 1.0f;
-    f32 f29 = 204.0f;
-    f32 f30 = 20.0f;
-    f32 f31 = 255.0f;
 
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
@@ -410,23 +407,23 @@ extern "C" void fn_80115A80(_EFT* self)
                 if (t < 0x3C) {
                     f0 = 0.0f;
                 } else {
-                    f0 = (f32)(t - 0x3C) / f27;
+                    f0 = (f32)(t - 0x3C) / 60.0f;
                 }
-                if (f0 > f28) {
-                    f0 = f28;
+                if (f0 > 1.0f) {
+                    f0 = 1.0f;
                 }
                 color.r = 0xFF;
-                color.g = 0xFF - (s32)(f29 * f0);
-                color.b = 0xFF - (s32)(f29 * f0);
+                color.g = 0xFF - (s32)(204.0f * f0);
+                color.b = 0xFF - (s32)(204.0f * f0);
                 if (t < 0x14) {
                     f1 = 0.0f;
                 } else {
-                    f1 = (f32)(t - 0x14) / f30;
+                    f1 = (f32)(t - 0x14) / 20.0f;
                 }
-                if (f1 > f28) {
-                    f1 = f28;
+                if (f1 > 1.0f) {
+                    f1 = 1.0f;
                 }
-                color.a = (s8)(f31 * f1);
+                color.a = (u8)(255.0f * f1);
             } else {
                 color = lbl_805A026C[(s8)(r - 1)];
             }
@@ -438,19 +435,17 @@ extern "C" void fn_80115A80(_EFT* self)
             return;
         }
         plw = (_PLW*)self->source_0x30;
-        if ((u32)(plw->field_0x65E - 3) > 1U) {
-            switch (plw->field_0x65E) {
-            case 0:
-                setVisibility__6MHcharFUlb(work->models[i], 1, 1);
-                setVisibility__6MHcharFUlb(work->models[i], 2, 0);
-                break;
-            default:
-                fn_80115FB0(self);
-                return;
-            }
-        } else {
-            setVisibility__6MHcharFUlb(work->models[i], 1, 0);
-            setVisibility__6MHcharFUlb(work->models[i], 2, 1);
+        switch (plw->field_0x65E) {
+        case 0:
+            setVisibility__6MHcharFUlb(work->models[0], 1, 1);
+            setVisibility__6MHcharFUlb(work->models[0], 2, 0);
+            break;
+        case 1:
+        case 3:
+        case 4:
+            setVisibility__6MHcharFUlb(work->models[0], 1, 0);
+            setVisibility__6MHcharFUlb(work->models[0], 2, 1);
+            break;
         }
         motion = Get_motion_no(plw);
         if (plw->field_0x662 <= 0 || (plw->field_0x664 != motion && plw->field_0x666 != motion)) {
@@ -472,14 +467,13 @@ extern "C" void fn_80115A80(_EFT* self)
         self->field_0x2C = (s32)plw->rot_z_0x5C;
         vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
         if (i == 1) {
-            v.x *= f25;
+            v.x *= -1.0f;
         }
         mulVecMat(&v, &work->mtx[i][0]);
-        f1 = work->mtx[i][0].m[2][3];
         work->mtx[i][0].m[0][3] += v.x;
         work->mtx[i][0].m[1][3] += v.y;
-        work->mtx[i][0].m[2][3] = f1 + v.z;
-        mtx34_trans_get_c1(&work->mtx[i][0], &self->pos_0x18, f1);
+        work->mtx[i][0].m[2][3] += v.z;
+        mtx34_trans_get(&work->mtx[i][0], &self->pos_0x18);
         work->models[i]->pos_0x04 = self->pos_0x18;
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
@@ -490,6 +484,7 @@ extern "C" void fn_80115A80(_EFT* self)
         }
     }
 }
+#pragma pop
 
 /* Bumps the record's `state_0x05` state index. */
 extern "C" void fn_80115FA0(_EFT* self)

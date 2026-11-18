@@ -12,6 +12,7 @@
  *   on.  The two grid loaders at 0x8029135C read no pool and fill `pl_land_data`, so they open this unit; every data
  *   section of the band has its first referrer at or after them.
  * FLAGS. The `Pl` library's settled set (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on -fp_contract off`).
+ * FLAGS. `#pragma optimization_level 4` scoped to `pl_wall_slot_push` (same size, raises its row).
  * NAMES. `GetGroundHit`, `GetGroundHit2`, `hit_ground_comon` and `findInterSection*` are the map's (mangled) names;
  *   every other function is a C-linkage name derived from its body.  GUESS (from each body and its callers): every
  *   `pl_*`/`em_coll_*` function name, `vec3_scale_inv`, `vec3_scale_to`, `coll_wall_slide`, `coll_line_check`,
@@ -1064,6 +1065,8 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
 /* 0x80293504 (0x578): the push hit-box `slot` asks for: a face hit pushes the sweep end out along the normal (when
  * sliding, flattened and kept off the face's edges), an edge hit pushes away from the touch point; 0 when the push
  * is zero.  `*flag` is set for a crossing hit. */
+#pragma push
+#pragma optimization_level 4
 s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
     PlBox unused_box;
     PlCollPoly* box;
@@ -1164,6 +1167,7 @@ s8 pl_wall_slot_push(PlSlideWork* work, VEC3* push, s8 slot, u8* flag) {
     }
     return 1;
 }
+#pragma pop
 
 /* 0x80293A7C - scale `v` by the reciprocal of `divisor` through the in-place scale `vec3_scale_in_place`;
  * the tail call is the whole body. */
