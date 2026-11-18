@@ -88,6 +88,7 @@
  * RESIDUALS. mwcc-debugger dump, `note_value_to_slot`: regsim 0/0 callee-saved, 8/11 volatile, best plan cost 0;
  *            first divergence insn 3: retail `addi r5, r4, note_slot_table@l` vs ours `addi r6, r4,
  *            note_slot_table@l`
+ * SHAPES. note_trade_open's `roll` is a `u32` (raises its row; ours is then 4 B short).
  */
 
 #include "types.h"
@@ -2179,7 +2180,7 @@ extern u16 note_trade_menu_row_tbl[3];
 extern "C" void note_trade_open(struct _PLW* player, struct _LB_NPC* npc) {
     LbNoteTradeWork* w = lobby_w.note_trade_0x0AC;
     u16 seed;
-    u16 roll;
+    u32 roll;
     u16 sum;
     s32 i;
     u8* p;

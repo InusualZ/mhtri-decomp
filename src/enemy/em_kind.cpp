@@ -19,7 +19,7 @@
  *    register free; `fn_8013C7E0`: retail stores the first `em_area_next` answer (`stb r3`) and then narrows it
  *    into r30 (`clrlwi r30,r3,24`), ours copies it (`mr r30,r3`) first (a `u8`/`s32` local and chained assignments measure equal or worse);
  *  - `fn_8013CAA0`: retail re-narrows the table byte it passes to `fn_8013AB74` (`clrlwi`);
- *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013D054`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
+ *  - `fn_8013C57C`, `em_prog_partner_cond_ck`, `fn_8013FD98`, `fn_80140354`, `fn_801406E0`,
  *    `fn_80140E48`, `fn_80140FB0`: register allocation only;
  *   flipcheck: `.text` +4 B (`fn_8013BE60`), and `pl_act6_52_54_61_62_ck`/`pl_act6_class_ck` stay undefined until the
  *   registry names land in the map.
@@ -36,6 +36,7 @@
  * RESIDUALS. fn_801406E0: one temp (r44 r0 vs retail r3: `addi r3,r3,1` against `addi r0,r3,1`).
  *            fn_80140E48/fn_80140FB0: regsim differs on the mulli result (r38 r4 vs retail r5) while the flag mask
  *            sits in r6; `u32 ctx = flag` declared first measures 94.5 %.
+ * SHAPES. fn_8013D054's `value` is a `u8` (row 100 %).
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -1044,7 +1045,7 @@ s16 fn_8013D054(_ENEMY_WORK *self, u8 *in) {
     }
     if (in[0] == 0) {
         u32 sub;
-        s16 value;
+        u8 value;
 
         switch (in[1]) {
         case 0:

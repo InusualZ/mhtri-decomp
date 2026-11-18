@@ -18,8 +18,9 @@
  * RESIDUAL.
  *   * `quest_item_pair_copy_block`/`_row`: callee-saved colouring (target `rec`=r29, `dst`/
  *     `flagged`=r30, `kind`=r31; ours a cyclic shift), plus `quest_item_slot_find`'s mask/load scheduling.
- *   * `quest_item_slot_add` 93.06 %: target keeps the dead loop counters (`li r5,0` / `addi r5,r5,1`), stores the
- *     rotation byte before masking it (`addi; stb; clrlwi`) and skips the `extsb` before the merged count store.
+ *   * `quest_item_slot_add` 97.13 % (`s16 i` brings back the dead loop counters; ours is then 436 B against 432 B): the target
+ *     stores the rotation byte before masking it (`addi; stb; clrlwi`), skips the `extsb` before the merged count store and
+ *     compares `extsh r0,r3` without extending `result` itself.
  *     Kept: `u32 result` (the unsigned `cmplwi r3,5` and the `extsh` temp), the `Q_ItemCount* slot` declaration inside
  *     the branch, `Q_ItemCount::num` as `s8`, the moving pointer.
  *
@@ -267,7 +268,7 @@ s16 quest_item_slot_find(Q_ItemCount* slots, u16 id) {
 s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count) {
     ItemDataRecord* rec = GetItemData(id);
     u32 result;
-    s32 i;
+    s16 i;
 
     if (rec == NULL) {
         return 1;

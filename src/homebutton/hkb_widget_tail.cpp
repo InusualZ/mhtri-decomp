@@ -47,6 +47,7 @@
  * RESIDUALS. Unwritten: the input widget's constructor 0x8056D814 (0x24) stores the table 0x80658458, whose slots name
  *   other units' inline functions (0x8055CD20, 0x8054F53C, 0x80556DBC) - writing it needs the widget's class with an
  *   MWCC-emitted table (rule 10).
+ * FLAGS. HkbLayout::CreateAnimTransform takes a scoped `#pragma opt_common_subs off` + `opt_propagation off` (same size, raises its row).
  */
 
 #include "types.h"
@@ -856,6 +857,9 @@ extern "C" void hkbAnimBindNamedPane(HkbAnimTransform* anim, nw4r::lyt::Pane* pa
 
 /* 0x8056F02C (0x1A0): Creates one HkbAnimTransform per `pai1` block of an RLAN image of a known animation kind and
  * returns the last; NULL for an unknown file version. */
+#pragma push
+#pragma opt_common_subs off
+#pragma opt_propagation off
 /* untyped: byte range - the RLAN resource image */
 nw4r::lyt::AnimTransform* HkbLayout::CreateAnimTransform(const void* animResBuf, nw4r::lyt::ResourceAccessor* pResAcsr) {
     const nw4r::ut::BinaryFileHeader* pFileHead = static_cast<const nw4r::ut::BinaryFileHeader*>(animResBuf);
@@ -898,6 +902,7 @@ nw4r::lyt::AnimTransform* HkbLayout::CreateAnimTransform(const void* animResBuf,
     }
     return pAnimTrans;
 }
+#pragma pop
 
 
 /* 0x8056F224 (0x10): Starts with the caps lock off and no shift key held. */

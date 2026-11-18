@@ -56,7 +56,7 @@
  *   scaled index.  fn_802D77DC: dump 03 compares the narrowed byte with `cmpi` (signed) in a chain of blocks that ends in `b B6`; retail
  *   folds the default into `li; bnelr`; `#pragma peephole on`, if-chain, ternary and case orders measure lower.
  * RESIDUALS. 17 rows partial (objdiff); the measured ones:
- *  - `ai_npc_enemy_scan`, `ai_npc_item_stock_get`, `fn_802D7F10`: scratch/callee-saved register colouring
+ *  - `ai_npc_enemy_scan`, `fn_802D7F10`: scratch/callee-saved register colouring
  *    (declaration orders and the `u32` parameter re-mask of `ai_npc_skill_group_get` tried);
  *  - `ai_npc_m2_step11_arm`: retail colours `arg` (r30) before `armed` (r29); `armed` is the only local and outnumbers
  *    the parameter (regsim: no declaration order reaches it, a `limit` copy coalesces into `arg`);
@@ -117,6 +117,7 @@
  *            retail
  * RESIDUALS. mwcc-debugger dump, `fn_802D6A00`: regsim 1/7 callee-saved, 36/36 volatile, best plan cost 4; first
  *            divergence insn 5: retail `mr r29, r3` vs ours `mr r28, r3`; size differs from retail (300 B vs 304 B)
+ * SHAPES. ai_npc_item_stock_get declares `i` first after `self` (regsim's plan order; row 100 %).
  */
 
 #pragma optimization_level 4
@@ -7075,10 +7076,10 @@ f32 ai_npc_tuning_get(_AINPC_W* self, u32 which)
 s16 ai_npc_item_stock_get(u16 item)
 {
     _AINPC_W* self = &AINPC_VIEW;
+    u8 i;
     s16 left;
     u16* p;
     u8 count;
-    u8 i;
 
     if (AINPC_VIEW.active == 0) {
         return 0;

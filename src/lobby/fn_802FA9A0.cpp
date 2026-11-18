@@ -25,7 +25,6 @@
  *   offsets into `work` (a `page++` pointer measures the same, a counted loop is unrolled by two: 94.9 %, 208 B; with `page++` in the loop header 96.0 %: the first compare is
  *   folded and the pointer is advanced after it).
  * RESIDUALS. Every row is written; 12 rows are short of 100:
- *   - lb_barter_entry_flags: retail keeps `index * 12` live across the calls, ours keeps `index` and re-multiplies;
  *   - lb_barter_step: the tab switch is lowered as an unsigned range test then a signed `cmpwi 2` in retail (ours a
  *     signed binary search), and `3 - (ok == 0)` is `neg`+`addi` there (ours `subfic`);
  *   - lb_barter_cart_slot_find: retail returns a first-loop hit through the function's single exit (ours its own
@@ -51,6 +50,7 @@
  *            first divergence insn 20: retail `bne 0x56d8` vs ours `bne 0x5580`; size differs from retail (308 B vs 312 B)
  * SHAPES. `lb_barter_refs_kind_build` walks the first table through its own pointer `src_a` (declared after
  *            `src`), the plan's extra named local.
+ * FLAGS. lb_barter_entry_flags takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  */
 #include "types.h"
 #include "lobby/fn_802FA9A0.h"
@@ -3078,6 +3078,8 @@ u16 lb_barter_cart_total(LbBarterWork* work, LbBarterCartRow* cart) {
     return total;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Why page row `index` cannot go into `cart`: 0x10 an empty row, 4 out of stock, 2 over the limit, 1 no cart row, 8 a
  * once-only row already taken, 0x20 a full stack. */
 u32 lb_barter_entry_flags(LbBarterWork* work, LbBarterCartRow* cart, s16 index) {
@@ -3125,6 +3127,7 @@ u32 lb_barter_entry_flags(LbBarterWork* work, LbBarterCartRow* cart, s16 index) 
     }
     return flags;
 }
+#pragma pop
 
 /* Puts `count` of page row `entry` into `cart`, taking them off the stock on the stock tab. */
 void lb_barter_cart_add(LbBarterWork* work, LbBarterCartRow* cart, LbBarterEntry* entry, s16 count) {

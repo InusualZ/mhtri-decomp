@@ -13,14 +13,8 @@
  *   LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
  * RESIDUALS. our object emits weak LinkList<...>, LinkListNode and ut::NonCopyable destructors the target lacks
  *   (unreferenced, dead-stripped by the link).
- * RESIDUALS. SetTagProcessor / SetTagProcessorImpl: the second inlined level walks the child list with `lwzu` where
- *   retail uses `lwz` + `addi`. Dump (Wii/1.3 stand-in, same instruction shape): backend-39 (before the final peephole)
- *   already has `lwz r29,0x14(r25); addi r25,r25,0x14` - the allocator gave the level-2 pane and its end iterator one
- *   register, and backend-40 (peephole) fuses them to `lwzu`; retail's end iterator has its own register. Six source
- *   spellings of the loop (reference list, child local, while, cast first, `it++`, hoisted end) measure identically.
- *   (retail's level-3 loop and our levels 1 and 3 do fuse). Tried at 98.08 %: `it++`
- *   (same), `end` hoisted into the for-init with `++it` / `it++` (97.94), the whole file under `#pragma peephole off`
- *   (91.3 unit-wide).
+ * FLAGS. SetTagProcessor and SetTagProcessorImpl take a scoped `#pragma opt_loop_invariants off` (the second inlined level then keeps
+ *   retail's `lwz` + `addi` child walk; same sizes, rows 100 %).
  */
 #include "homebutton/hkb_layout.h"
 
@@ -37,6 +31,8 @@ typedef ut::LinkList<AnimTransform, 4> AnimTransformList;
 
 namespace {
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x8052B344 (0x1AC): Gives every text box in the pane's subtree the tag processor. */
 inline void SetTagProcessorImpl(Pane* pPane, ut::TagProcessorBase<wchar_t>* pTagProcessor) {
     if (TextBox* pTextBox = ut::DynamicCast<TextBox>(pPane)) {
@@ -47,6 +43,7 @@ inline void SetTagProcessorImpl(Pane* pPane, ut::TagProcessorBase<wchar_t>* pTag
         SetTagProcessorImpl(it.operator->(), pTagProcessor);
     }
 }
+#pragma pop
 
 /* 0x8052B4F0 (0xC8): Returns whether a pane, or one of its parents when the binding descends, is in one of the
  * animation's groups. */
@@ -353,10 +350,13 @@ const ut::Rect Layout::GetLayoutRect() const {
     return ut::Rect(-mLayoutSize.width / 2, mLayoutSize.height / 2, mLayoutSize.width / 2, -mLayoutSize.height / 2);
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x8052BF74 (0x1B0): Gives every text box in the pane tree the tag processor. */
 void Layout::SetTagProcessor(ut::TagProcessorBase<wchar_t>* pTagProcessor) {
     SetTagProcessorImpl(mpRootPane, pTagProcessor);
 }
+#pragma pop
 
 /* 0x8052C124 (0x20C): Builds the pane a pane block describes, or returns NULL for another block. */
 /* untyped: byte range - the pane block the builder reads */

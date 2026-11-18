@@ -51,6 +51,7 @@
  *            lb_s26_pick_row_lsp@sda21`
  * SHAPES. `lb_screen26_trade_commit` declares `roll`, `sum`, `pick`, `i` and assigns them in statements (split
  *            initialisers, regsim plan order).
+ * FLAGS. lb_screen26_trade_tabs_draw takes a scoped `#pragma opt_strength_reduction off` (same size, raises its row).
  */
 
 
@@ -1965,6 +1966,8 @@ void lb_screen26_combo_draw(LbScreen26Work* work)
     }
 }
 
+#pragma push
+#pragma opt_strength_reduction off
 /* 0x803C7050 (0x190): draws the three trade page tabs, the current one blinking and with its arrows. */
 void lb_screen26_trade_tabs_draw(LbScreen26Work* work, u32 active, u8 arrows)
 {
@@ -2004,6 +2007,7 @@ void lb_screen26_trade_tabs_draw(LbScreen26Work* work, u32 active, u8 arrows)
         draw_sprite_anim_idx(t->frame, frame, &pos);
     }
 }
+#pragma pop
 
 /* 0x803C71E0 (0x270): draws the trade page: the four rewards and the five offered items with the counts held. */
 void lb_screen26_trade_list_draw(LbScreen26Work* work, bool active, u8 locked)

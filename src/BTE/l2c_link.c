@@ -14,12 +14,12 @@
  *   folds the whole event out of the loop (an event local of any width, an inline ternary, a while loop, scoped
  *   opt_loop_invariants/opt_strength_reduction/opt_propagation off measured the same; two calls or a switch are
  *   worse).
- *   l2c_link_adjust_allocation: yy and p_lcb take r28/r29 swapped against the target (every declaration
- *   order, a combined for-init and a separate first-loop counter measured the same). flipcheck also
+ *   flipcheck also
  *   refuses on LogMsg_6, btm_acl_created, btm_cb, btsnd_hcic_accept_conn and btu_cb: the map rows the source names are
  *   still generated (requests bte-l2cap#2/#3/#5/#6/#7/#8/#13/#23/#26), so a flip links against undefined symbols.
  * SHAPES. plain C; l2c_link_sec_comp is the security manager's callback (its middle parameter is the reference the
  *   caller registered, unused here).
+ * FLAGS. l2c_link_adjust_allocation takes a scoped `#pragma opt_lifetimes off` (same size, row 100 %).
  */
 
 #include "BTE/l2c_link.h"
@@ -397,6 +397,8 @@ void l2c_link_check_send_pkts(tL2C_LCB* p_lcb, tL2C_CCB* p_ccb, BT_HDR* p_buf) {
     }
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* 0x804959F0 (0x198): Splits the controller's ACL buffers between the active links, high priority first. */
 void l2c_link_adjust_allocation(void) {
     u16 yy;
@@ -438,6 +440,7 @@ void l2c_link_adjust_allocation(void) {
         }
     }
 }
+#pragma pop
 
 /* 0x80495B88 (0xE4): Returns the completed packets of each listed link to its and the controller's windows. */
 void l2c_link_process_num_completed_pkts(u8* p) {

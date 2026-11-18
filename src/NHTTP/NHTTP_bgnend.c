@@ -90,6 +90,7 @@
  *     field list back through `request->postDataList->next`.
  *   - `NHTTPRequestNode.id` / `NHTTPi_cancelRequest`'s `id` are `s32`: retail's comparison is `cmpw`,
  *     not `cmplw`.
+ * RESIDUALS. NHTTPi_Startup: the `error` local is `s16` (the row rises; ours is then 396 B against the target's 400 B).
  */
 
 #include "NHTTP/NHTTP_bgnend.h"
@@ -179,7 +180,7 @@ s32 NHTTPi_Startup(NHTTPInfo* info, NHTTPAllocFn alloc, NHTTPFreeFn free, u32 ar
     NHTTPRequestInfo* request = (NHTTPRequestInfo*)NHTTPi_GetReqInfoP(base);
     NHTTPMutexInfo* mutex = (NHTTPMutexInfo*)NHTTPi_GetMutexInfoP(base);
     NHTTPThreadInfo* thread = (NHTTPThreadInfo*)NHTTPi_GetThreadInfoP(base);
-    s32 error;
+    s16 error;
 
     memory = 0;
     bgnend->alloc_fn = (void*)alloc;

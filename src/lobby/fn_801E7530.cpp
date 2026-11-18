@@ -61,6 +61,7 @@
  *            3 EXACT; first divergence insn 5: retail `mr r29, r3` vs ours `mr r28, r3`
  * RESIDUALS. lb_hunt_day_roll: `and r0,r0,x` where ours folds `andi. r0,r0,0x50`; `80 > roll`, `!(roll >= 80)` and a named `s32 roll`
  *            all fold the same way.
+ * SHAPES. lb_farm_seed_info_draw declares `id` before `row` (`mt.py hill` order search; raises its row).
  */
 #include "types.h"
 
@@ -2523,8 +2524,8 @@ void lb_farm_seed_info_draw(u8 seed, u16 fertilizer)
 {
     char text[0x10];
     _mh_ivec2_ anchor;
-    const LbFarmHarvestRow* row;
     const u16* id;
+    const LbFarmHarvestRow* row;
     s32 i;
     void* unit;
 

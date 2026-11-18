@@ -128,6 +128,7 @@
  *   empty, so its object gets no `__register_global_object` (retail has none).
  * RESIDUALS. mwcc-debugger dump, `g3d_tex_obj_cache_load`: regsim 6/6 callee-saved, 5/6 volatile, best plan cost 0;
  *            first divergence insn 33: retail `slwi r0, r27, 5` vs ours `<DIFF_DELETE>`; size differs from retail
+ * FLAGS. G3dIndMtxCallbackStd::SetNrmMapMtx takes a scoped `#pragma optimization_level 4` (raises its row; ours stays 4 B over).
  */
 
 #include "types.h"
@@ -2411,6 +2412,8 @@ G3dIndMtxCallback::G3dIndMtxCallback() {
 
 #pragma push
 #pragma peephole on
+#pragma push
+#pragma optimization_level 4
 /* 0x80088858 (0x1A0): builds the normal-map matrix of indirect matrix `id` from the light direction and the normal
  * matrix (the specular method adds the half vector's row), or clears it for a method that needs none. */
 void G3dIndMtxCallbackStd::SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC3* pLightDir,
@@ -2448,6 +2451,7 @@ void G3dIndMtxCallbackStd::SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC
         }
     }
 }
+#pragma pop
 #pragma pop
 
 /* 0x800889F8 (0x50): resets the three matrices to identity and disables them. */

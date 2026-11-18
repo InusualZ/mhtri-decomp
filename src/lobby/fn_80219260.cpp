@@ -26,8 +26,6 @@
  *  - `lb_scroll_side_stage` (98.3): kinds 1/2 copy only, 5/6/10 take the second-page test and every other kind copies
  *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
  *    pointers) where ours hoists the load into r4 (a late `kind = ...` turns the range tests into signed compares).
- *  - `lb_equip_detail_blade_draw` (98.0): retail tests the 15/16 case range with `subi`+`cmplwi`, ours with two
- *    signed compares.
  *  - `lb_award_rows_apply` (98.3), `lb_menu_row_insert` (99.1), `lb_talk_reward_give` (99.1): register order only.
  *  - `lb_screen07_step` (98.8): the base and byte registers swap (r4/r3).
  *  - `lb_menu_angle_rank_get` (99.9): our frame is 0x40 against 0x30 (the conversion slots are not shared).
@@ -44,6 +42,7 @@
  *   the `u16` parameter.
  * RESIDUALS. mwcc-debugger dump, `lb_menu_row_insert`: regsim 5/5 callee-saved, 11/11 volatile (EXACT); first
  *            divergence insn 16: retail `mr r5, r27` vs ours `mr r6, r27`
+ * FLAGS. lb_equip_detail_blade_draw takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  */
 #include "types.h"
 
@@ -836,6 +835,8 @@ void lb_equip_detail_draw(LbScrollWork* self, u8 page, u8 mode, u8 sub, u16 anch
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Draws the two detail panels of a blade or gunner list (kinds 1/5) and, for a lone base side, its cell. */
 void lb_equip_detail_blade_draw(LbScrollWork* self, _mh_ivec2_* ofs) {
     u16 anchor;
@@ -889,6 +890,7 @@ void lb_equip_detail_blade_draw(LbScrollWork* self, _mh_ivec2_* ofs) {
         }
     }
 }
+#pragma pop
 
 /* Draws the compared and the base side's detail panels and cells of a compare list (kinds 2/6). */
 void lb_equip_detail_compare_draw(LbScrollWork* self, _mh_ivec2_* ofs) {

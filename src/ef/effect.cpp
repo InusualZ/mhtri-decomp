@@ -24,7 +24,8 @@
  *  - `fn_800F9E04` (-4 B): retail hoists the address of `setMatColor`'s by-value colour copy (`addi r31,r1,8`)
  *    out of the material loop and keeps the loop index in r28, and builds `change_color_eff`'s colour argument
  *    before `r3`; ours materialises the copy's address in each iteration;
- *  - `fn_800FA450`: register colouring of `count`/`which`/`rec` after the emitter walk (r29/r31 in retail);
+ *  - `fn_800FA450`: retail sets `j = 0` before copying `stage_effect_block_get()` into `rec` (`li r30,0` ahead of `mr r31,r3`;
+ *    a `for (j = 0, rec = ...)` header and a separate `j = 0;` measure no better); declarations follow regsim's plan;
  *  - `effect_retire`, `effect_layer_reset`: retail's virtual calls stage the table in r12 (`lwz r12,0(r3);
  *    lwz r12,N(r12)`); the typed-table views here stage it in r4/r5 - the real classes (`nw4r::ef::Effect`,
  *    `MemoryManagerBase`) are not declarable from this unit without a second copy of their definitions;
@@ -663,9 +664,9 @@ extern "C" void fn_800FA450(void* effect) {
     u32 i;
     u32 count;
     u8 which;
-    s32 alive;
-    EftEmitterRecord* rec;
     s32 j;
+    EftEmitterRecord* rec;
+    s32 alive;
     nw4r::math::VEC3 pos;
     PlCapsuleBox box2;
     ef_store_word(&res, 0);

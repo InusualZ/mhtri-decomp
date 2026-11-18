@@ -37,6 +37,7 @@
  *            first divergence insn 26: retail `<DIFF_INSERT>` vs ours `mr r7, r5`; size differs from retail
  * RESIDUALS. mwcc-debugger dump, `em_variant_element_pick`: regsim 7/7 callee-saved, 18/18 volatile (EXACT); first
  *            divergence insn 31: retail `lwz r3, 0x4(r27)` vs ours `lwz r5, 0x4(r27)`
+ * FLAGS. em_sub_buffer_release also takes `#pragma opt_loop_invariants off` + `opt_strength_reduction off` (same size, raises its row).
  */
 
 #include "types.h"
@@ -3297,6 +3298,9 @@ EmResBuffer* em_sub_buffer_claim(u8 kind) {
 
 #pragma push
 #pragma opt_lifetimes off
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* Drops one reference of monster kind `kind`'s sub-buffer; the last one releases its effect resources and clears it.
  * Returns the references left. */
 u8 em_sub_buffer_release(u8 kind) {
@@ -3353,6 +3357,7 @@ u8 em_sub_buffer_release(u8 kind) {
     }
     return 0;
 }
+#pragma pop
 #pragma pop
 
 /* `size` bytes (rounded up to 32) of monster kind `kind`'s sub-buffer; NULL when it is full. */

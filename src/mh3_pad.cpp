@@ -37,8 +37,7 @@
  *   functions standing for MWCC's static initialiser and the PlayerPad / Nunchuk-block constructors (a class
  *   `PlayerPad` whose +0xFC block holds 32 constructed VEC3s cannot be expressed in the flat header layout its 150
  *   consumers use), so the `.ctors` word (0x8056F2C4) that points at the initialiser is not emitted.
- *   Register allocation or scheduling only: `kpad_read_acc` (`&kpad_work` is formed before the first sample
- *   load), `pad_acc_y_delta`/`pad_fs_acc_y_delta` (r3/r4 swapped for the two sample pointers),
+ *   Register allocation or scheduling only: `pad_acc_y_delta`/`pad_fs_acc_y_delta` (r3/r4 swapped for the two sample pointers),
  *   `stage_map_set` (the flush size's constant is formed before `lbl_807947C0` loads), `pad_wpad_init`,
  *   `pad_menu_merge`, `kpad_pointer_read` and `kpad_read_dpd` (colouring), `lang_index_set` (`add` operand
  *   order), `pad_wait_table_set` (the unrolled loop's source-pointer bump is scheduled early).  `kpad_pointer_read`: all six
@@ -71,6 +70,7 @@
  * RESIDUALS. mwcc-debugger dump, `stage_map_set`: regsim 1/1 callee-saved, 18/19 volatile, best plan cost 0; first
  *            divergence insn 26: retail `<DIFF_INSERT>` vs ours `lwz r3, lbl_807947C0@sda21`
  * FLAGS. `pad_wpad_read` takes a scoped `#pragma optimization_level 4` + `#pragma opt_lifetimes off` (size unchanged, raises its row).
+ * FLAGS. kpad_read_acc takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
  */
 
 #pragma peephole off
@@ -2259,6 +2259,8 @@ extern "C" void kpad_calc_acc_vertical(KpadWork* kp)
     kp->status.acc_vertical.y = vy / f1;
 }
 
+#pragma push
+#pragma opt_propagation off
 /* Converts one sample's remote acceleration and smooths it into the pointer work. */
 extern "C" void kpad_read_acc(WPADStatus* s)
 {
@@ -2282,6 +2284,7 @@ extern "C" void kpad_read_acc(WPADStatus* s)
     kpad_calc_acc_horizon(kp);
     kpad_calc_acc_vertical(kp);
 }
+#pragma pop
 
 /* Converts the four pointer objects of a sample (`obj` is the last one) into the work's object samples. */
 extern "C" void kpad_obj_from_dpd(KpadWork* kp, WPADDpdObject* obj)

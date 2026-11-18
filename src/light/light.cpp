@@ -30,6 +30,7 @@
  *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `mr r31, r5`
  * SHAPES. `light_flare_setup` loops its second pass on its own counter `flare_index` (declared before `i`), which
  *            is what colours the loop counter and the model pointer like retail.
+ * SHAPES. light_init's `num` is an `s16` (raises its row).
  */
 
 #include "types.h"
@@ -283,7 +284,7 @@ void light_init(void)
 {
     g3d::LightObj* objs;
     LightPointWork* w;
-    u32 num;
+    s16 num;
     u32 i;
 
     w = &light_point_work;

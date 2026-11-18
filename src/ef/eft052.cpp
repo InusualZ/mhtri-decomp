@@ -29,7 +29,7 @@
  *   spellings measure equal).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
  *  - `eft052_place`: the register colouring only (regsim EXACT: retail's `table` is r26 and the loop counter r27, ours r27/r29);
- *  - `eft052_hold_list_draw`, `hud_msg_free`, `hud_msg_enqueue`, `fn_80358B40`: register colouring only;
+ *  - `eft052_hold_list_draw`, `hud_msg_enqueue`, `fn_80358B40`: register colouring only;
  *  - `hud_msg_update`: retail steps its first queue walk by 8 bytes (`queue += 2`, kept as written).
  *   flipcheck: `.bss`/`.data`/`.sbss`/`.sdata`/`.sdata2` claimed, not emitted.
  * SHAPES. The pooled `0.0f` is loaded through its label `lbl_8079B640` (a literal emits a 4-byte `.sdata2` of ours).
@@ -44,6 +44,7 @@
  * SHAPES. `eft_area_se_req` tests `(u32)(type - 9) <= 1` and `(s32)type == 1`; `eft052_box_menu_draw` writes the
  *            enable test as `if (total == 0 && i != 2) enabled = false; else enabled = true;` (retail's arm order).
  * FLAGS. `eft052_item_get_step` takes a scoped `#pragma optimization_level 4` (size unchanged, raises its row).
+ * SHAPES. hud_msg_free's scan loop is `for (queue = ..., i = 0; i < 16; queue++, i++)` (row 100 %); the same header measures lower in hud_msg_enqueue.
  */
 
 #include "types.h"
@@ -1292,7 +1293,7 @@ extern "C" void hud_msg_free(HudMsg* msg)
 
     if (work == NULL)
         return;
-    for (i = 0, queue = work->queue_0xBCC; i < 16; i++, queue++) {
+    for (queue = work->queue_0xBCC, i = 0; i < 16; queue++, i++) {
         if (*queue == msg)
             break;
     }

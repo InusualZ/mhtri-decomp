@@ -62,7 +62,6 @@
  *    if-converts, an earlier `mode = 2` costs a callee-saved register);
  *  - `sendReqLoginInfo`: the tag-9 `li` and the count `li` swap in each branch, and the `putItemAny` argument setup
  *    computes `&loginFields_82AC` last (statement orders, `const` and cast spellings tried);
- *  - `recvAnsAgreementPageInfo`: retail addresses the page count as `infoPtr+12`, ours folds it to `r1+28`.
  *  - the tag lists (`sendServerTimeout` {1,2,3} at 0x8079C7D8, `sendReqOpcode1B`'s 8-byte block at 0x8079C7E0, the
  *    runs from 0x8079C7E8) are single pool objects, one map row each (size = the array).
  *  - `handleNetworkState2Binary`'s `extabindex` row carries its size, so it differs while the function's size does.
@@ -105,6 +104,7 @@
  *    row is declared `extern`; `maskedUserName` (`.sdata`) still is.
  * RESIDUALS. mwcc-debugger dump, `sendReqLoginInfo`: regsim 3/3 callee-saved, 11/11 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 20: retail `li r0, 0x9` vs ours `li r30, 0x3`
+ * FLAGS. recvAnsAgreementPageInfo takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
  */
 
 #include "types.h"
@@ -5909,6 +5909,8 @@ s32 PatInterface::recvAnsAgreementPageNum(s32 index, const PatPacketHeader* head
     return 0;
 }
 
+#pragma push
+#pragma opt_propagation off
 /* Reads the agreement's page info (its page records onto the call stack) and reports it. */
 s32 PatInterface::recvAnsAgreementPageInfo(s32 index, const PatPacketHeader* header)
 {
@@ -5934,6 +5936,7 @@ s32 PatInterface::recvAnsAgreementPageInfo(s32 index, const PatPacketHeader* hea
     growStackSize(this, stackSize);
     return 0;
 }
+#pragma pop
 
 /* Reads one agreement page (its text onto the call stack) and reports it. */
 s32 PatInterface::recvAnsAgreementPage(s32 index, const PatPacketHeader* header)

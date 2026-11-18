@@ -25,11 +25,11 @@
  *  - quest_scene_boot, quest_scene_end, vs_scene_end: retail shares one tail between two switch cases (case 4's movie
  *    cut jumps into its close path; the end modes' case 2 reuses case 1's `scene_actors_move` call, and the versus
  *    end's case 2 reuses case 99's leave block) - a `goto` shape (rule 8); the source repeats the tail.
- *  - field_scene_main: the post-exit block sits after the switch in retail; the source keeps it in case 0.
+ *  - field_scene_main: the post-exit block sits after the switch in retail; the source keeps it in case 0 (ours is 408 B
+ *    against 404 B; the `exit_point` if/else form places retail's `li`).
  *  - quest_scene_load, scene_area_change_step: a `case 0: case 1:` pair compares `cmplwi 1`/`cmpwi 2` in retail; the
  *    `(u32)` switch gets `cmplwi` for both.
- *  - net_error_dialog_draw: the button x (`x + 526`) is rematerialised at each call instead of kept in r31, and the
- *    two `0.5f` products swap their `fmuls` operands.
+ *  - net_error_dialog_draw: the two `0.5f` products swap their `fmuls` operands.
  *  - data: the class-7 step/row tables, the stage tables and the `.sdata` stage records are `extern` map symbols the
  *    object does not emit (dtk's split of the TU's `.data` carries relocations into another unit inside some tables),
  *    so `.data`/`.sdata` are not matched; `.sbss` lacks `quest_stage_release_none` (only the `.sdata` records use it).
@@ -39,6 +39,7 @@
  *   (`.ctors`).  The scene inits clear the root counters with unrolled loops; the network slot loops count in an `int`.
  * RESIDUALS. scene_area_change_step: the sub-step `switch` measured as `(u32)`, plain `u8`, `(s32)` and an if chain: none gives
  *            retail's `cmplwi 1; cmpwi 2` pair.
+ * FLAGS. net_error_dialog_draw takes a scoped `#pragma opt_propagation off` (same size, raises its row; `width` is `s16`).
  */
 
 #include "types.h"
@@ -2498,12 +2499,14 @@ void root_wait_frames_set(s32 value) {
     }
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x8028D5F4 (0x184): draws the network error dialog: the frame, the message, the confirm button and the session
  * error code. */
 void net_error_dialog_draw(void) {
     _MH_VEC2 screen;
     char text[32];
-    s32 width = 590;
+    s16 width = 590;
     s32 x;
     s32 code;
 
@@ -2526,6 +2529,7 @@ void net_error_dialog_draw(void) {
     sprintf(text, net_error_code_fmt, MH3GetErrorString2(51), code);
     flfntPrintf(text);
 }
+#pragma pop
 
 /* 0x8028D778 (0x654): the quest scene's end mode: fills the result, shows the end message, tears the quest down and
  * then runs the result screen, the network close and error dialog, or the staff roll after the final quest. */
@@ -2893,9 +2897,10 @@ void field_scene_main(_PL_ROOT* root) {
         }
         if (quest_move_sub_state_4_get() == 1) {
             u8 flag = root->field_0x22D9;
-            exit_point = 1;
             if (flag != 0) {
                 exit_point = flag;
+            } else {
+                exit_point = 1;
             }
             se_slot_req(6);
             break;

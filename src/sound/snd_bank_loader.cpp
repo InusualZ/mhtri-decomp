@@ -31,7 +31,7 @@
  *   case 1 falling into it and case 2 branching back - a `goto` layout; rule 8 forbids it and the conformant shapes
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.
  *   snd_quest_bgm_set: register colouring only (retail keeps the three parameters in r25..r27, ours r27..r29).
- *   pl_weapon_se_bank_load (97.77) and snd_player_banks_load (97.08): register colouring and one scheduled load.
+ *   pl_weapon_se_bank_load (97.77): register colouring and one scheduled load.
  *   snd_area_bank_load, fn_800F06AC, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
  *   retail loads and extends in the handle's own register, the plain s8 load measures worse), snd_area_env_bank_load,
  *   demo_bgm_load: register choice / operand order only.
@@ -47,6 +47,7 @@
  * and `se_name_idx` (+0x01D) are named from this unit's evidence.
  * RESIDUALS. demo_bgm_ready_ck: regsim is EXACT for the saved set; retail emits `li r29,0` before `li
  *            r31,demo_stream_slot@sda21`, ours the reverse (two constant vregs, instruction order).
+ * FLAGS. snd_player_banks_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  */
 
 #include "types.h"
@@ -861,6 +862,8 @@ extern "C" void scene_se_bank_load(u8 a, u8 b)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* One enemy slot's files: one `whd` per chunk plus the shared `tsb`. */
 extern "C" void snd_player_banks_load(void)
 {
@@ -905,6 +908,7 @@ extern "C" void snd_player_banks_load(void)
         }
     }
 }
+#pragma pop
 
 /* The same for one already-selected slot. */
 extern "C" void pl_voice_bank_load(_PLW* work)

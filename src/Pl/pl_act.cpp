@@ -11131,8 +11131,8 @@ void equip_deco_attach(_EQUIP* equip, u16 deco)
 void equip_deco_pack(_EQUIP* equip)
 {
     s32 slots = equip_deco_slots_get(equip);
-    u16 sum = 0;
     s32 i;
+    u16 sum = 0;
 
     for (i = 0; i < slots; i++) {
         sum += equip->skill_id[i];

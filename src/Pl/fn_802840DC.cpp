@@ -16,7 +16,7 @@
  *   `pl_gun_ammo_entry_get`, `pl_act_state_enter_aim`, `pl_motion_stick_move`, `pl_gun_shot_se_req`,
  *   `pl_gun_empty_se_req`, `eft042_set`.
  * RESIDUALS. Every row is written.
- *  - `pl_weapon2_alt_act_shell_fire`, `pl_weapon456_act_fire`: retail loads
+ *  - `pl_weapon456_act_fire`: retail loads
  *    `shell_set_func_ptr` for a table call after the other arguments, ours first (`lwz r5` scheduled ahead of
  *    `mr r3`/`li r4`); an explicit `(*p->slot)(...)` and an inline wrapper give the same order.  The fire act also
  *    keeps the rapid-shot row index in r4 where ours uses r3.
@@ -33,6 +33,7 @@
  *   `s32` flag result unsigned (`pl_part_flag2_ck(...) == 1`).
  * FLAGS. `pl_weapon2_act_shell_fire` takes a scoped `#pragma opt_common_subs off` (same size, row 100).
  * FLAGS. `pl_weapon456_act_fire` takes a scoped `#pragma opt_propagation off` (same size, raises its row).
+ * FLAGS. `pl_weapon2_alt_act_shell_fire` takes a scoped `#pragma opt_common_subs off` (same size, row 100 %).
  */
 
 #include "types.h"
@@ -1078,6 +1079,8 @@ void pl_weapon2_alt_act_lunge_b(_PLW* self, s32 kind)
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* The alternate-form shell shot (attack 24): kind 1 lunges like `pl_weapon2_alt_act_lunge_b`, and at frame 74 the
  * shell job fires its kind-1 shell. */
 void pl_weapon2_alt_act_shell_fire(_PLW* self, s32 kind)
@@ -1113,6 +1116,7 @@ void pl_weapon2_alt_act_shell_fire(_PLW* self, s32 kind)
         break;
     }
 }
+#pragma pop
 
 /* The alternate-form rapid strikes (`pl_weapon2_act_rapid` with motions 0x48A/0x48B and attacks 31-34). */
 void pl_weapon2_alt_act_rapid(_PLW* self)

@@ -58,6 +58,7 @@
  * RESIDUALS. mwcc-debugger dump, `lb_pop_screen_draw`: regsim 3/3 callee-saved, 9/9 volatile (EXACT); first
  *            divergence insn 30: retail `cmpwi r0, 0x2` vs ours `cmplwi r0, 0x2`
  * SHAPES. `lb_pop_room_enter` declares `place`, `kind`, `player`, `peer`, `i` (regsim plan order).
+ * FLAGS. lb_room_box_list_set takes a scoped `#pragma opt_common_subs off`; its `rows++` sits in the for header (raises its row).
  */
 
 #include "types.h"
@@ -1658,6 +1659,8 @@ void lb_room_move_list_init(LbRoomWork* work)
     lb_list_init(&work->rooms_0x68, work->rooms_0xA8 - 1, 2, 0, -1, off_mask, 5, 3, 0);
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* Lists the picked room's placed models in the item-hold strip (`quiet` keeps a refresh silent). */
 void lb_room_box_list_set(LbRoomWork* work, u8 quiet)
 {
@@ -1672,14 +1675,13 @@ void lb_room_box_list_set(LbRoomWork* work, u8 quiet)
     memset(work->items_0xAC, 0, sizeof(work->items_0xAC));
     rows = 0;
     used = 0;
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < count; i++, rows++) {
         if (lobby_w.place_ids_0x134[base + i] != 0xFF) {
             work->items_0xAC[i] = note_slot_to_value(lobby_w.place_ids_0x134[base + i]);
             used++;
         } else {
             work->items_0xAC[i] = 0;
         }
-        rows++;
     }
     if (used == 0) {
         memset(work->items_0xAC, 0, sizeof(work->items_0xAC));
@@ -1700,6 +1702,7 @@ void lb_room_box_list_set(LbRoomWork* work, u8 quiet)
         eft052_hold_entry_set(&entry, 0);
     }
 }
+#pragma pop
 
 /* Steps the move screen: here/elsewhere, the slot list of this room, the slot's take-back question, the other rooms
  * and their hold strip; 2 once cancelled. */
