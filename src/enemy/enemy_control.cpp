@@ -692,17 +692,20 @@ void emc_spawn_req_clear_all(void) {
  * free request and is matched to a waiting area record of that kind; returns 1 when all were filed. */
 u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 count, u8 flags, u8 request,
                      nw4r::math::VEC3* pos, s32 rot_arg) {
-    EmAreaEntry* entries;
-    u8 req_flags;
+    Marker2Rec* req;
+    u32 pos_bit;
+    u32 rot_bit;
+    u8 want;
     s32 left;
-    _CP_VECTOR* rot;
-    u16 i;
+    s32 i;
     s32 e;
+    u8 req_flags;
+    EmAreaEntry* entries;
+    _CP_VECTOR* rot;
     rot = (_CP_VECTOR*)rot_arg;
     e = 0;
     entries = &em_area_entry_tbl[0][0];
     req_flags = flags;
-    Marker2Rec* req;
 
     if (pos != NULL) {
         req_flags = flags | 2;
@@ -716,6 +719,8 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
     }
     i = 0;
     req = &emc_work.marker2_0x1F8[0];
+    pos_bit = req_flags & 2;
+    rot_bit = req_flags & 4;
     for (;;) {
         if (left == 0) {
             return 1;
@@ -728,10 +733,10 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
             req->field_0x07 = area;
             req->field_0x08 = req_flags;
             req->field_0x0A = request;
-            if (req_flags & 2) {
+            if (pos_bit) {
                 req->pos_0x0C = *pos;
             }
-            if (req_flags & 4) {
+            if (rot_bit) {
                 eft_rot_vec_copy((_CP_VECTOR*)&req->field_0x18, rot);
             }
             for (; e < 128; e++, entries++) {
@@ -742,7 +747,7 @@ u32 em_spawn_request(u16 order, u8 kind, u8 team, u8 area, u8 entry, u8 max, u8 
                                 continue;
                             }
                         } else {
-                            u8 want = req->field_0x07;
+                            want = req->field_0x07;
                             if (want != 0xFF && em_area_entry_near_ck(entries, get_now_mapno(), want) == 0) {
                                 continue;
                             }
@@ -3441,14 +3446,15 @@ u32 em_area_entry_make(u8* area_arg, u8 kind, u8 index) {
     if (kind > 2) {
         return 0;
     }
-    if (index >= stage_map_area_count_get(root->area_no_0xED)) {
+    if (index >= (u8)stage_map_area_count_get(root->area_no_0xED)) {
         return 0;
     }
     p = area;
     for (i = 0; i < kind; i++) {
         p++;
     }
-    n = *p >> 2;
+    n = *p;
+    n >>= 2;
     if (n == 0) {
         return 0;
     }
@@ -3459,7 +3465,8 @@ u32 em_area_entry_make(u8* area_arg, u8 kind, u8 index) {
     for (i = 0; i < index; i++) {
         p += 2;
     }
-    n = p[0] >> 2;
+    n = p[0];
+    n >>= 2;
     if (p[1] == 0) {
         return 0;
     }

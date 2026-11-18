@@ -6174,7 +6174,7 @@ void NetworkLayerPat::setMediatorValue_D8(u32 value)
 }
 
 /* The mediator's terms flag. */
-u8 NetworkLayerPat::getMediatorValue_DC()
+u32 NetworkLayerPat::getMediatorValue_DC()
 {
     return getMediatorTermsFlag(getInstance());
 }

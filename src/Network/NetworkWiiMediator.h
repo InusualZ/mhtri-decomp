@@ -275,12 +275,12 @@ s32 getMediatorTermsProgressLevel(NetworkWiiMediator* self);
 u16 getMediatorTermsProgress(NetworkWiiMediator* self);
 /* 0x80416B90 / 0x80416BD8 - store / read the terms object's +0xE2 byte (0 with no terms object). */
 void setMediatorTermsFlag(NetworkWiiMediator* self, u32 flag);
-u8 getMediatorTermsFlag(NetworkWiiMediator* self);
+u32 getMediatorTermsFlag(NetworkWiiMediator* self);
 
 /* 0x804168F8 / 0x80416BD0 / 0x80416C10 - the terms object's ready byte (as 0/1) and its +0xE2 byte. */
 u32 isPatTermsReady(struct PatTerms* terms);
 void setPatTermsFlag(struct PatTerms* terms, u32 flag);
-u8 getPatTermsFlag(struct PatTerms* terms);
+u32 getPatTermsFlag(struct PatTerms* terms);
 
 /* The mediator's terms and transfer-state entry points the network pat control drives (GUESS names from the
  * bodies; the fields are the mediator's +0x6DD0 mode byte, the +0x6DD1/+0x6DD2 flag bytes and the +0x6DD4

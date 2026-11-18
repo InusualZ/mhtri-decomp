@@ -40,7 +40,8 @@
  *   load), `pad_acc_y_delta`/`pad_fs_acc_y_delta` (r3/r4 swapped for the two sample pointers),
  *   `stage_map_set` (the flush size's constant is formed before `lbl_807947C0` loads), `pad_wpad_init`,
  *   `pad_menu_merge`, `kpad_pointer_read` and `kpad_read_dpd` (colouring), `lang_index_set` (`add` operand
- *   order), `pad_wait_table_set` (the unrolled loop's source-pointer bump is scheduled early).
+ *   order), `pad_wait_table_set` (the unrolled loop's source-pointer bump is scheduled early).  `kpad_pointer_read`: all six
+ *   declaration orders measure equal; naming `&kpad_work` as `kp` at function scope measures worse.
  *   `pad_wpad_read`: retail re-forms `Psw + chan*0x350` for the second (core/Nunchuk) half and reads
  *   `pad_probe_type` through a copy of the pad pointer; ours keeps the base (`opt_common_subs off` re-forms
  *   both the multiply and the base: worse).  `pad_fs_stick_read`: retail keeps the two s16 stick values in

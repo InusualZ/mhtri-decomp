@@ -50,8 +50,8 @@
  *  - `gallery_demo_load_step`: the sub-step 6 switch tests `== 2` with `cmpwi` after a `cmplwi 1` (ours: `cmplwi`
  *    both, or `cmpwi` both on a plain `u8` operand), and `sub + 1` keeps a `clrlwi`.
  *  - `initPatTerms` (`bne`+`blr` vs `beqlr`), `resetPatTermsState` (the 0 is materialised after the state test),
- *    `writePatTermsVoice` (`getPatTermsFlag`'s `u8` return gets a `clrlwi`), `lb_plsearch_open` (a `clrlwi` on
- *    the server type index), `mailbox_draw`/`mailbox_reply_draw`/`plsearch_search_draw` (register colouring).
+ *    `lb_plsearch_open` (a `clrlwi` on
+ *    the server type index; a local for the call result and `peephole on` around the function measure no better), `mailbox_draw`/`mailbox_reply_draw`/`plsearch_search_draw` (register colouring).
  *  - Data: `.data`, `.sdata`, `.bss` and the vtable are emitted, in this file's order rather than the four TUs';
  *    nine callees are registry names not yet in the map (`sys_tex_image_get`, `userdata_save_export`/`_import`,
  *    `friend_pick_*`, `friend_card_view`, `hud_mail_notice_clear`, `card_equip_ids_build`).
@@ -4765,8 +4765,8 @@ s32 readPatTermsVoice(PatTerms* terms, u8* out, s32 size) {
  * terms flag is up; the byte count. */
 s32 writePatTermsVoice(PatTerms* terms, const s16* in, s32 size) {
     s32 count;
-    s32 i;
     s16* out;
+    s32 i;
 
     count = (size / 2 < 192) ? size / 2 : 192;
     if (!isTermsUpdateFinished(terms)) {

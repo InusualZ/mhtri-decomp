@@ -146,7 +146,7 @@ public:
     virtual u8 getFlag75();                        /* +0x0D0 */
     virtual void setFlag76(bool value);            /* +0x0D4 */
     virtual void setMediatorValue_D8(u32 value) = 0;                         /* +0x0D8 */
-    virtual u8 getMediatorValue_DC() = 0;                                    /* +0x0DC */
+    virtual u32 getMediatorValue_DC() = 0;                                    /* +0x0DC */
     virtual void setFriendTransferMode_E0(s8 slot, bool mode) = 0;            /* +0x0E0 */
     virtual BOOL isFriendTransferActive_E4(s8 slot) = 0;                     /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot) = 0;                      /* +0x0E8 */

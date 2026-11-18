@@ -529,7 +529,7 @@ public:
     virtual void readRoomHeader_C8(s32 index, u8* out);                       /* +0x0C8 */
     virtual void setFlag75(u32 value);                                        /* +0x0CC */
     virtual void setMediatorValue_D8(u32 value);                              /* +0x0D8 (GUESS: forwards to the mediator's terms flag) */
-    virtual u8 getMediatorValue_DC();                                         /* +0x0DC */
+    virtual u32 getMediatorValue_DC();                                         /* +0x0DC */
     virtual void setFriendTransferMode_E0(s8 slot, bool mode);                /* +0x0E0 */
     virtual BOOL isFriendTransferActive_E4(s8 slot);                          /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot);                           /* +0x0E8 */

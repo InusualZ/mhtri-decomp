@@ -1913,7 +1913,7 @@ void setPatTermsFlag(PatTerms* terms, u32 flag)
 #pragma peephole off
 
 /* The terms object's +0xE2 byte, 0 when there is no terms object. */
-u8 getMediatorTermsFlag(NetworkWiiMediator* self)
+u32 getMediatorTermsFlag(NetworkWiiMediator* self)
 {
     if (getPatTerms() != NULL) {
         return getPatTermsFlag(getPatTerms());
@@ -1921,7 +1921,7 @@ u8 getMediatorTermsFlag(NetworkWiiMediator* self)
     return 0;
 }
 
-u8 getPatTermsFlag(PatTerms* terms)
+u32 getPatTermsFlag(PatTerms* terms)
 {
     return terms->flag_0xE2;
 }

@@ -29,7 +29,7 @@
  *   lb_server_select_rooms_draw, lb_server_select_help_draw, lb_screen26_trade_build,
  *   lb_screen26_picks_draw, lb_server_select_servers_draw, lb_server_select_screen_step, lb_screen26_box_draw,
  *   lb_screen26_step, lb_screen26_combo_items_draw.
- *   npc_talk_start is 8 bytes long (msg * 8 is recomputed after the conditional `choice` store; retail keeps it), so
+ *   npc_talk_start is 8 bytes long (msg * 8 is recomputed after the conditional `choice` store; retail keeps it; a `rec = &recs[msg]` pointer for the `msg_a`/`msg_b` reads gives 524 B at a lower score), so
  *   `.text` is 0x5E28 against 0x5E20.  lb_screen26_step: the one-case compare is `cmplwi 2` where retail has `cmpwi 2`.
  *   The server-select list draws keep `x` sign-extended at its assignment where retail extends it at each use.
  *   `.sdata` ends at +0x1C3 against +0x1C8 and `.sbss` is 4 bytes against 8: unreferenced tail words, contents unknown.

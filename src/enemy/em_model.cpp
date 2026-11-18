@@ -28,7 +28,8 @@
  *    FuncObjCalcWorld::Get/SetCallbackNodeID) keep the map's generated rows: other units still call them by C names
  *    until those classes are modelled there, so the relocations differ by name only;
  *  - `em_pop_obj_callback_bind`: retail's first search jumps into the second loop's bind tail (a shared tail); without
- *    `goto` the best shape is a break-out first loop and a guarded second loop (the flag-free unrolled form is worse);
+ *    `goto` the best shape is a break-out first loop and a second loop guarded by `i >= 0x20` with `i = 0x20` set first
+ *    (the `mode != 0 ||` guard and the flag-free unrolled form are worse); the bind tail still repeats (+20 B);
  *  - `em_pop_obj_tint_set`: retail re-sign-extends the channels at every use and keeps `0 < r` as `li 0; cmpw`, the
  *    shape of inline helpers' argument copies (a max helper and a scale/clamp helper); `dont_inline` (needed for the
  *    out-of-line ResMat/ResMatChan copies) keeps any helper out of line, so the copies are written as blocks over s32
@@ -1983,6 +1984,7 @@ void em_pop_obj_callback_bind(EmPopObj* obj, u8 mode) {
     s32 i;
     nw4r::g3d::ScnMdlSimple* scn;
 
+    i = 0x20;
     if (mode == 0) {
         for (i = 0; i < 0x20; i++) {
             if (em_handle_tbl[i] != NULL && em_handle_tbl[i]->in_use_0x04 != 0 && em_handle_tbl[i]->owner_0x08 == obj) {
@@ -1990,7 +1992,7 @@ void em_pop_obj_callback_bind(EmPopObj* obj, u8 mode) {
             }
         }
     }
-    if (mode != 0 || i >= 0x20) {
+    if (i >= 0x20) {
         for (i = 0; i < 0x20; i++) {
             if (em_handle_tbl[i] != NULL && em_handle_tbl[i]->in_use_0x04 == 0) {
                 scn = (nw4r::g3d::ScnMdlSimple*)obj->model_0x038.field_0x118;

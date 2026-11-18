@@ -20,7 +20,8 @@
  *   step 3 and branches into both from step 4 (idea 213); the goto-free source shares the verify-retry tail after the
  *   switch (do/while(0), idea 183) and duplicates the read tail in step 4 (+108 B, the bodies after it shift).
  *   read_wpad_memory: step 1's error results branch back to step 0's read loop (a backward jump into another case);
- *   the goto-free source omits those six instructions.
+ *   the goto-free source omits those six instructions (a `for (;;)` with a local step and `continue` in the
+ *   error cases hoists the loads and measures worse).
  *   getDirVec, VEC3::operator=: retail copies VEC3 as words and returns it by NRVO - its VEC3 derives from a base struct
  *   with a constructor; the shared nw4r::math::VEC3 here is a plain struct of floats (a 399-includer header).
  *   hunter_rank_points_get hoists

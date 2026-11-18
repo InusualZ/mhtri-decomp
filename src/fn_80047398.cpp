@@ -19,8 +19,8 @@
  *   `faceGX*` (the SDK's `GXPosition2s16`/`GXColor4u8`/`GXTexCoord2f32`/`GXEnd`/`GXSetTexCoordGen` emitted out of
  *   line, named in the `dbgGX*`/`fntGX*` scheme), `m_face_file_tbl`/`f_face_file_tbl`/`skin_file_tbl` (draw_shape's).
  * RESIDUALS. Register allocation only: `face_draw` (f28/f29/f27 hold 1.0/0.25/0.125 in retail, ours 1.0 in f29;
- *   the makeup block re-derives `work + i` through r4 where retail reads r27); `face_tex_bind` (retail work=r29,
- *   sex=r27, i=r31; ours work=r31, sex=r28); `face_buf_reset`, 8 bytes short (retail hoists the unrolled loop's trip
+ *   the makeup block re-derives `work + i` through r4 where retail reads r27); `face_tex_bind` (the second loop's
+ *   texobj pointer takes r26 where retail reuses r28); `face_buf_reset`, 8 bytes short (retail hoists the unrolled loop's trip
  *   count `li r28,2` out of the outer loop and saves r28, ours rematerialises `li r0,2` per pass).
  */
 
@@ -277,12 +277,13 @@ void face_tex_reload(u8 sex, u8 index)
 /* 0x800478F0 (0x200): once all three files are loaded, binds their images as GX texture objects. */
 void face_tex_bind(u32 sex)
 {
-    FaceWork* work = &face_work;
-    TPLPalette* pal;
     TPLImageHeader* image;
     GXTexObj* obj;
-    s32 j;
     s32 i;
+    s32 j;
+    FaceWork* work = &face_work;
+    TPLPalette* face_pal;
+    TPLPalette* pal;
 
     if (work->state[0] != 2 || work->state[1] != 2 || work->state[2] != 2) {
         return;
@@ -291,10 +292,10 @@ void face_tex_bind(u32 sex)
         return;
     }
     for (j = 0; j < 2; j++) {
-        pal = work->tex[j];
-        TPLBind(pal);
-        for (i = 0; i < pal->numDescriptors; i++) {
-            image = TPLGet(pal, i)->textureHeader;
+        face_pal = work->tex[j];
+        TPLBind(face_pal);
+        for (i = 0; i < face_pal->numDescriptors; i++) {
+            image = TPLGet(face_pal, i)->textureHeader;
             obj = &work->texobj[i % 4 + j * 4];
             GXInitTexObj(obj, image->data, image->width, image->height, image->format, image->wrapS, image->wrapT, 0);
             GXInitTexObjLOD(obj, 0, 1, 0.0f, 0.0f, 0.0f, 0, 0, 0);
@@ -302,8 +303,7 @@ void face_tex_bind(u32 sex)
     }
     pal = work->tex[j];
     TPLBind(pal);
-    obj = &work->texobj[8];
-    for (i = 0; i < pal->numDescriptors; i++) {
+    for (i = 0, obj = &work->texobj[8]; i < pal->numDescriptors; i++) {
         image = TPLGet(pal, i)->textureHeader;
         GXInitTexObj(obj, image->data, image->width, image->height, image->format, 0, 0, 0);
         GXInitTexObjLOD(obj, 0, 1, 0.0f, 0.0f, 0.0f, 0, 0, 0);

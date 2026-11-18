@@ -606,10 +606,8 @@ size_bytes,unit,function,match_percent,address
 492,homebutton/hbm_value,__dt__14SysKbdVuObjectFv,0.0,0x8055CB34
 492,homebutton/tiHKBManager,fn_8056A638,98.374,0x8056A638
 492,lobby/lb_pane_ui,lb_dye_inner_draw,95.2439,0x801FA0DC
-492,menu/menu_plsearch,writePatTermsVoice,98.0081,0x804510FC
 496,DWCi/gt2Auth,gti2GetResponse,98.9516,0x8050CA60
 496,homebutton/hbm_kb_cursor,hbmKbCursorCreateMemoKeys,94.7903,0x80567014
-496,lobby/fn_801E0ADC,em007_model_eft_draw,99.5161,0x801E2674
 496,lobby/fn_80212810,lb_count_window_draw,99.8387,0x80214D00
 496,lobby/fn_80219260,lb_scroll_side_stage,92.0161,0x80219340
 496,lobby/lb_npc,lb_npc_act_set,95.4839,0x8020A3E4
@@ -663,14 +661,11 @@ size_bytes,unit,function,match_percent,address
 544,sound/mhchar,mhchar_model_release,94.4338,0x800E26C4
 552,Network/network_socket_streams,receive__18NetworkMultipleUdpFlPUcl,97.7899,0x803CE984
 552,draw_shape,drawshape_gx_begin_setup,99.8188,0x80054580
-552,enemy/enemy_control,em_area_entry_make,99.058,0x80147894
 552,lobby/lb_quest_ui,lb_trade_list_draw,98.6232,0x803931C0
 556,SO/socket,SendTo,98.3813,0x80520928
 556,fn_8004CAD8,read_wpad_memory__FP13_vs_user_dataUc,94.2806,0x8004FA54
 556,lobby/fn_801E0ADC,lb_eqshop_goods_draw,98.1655,0x801E6198
 560,lobby/lb_screen_step,lb_smith_detach_draw,98.5,0x803653A0
-564,enemy/enemy_control,em_spawn_request,97.1986,0x80141B88
-564,lobby/lb_companion_ui,lb_skill_unlock_announce,95.2979,0x8033C77C
 564,sound/snd_bank_loader,fn_800F06AC,99.3262,0x800F06AC
 568,Pl/pl_act,equip_skill_points_get,98.0141,0x80271BD4
 568,ef/system_core,memory_layout_init,98.3099,0x800CF3E4

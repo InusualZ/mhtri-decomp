@@ -27,10 +27,11 @@
  *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
  *     operands does not move it (regsim: colouring exact).
  *   - register colouring only: lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
- *     lb_title_frame_draw, lb_eqshop_help_draw, eft033_create, eft033_move_joint (the second loop counter), and
+ *     lb_title_frame_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
+ *   - lb_eqshop_help_draw: retail leaves the `0x78 : 0x79` pick in `msg` unnarrowed, ours adds a `clrlwi` (an if/else pick is
+ *     4 B shorter but scores lower).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
- * *   - em007_model_eft_draw: one register.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
  *   extab/extabindex short of the claim.  The trade tables (0x805BA660-0x805BA750) are an unclaimed hole read by this
  *   unit and lobby/fn_801E7530 (src/unsplit/lb_trade_rows.h, request #8).  LbShopListTmpl is the 0x14 template
@@ -1200,7 +1201,7 @@ void em007_model_eft_draw(_EFT* eft, MHchar* model)
     MaskEftView* work = (MaskEftView*)eft->work_0x38;
     _PLW* plw = ((_AINPC_W*)eft->source_0x30)->plw_0x16C;
     MaskJobRec* job;
-    u16 motion;
+    s32 motion;
 
     switch (work->state_0x2B) {
     case 1:

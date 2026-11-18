@@ -26,6 +26,9 @@
  *   - `lb_kakou_weapon_cost_flags_get`, `lb_deco_row_flags_get`: retail loads the table row pointer straight into
  *     the saved register (`lwzx r30` + `add r30,r30`).
  *   - `lb_sprite_pulse_draw`, `lb_count_window_draw`: `mullw` operand order; both source orders give ours.
+ *   - `lb_seisan_row_flags_get`: retail joins the blade and gun unlock bytes in r0 and narrows once (`clrlwi` before the
+ *     `extsh` argument), ours loads each arm into r4 (a ternary, a u32 local and `(u8)` casts give ours); the record pointer
+ *     takes r28 where retail has r29.
  *   - register colouring or scheduling only: `lb_text_center_print` (retail loads `spr.width` before `spr.pos.x`),
  *     `lb_list_draw_ex`, `lb_item_window_draw`, `lb_seisan_row_flags_get`, `lb_kakou_weapon_flags_get`,
  *     `lb_kakou_icon_build`, `lb_gun_recipe_material_flags_get`,
@@ -918,12 +921,12 @@ u16 lb_seisan_row_flags_get(u16 kind, u16 idx, u8 level)
 {
     PlWeaponRec* gun;
     PlSkillRec* blade;
-    u16 item;
-    Q_UserData* user;
     u8 locked;
-    u16 flags;
-    LbSmithRow* row;
     u32 gun_kind;
+    Q_UserData* user;
+    LbSmithRow* row;
+    u16 flags;
+    u16 item;
 
     user = (Q_UserData*)lobby_world_block;
     flags = 0;

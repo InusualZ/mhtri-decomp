@@ -50,8 +50,6 @@
  *    temporaries are retail's r5 where ours stay r0);
  *  - `lb_combo_rate_get`: `userdata_item_slot_count`'s `s16` result is sign-extended where retail keeps it (the owner
  *    header's width), and the item box capacity's `clrlwi` is scheduled after the item load;
- *  - `lb_skill_unlock_announce`: retail walks `lb_skill_unlock_items` with two pointers (one for the `need_0x00` test,
- *    one for the other fields), ours with one (an indexed loop and `s16`/`s32`/`u8` counters measure the same or worse);
  *  - `lb_s13_dance_values_draw`: retail keeps the pair index in its own register beside the `lb_s13_value_pairs` base,
  *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
  *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
@@ -71,7 +69,8 @@
  * SHAPES. Declaration order decides the callee-saved colours of `lb_combo_rate_get`/`lb_combo_exec` (playbook 63) and
  *   of the screen-13 helpers; `lb_combo_exec`'s yield roll is a `for (;;)` with the test first (retail does not rotate
  *   it); a draw helper declares its layout base before the row position (retail puts the base at +0xC); the two-row
- *   loops are `for` loops (a `do`/`while` keeps an `extsh`/`clrlwi` on the test).
+ *   loops are `for` loops (a `do`/`while` keeps an `extsh`/`clrlwi` on the test); `lb_skill_unlock_announce` walks each
+ *   table with two pointers set by one chained assignment and stepped in lockstep (one tests the sentinel field).
  * FLAGS. scoped `#pragma peephole on` around lb_act_best_keep (99.60 -> 99.73).
  * RESIDUALS. lb_act_best_keep: retail stores the raw `value` byte (r4) while ours stores the extsb copy, the CSE of
  *            the sign extension (regsim EXACT; an `s8 value` local scores 93.65).
@@ -2339,21 +2338,23 @@ u32 lb_item_gets_pending_ck(void) {
  * dances, announcing each on the message line. */
 void lb_skill_unlock_announce(void) {
     s8 text[0x40];
+    LbSkillUnlock* need_row;
     LbSkillUnlock* unlock;
+    LbSkillFlag* skill_row;
     LbSkillFlag* flag;
 
-    for (unlock = lb_skill_unlock_items; unlock->need_0x00 != 0xFFFF; unlock++) {
-        if (userdata_progress_flag_ck(unlock->done_0x02) == 0 && userdata_progress_flag_ck(unlock->need_0x00) != 0) {
+    for (need_row = unlock = lb_skill_unlock_items; need_row->need_0x00 != 0xFFFF; unlock++, need_row++) {
+        if (userdata_progress_flag_ck(unlock->done_0x02) == 0 && userdata_progress_flag_ck(need_row->need_0x00) != 0) {
             lobby_world_block->flags_0x519C |= 1 << unlock->skill_0x04;
             userdata_progress_flag_set(unlock->done_0x02);
             sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_item_name_str(unlock->skill_0x04));
             hud_msg_push(0, (char*)text);
         }
     }
-    for (flag = lb_skill_unlock_flags; flag->flag_0x00 != 0xFFFF; flag++) {
-        if (userdata_progress_flag_ck(flag->flag_0x00) == 0 && (lobby_world_block->flags_0x519C & (1 << flag->skill_0x02)) != 0) {
+    for (skill_row = flag = lb_skill_unlock_flags; flag->flag_0x00 != 0xFFFF; flag++, skill_row++) {
+        if (userdata_progress_flag_ck(flag->flag_0x00) == 0 && (lobby_world_block->flags_0x519C & (1 << skill_row->skill_0x02)) != 0) {
             userdata_progress_flag_set(flag->flag_0x00);
-            sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_item_name_str(flag->skill_0x02));
+            sprintf((char*)text, (char*)LbStr(0, 0x1C7), get_item_name_str(skill_row->skill_0x02));
             hud_msg_push(0, (char*)text);
         }
     }
