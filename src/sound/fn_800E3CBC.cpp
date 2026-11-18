@@ -29,7 +29,8 @@
  * `prim_queue_draw`'s `rlwinm`+`cmpwi` zero test fuses into `rlwinm.`+`bne` and the whole unit loses ~5
  * points (prim_queue_draw 74.5 -> 85.3, fn_800E4148 85.8 -> 89.7, fn_800E4284 89.9 -> 94.3).
  *
- * Residuals: `prim_list_exec` (+8 B) materialises an address the peephole pass would fold; `fn_800E4390`/
+ * Residuals: `prim_list_exec` (-4 B) keeps no `clrlwi` after `system_lobby_flag_get` (declared `u8` or `s32`, local or cast: all
+ *   measured the same) and compares `mode == 1` with `cmplwi` where retail uses `cmpwi` (`bool mode` measures worse); `fn_800E4390`/
  * `set_zmode` are size-exact and differ only in register colouring (`fn_800E4390`: regsim search's best plan,
  * `cur`/`raw` block locals ahead of `f`, reaches 4/5 volatile targets and measures worse - the unnamed `@` temporary
  * stays r0 where retail has r5).  `fn_800E3D7C` reads 100 % with `p`, `i`, `base` declared in that order and
@@ -145,12 +146,14 @@ extern f32 lbl_80796464;
 extern f32 lbl_80796468;
 extern f64 lbl_80796470;
 void* word_read(void* a);
-s32 stage_water_enabled_ck(void);
+/* free: retail C linkage, the map carries the unmangled name */
+u32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
-s32 stage_water_b_enabled_ck(void);
+/* free: retail C linkage, the map carries the unmangled name */
+u32 stage_water_b_enabled_ck(void);
 s32 system_lobby_flag_get(void);
-s32 camera_mode1_ck(void);
-s32 camera_work_ck(void);
+u32 camera_mode1_ck(void);
+u32 camera_work_ck(void);
 s32 my_player_no(void);
 void* ef_effect_root_mtx(void* p);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
@@ -214,6 +217,7 @@ extern "C" void sound_free_lists_reset(void)
 
 /* The per-frame driver: for both record lists, run each live record's callback, state and draw setup.
  * `mode` selects the state filter (`1` keeps only the flag-0x2 records). */
+#pragma optimization_level 4
 extern "C" void prim_list_exec(void* a, u8 mode)
 {
     MTX34 b40;
@@ -225,12 +229,12 @@ extern "C" void prim_list_exec(void* a, u8 mode)
     GXInvalidateVtxCache();
     ((nw4r::g3d::Camera*)a)->GetCameraMtx(&b40);
     DrawCtx* ctx = (DrawCtx*)word_read(a);
-    s32 sel = stage_water_enabled_ck();
+    u32 sel = stage_water_enabled_ck();
     if (sel == 1) {
         f31 = lbl_80796458;
         fn_80074AA8(a, 0, &scalef, 0);
     }
-    s32 sub = stage_water_b_enabled_ck();
+    u32 sub = stage_water_b_enabled_ck();
     for (u32 i = 0; i < 2; i++) {
         PrimRec* p = (PrimRec*)prim_rec_pool[i];
         for (u32 j = 0; j < prim_rec_count[i]; j++, p++) {
@@ -263,8 +267,9 @@ extern "C" void prim_list_exec(void* a, u8 mode)
                     continue;
                 }
             }
+            Obj* h;
             if (p->kind <= 1) {
-                Obj* h = (Obj*)p->handle;
+                h = (Obj*)p->handle;
                 if (p->started == 0) {
                     if ((p->flags & 0x40) && p->callback != 0) {
                         p->callback(p);
@@ -283,29 +288,46 @@ extern "C" void prim_list_exec(void* a, u8 mode)
                 f32 f1;
                 if (p->flags & 1) {
                     f1 = p->pos.y;
-                } else if (p->kind > 1) {
-                    if (p->kind == 2) {
-                        f1 = ((f32*)ef_effect_root_mtx(p->handle))[7];
-                    } else {
-                        f1 = lbl_80796458;
-                    }
                 } else {
-                    reinterpret_cast<nw4r::g3d::ScnObj*>(p->handle)->GetMtx(
-                        nw4r::g3d::ScnObj::MTX_LOCAL, &b10);
-                    f1 = b10.m[1][3];
+                    switch (p->kind) {
+                    case 2:
+                        f1 = ((f32*)ef_effect_root_mtx(p->handle))[7];
+                        break;
+                    case 0:
+                    case 1:
+                        reinterpret_cast<nw4r::g3d::ScnObj*>(h)->GetMtx(
+                            nw4r::g3d::ScnObj::MTX_LOCAL, &b10);
+                        f1 = b10.m[1][3];
+                        break;
+                    default:
+                        f1 = lbl_80796458;
+                        break;
+                    }
                 }
                 if (sel == 1) {
                     if (f31 < scalef) {
-                        p->state = (f1 < f31) ? 2 : 1;
+                        if (f1 < f31) {
+                            p->state = 2;
+                        } else {
+                            p->state = 1;
+                        }
                     } else {
-                        p->state = (f1 < f31) ? 1 : 2;
+                        if (f1 < f31) {
+                            p->state = 1;
+                        } else {
+                            p->state = 2;
+                        }
                     }
                 }
                 break;
             }
             case 0:
                 if (sub == 1) {
-                    p->state = (p->flags & 0x4) ? 2 : 1;
+                    if (p->flags & 0x4) {
+                        p->state = 2;
+                    } else {
+                        p->state = 1;
+                    }
                 }
                 break;
             default:
@@ -316,7 +338,6 @@ extern "C" void prim_list_exec(void* a, u8 mode)
     }
 }
 
-#pragma optimization_level 4
 /* Project the record against `arg` and decide whether it survives this frame's culling. */
 extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
 {

@@ -1886,7 +1886,7 @@ void lb_page_arrow_put(s16 x, s16 y, s16 page, s16 pages, u16 moved, s32 active)
 }
 
 /* Puts the stick page arrows with the held flag set. */
-void lb_ana_page_arrow_put(s32 lsp, s32 kind, s32 page, s32 pages, s32 moved, _mh_ivec2_* pos, bool active)
+void lb_ana_page_arrow_put(s32 lsp, s32 kind, s16 page, s16 pages, s32 moved, _mh_ivec2_* pos, bool active)
 {
     LbPutAnaPageArrow((u16)lsp, (u16)kind, (s16)page, (s16)pages, (u16)moved, pos, active, true);
 }

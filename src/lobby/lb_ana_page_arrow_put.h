@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* Puts the stick page arrows with the held flag set (`LbPutAnaPageArrow`). */
-void lb_ana_page_arrow_put(s32 lsp, s32 kind, s32 page, s32 pages, s32 moved, struct _mh_ivec2_* pos, bool active);
+void lb_ana_page_arrow_put(s32 lsp, s32 kind, s16 page, s16 pages, s32 moved, struct _mh_ivec2_* pos, bool active);
 
 #ifdef __cplusplus
 }

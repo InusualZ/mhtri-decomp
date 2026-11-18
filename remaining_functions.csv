@@ -872,7 +872,6 @@ size_bytes,unit,function,match_percent,address
 808,homebutton/hbm_kb_child,create__10HbmKbChildFP12MEMAllocator,97.698,0x80555C34
 812,ef/eft013_fx,fn_8010B71C,99.4828,0x8010B71C
 812,menu/menu_placeinfo,lb_community_list_ex_draw,97.7586,0x80439568
-812,menu/menu_plsearch,plsearch_search_draw,99.5074,0x8044C88C
 812,sound/fn_800E3CBC,prim_list_exec,88.0985,0x800E3E1C
 820,g3d/g3d_draw,"__sort<PQ34nw4r3g3d4MdlZ,RPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b>__3stdFPQ34nw4r3g3d4MdlZPQ34nw4r3g3d4MdlZRPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b_v",99.439,0x80079B38
 820,g3d/g3d_draw,"sort<PQ34nw4r3g3d4MdlZ,PFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b>__3stdFPQ34nw4r3g3d4MdlZPQ34nw4r3g3d4MdlZPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b_v",97.7805,0x80079604
@@ -897,7 +896,6 @@ size_bytes,unit,function,match_percent,address
 860,ef/eft052,hud_msg_step,98.093,0x8035AEE4
 860,homebutton/hbm_anim_record,create__12HbmAnimPanelFP12MEMAllocator,97.9767,0x80557390
 860,homebutton/hbm_text_panel,hbmPanelCheckWordWrap,99.7907,0x80546D98
-860,lobby/lb_pane_ui,fn_801ED688,99.5349,0x801ED688
 860,menu/menu_item_sub,menu_item_sub_page15_draw,99.7674,0x8036B2C0
 860,menu/menu_placeinfo,draw_search_city_dialog,98.2791,0x80439894
 860,menu/menu_plsearch,mailbox_draw,99.0233,0x8044DC78

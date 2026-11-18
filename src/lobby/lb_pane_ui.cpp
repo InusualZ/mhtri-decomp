@@ -44,6 +44,7 @@
  *    `lb_entry_pane_menu_step` (the sort loop), `lb_entry_pane_sort_apply`,
  *    `lb_model_pane_draw` (the row text id from the
  *    unmasked counter), `lb_my_set_detail_draw`/`lb_gun_set_detail_draw` (the page row count re-masked at the use),
+ *    (`lb_gun_set_detail_draw` also lacks two `b` after the `Gunner_opt_ok_ck` call, whose result retail discards inside an if/else shell)
  *    `lb_box_top_draw`, `lb_my_set_list_draw`, `lb_equip_set_pane_step`, `lb_equip_set_pane_init` (parameter homes),
  *    `lb_equip_box_wear_step`, `lb_entry_pane_scroll_refresh` (the `kind == 10` test is `cmplwi`), `fn_801EE1E4`,
  *    `fn_801EDC4C`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`, `fn_801ED688`, `fn_801EDB34`;
@@ -585,7 +586,7 @@ s32 lb_cam_manual_begin(LbMenuPanel* self);
 s32 lb_box_cam_input_step(LbMenuPanel* self, u8 flag);
 void lb_box_model_turn_step(LbMenuPanel* self);
 u32 lb_page_record_empty_ck(struct LbPage* page);
-s32 lb_cmd_pressed_ck(u32 mask);
+s32 lb_cmd_pressed_ck(u16 mask);
 s32 lb_cmd_repeat_ck(u32 mask);
 u16 lb_cmd_repeat_get(void);
 u16 lobby_cmd_trig_get(void);

@@ -3210,7 +3210,7 @@ void plsearch_search_draw(MenuSlot* slot) {
     u32 cursor;
     u32 prompt;
     u32 typed;
-    s32 help;
+    u8 help;
 
     if (slot->field_0x014 == 19 || slot->field_0x014 == 20) {
         help = 0;
