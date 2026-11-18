@@ -69,6 +69,7 @@
  *   is used as a bool).
  * RESIDUALS. mwcc-debugger dump, `stage_map_set`: regsim 1/1 callee-saved, 18/19 volatile, best plan cost 0; first
  *            divergence insn 26: retail `<DIFF_INSERT>` vs ours `lwz r3, lbl_807947C0@sda21`
+ * FLAGS. `pad_wpad_read` takes a scoped `#pragma optimization_level 4` + `#pragma opt_lifetimes off` (size unchanged, raises its row).
  */
 
 #pragma peephole off
@@ -1179,6 +1180,9 @@ extern "C" void pad_frame_read(void)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
+#pragma opt_lifetimes off
 /* Reads channel `chan`'s remote: probes it, copies the sample of its device and derives the button blocks. */
 extern "C" void pad_wpad_read(s32 chan)
 {
@@ -1347,6 +1351,7 @@ extern "C" void pad_wpad_read(s32 chan)
     }
     pad_menu_merge(chan);
 }
+#pragma pop
 
 /* Creates an expandable heap over `size` bytes at `base`. */
 extern "C" MEMiHeapHead* exp_heap_create(void* base, u32 size)

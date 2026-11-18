@@ -44,6 +44,7 @@
  *            B)
  * SHAPES. `eft_area_se_req` tests `(u32)(type - 9) <= 1` and `(s32)type == 1`; `eft052_box_menu_draw` writes the
  *            enable test as `if (total == 0 && i != 2) enabled = false; else enabled = true;` (retail's arm order).
+ * FLAGS. `eft052_item_get_step` takes a scoped `#pragma optimization_level 4` (size unchanged, raises its row).
  */
 
 #include "types.h"
@@ -976,6 +977,8 @@ extern "C" void eft052_box_sort(Eft052ItemBox* box)
         eft052_box_cell_merge(&box->cells_0x24[i], box->sorted_0x28, box->cell_count_0x2C);
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x8035A034 (0x694): One step of the item hand-over window: the menu (take, store, leave), moving one cell to the
  * pouch or the box, the sort question and the leave question; 1 once the window closes. */
 extern "C" s32 eft052_item_get_step(void)
@@ -1140,6 +1143,7 @@ extern "C" s32 eft052_item_get_step(void)
     }
     return done;
 }
+#pragma pop
 
 /* 0x8035A6C8 (0x110): Draws the box menu at layout `lsp`: its frame and the three options (leave greys out while the
  * box is empty, and shows the close line). */

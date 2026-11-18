@@ -34,8 +34,7 @@
  *     camera_follow_wall_turn, whose step limit returns past the rotation.  Every branch pairs; the residual is
  *     colouring (kind/area/yaw shifted in r29..r31, the helper's `step` copy in r24, three temporaries' stack
  *     slots).  A goto spelling with `clamped` hoisted and the floor stored to `pos.y` first measures 98.66.
- *   - Register allocation: camera_follow_shake_update keeps two slot bases (`cam + i` for the state and the timer
- *     bytes) where retail keeps one (a sub-struct, a 2-D array and every index type tried); camera_quake_apply keeps
+ *   - Register allocation: camera_quake_apply keeps
  *     the row where retail keeps the row's byte offset (row types and an inline index tried);
  *     camera_event_script_step loads the latch mask into r0 before extending it into r4.
  * SHAPES.  camera_shoulder_update's segment end points are one `VEC3 seg[2]` (an array local takes the slots above `eye`
@@ -54,6 +53,7 @@
  *   index); a few byte fields compare signed through an `(s32)` cast (camera_kill_cut_start, camera_event_path_step);
  *   camera_aim_update reads the scope pick through a signed-byte view of camera_aim_scope_get; camera_follow_snap
  *   copies the range's look-at offset through an inline helper whose local takes the last stack slot.
+ * FLAGS. `camera_follow_shake_update` takes a scoped `#pragma optimization_level 4` (same size, matches).
  */
 
 #include "types.h"
@@ -1899,6 +1899,8 @@ extern "C" void camera_shake_slot_arm(CamFollow* cam, u8 index, u8 frames)
     cam->slot_armed[index] = 0;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Builds the follow camera's swing and turn shakes from the shake table row the player's action picks, and
  * runs the two shake slots' decay. */
 extern "C" void camera_follow_shake_update(CamFollow* cam, _PLW* player)
@@ -2039,6 +2041,7 @@ extern "C" void camera_follow_shake_update(CamFollow* cam, _PLW* player)
         }
     }
 }
+#pragma pop
 
 /* Applies the follow camera's push offsets: in push mode 2 it re-aims the pitch from the pushed view, otherwise
  * the yaw, and clears both offsets. */

@@ -451,7 +451,7 @@ extern "C" void em032_frame_update(_ENEMY_WORK* work) {
         case 6:
             switch (work->field_0x43B) {
             case 0: {
-                u16 max;
+                u32 max;
                 EmAreaWork* pl;
                 u16 i;
                 _ENEMY_WORK* em;
@@ -459,7 +459,7 @@ extern "C" void em032_frame_update(_ENEMY_WORK* work) {
 
                 max = get_move_work_max(2);
                 pl = (EmAreaWork*)get_move_work_adrs(2);
-                for (i = 0; i < max && found == 0; i++, pl++) {
+                for (i = 0; i < (u16)max && found == 0; i++, pl++) {
                     if ((s32)pl->active != 0 && em_pl_slot_leaving_ck(pl->field_0x008) == 0 &&
                         work->area_no == pl->area_no && calcVecDistXZ(&work->pos, &pl->vec_0x3C) <= 200.0f &&
                         pl->vec_0x3C.y <= work->pos.y + 100.0f && pl->vec_0x3C.y >= work->pos.y - 100.0f &&
@@ -476,7 +476,7 @@ extern "C" void em032_frame_update(_ENEMY_WORK* work) {
                 }
                 max = get_move_work_max(3);
                 em = (_ENEMY_WORK*)get_move_work_adrs(3);
-                for (i = 0; i < max && found == 0; i++, em++) {
+                for (i = 0; i < (u16)max && found == 0; i++, em++) {
                     if ((u32)em_work_die_ck(work) != 1 && work->area_no == em->area_no && work != em) {
                         if ((em->team == 0x20 && em->field_0x00A == 2) || (em->team == 0x20 && em->field_0x00A == 6)) {
                             if (em->field_0x43B == 2 && vec3_distance(&work->pos, &em->pos) <= 500.0f) {
@@ -520,7 +520,7 @@ extern "C" void em032_frame_update(_ENEMY_WORK* work) {
                 }
                 max = shell_pool.work_max_0x04;
                 shell = shell_pool.work_0x08;
-                for (i = 0; i < max && found == 0; i++, shell++) {
+                for (i = 0; i < (u16)max && found == 0; i++, shell++) {
                     if ((s32)shell->active_0x00 != 0 && work->area_no == shell->area_0x08 &&
                         vec3_distance(&work->pos, &shell->pos_0x18) <= 200.0f &&
                         ((EmHitSlot*)shell->hit_0x5C)->power_0x3C > 0.0f &&

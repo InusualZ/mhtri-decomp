@@ -22,6 +22,7 @@
  *   `lis`/`addi`; the `.data` is defined after the functions so the switch table leads it, as in retail.  The
  *   draw reads the block through one local pointer (retail materialises it once), and the selection search is an
  *   inline helper whose `return` gives retail's per-hit store.
+ * FLAGS. `lb_menu_marker_update` takes a scoped `#pragma opt_loop_invariants off` (same size, raises its row).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -253,6 +254,8 @@ static inline void lb_menu_row_find(LbMenuScratch* scratch, LbMenuRow* key)
 
 /* Retail keeps the distance's `fmuls`/`fmuls`/`fadds`. */
 #pragma fp_contract off
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x8021E538 (0x6B8): rebuilds the target marker's rows - the lobby NPCs and the other players in range, the stage zone
  * and the lobby spot the player stands on - then keeps the selection on the same row and steps it on input. */
 void lb_menu_marker_update(LbMenuScratch* scratch)
@@ -408,6 +411,7 @@ void lb_menu_marker_update(LbMenuScratch* scratch)
         }
     }
 }
+#pragma pop
 
 #pragma fp_contract reset
 

@@ -93,6 +93,8 @@
  * RESIDUALS. mwcc-debugger dump, `fn_801EDB34`: regsim 2/7 callee-saved, 7/7 volatile, best plan cost 7; first
  *            divergence insn 24: retail `mr r29, r3` vs ours `mr r30, r3`; the kept declaration permutation moves it closer;
  *            the plan's backend temporary (`mr r48,r3`) is not nameable
+ * RESIDUALS. lb_dye_pane_draw: retail keeps the two loop counters unmasked and narrows at each use (`u32 i` with `(u8)i` uses measures 97.00 against 97.52), passes `lit` to
+ *   `lb_list_row_draw` without a `clrlwi` (an `s32 lit` measures 95.50) and stores `sel_id_0x014` through `clrlwi 16` (a `u16` field measures 97.33).
  */
 #include "types.h"
 #include "id_value.h"
@@ -7910,9 +7912,9 @@ extern "C" {
 void lb_dye_pane_draw(LbPage* self)
 {
     _SPR_DATA_ spr;
-    _mh_ivec2_ pos;
     _mh_ivec2_ base;
     _mh_ivec2_ origin;
+    _mh_ivec2_ pos;
     u32 color;
     const s16* cells;
     ::_EQUIP* equip;

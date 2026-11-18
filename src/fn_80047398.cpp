@@ -22,6 +22,7 @@
  *   the makeup block re-derives `work + i` through r4 where retail reads r27); `face_tex_bind` (the second loop's
  *   texobj pointer takes r26 where retail reuses r28); `face_buf_reset`, 8 bytes short (retail hoists the unrolled loop's trip
  *   count `li r28,2` out of the outer loop and saves r28, ours rematerialises `li r0,2` per pass).
+ * FLAGS. `face_draw` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  */
 
 #include "types.h"
@@ -423,6 +424,8 @@ s32 face_tex_ready_ck(u8 slot)
     return face_work.dirty[slot] == 0;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x80047D6C (0x9F8): renders every shown, changed slot's face into its two images, then clears the screen. */
 void face_draw(void)
 {
@@ -520,6 +523,7 @@ void face_draw(void)
     g3d_state_invalidate(0x7FF);
     GXSetNumIndStages(0);
 }
+#pragma pop
 
 /* --- the GX pipe helpers (the SDK's write-gather-pipe writers, emitted out of line) ------------------------ */
 

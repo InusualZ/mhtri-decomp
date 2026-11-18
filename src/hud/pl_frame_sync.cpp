@@ -53,6 +53,7 @@
  *            first divergence insn 29: retail `clrlwi r4, r30, 24` vs ours `clrlwi r0, r30, 24`
  *   - `pl_act_handler_11`/`_21` measured: a single `pl_act_enter` after an if/else with `return` exits is 24 B worse in
  *     both rows than the two calls.
+ * FLAGS. `eft_frame_state_step` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  */
 
 #include "types.h"
@@ -229,6 +230,8 @@ void eft_frame_state_init(_EFT* self) {
 #pragma push
 #pragma pool_data off
 #pragma fp_contract off
+#pragma push
+#pragma optimization_level 4
 /* 0x803305F8 (0x808): follows the source's joint each frame, steps every record's colour and alpha keys, and
  * re-spawns the flash model on the records that flash. */
 void eft_frame_state_step(_EFT* self) {
@@ -492,6 +495,7 @@ void eft_frame_state_step(_EFT* self) {
         }
     }
 }
+#pragma pop
 
 #pragma pop
 

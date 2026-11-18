@@ -90,6 +90,7 @@
  *            cost 0; first divergence insn 23: retail `clrlwi r5, r3, 16` vs ours `clrlwi r3, r3, 16`
  * RESIDUALS. mwcc-debugger dump, `wpadFilterButtons`: regsim 1/1 callee-saved, 23/26 volatile, best plan cost 0;
  *            first divergence insn 13: retail `add r6, r31, r0` vs ours `add r5, r31, r0`
+ * FLAGS. `wpadSampleChanged` takes a scoped `#pragma opt_dead_assignments off` (size unchanged, raises its row).
  */
 
 #include "types.h"
@@ -728,6 +729,8 @@ static inline BOOL wpadDebounceMove(WPADCB* cb, s32 moved, s32 group)
     return FALSE;
 }
 
+#pragma push
+#pragma opt_dead_assignments off
 /* Compares a new sample with the last one: buttons, the accelerometer, the pointer and the extension's inputs. */
 BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
 {
@@ -825,6 +828,7 @@ BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
     }
     return changed;
 }
+#pragma pop
 
 /* Counts consecutive reports with no input and clears the flag once the count passes the limit. */
 void wpadCountIdleReports(s32 chan, WPADSample* sample)

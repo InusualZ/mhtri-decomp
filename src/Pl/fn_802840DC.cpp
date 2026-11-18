@@ -34,6 +34,7 @@
  * RESIDUALS. mwcc-debugger dump, `pl_weapon2_act_shell_fire`: regsim 1/1 callee-saved, 3/3 volatile (EXACT,
  *            colouring is not the cause); first divergence insn 41: retail `<DIFF_INSERT>` vs ours `lwz r5,
  *            shell_set_func_ptr@sda21`
+ * FLAGS. `pl_weapon456_act_fire` takes a scoped `#pragma opt_propagation off` (same size, raises its row).
  */
 
 #include "types.h"
@@ -1694,6 +1695,8 @@ void pl_weapon456_shot_se(_PLW* self, s32 alt)
     }
 }
 
+#pragma push
+#pragma opt_propagation off
 /* The gunner's fire act: the `index` fire motion of the form's table (or the charge motion for `mode` 1), the shot
  * at frame 4 with its sound, shell, ammo use and empty-magazine sound; rapid shots (+0x007) chain the next motion,
  * and the alternate form's indices 2/5 recoil the actor along its aim. */
@@ -1884,6 +1887,7 @@ void pl_weapon456_act_fire(_PLW* self, s32 index, s32 mode, s32 alt, u8 special)
         break;
     }
 }
+#pragma pop
 
 /* The alternate-form reload: motion 0x481 with the aim pair 0x48B/0x48C, the magazine refilled and the motion speed
  * set by the reload tier; back to the alternate aim state when it ends. */

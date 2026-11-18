@@ -1128,7 +1128,6 @@ size_bytes,unit,function,match_percent,address
 1740,menu/menu_friendlist,friend_pick_step,98.6782,0x8043F398
 1776,WPAD/WPADEncrypt,WPADiCreateKey,88.7117,0x804F72C0
 1784,WPAD/WPADEncrypt,WPADiCreateKeyFor3rd,98.7556,0x804F79B0
-1788,camera/camera_main,camera_follow_shake_update,99.0604,0x802B81E0
 1792,enemy/em_prog_support,note_page_step,99.5312,0x80384434
 1800,homebutton/hbm_kb_widget,hbmKbCandHandleInput,99.9556,0x80553848
 1820,lobby/lb_pane_ui,fn_801EE1E4,98.8352,0x801EE1E4
@@ -1165,8 +1164,6 @@ size_bytes,unit,function,match_percent,address
 2176,lobby/lb_pane_ui,lb_box_menu_draw,98.3621,0x801FA958
 2176,menu/menu_infomation,skill_table_body_draw,98.6581,0x8030A9B4
 2216,lobby/fn_802FA9A0,lb_barter_step,97.4819,0x803004D0
-2220,hud/cockpit_quest,quest_gauge_draw,99.964,0x802E7FA0
-2272,hud/cockpit_quest,cockpit_split_gauge_draw,99.9648,0x802F09C4
 2288,ef/ef_animcurve,ef_anim_resolve_key_index,99.8077,0x8009D5C0
 2296,WPAD/wpad,wpadSampleChanged,93.5679,0x804EBAF0
 2312,Pl/pl_act_step,pl_act_fishing,99.3858,0x8024AA54

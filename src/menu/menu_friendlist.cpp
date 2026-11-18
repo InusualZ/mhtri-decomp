@@ -37,6 +37,7 @@
  *    order among those tried reaches retail's.
  *  - `option_cursor_draw`: retail compares the value state before materialising 0xFFFF (`cmpwi` first); MWCC schedules
  *    the compare after it in every spelling tried (if/else, ternary, int locals).
+ * FLAGS. `friend_pick_step` takes a scoped `#pragma opt_propagation off` (size unchanged, raises its row).
  */
 
 #include "types.h"
@@ -218,6 +219,8 @@ s32 movie_page18_step(MenuSlot* slot) {
     return friend_pick_step(&page18_pick_work);
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x8043F398 (0x6CC): fetches the page's cards one by one, lets the player pick a friend, shows its card and sends
  * a friend request; 1 picked (mode 1), 2 back, 3 nothing to fetch or the request failed, 4 closed. */
 s32 friend_pick_step(FriendPickWork* work) {
@@ -452,6 +455,7 @@ s32 friend_pick_step(FriendPickWork* work) {
     }
     return ret;
 }
+#pragma pop
 
 /* 0x8043FA64 (0xC): draws menu page 18's picker. */
 void movie_page18_draw(MenuSlot* slot) {

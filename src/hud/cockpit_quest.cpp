@@ -30,8 +30,6 @@
  *   `step`), `cockpit_supply_box_draw`, `cockpit_item_tag_update` (the second search loop's counters),
  *   `cockpit_split_item_ring_draw`, `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
  *   `quest_gauge_bar_draw` (the `origin.x`/`origin.y` volatile temporaries r7/r6 swapped).
- *   `quest_gauge_draw`, `cockpit_split_gauge_draw`: the `health_max / 10` dividend is loaded into r4 and the magic
- *   constant into r0 in retail, the other way round in ours.
  *   `cockpit_name_tags_draw`: the first `Pl_area_flag_get` result lives in r26 in retail, r25 in ours.
  *   `cockpit_take_menu_draw`, `cockpit_hunt_log_draw`, `cockpit_item_list_entry_draw`, `quest_gauge_update`,
  *   `quest_targets_update_a`/`_b`: retail emits the default `li` of a two-constant choice between the compare and
@@ -70,6 +68,7 @@
  *            is not the cause); first divergence insn 42: retail `<DIFF_INSERT>` vs ours `li r0, 0x4`
  * RESIDUALS. mwcc-debugger dump, `cockpit_npc_digit_draw`: regsim 2/2 callee-saved, 7/7 volatile (EXACT); first
  *            divergence insn 48: retail `lfs f0, lbl_8079A920@sda21` vs ours `lfs f4, 0x4c(r1)`
+ * FLAGS. `quest_gauge_draw` and `cockpit_split_gauge_draw` take a scoped `#pragma optimization_level 4` (same size, match).
  */
 
 #include "types.h"
@@ -1908,6 +1907,8 @@ s16 quest_gauge_flicker_ofs_idle[28] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802E7FA0.  Draws the quest cockpit's three gauges for the first player: the stamina bar (0xB9E group), the
  * health bar with its tick marks (0xB99 group) and the stagger gauge with its flash (0xBAC group). */
 void quest_gauge_draw(void) {
@@ -2103,6 +2104,7 @@ void quest_gauge_draw(void) {
         drawshape_exec();
     }
 }
+#pragma pop
 
 /* 0x802E884C (0x70).  "Is this quest target usable by the player?": `quest_target_usable_ck` is asked twice -
  * a global gate first (the same arguments with flags 0), then the per-target test when the gate
@@ -5434,6 +5436,8 @@ s16 cockpit_split_flicker_ofs_idle[26] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802F09C4 (0x8E0): `quest_gauge_draw` for player `player`'s split view: the stamina, health and stagger gauges
  * at the player's anchor, with the split view's own tick and flicker tables. */
 void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
@@ -5630,6 +5634,7 @@ void cockpit_split_gauge_draw(CockpitWork* work, u8 player) {
         drawshape_exec();
     }
 }
+#pragma pop
 
 /* The weapon-class frame per player and class, the class glow colours, and per player the glow and condition ids. */
 u16 cockpit_weapon_frame_ids[2][7] = {

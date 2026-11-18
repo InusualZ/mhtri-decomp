@@ -75,6 +75,7 @@
  *   a range of cases tested as `cmplwi`/`ble` then `cmpwi`/`beq` is a `switch` (`q_result_points_page_draw`);
  *   `q_result_phase_input` runs case 4's body for every phase it does not name (`case 4: default:` last, `case 0:`
  *   empty); `seconds` is `elapsed - minutes * per_minute`, not a second division.
+ * FLAGS. `multi_box_phase_input` takes a scoped `#pragma opt_lifetimes off` (same size, raises its row).
  */
 
 #pragma pool_data off
@@ -3618,6 +3619,8 @@ u32 multi_box_phase_step(QResultScreen* self, u8 mode) {
 /* The two `system_w` bytes the box save keeps while the player's options are swapped in. */
 u8 multi_box_save_keep[2];
 
+#pragma push
+#pragma opt_lifetimes off
 /* 0x8039DBC8 (0x780): Runs the box band's current phase: the grid choice (1), the reward (5), the ready flags (8) and
  * the save that writes each player's box back to the remote or the save file (9); returns 1 when the phase is done. */
 s32 multi_box_phase_input(QResultScreen* self)
@@ -3848,6 +3851,7 @@ s32 multi_box_phase_input(QResultScreen* self)
     }
     return 0;
 }
+#pragma pop
 
 /* 0x8039E348 (0x284): The multiplayer box screen's task: sets the screen up from the result record and the
  * delivered items, then runs the box phases until the closing fade ends and returns `box_result`. */

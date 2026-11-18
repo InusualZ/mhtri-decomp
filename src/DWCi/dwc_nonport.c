@@ -18,6 +18,7 @@
  *   alignment code into the copy loops cross each other, which nested `if (0) { case ... }` blocks cannot express
  *   (playbook 241).
  *   `DWCi_GetConsoleFriendCode` names `DWCi_consoleFriendCode` where retail names `lbl_807957DC` (the low word).
+ * FLAGS. `DWCi_Np_CPUCopyFast` takes a scoped `#pragma opt_common_subs off` (size unchanged, raises its row).
  */
 
 #include "types.h"
@@ -28,6 +29,8 @@
 #include "DWCi/dwc_report.h"             /* DWC_Printf */
 #include "DWCi/dwc_nonport.h"
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x80507C40 (0x9E4): copies `len` bytes, by the widest unit both pointers can be aligned to (8, 4 or 2
  * bytes, after copying the bytes in front of the boundary), falling back to `memcpy` for odd distances. */
 void DWCi_Np_CPUCopyFast(u8* dst, const u8* src, u32 len) {
@@ -181,6 +184,7 @@ void DWCi_Np_CPUCopyFast(u8* dst, const u8* src, u32 len) {
         }
     }
 }
+#pragma pop
 
 /* 0x8062FFD0 (0x24) / 0x8062FFF4 (0x25): the two lines the friend-code reporter prints, the value
  * as `%016lld` (the 64-bit pair `lbl_807957D8`/`0xDC` prints as two varargs registers). */
