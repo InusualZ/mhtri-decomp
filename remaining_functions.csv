@@ -924,7 +924,6 @@ size_bytes,unit,function,match_percent,address
 912,DWCi/natneg,DWCi_natNegPollReplies,93.2588,0x805125F0
 912,hud/cockpit_quest,quest_gauge_update,99.1228,0x802E796C
 912,lobby/lb_pane_ui,lb_equip_box_wear_step,98.9737,0x801F1874
-916,DWCi/gt2Message,DWCi_requestBlockState,98.8428,0x805108B0
 916,Pl/pl_act_step,pl_act_walk,99.9563,0x80252FD4
 916,WUD/wud,__wudClearControlBlock,97.5764,0x804FCA30
 916,hud/layout,draw_title_window,99.5415,0x802E3718

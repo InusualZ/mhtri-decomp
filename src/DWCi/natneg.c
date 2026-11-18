@@ -57,13 +57,11 @@
  *
  * Residuals, all measured:
  *   - `DWCi_natNegPollReplies` reaches `natNegMessageMagic` ABSOLUTELY (`lis`/`addi`, the only two ADDR16
- *     sites among twelve) and its two `switch`es are MWCC's COMPARE TREE (`cmpwi 2; beq; bge; ...`) where
- *     Wii/1.0-1.7 lowers the same dense switch to a linear `beq` chain - every GC/2.x and GC/3.0 compiler
- *     produces the tree (measured, scratch compile, cases 1,2,3 and 0..3); at `-O0` the Wii compilers do
- *     too, and no pragma, flag or spelling in this compiler moves it.  `DWCi_natNegOnReply`'s own
- *     switch (cases 1, 2, 14) IS linear in the target.  Both facts point at the SAME conclusion: PollReplies
- *     (and the 4-byte thunk after it) is a DIFFERENT translation unit, compiled by an older compiler,
- *     whose `.sdata` reference to the signature is an `extern` and whose `.sbss` flags (0x8079582C..44)
+ *     sites among twelve) and its two `switch`es are MWCC's COMPARE TREE (`cmpwi 2; beq; bge; ...`), which this
+ *     function now reproduces under `#pragma opt_optimizecontrolflow off` (93.26 -> 95.76); the remaining
+ *     difference is the ABSOLUTE magic reference below.  `DWCi_natNegOnReply`'s own switch (cases 1, 2, 14) is
+ *     linear in the target.  The absolute magic reference points at PollReplies (and the 4-byte thunk after
+ *     it) being a DIFFERENT translation unit, whose `.sdata` reference to the signature is an `extern` and whose `.sbss` flags (0x8079582C..44)
  *     sit between `DWCi_natNegAddressRingIndex` and the socket list.  Unit-wide `GC/3.0a5.2` measures
  *     PollReplies 85.3 against this build's 82.5 before the loop fix, and lowers every other function
  *     (TickIdle 91.8, GetStringLength 91.6, SetSocket 96.5, OnReply 93.5).  Filed as a seam request:
@@ -281,6 +279,8 @@ char* DWCi_natNegFormatAddress(u32 addr, u16 port, char* buf) {
  * an ERT reply (type 2, routed by its port type) or a report of the local address (type 11, routed
  * by the cookie, which also records the local address and port).  Returns 0 once every reply has
  * been seen. */
+#pragma push
+#pragma opt_optimizecontrolflow off
 u32 DWCi_natNegPollReplies(s32 sock, struct DWCiNatNegSession* session) {
     DWCiSockAddrIn from;
     DWCiSockAddrIn local;
@@ -404,6 +404,7 @@ u32 DWCi_natNegPollReplies(s32 sock, struct DWCiNatNegSession* session) {
     }
     return 1;
 }
+#pragma pop
 
 
 /* 0x80512980 (0x4): a tail thunk onto `DWCi_natNegPollReplies` - the image keeps the same routine
@@ -808,7 +809,11 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         }
         DWCi_natNegServerAddr2 = addr;
     }
-    ok = (DWCi_natNegServerAddr0 != 0 && DWCi_natNegServerAddr1 != 0 && DWCi_natNegServerAddr2 != 0);
+    if (DWCi_natNegServerAddr0 != 0 && DWCi_natNegServerAddr1 != 0 && DWCi_natNegServerAddr2 != 0) {
+        ok = 1;
+    } else {
+        ok = 0;
+    }
     if (ok == 0) {
         return 3;
     }

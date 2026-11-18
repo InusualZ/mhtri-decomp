@@ -15,7 +15,7 @@
  *   `DWCi_appendTransfer` (gti2ResendMessage), GUESS `DWCi_flushRequest` (gti2Send), GUESS `DWCi_protocolMagic`,
  *   GUESS `DWCi_gt2ReceiveBuffer`. The file name is the GameSpy SDK's `gt2Message.c` (no `__FILE__` string).
  * RESIDUALS. Register colouring and block order remain in the larger message handlers
- *   (`gti2HandleReliableMessage`, `gti2HandleMessage`, `gti2ReceiveMessages`, `DWCi_requestBlockState`).
+ *   (`gti2HandleReliableMessage`, `gti2HandleMessage`, `gti2ReceiveMessages`).
  *   `gti2HandleReliablePacket` re-tests the scan index after a delivered message where retail branches straight
  *   back to the scan, and colours the header length / header pointer and two delivery locals the other way round.
  *   `gti2HandleNack`'s inlined resend adds the buffer before the header offset where the standalone
@@ -854,6 +854,7 @@ int DWCi_requestBlockState(DWCiReq* req, u32 type, u32 len, u32* overflow) {
     DWCiXfer message;
     s16 vdpLength = len - req->conn->protocolOffset;
     s32 count;
+    s32 appended;
     u16 serialNumber;
 
     if (gti2GetBufferFreeSpace(&req->outgoingBuffer) < (s32)len) {
@@ -871,7 +872,8 @@ int DWCi_requestBlockState(DWCiReq* req, u32 type, u32 len, u32* overflow) {
     message.stamp = current_time();
     count = ArrayLength(req->outgoingBufferMessages);
     ArrayAppend(req->outgoingBufferMessages, &message);
-    if (count + 1 != ArrayLength(req->outgoingBufferMessages)) {
+    appended = (count + 1 == ArrayLength(req->outgoingBufferMessages));
+    if (appended == 0) {
         if (!gti2OutgoingBufferFullInline(req)) {
             return 0;
         }

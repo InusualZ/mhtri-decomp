@@ -32,6 +32,9 @@ scored 85.78 (frame pointer). The opt_* pragmas `opt_rebuildconditionals`, `opt_
 `opt_arithtransformation`, `opt_foldconstants`, `switch_tables`, `opt_dead_code` and `opt_pointer_analysis` off
 keep the `beq` chain (demo).
 
+A second case: `DWCi/natneg` `DWCi_natNegPollReplies` (Wii/1.3, a `.c` unit; two switches of 3 and 4 cases) 93.26 -> 95.76 %
+with the pragma around the function alone; a unit header had called the tree "unreachable on Wii compilers".
+
 **Example.**
 
 ```c
