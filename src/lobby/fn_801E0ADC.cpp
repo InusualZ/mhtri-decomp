@@ -19,6 +19,7 @@
  *   names this unit proposed are in the name registry (GUESS: ai_npc_joint_mtx_get, eft013_npc_place, eft025_npc_set,
  *   chacha_mask_se00/01/16/17_req).
  * FLAGS. `#pragma opt_loop_invariants off` scoped to em007_model_eft_update (98.47 to 99.52, same size).
+ * SHAPES. lb_eqshop_help_draw keeps `msg` an `s32` and tests `(u16)msg != 0xFFFF` (retail leaves the pick unnarrowed).
  * RESIDUALS. Every row is written.  `Em007ModelCopy` is declared in enemy/em007_act.h; MaskEftView is this unit's view
  *   of `Em007EftWork` (enemy/em007_act.cpp, request lobby-801e0adc#4).
  *   - em007_model_eft_update: register colouring only - retail gives the hoisted zero copies r21-r31/r14 and the
@@ -30,8 +31,6 @@
  *   - register colouring only: lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
  *     lb_title_frame_draw, eft033_create, eft033_move_joint (the second loop counter), and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
- *   - lb_eqshop_help_draw: retail leaves the `0x78 : 0x79` pick in `msg` unnarrowed, ours adds a `clrlwi` (an if/else pick is
- *     4 B shorter but scores lower).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
  *   extab/extabindex short of the claim.  The trade tables (0x805BA660-0x805BA750) are an unclaimed hole read by this
@@ -3270,7 +3269,7 @@ void lb_eqshop_scroll_frame_draw(u8 kind)
 /* Puts the shop's help line for the current state and step, with the second line for a refused row. */
 void lb_eqshop_help_draw(LbEquipShopWork* self)
 {
-    u16 msg = 0xFFFF;
+    s32 msg = 0xFFFF;
     u16 line = 0xFFFF;
     u16 panel = 0x1877;
     s32 row_no = 1;
@@ -3329,7 +3328,7 @@ void lb_eqshop_help_draw(LbEquipShopWork* self)
             break;
         }
     }
-    if (msg != 0xFFFF) {
+    if ((u16)msg != 0xFFFF) {
         lb_panel_msg_draw(panel, msg);
         if (line != 0xFFFF) {
             lb_panel_line_draw(panel, line, 2, row_no);

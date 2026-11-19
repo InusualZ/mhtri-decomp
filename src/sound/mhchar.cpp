@@ -17,6 +17,7 @@
  *   `res_gen_mode_common_copy_ctor`, `res_mat_pix_copy_ctor`, `res_mat_pix_common_copy_ctor`,
  *   `scn_mdl_vis_access_valid_ck` (the nw4r inline accessors this TU keeps out of line), `MHcharBankFile`;
  *   the bank tables `mhchar_bank*`, `mhchar_world_callback`.
+ * FLAGS. `mhchar_model_release` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %).
  * RESIDUALS.
  *   - `MHcharModel` repeats pl.h's `MHchar` prefix: pl.h's record stops at +0x140 and its embedders pad the
  *     rest, so the full layout cannot move into pl.h without re-cutting every embedder.  Modelling `MHchar` as
@@ -33,7 +34,7 @@
  *     out-of-line `ResMatMisc`/`ResTexSrt` copy constructors under `#pragma dont_inline on`.
  *   - `mhchar_frame_check`: the hold path jumps into the shared case switch (a `goto` shape); the body uses a
  *     flag, one saved register more.
- *   - `mhchar_layer_weight_update`/`mhchar_model_release`: retail hoists the motion-table walk's trip count into
+ *   - `mhchar_layer_weight_update`: retail hoists the motion-table walk's trip count into
  *     a saved register; ours reloads it (register colouring only).
  *   - `mhchar_motion_layer_set`: retail keeps `layer * 4` in a saved register across the calls (colouring).
  *   - The `res_file_*`/`nw_*`/`res_anm_chr_ctor`/`frame_ctrl_set_play_policy` callees are registry names; until
@@ -1157,6 +1158,8 @@ extern "C" void mhchar_mat_blend_set(MHchar* self, u32 index, f32 value)
     self->field_0xD4[index] = value;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x800E26C4 (0x220): Releases the motions: detaches and destroys the blend's children and the blend, clears
  * the layers and destroys the model's own motions. */
 extern "C" void mhchar_model_release(MHchar* chr)
@@ -1197,6 +1200,7 @@ extern "C" void mhchar_model_release(MHchar* chr)
         }
     }
 }
+#pragma pop
 
 /* The model's +0x114 joint-list handle. */
 extern "C" u32 mhchar_mat_num_get(MHchar* self)

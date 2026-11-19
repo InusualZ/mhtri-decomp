@@ -25,6 +25,7 @@
  *   `hud_msg_step`, `hud_msg_update`, `hud_msg_open`, `hud_msg_draw`, `hud_msg_push`, `hud_msg_push_two_line`,
  *   `hud_item_msg_push`, `hud_msg_sub_set`, `hud_msg_shown_id_get`, `hud_msg_work`) and `eft_area_se_req`; the data
  *   `eft052_hold_frame_sprites`, `eft052_hold_row_sprites`, `eft052_hold_arrow_sprites`.
+ * FLAGS. `eft052_box_list_draw` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
  * RESIDUALS. eft052_item_half_get: dump 03 gives the shift result its own vreg (`srawi r33,r35,1`) coloured r0, retail reuses r3 (`u32`/`s32` value
  *   spellings measure equal).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
@@ -1179,6 +1180,8 @@ extern "C" void eft052_box_menu_draw(Eft052ItemBox* box, u16 lsp, const u16* fra
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x8035A7D8 (0x20C): Draws the item box: the menu, or the pointed cell; then the help line of the state. */
 extern "C" void eft052_box_list_draw(u16 panel, const u16* sprites, const u16* rows, u16 help, u8 flag)
 {
@@ -1232,6 +1235,7 @@ extern "C" void eft052_box_list_draw(u16 panel, const u16* sprites, const u16* r
         lb_panel_msg_draw(0x1878, 0x1DE);
     }
 }
+#pragma pop
 
 #pragma fp_contract off
 

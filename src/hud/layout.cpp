@@ -22,6 +22,7 @@
  *   get_lsp_anim; every table name (button_icon_uvs, uv_rect_uvs, equip_kind_icon_tex, weapon_type_icon_tex,
  *   monster_icon_cells, window_*, title_*, prompt_frame_*, window_box_uvs, window_frame_presets, lsp_arena_id_remap),
  *   lsp_data_adrs / sub_lsp_data_adrs (after the dump's `arena_lsp_data_adrs`, which the arena branch reads).
+ * FLAGS. `draw_prompt_frame` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  * RESIDUALS. note_box_size: dump 03 narrows the negated height twice (`extsh r34,r41` ... `extsh r35,r42`); retail keeps only the first; `-height`,
  *   one-expression and `s32` temp spellings measure equal.
  * RESIDUALS. note_box_size: one extra `extsh` after the `neg` (four source shapes reproduce it).
@@ -30,7 +31,7 @@
  * RESIDUALS. window_frame_tex_draw: frame 0x100 vs 0xA0 (96 bytes of retail locals no body reads) and a `cmpwi`
  *   where ours has `cmplwi` on `style == 1`.
  * RESIDUALS. draw_title_window: retail sign-extends `x` again before `x + 32`.
- * RESIDUALS. draw_prompt_frame: retail re-indexes the strip table (`lhax`), ours reuses the element address.
+ * RESIDUALS. draw_prompt_frame: one `add` operand order (`add r0, r0, r6` in retail, `add r0, r6, r0` here).
  * RESIDUALS. draw_sprite: retail materialises the 0x4330 word twice.
  * SHAPES. `get_wide_offset` returns an `s32` from an `s32` accumulator (retail adds the narrowed `size.x - 640` with
  *   no `extsh` after the add); `put_lsp_anchor_offset` returns `get_lsp_data`'s record (retail keeps r3 live, so
@@ -1509,6 +1510,8 @@ f32 prompt_frame_translate[2][2] = {
     { 0.0f, 0.0f }, { 0.0f, 0.25f },
 };
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802E3AAC (0x26C): Draws a one-line prompt frame `width` wide (at least 96, rounded down to 16): a body strip of
  * texture `kind` (a flat colour for 0), then the border strip, notched in the middle, in frame `mode`. */
 void draw_prompt_frame(s16 x, s16 y, u16 width, u8 mode, u8 kind)
@@ -1574,6 +1577,7 @@ void draw_prompt_frame(s16 x, s16 y, u16 width, u8 mode, u8 kind)
     drawshape_set_tex_translate(prompt_frame_translate[mode]);
     drawshape_exec();
 }
+#pragma pop
 
 /* .data 0x805D5AB0: the uvs of `draw_window_box`'s eight border quads (texture 5). */
 _mh_tex_uv_ window_box_uvs[32] = {

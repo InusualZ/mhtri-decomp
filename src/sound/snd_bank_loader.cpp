@@ -32,7 +32,7 @@
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.
  *   snd_quest_bgm_set: register colouring only (retail keeps the three parameters in r25..r27, ours r27..r29).
  *   pl_weapon_se_bank_load (97.77): register colouring and one scheduled load.
- *   snd_area_bank_load, fn_800F06AC, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
+ *   snd_area_bank_load, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
  *   retail loads and extends in the handle's own register, the plain s8 load measures worse), snd_area_env_bank_load,
  *   demo_bgm_load: register choice / operand order only.
  *   `.data` (4 B), `.sdata` (1 B) and `.sbss` (5 B) are short of their claims by the alignment tail before the next
@@ -1213,10 +1213,10 @@ extern "C" void fn_800F06AC(u8 unused, u8 kind)
 {
     char name[0x88];
     u32 args[3];
-    s32 n;
-    s32 i;
-    const u8* p;
     s32 chunk;
+    s32 n;
+    const u8* p;
+    s32 i;
 
     for (i = 0; i < 0x10; i++) {
         snd_wk->se_slot[i].id = 0;
@@ -1230,7 +1230,7 @@ extern "C" void fn_800F06AC(u8 unused, u8 kind)
     chunk = 4;
     for (;;) {
         u8 id = p[0];
-        u8 bank;
+        u16 bank;
         if (id == 0xFF) {
             break;
         }

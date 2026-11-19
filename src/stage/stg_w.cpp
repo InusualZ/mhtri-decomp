@@ -2775,9 +2775,9 @@ extern "C" void stage_arena_land_grid_load_req(u32 a, u32 b)
 extern "C" void stage_map_obj_load(u8 mapno)
 {
     StageGroup* g = (StageGroup*)stage_map_group_get(mapno);
-    s32 count = g->kind;
     StageArea* areas;
     StageArea* area;
+    s32 count = g->kind;
     u8* buf;
     s32 i;
     EftResFile* file;

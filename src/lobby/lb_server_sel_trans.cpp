@@ -23,14 +23,13 @@
  *   qnpc_talk_data, npc_talk_item_fmt, npc_talk_str_fmt.
  *   GUESS (screen 0x1B): lb_server_select_close/rooms_open/rooms_build/type_info_draw/types_draw/title_draw/
  *   help_draw/servers_draw/rooms_draw/draw.
- * RESIDUALS. 17 rows below 100 %, register/stack colouring or one scheduling pair each (hill-climbed declaration
+ * RESIDUALS. 16 rows below 100 %, register/stack colouring or one scheduling pair each (hill-climbed declaration
  *   orders are applied): lb_screen26_trade_list_draw, lb_screen26_combo_list_draw, lb_screen26_trade_tabs_draw,
- *   npc_talk_start, lb_server_select_types_draw, lb_screen26_trade_commit, lb_server_select_rooms_build,
+ *   lb_server_select_types_draw, lb_screen26_trade_commit, lb_server_select_rooms_build,
  *   lb_server_select_rooms_draw, lb_server_select_help_draw, lb_screen26_trade_build,
  *   lb_screen26_picks_draw, lb_server_select_servers_draw, lb_server_select_screen_step, lb_screen26_box_draw,
  *   lb_screen26_step, lb_screen26_combo_items_draw.
- *   npc_talk_start is 8 bytes long (msg * 8 is recomputed after the conditional `choice` store; retail keeps it; a `rec = &recs[msg]` pointer for the `msg_a`/`msg_b` reads gives 524 B at a lower score), so
- *   `.text` is 0x5E28 against 0x5E20.  lb_screen26_step: the one-case compare is `cmplwi 2` where retail has `cmpwi 2`.
+ *   lb_screen26_step: the one-case compare is `cmplwi 2` where retail has `cmpwi 2`.
  *   The server-select list draws keep `x` sign-extended at its assignment where retail extends it at each use.
  *   `.sdata` ends at +0x1C3 against +0x1C8 and `.sbss` is 4 bytes against 8: unreferenced tail words, contents unknown.
  *   flipcheck: the registry callee names (sound/AI/light/stage demo hooks, SE bank requests, font typewriter, combo
@@ -53,6 +52,8 @@
  *            initialisers, regsim plan order).
  * FLAGS. lb_screen26_trade_tabs_draw takes a scoped `#pragma opt_strength_reduction off` (same size, raises its row).
  * FLAGS. lb_server_select_types_draw and lb_server_select_servers_draw take a scoped `#pragma optimization_level 4` (same size, raises both rows).
+ * FLAGS. npc_talk_start takes a scoped `#pragma optimization_level 4` (524 B, row at 100 %); lb_server_select_rooms_draw the same (same size, raises its row).
+ * FLAGS. lb_screen26_trade_build takes a scoped `#pragma opt_loop_invariants off` (same size, raises its row).
  */
 
 
@@ -1423,6 +1424,8 @@ u8 lb_trade_state_get(void)
     }
 }
 
+#pragma push
+#pragma opt_loop_invariants off
 /* 0x803C5C64 (0x210): draws trade page `page`'s four rewards and five offered items from the day's seed. */
 void lb_screen26_trade_build(LbScreen26Work* work, s16 page)
 {
@@ -1472,6 +1475,7 @@ void lb_screen26_trade_build(LbScreen26Work* work, s16 page)
         left--;
     }
 }
+#pragma pop
 
 /* 0x803C5E74 (0x1C): opens the trade on its first page. */
 void lb_screen26_trade_open(LbScreen26Work* work)
@@ -2549,6 +2553,8 @@ void npc_talk_draw(void)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x803C8454 (0x20C): opens NPC `npc`'s talk message `msg` (with item `item` named in it, or the message text as
  * is when 0) in window kind `kind`; 0 while a demo runs or the window cannot open. */
 s32 npc_talk_start(s8 npc, u8 msg, u16 item, u8 kind)
@@ -2620,6 +2626,7 @@ s32 npc_talk_start(s8 npc, u8 msg, u16 item, u8 kind)
     }
     return 1;
 }
+#pragma pop
 
 /* 0x803C8660 (0x10): non-zero while the talk window is open. */
 u8 npc_talk_active_ck(void)
@@ -3051,6 +3058,8 @@ void lb_server_select_servers_draw(LbServerSelWork* work, bool active)
 }
 #pragma pop
 
+#pragma push
+#pragma optimization_level 4
 /* 0x803C94A4 (0x21C): draws the room list of the picked server with each room's population. */
 void lb_server_select_rooms_draw(LbServerSelWork* work, bool active)
 {
@@ -3093,6 +3102,7 @@ void lb_server_select_rooms_draw(LbServerSelWork* work, bool active)
         y += 0x1A;
     }
 }
+#pragma pop
 
 /* 0x803C96C0 (0xB4): the server-select screen's draw callback. */
 void lb_server_select_draw(void)

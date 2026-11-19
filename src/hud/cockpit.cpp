@@ -20,14 +20,13 @@
  *   `atlas_icon_uv_get`, `pointer_reset`, `kpad_pointer_read`, `pointer_update`, `pointer_dpd_state`,
  *   `se_req_page_toggle`, `se_item_get_play`, `place_rec_copy`, `word_read`, `em_hit_parts_get`, `em_tall_ck`,
  *   `em_part_sphere_get`, `place_list_highlight_draw`, `pl_root_lock_ck`, `item_bonus_class_get`, `chara_icon_tex_tbl`.
+ * FLAGS. `ainpc_page_label_draw` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %; it gives the single range test for steps 2..3).
  * RESIDUALS. `cockpit_notice_show` 89.8: the `1 << kind` mask is shifted into r0 and narrowed into r5; retail shifts and
  *   narrows in r5.
  *   `cockpit_notice_update` 97.8: retail sets `ofs` after the loop's pointer induction (`li r8` after `mr r7`).
  *   `ainpc_page_select_button_ck` 96.6: the inversion needs `else if (down == 0)` to stay branched (a plain `else`
  *   becomes `subfic/or/srwi`); ours keeps the redundant compare.
- *   `ainpc_page_label_draw` 98.4: retail tests steps 2..3 as one unsigned range (`subi; cmplwi 1`), ours as two
- *   signed compares.
- *   `hud_edge_dir_get` 99.8: the four `out->x` sums land in r3 where retail uses r0, and the unmoved branch rotates
+ * *   `hud_edge_dir_get` 99.8: the four `out->x` sums land in r3 where retail uses r0, and the unmoved branch rotates
  *   r4/r5/r6.
  *   `cockpit_msg_slot_update` 99.3: `ef/eft052.h` declares `hud_item_msg_push` returning s32 and `hud_msg_sub_set`
  *   taking u8, so ours `extsb`s the stored id and drops the `extsb` before the call; declaring s8 for both gives 100
@@ -63,8 +62,6 @@
  * RESIDUALS. mwcc-debugger dump, `ainpc_page_select_button_ck`: regsim 4/4 callee-saved, 13/13 volatile (EXACT,
  *            colouring is not the cause); first divergence insn 48: retail `<DIFF_INSERT>` vs ours `cmpwi r31, 0x0`;
  *            size differs from retail
- * RESIDUALS. ainpc_page_label_draw: the step switch measured with the 2/3 case pair first, last, and as an if chain with a
- *            `(u8)(step - 2) > 1` test: no spelling gives the single range test.
  */
 
 #include "types.h"
@@ -2242,6 +2239,8 @@ void ainpc_page_cursor_draw(void)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802DD760 (0x268): draws the pick's mark, the place-list highlight and the label of the pick (a monster's name or
  * the item/list row's text). */
 void ainpc_page_label_draw(void)
@@ -2333,6 +2332,7 @@ void ainpc_page_label_draw(void)
         font_flush();
     }
 }
+#pragma pop
 
 /* 0x802DD9C8 (0xA0): draws the pick-state mark `state` (menu layout table row 96, its classic-controller column under
  * option 7) at frame `frame`. */

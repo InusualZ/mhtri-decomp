@@ -22,6 +22,7 @@
  *   (retail keeps its 17-row clear as a `mtctr` loop).
  * FLAGS. lb_hunt_info_draw takes a scoped `#pragma opt_loop_invariants off`.
  * FLAGS. lb_farm_seed_ck takes a scoped `#pragma opt_common_subs off`.
+ * FLAGS. lb_daily_menu_roll takes a scoped `#pragma opt_strength_reduction off` (584 B, equal to retail).
  * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
  *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B) and an
  *   inline `kind == 1` predicate measures equal.
@@ -1217,6 +1218,8 @@ s32 lb_id_list_has(u8* list, u8 count, u8 id)
 }
 
 #pragma opt_unroll_loops off
+#pragma push
+#pragma opt_strength_reduction off
 /* 0x801E9640 (0x248): rebuilds the free hunt's point rows from the monster tables and draws its four-monster
  * rotation, leaving out the monsters of `today`. */
 void lb_daily_menu_roll(u8* today)
@@ -1289,6 +1292,7 @@ void lb_daily_menu_roll(u8* today)
     lb_param_w.rotation_0x1E[3][0] = picks[3];
     lb_param_w.rotation_0x1E[3][1] = 2;
 }
+#pragma pop
 #pragma opt_unroll_loops reset
 
 /* 0x801E9888 (0x84): moves the free-hunt schedule on by one day and draws the new last day. */

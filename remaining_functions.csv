@@ -564,11 +564,8 @@ size_bytes,unit,function,match_percent,address
 520,hud/cockpit_quest,cockpit_ammo_gauge_draw,99.6923,0x802ECA20
 520,hud/cockpit_quest,cockpit_hunt_log_draw,97.5308,0x802EF424
 524,BTE/uusb_ppc,UUSB_Write,99.2366,0x8047A060
-524,ef/eft052,eft052_box_list_draw,98.4733,0x8035A7D8
 524,enemy/em005_act,__sinit_\em005_act_cpp,90.7328,0x801D6FB8
 524,enemy/em_prog_support,chat_log_page_draw,99.8092,0x80384CC0
-524,lobby/fn_801E0ADC,lb_eqshop_help_draw,98.5496,0x801E6A14
-524,lobby/lb_server_sel_trans,npc_talk_start,98.4351,0x803C8454
 528,g3d/g3d_calcview,mtx34_calc_billboard_y,99.8485,0x8006FBBC
 528,homebutton/hkb_widget_tail,Bind__16HkbAnimTransformFPQ34nw4r3lyt4Panebb,98.7121,0x8056ECB0
 528,lobby/fn_801E7530,lb_farm_harvest,99.0152,0x801EA2B4
@@ -586,15 +583,12 @@ size_bytes,unit,function,match_percent,address
 540,homebutton/hbm_kb_child,onPaneEvent__21HbmKbChildPaneHandlerFP12HbmComponentUlP14HbmPaneTrigger,99.4074,0x80556840
 540,lobby/lb_server_sel_trans,lb_server_select_rooms_draw,99.0741,0x803C94A4
 544,enemy/em_common,em_hate_update,98.8382,0x8012B64C
-544,sound/mhchar,mhchar_model_release,94.4338,0x800E26C4
 552,Network/network_socket_streams,receive__18NetworkMultipleUdpFlPUcl,97.7899,0x803CE984
 552,draw_shape,drawshape_gx_begin_setup,99.8188,0x80054580
-552,lobby/lb_quest_ui,lb_trade_list_draw,98.6232,0x803931C0
 556,SO/socket,SendTo,98.3813,0x80520928
 556,fn_8004CAD8,read_wpad_memory__FP13_vs_user_dataUc,94.2806,0x8004FA54
 556,lobby/fn_801E0ADC,lb_eqshop_goods_draw,98.1655,0x801E6198
 560,lobby/lb_screen_step,lb_smith_detach_draw,98.5,0x803653A0
-564,sound/snd_bank_loader,fn_800F06AC,99.3262,0x800F06AC
 568,Pl/pl_act,equip_skill_points_get,98.0141,0x80271BD4
 568,ef/system_core,memory_layout_init,98.3099,0x800CF3E4
 568,enemy/em_model,em_pop_obj_callback_bind,88.3451,0x803BCD38
@@ -638,7 +632,6 @@ size_bytes,unit,function,match_percent,address
 616,ai/ai_npc,ai_npc_step4_arm,98.8961,0x802C3178
 616,ef/eft041,eft041_move,97.987,0x8030681C
 616,homebutton/hbm_kb_cursor,create__17HbmKbCursorArrowsFP12MEMAllocatorPQ34nw4r3lyt16ResourceAccessor,99.3052,0x8056725C
-616,hud/cockpit,ainpc_page_label_draw,98.4416,0x802DD760
 616,menu/menu_friendlist,movie_page04_split_draw,98.474,0x80442774
 620,hud/layout,draw_prompt_frame,99.2903,0x802E3AAC
 624,enemy/em_common,em_owner_slot_update,99.8718,0x801252DC

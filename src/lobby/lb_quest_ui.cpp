@@ -30,13 +30,13 @@
  *   GUESS: `lb_kitchen_open`, `lb_kitchen_courses_roll`, `lb_kitchen_special_input`,
  *   GUESS: `lb_kitchen_bonus_roll`, `lb_kitchen_extra_roll`, `lb_kitchen_step`, `lb_kitchen_course_draw`,
  *   GUESS: `lb_kitchen_special_screen_draw`, `lb_trade_offer_state`, `lb_scene_eft_init`, `lb_scene_eft_move`
+ * FLAGS. `lb_trade_list_draw` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
  * RESIDUALS. Every row is written.
  *  - `lb_kitchen_open`: retail keeps two row counters for the rolled pairs (one byte offset, one index) and saves two
  *    more registers (`_savegpr_25`/`_restgpr_25` against our `_savegpr_27`/`_restgpr_27`);
  *  - `lb_kitchen_courses_roll`, `lb_kitchen_step`: register order in the loops (retail gives the loop index r31/r27);
  *  - `lb_scene_eft_move`: retail schedules the 1.0f `lfs` after the area byte's `lbz`, and its pool word is named by
  *    the map (`lbl_8079C2AC`) where ours is anonymous;
- *  - `lb_trade_list_draw`: register order, and retail reloads `choice.cursor` for the pouch test;
  *  - `lb_trade_step`: retail truncates `toggle_word_step`'s last argument (`clrlwi r7`), a `u16` parameter that
  *    `menu/menu_message.h` declares `s32` (request quest-q3#19);
  *  - `lb_kitchen_meal_serve`: the two rare bytes load in the other order and one `lhz` is scheduled after the
@@ -2130,6 +2130,8 @@ void lb_trade_frame_draw(void) {
     draw_sprite_ary(lb_trade_title_ids, &pos);
 }
 
+#pragma push
+#pragma opt_common_subs off
 /* 0x803931C0 (0x228): Draws the offer list, the picked offer's item panel and text, the box/pouch tabs and the page
  * arrows. */
 void lb_trade_list_draw(LbTradeWork* work) {
@@ -2184,6 +2186,7 @@ void lb_trade_list_draw(LbTradeWork* work) {
     draw_sprite_anim_idx(0x21BB, 5, &base);
     lb_page_arrow_draw(0x21B0, work->page, work->page_count, work->page_moved, active);
 }
+#pragma pop
 
 /* 0x803933E8 (0x368): Draws the picked offer's prices: each price's item cell, its help record, the count it asks and
  * the count held, dimmed when the player holds too few. */

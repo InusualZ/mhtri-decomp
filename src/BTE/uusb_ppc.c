@@ -24,7 +24,7 @@
  *   of the evt_read_pending store (scoped opt_common_subs/opt_propagation/global_optimizer/opt_lifetimes off and a
  *   NULL local do not split it). UUSB_Open: the vendor id lands in r0 and the bus
  *   index in r3 where ours swaps them (r4 / r0). UUSB_Write: the result, the copy target and the buffer take r28 /
- *   r27 / r26 where ours takes r26 / r28 / r27 (declaration order and an if/else chain do not move it). The
+ *   r27 / r26 where ours takes r27 / r28 / r26 (all six declaration orders and an if/else chain measured). The
  *   control block is 0x4C bytes (UUSB_Open clears that much) while the map's object is 0x60, the gap being the
  *   32-byte alignment of the receive stacks.
  * SHAPES. plain C; the receive pipes are re-armed by the static inline helpers uusb_start_evt_read and
@@ -408,8 +408,8 @@ u16 UUSB_Read(u8 port, u8* p_data, u16 len) {
 /* 0x8047A060 (0x20C): Copies `len` bytes at `p_data` into a transport buffer and writes it to the command or ACL
  * pipe, or queues it while the pipe has too many writes in flight; returns the IOS USB result of the write. */
 u16 UUSB_Write(u8 port, const u8* p_data, u16 len, BT_HDR* p_msg) {
-    BT_HDR* p_buf;
     u8* p_dst;
+    BT_HDR* p_buf;
     s32 result = 0;
 
     if (uusb_cb.state != UUSB_STATE_RUNNING) {
