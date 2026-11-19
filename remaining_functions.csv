@@ -503,7 +503,6 @@ size_bytes,unit,function,match_percent,address
 460,OS/OSPlayTime,__OSGetPlayTime,96.8696,0x804D6EC0
 460,Pl/pl_act,fn_80274174,97.5652,0x80274174
 460,RSO/runtime,RSORelocate,99.4783,0x804DAA24
-460,ef/effect,fn_800FA5D4,99.9652,0x800FA5D4
 460,ef/eft_res,eft_res_models_spawn,99.8,0x800F93D8
 464,Pl/pl_act,pl_hit_attack_build,97.1897,0x80277974
 464,lobby/fn_80212810,lb_list_dialog_draw,97.9655,0x80214B30
@@ -530,13 +529,8 @@ size_bytes,unit,function,match_percent,address
 484,g3d/g3d_state,g3d_light_table_set_setting,99.3802,0x800854B8
 484,menu/menu_sysmsg,kbd_key_input__Fv,93.3471,0x80455F6C
 488,DWCi/gt2Message,gti2HandleNack,99.3197,0x8050F810
-488,Pl/pl_act_step,pl_act_stun,99.5082,0x80257E88
-488,enemy/em016_prog,em016_frame_effect,95.9426,0x8018D370
 488,enemy/em_prog_support,lb_spot_save_step,67.9754,0x80383370
-488,hud/layout,window_body_draw,99.3443,0x802E3F28
-488,light/light,light_point_param_get,99.1803,0x802BF818
 488,lobby/lb_npc,fn_802050AC,98.2377,0x802050AC
-492,MSL_C/alloc,deallocate_from_fixed_pools,98.1626,0x80458E8C
 492,OS/OSPlayRecord,__OSStopPlayRecord,95.4797,0x804D6330
 492,enemy/em007_act,em007_act9_1,98.374,0x801DA8DC
 492,homebutton/hbm_value,__dt__14SysKbdVuObjectFv,0.0,0x8055CB34
@@ -551,7 +545,6 @@ size_bytes,unit,function,match_percent,address
 500,DWCi/natneg,DWCi_natNegSetSocket,99.84,0x80512C90
 500,homebutton/hbm_anim_record,updateLabels__12HbmAnimPanelFUsUs,99.6,0x805581C0
 500,menu/menu_plsearch,lb_plsearch_open,99.16,0x8044F530
-504,Network/net_session_close,onCircleListReceived,99.2064,0x8043390C
 504,hud/cockpit,ainpc_page_cursor_in_box_ck,99.6905,0x802DC568
 504,lobby/lb_companion_ui,lb_s13_slot_list_draw,97.9365,0x8033EDAC
 504,menu/menu_infomation,weapon_affinity_compare,99.7222,0x80316780

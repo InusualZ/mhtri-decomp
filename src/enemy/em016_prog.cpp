@@ -19,10 +19,8 @@
  *   programs are named `<species>_se_seq_<sub>`/`_se_alt_seq_<sub>` after the first `state_sub` that plays them,
  *   their records `<table>_rec<N>`; `em017_0x328`'s alert pair and `EmActWork` are this unit's views.
  * FLAGS. em016_action_select takes a scoped `#pragma optimization_level 4` (the 5/6/8 range test comes out as retail's `subi`+`cmplwi`).
- * RESIDUALS. 5 rows short of 100:
+ * RESIDUALS. 4 rows short of 100:
  *  - `em016_frame_em017`: self sits in r31 where retail has r29 (the loop's found/rec/max/i take r31..r27);
- *  - `em016_frame_effect`: retail masks the `calcVecAngX` result (`clrlwi r30,r3,16`), ours keeps the `u16` return
- *    unmasked (scoped `#pragma opt_common_subs off` gives retail's per-test `(u16)(angle + 0x8000)`, size equal);
  *  - `em016_strafe_point_get`: the selected offset lands in r4 where retail has r3 (`&v` computed late);
  *  - `em016_action_allow_ck`, `em016_swim_rest`: one scratch register coloured differently.
  *  `.ctors` is not emitted: `em016_static_init` is a plain function (a real `__sinit` needs the vector pair
@@ -6268,10 +6266,10 @@ void em016_action_dispatch(_ENEMY_WORK* self) {
 void em016_frame_effect(_ENEMY_WORK* self) {
     VEC3 sp8;
     MTX34 sp18;
-    s16 ang;
+    u16 ang;
 
     if (em_alt_mode_ck_c1(self) != 0) {
-        ang = calcVecAngX(&self->vec_0x76C);
+        ang = (u16)calcVecAngX(&self->vec_0x76C);
         if ((u16)(ang + 0x8000) > 0x671B) {
             switch (em_get_mot_no(self)) {
             case 0x4A:

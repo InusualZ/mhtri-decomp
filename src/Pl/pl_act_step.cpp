@@ -70,8 +70,6 @@
  *    local is what gives retail's three-instruction range test (`addi r0,r3,-1; cmplwi r0,1; ble`);
  *  - `fn_8025FF0C`, `fn_80260198`: the `pl_move_work` scan keeps a dead loop counter and adds the row base before
  *    the entry offset (row-pointer and pointer-plus-index spellings measured equal);
- *  - `pl_act_stun`: retail sign-extends the doubled shake count (`extsb`) where ours masks it; an `s8` local
- *    re-extends at the load and scores lower;
  *  - `fn_8025A7FC`: one `clrlwi r3,r3,24` on the incremented `+0x3A6` before the compare that ours folds;
  *  - `fn_802602A0`, `fn_8024676C`: register colouring only (the actor, the turn rates and the shared 0/1 constant
  *    take other saved registers; declaration order searched);
@@ -9456,7 +9454,7 @@ extern "C" void pl_act_guard_timer_reset(_PLW* self)
 /* The stun act (`variant` 1 the drawn stun): arms the stun motion and its 300-frame windows; each window the input
  * shake count of the stun table (doubled with skill 9) shortens it, and the actor recovers after five. */
 extern "C" void pl_act_stun(_PLW* self, s32 variant) {
-    u8 need;
+    s32 need;
 
     switch (self->act_step_0x05) {
     case 0:
@@ -9490,7 +9488,7 @@ extern "C" void pl_act_stun(_PLW* self, s32 variant) {
             self->field_0x006++;
             need = pl_stun_shake_needs[self->field_0x007];
             if (Pl_Skill_ck(self, 9) == 1) {
-                need = (s8)need * 2;
+                need = (s8)((s8)need * 2);
             }
             if (self->field_0x006 >= (s8)need) {
                 self->field_0x006 = 0;

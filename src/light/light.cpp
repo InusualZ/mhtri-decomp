@@ -21,7 +21,7 @@
  *   light_update, light_point_nearest_get, light_set_default_select: retail's `(u8)i` index and the loaded slot byte take r4 where
  *   ours take r0 (regsim's plan leaves r39/r41/r42 on r0; named locals for them measure equal). light_init: the light-setting/object registers and one `addi`
  *   scheduled late. light_flare_update: the camera temporary's stack slot. light_point_scale_set: `mode`'s copy
- *   scheduled one instruction early. light_point_param_get: one dead `b` of an empty case.
+ *   scheduled one instruction early.
  * SHAPES. `light_em_slot_alloc` sets `i = 0` ahead of `base = slot * 3` (retail schedules the counter first).
  *   `light_set_get`/`light_setting_get_light_set` keep the out-pointer form (a by-value LightSet measured
  *   worse); a pointer to the light set held across the loop (`pset`) is retail's register shape; the returned
@@ -482,6 +482,7 @@ extern "C" void light_point_param_get(GXColor* color, f32* range, f32* falloff, 
             scale = 0.7f;
             break;
         case 11:
+            scale = 1.0f;
             break;
         default:
             scale = 0.5f;

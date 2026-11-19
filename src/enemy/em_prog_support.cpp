@@ -23,9 +23,10 @@
  * FLAGS. `cflags_main` (Wii/1.3) with a file-wide `#pragma peephole off` (retail keeps `clrlwi`/`extsb` before every
  *   narrow compare and call argument: 13 rows gained when it was turned off).
  * RESIDUALS.
- *  - `lb_spot_save_step`: retail shares one "finish" block (system flag 0, step 3, `lb_npc_act_set`) between the
- *    create-start failure, the system-file wait and step 4 - a jump into another case only a `goto` spells (rule 8);
- *    the duplicated block is 584 B against 488 B.
+ *  - `lb_spot_save_step`: the shared "finish" block (system flag 0, step 3, `lb_npc_act_set`) is written once after
+ *    the switch (`do { switch } while (0)`, `continue` on the paths that skip it): 488 B = retail, every instruction
+ *    paired except the block's position and three branch targets - retail places it inside case 2's `case 1:` body
+ *    and branches to it from case 1 and case 4 (a jump into another case, idea 213);
  *  - `note_page_draw`, `lb_screen16_step`: retail lowers the 0..1 / 0..2 case ranges to one `cmplwi` and the other
  *    cases to `cmpwi`; ours either keeps `cmpwi 0; blt` (int switch) or `cmplwi` throughout (the `(u32)` switch kept,
  *    95.00 against 92.78); `lb_screen16_step` keeps a branch where retail if-converts `off_mask |= 2`.
@@ -282,35 +283,34 @@ extern "C" void lb_screen16_step(void) {
 extern "C" s32 lb_spot_save_step(LbSpotWork* work) {
     s32 result = 0;
 
-    switch (work->step_0x01) {
-    case 0:
-        switch (lobby_cmd_toggle_step_raw(&work->yes_no_0x04)) {
-        case 1:
-            if (game_data_file_create_start() != 0) {
-                system_w.field_0x865 = 1;
-                work->step_0x01++;
-                lb_player_spot_walk_act6(work->player_0x08, work->spot_0x0C);
-                bgm_lobby_depart_set();
-                break;
+    do {
+        switch (work->step_0x01) {
+        case 0:
+            switch (lobby_cmd_toggle_step_raw(&work->yes_no_0x04)) {
+            case 1:
+                if (game_data_file_create_start() != 0) {
+                    system_w.field_0x865 = 1;
+                    work->step_0x01++;
+                    lb_player_spot_walk_act6(work->player_0x08, work->spot_0x0C);
+                    bgm_lobby_depart_set();
+                    continue;
+                }
+            case 2:
+                result = 2;
+                continue;
             }
-        case 2:
-            result = 2;
-            break;
-        }
-        break;
-    case 1:
-        ainpc_page_hold_clear();
-        if (Get_motion_no(work->player_0x08) != 326) {
-            s32 saved = game_save_wait();
-            switch (saved) {
+            continue;
+        case 1:
+            ainpc_page_hold_clear();
+            if (Get_motion_no(work->player_0x08) == 326) {
+                continue;
+            }
+            switch (game_save_wait()) {
             case 1:
                 if (game_system_file_create_start() != 0) {
                     system_w.field_0x865 = 1;
                     work->step_0x01++;
-                } else {
-                    system_w.field_0x865 = 0;
-                    work->step_0x01 = 3;
-                    lb_npc_act_set(work->player_0x08, 0, 7, 0);
+                    continue;
                 }
                 break;
             case -2:
@@ -318,41 +318,45 @@ extern "C" s32 lb_spot_save_step(LbSpotWork* work) {
                 system_w.field_0x865 = 0;
                 work->nand_msg_0x30 = chg_nand_err2msgcode();
                 work->step_0x01 = 4;
+                continue;
+            default:
+                continue;
+            }
+            break;
+        case 2:
+            ainpc_page_hold_clear();
+            switch (game_system_file_create_wait()) {
+            case -2:
+            case -1:
+                system_w.field_0x865 = 0;
+                work->nand_msg_0x30 = chg_nand_err2msgcode();
+                work->step_0x01 = 4;
+                continue;
+            case 1:
+                break;
+            default:
+                continue;
+            }
+            break;
+        case 3:
+            ainpc_page_hold_clear();
+            if (work->player_0x08->act_no == 0) {
+                result = 1;
+            }
+            continue;
+        case 4:
+            ainpc_page_hold_clear();
+            if ((u32)lb_cmd_pressed_ck(0x10) == 1) {
                 break;
             }
+            continue;
+        default:
+            continue;
         }
-        break;
-    case 2:
-        ainpc_page_hold_clear();
-        switch (game_system_file_create_wait()) {
-        case -2:
-        case -1:
-            system_w.field_0x865 = 0;
-            work->nand_msg_0x30 = chg_nand_err2msgcode();
-            work->step_0x01 = 4;
-            break;
-        case 1:
-            system_w.field_0x865 = 0;
-            work->step_0x01 = 3;
-            lb_npc_act_set(work->player_0x08, 0, 7, 0);
-            break;
-        }
-        break;
-    case 3:
-        ainpc_page_hold_clear();
-        if (work->player_0x08->act_no == 0) {
-            result = 1;
-        }
-        break;
-    case 4:
-        ainpc_page_hold_clear();
-        if (lb_cmd_pressed_ck(0x10) == 1) {
-            system_w.field_0x865 = 0;
-            work->step_0x01 = 3;
-            lb_npc_act_set(work->player_0x08, 0, 7, 0);
-        }
-        break;
-    }
+        system_w.field_0x865 = 0;
+        work->step_0x01 = 3;
+        lb_npc_act_set(work->player_0x08, 0, 7, 0);
+    } while (0);
     return result;
 }
 

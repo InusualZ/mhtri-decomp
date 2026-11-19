@@ -180,6 +180,8 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
     FixedChunk* chunk;
     SubBlock* sb;
     int empty;
+    Block* prev;
+    Block* next;
 
     while (size > *sizes) {
         sizes++;
@@ -199,7 +201,7 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
                 fsb->prev->next = fsb->next;
                 fsb->next->prev = fsb->prev;
                 fsb->next = fp->front;
-                fsb->prev = fp->front->prev;
+                fsb->prev = fsb->next->prev;
                 fsb->prev->next = fsb;
                 fsb->next->prev = fsb;
                 fp->front = fsb;
@@ -237,7 +239,7 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
             }
         }
         if (empty) {
-            Block* next = block->next;
+            next = block->next;
             if (next == block) {
                 next = NULL;
             }
@@ -245,7 +247,7 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
                 pool->start = next;
             }
             if (next != NULL) {
-                Block* prev = block->prev;
+                prev = block->prev;
                 next->prev = prev;
                 prev->next = next;
             }

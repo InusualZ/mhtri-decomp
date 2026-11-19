@@ -47,7 +47,9 @@
  *    branching past the found block (idea 217; the top-tested `return` measures best, a post-loop `i < end` test
  *    loses 3 B); no `switch` to host an `if (0)` label;
  *  - `LbEquipModelCallbackA::ExecCallbackB` is compiled at `optimization_level 2` (+6 B over -O3; -O4 and
- *    `opt_common_subs off` measure lower);
+ *    `opt_common_subs off` measure lower); its locals are declared at function scope in regsim's plan order (node,
+ *    rule, rules, adj, joint); retail compares `joint` raw after the `lhz` in the second branch where ours inserts a
+ *    `clrlwi` (a `(u32)` cast on the compare measures equal);
  *  - `pl_rig_model_setup`/`pl_rig_weapon_load`: retail folds the model's member offsets into one displacement
  *    (`rig + slot * 0x164 + 0x118`), so those reads are written in place rather than through `pl_rig_res_mdl`/
  *    `pl_rig_scn_mdl`, and `pl_rig_model_setup` sets `i = 0` before taking the model's `ResMdl`; the rest is register
@@ -5367,20 +5369,20 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
     u32 node = pFuncObj->GetCallbackNodeID();
     nw4r::math::MTX34 mtx;
     nw4r::math::MTX34 joint_mtx;
-    PlRigNodeRule* rules;
     PlRigNodeRule* rule;
+    PlRigNodeRule* rules;
+    PlSeJointAdj* adj;
+    u16 joint;
 
     nw4r::math::VEC3 trans;
     rules = pl_rig_node_rules[kind_0x10];
     rule = &rules[node];
     if (rule->mode_0x00 == 2) {
-        PlSeJointAdj* adj = &adj_0x014[node];
+        adj = &adj_0x014[node];
 
         mtx34_identity(&mtx);
         mtx34_rot_xyz_deg((f32*)&mtx, adj->rot_0x18.x, adj->rot_0x18.y, adj->rot_0x18.z);
         if (system_lobby_flag_get() != 2) {
-            u16 joint;
-
             trans.x = adj->trans_0x0C.x;
             trans.y = adj->trans_0x0C.y;
             trans.z = adj->trans_0x0C.z;
@@ -5395,8 +5397,6 @@ void LbEquipModelCallbackA::ExecCallbackB(nw4r::g3d::WorldMtxManip* pManip, nw4r
                                      adj->scale_0x00.y * model_0x08->scale_0x1C.y,
                                      adj->scale_0x00.z * model_0x08->scale_0x1C.z);
         } else {
-            u16 joint;
-
             trans.x = adj->trans_0x0C.x;
             trans.y = adj->trans_0x0C.y;
             trans.z = adj->trans_0x0C.z;

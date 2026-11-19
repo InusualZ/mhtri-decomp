@@ -39,7 +39,6 @@
  *    temporary, an inline pair setter and `scheduling off`/`optimization_level 2-3` on the function leave our value
  *    computed at its store (the kind-first order costs `startRosterFetch` a fifth saved register); its four
  *    callee-saved registers are permuted (retail r31 result / r28 work / r30 profile);
- *  - `onCircleListReceived`: work and the circle cursor swap r30/r31 (every declaration order measured equal, `work` declared before the cursor and assigned after the declarations too);
  *  - `getProfileMemberCounts`: the three out-parameters take r30/r28/r29 where retail takes r28/r29/r30;
  * SHAPES. `refreshRosterCache` decrements the server type as `- 1LL` (retail's `li r0,-1` + `addc`, no mask before the
  *   byte store); `copyPeerProfileCard` tests the card's own settings byte after storing it.
@@ -928,8 +927,8 @@ void onCircleListReceived(s32 status, s32* values)
     NetworkSessionCircleList* list;
     NetworkSessionCircleInfo* circle;
     u32 length;
-    s32 i;
     NetCtrlWk* work = net_ctrl_wk;
+    s32 i;
     NetProfileRec* profile = work->profiles_0x168;
     s32 j;
 

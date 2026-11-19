@@ -31,7 +31,6 @@
  *   where ours has `cmplwi` on `style == 1`.
  * RESIDUALS. draw_title_window: retail sign-extends `x` again before `x + 32`.
  * RESIDUALS. draw_prompt_frame: retail re-indexes the strip table (`lhax`), ours reuses the element address.
- * RESIDUALS. window_body_draw: three locals swap registers.
  * RESIDUALS. draw_sprite: retail materialises the 0x4330 word twice.
  * SHAPES. `get_wide_offset` returns an `s32` from an `s32` accumulator (retail adds the narrowed `size.x - 640` with
  *   no `extsh` after the add); `put_lsp_anchor_offset` returns `get_lsp_data`'s record (retail keeps r3 live, so
@@ -1632,6 +1631,15 @@ void window_body_draw(s16 x, s16 y, u16 width, u16 height, u8 kind, u32 fill, u8
     _mh_tex_uv_ uvs[40];
     DrawRect rect;
     DrawRect title_rect;
+    _mh_ivec2_* vert;
+    _mh_tex_uv_* uv;
+    s16 strip;
+    s16 right;
+    s16 row;
+    s16 left_h;
+    s16 v0;
+    s16 v1;
+    u16 count;
 
     x += 12;
     y += 8;
@@ -1644,15 +1652,15 @@ void window_body_draw(s16 x, s16 y, u16 width, u16 height, u8 kind, u32 fill, u8
         draw_rect_set(&rect, x, y, width, height, fill);
         draw_rect_fill(&rect);
     } else {
-        _mh_ivec2_* vert = verts;
-        _mh_tex_uv_* uv = uvs;
-        s16 strip = window_body_strips[kind].height;
-        s16 right = x + width;
-        s16 row = y;
-        s16 v0 = window_body_strips[kind].v;
-        s16 v1 = v0 + strip;
-        s16 left_h = height;
-        u16 count = 0;
+        vert = verts;
+        uv = uvs;
+        strip = window_body_strips[kind].height;
+        right = x + width;
+        row = y;
+        v0 = window_body_strips[kind].v;
+        v1 = v0 + strip;
+        left_h = height;
+        count = 0;
 
         if (fill == 0) {
             fill = 0x0A1407FF;

@@ -39,7 +39,10 @@
  *    helper it is a `return` to the shared `mr r3,r29` (one instruction, the only difference);
  *  - an `s16` index retail re-extends at every use where ours extends once at the definition (`lb_pane_draw`'s and
  *    `lb_box_grid_draw`'s grid walks), and register colouring / scheduling:
- *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_dye_inner_draw`, `lb_color_pane_draw`, `lb_dye_pane_draw`,
+ *    `lb_box_grid_draw` (keeps `reason` on the stack), `lb_color_pane_draw`, `lb_dye_pane_draw`,
+ *    `lb_dye_inner_draw` (the two slot tables are read through non-const locals assigned after the loop counter, so retail's
+ *    reloads after each call stay; the callee-saved colouring is shifted by the offset temporary regsim names `@9750`, which no
+ *    named local reaches without a byte-offset access),
  *    `lb_dye_pane_step` (`self`/`pad`/`widths` in r28/r29/r27 for retail's r29/r27/r28: `self` is a stalled
  *    parameter node, no declaration order reaches it - regsim), `lb_box_lists_draw`, `lb_box_menu_draw`,
  *    `lb_entry_pane_menu_step` (the sort loop), `lb_entry_pane_sort_apply`,
@@ -3779,7 +3782,7 @@ void subTransSet(u32 a, long b, u32* value);
 namespace lb_chg {
 extern "C" {
 extern u8* lobby_world_block;
-s32 lb_list_row_draw(s32 text, u8 flag, s16* pos, s32 color, u8 mode);
+s32 lb_list_row_draw(s32 text, s32 flag, s16* pos, s32 color, u8 mode);
 }
 }  // namespace lb_chg
 #include "unsplit/lobby.h"
@@ -7841,19 +7844,23 @@ void lb_dye_inner_draw(LbChgColorWork* self)
 {
     _mh_ivec2_ origin;
     _mh_ivec2_ pos;
-    u16 count;
+    u32 count;
     s16 value;
     s32 color;
     s32 selected;
     u32 i;
     bool active;
+    u16* slotRows;
+    s16* slotValues;
 
     get_lsp_data(0x1C61U, &origin);
     draw_sprite_ary((const u16*)lbl_805B89D0, &origin);
     get_lsp_data(0x1C5BU, &origin);
-    count = (u16)fn_801F3EDC(self);
+    count = fn_801F3EDC(self);
     i = 0;
-    for (; (u8)i < count; i++) {
+    slotRows = (u16*)lbl_805B8A04;
+    slotValues = (s16*)lbl_805B875C;
+    for (; (u8)i < (u16)count; i++) {
         if (self->selected_0x08 == (s32)(u8)i) {
             selected = 1;
             active = 1;
@@ -7862,10 +7869,10 @@ void lb_dye_inner_draw(LbChgColorWork* self)
             active = 0;
         }
         color = GetMenuFontColor(1, active, 1, fn_801F3F14(self->table_0x28, (u8)i) == 1);
-        get_lsp_data(lbl_805B8A04[(u8)i], &pos);
+        get_lsp_data(slotRows[(u8)i], &pos);
         pos.x += origin.x;
         pos.y += origin.y;
-        value = lbl_805B875C[(u8)i];
+        value = slotValues[(u8)i];
         switch (value) {
         case -1:
             lb_chg::lb_list_row_draw((s32)LbStr(0, 0x231), (u8)active, (s16*)&pos, color, 8);
@@ -7874,10 +7881,10 @@ void lb_dye_inner_draw(LbChgColorWork* self)
             lb_cursor_prompt_draw((u8)(selected | 0x80), (s16*)&pos);
             break;
         default:
-            get_lsp_data(lbl_805B8A04[(u8)i], &pos);
+            get_lsp_data(slotRows[(u8)i], &pos);
             pos.x += origin.x;
             pos.y += origin.y;
-            lb_color_slot_draw((s16*)&pos, color, selected, lbl_805B875C[(u8)i], 0);
+            lb_color_slot_draw((s16*)&pos, color, selected, slotValues[(u8)i], 0);
             break;
         }
     }

@@ -29,8 +29,8 @@
  *  - `effect_retire`, `effect_layer_reset`: retail's virtual calls stage the table in r12 (`lwz r12,0(r3);
  *    lwz r12,N(r12)`); the typed-table views here stage it in r4/r5 - the real classes (`nw4r::ef::Effect`,
  *    `MemoryManagerBase`) are not declarable from this unit without a second copy of their definitions;
- *  - `fn_800FA5D4`: the two `ResMat*` copy-constructor temporaries sit at 0xC/0x10 in retail (compiler temporaries
- *    bound to the copy constructors' reference parameters), ours names them, so 0x10/0xC.
+ *  - `fn_800FA5D4`: the four copy-constructor temporaries and handles are declared at function scope (tex tev, tex chan,
+ *    handle tev, handle chan), which gives retail's stack slots 0x14/0x10/0xC/0x8 (per-block declarations gave 0x14/0xC/0x10/0x8);
  *   `fn_800FA208`: the frontend turns `if (hit == 1) return 1; return 0;` into `cntlzw` (the first backend dump
  *   already has it), so each case assigns `result` instead.
  *   The two static name arrays at the foot of the file are emitted with their `__sinit` and the element
@@ -719,16 +719,19 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
     PlCapsule box;
     nw4r::math::VEC3 pos;
     PlCapsuleBox shape;
+    void* texTev;
+    void* texChan;
+    u32 handleTev;
+    u32 handleChan;
     s32 count = mhchar_mat_num_get(chr);
     u8 flags = owner->flags_0x14;
     if ((flags & 1) != 0) {
         for (s32 i = 0; i < count; i++) {
             nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)(u32)chr->field_0x118, (u32)i);
             if (copied_mat_access_valid_ck(&access) != 0) {
-                void* tex;
-                u32 handle = (u32)scn_mdl_mat_access_get_tev_color(&access, 0);
-                res_mat_tev_color_copy_ctor((struct ResHandle*)&tex, (const struct ResHandle*)&handle);
-                if (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(&tex)->IsValid() != 0) {
+                handleTev = (u32)scn_mdl_mat_access_get_tev_color(&access, 0);
+                res_mat_tev_color_copy_ctor((struct ResHandle*)&texTev, (const struct ResHandle*)&handleTev);
+                if (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(&texTev)->IsValid() != 0) {
                     continue;
                 }
                 return;
@@ -739,10 +742,9 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
         for (s32 i = 0; i < count; i++) {
             nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)(u32)chr->field_0x118, (u32)i);
             if (copied_mat_access_valid_ck(&access) != 0) {
-                void* tex;
-                u32 handle = (u32)scn_mdl_mat_access_get_chan(&access, 0);
-                res_mat_chan_copy_ctor((struct ResHandle*)&tex, (struct ResHandle*)&handle);
-                if (reinterpret_cast<const nw4r::g3d::ResMatChan*>(&tex)->IsValid() != 0) {
+                handleChan = (u32)scn_mdl_mat_access_get_chan(&access, 0);
+                res_mat_chan_copy_ctor((struct ResHandle*)&texChan, (struct ResHandle*)&handleChan);
+                if (reinterpret_cast<const nw4r::g3d::ResMatChan*>(&texChan)->IsValid() != 0) {
                     continue;
                 }
                 return;
