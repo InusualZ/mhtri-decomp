@@ -959,7 +959,7 @@ void lb_trade_page_draw(LbMenuWork* self)
     const u16* idp;
     s32 i;
     s32 color;
-    u16 id;
+    s32 id;
     bool selected;
 
     get_lsp_data(0x1E4BU, &anchor);

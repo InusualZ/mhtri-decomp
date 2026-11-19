@@ -1069,7 +1069,7 @@ extern "C" void name_menu_page_build(LbNameMenuWork* w, s32 page) {
  * the closing message. */
 extern "C" void name_menu_step(void) {
     LbNameMenuWork* w = lobby_w.name_menu_0x0AC;
-    u8 kind;
+    s32 kind;
 
     w->moved_0x0C = 0;
     switch (w->state_0x00) {

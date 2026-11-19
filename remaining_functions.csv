@@ -660,7 +660,6 @@ size_bytes,unit,function,match_percent,address
 644,NWC24/nwc24_io,getUnScrambleId,51.7764,0x8051E100
 644,hud/pl_frame_sync,pl_act_handler_11,96.2112,0x803329DC
 644,hud/pl_frame_sync,pl_act_handler_21,96.2112,0x803336DC
-648,Pl/player_control,pl_parts_load_step,99.537,0x8026910C
 648,ef/eft050,eft050_fish_appear,98.3025,0x803405C8
 648,enemy/em_common,em_patrol_step,99.4753,0x801277F4
 652,Pl/pl_act_step,fn_8025FF0C,99.0491,0x8025FF0C
@@ -670,7 +669,6 @@ size_bytes,unit,function,match_percent,address
 656,lobby/lb_server_sel_trans,lb_screen26_step,99.6342,0x803C59A0
 656,sound/fn_800D7F54,se_hit_bank_req,99.5976,0x800DC0A8
 660,homebutton/hbm_text_panel,hbmPanelUpdate,96.2424,0x80546310
-660,menu/multi_result,name_menu_step,99.7515,0x803A30E0
 664,Pl/pl_motion,scene_area_change_step,99.6386,0x8028D2DC
 664,fn_80059550,save_msg_text_draw,97.4398,0x8005A648
 664,sound/fn_800D7F54,se_fishing_cast,73.2831,0x800DB044
@@ -683,7 +681,6 @@ size_bytes,unit,function,match_percent,address
 672,lobby/lb_equip_page,pl_rig_slot_bind,99.5238,0x80224550
 676,ef/eft050,lb_item_box_grid_draw,99.4083,0x8033F788
 676,homebutton/hbm_kb_list,create__9HbmKbListFP12MEMAllocator,99.2308,0x80554834
-676,hud/cockpit_quest,quest_gauge_bar_draw,99.6745,0x802E7CFC
 676,light/light,light_point_nearest_get,98.3195,0x802BFC1C
 680,WUD/wud,WUDiVendorEventCallback,99.9118,0x804FF680
 680,enemy/fn_8011D448,em_parts_refresh,99.2647,0x8011EA90
@@ -712,7 +709,6 @@ size_bytes,unit,function,match_percent,address
 704,SSL/ssl,SSLWrite,98.1023,0x8051BD98
 704,main,main,99.9432,0x8003F218
 708,SYN/synenv,SYNSetupModulationEnvelope,98.0452,0x804DFF10
-708,camera/camera_main,camera_quake_apply,95.8757,0x802BE7E8
 708,homebutton/hbm_text_panel,hbmPanelTruncateText,99.3503,0x80548FE4
 712,THP/THPDec,THPVideoDecode,88.9944,0x804E1120
 712,homebutton/hbm_text_panel,hbmPanelOnTextChanged,98.4551,0x805492A8
@@ -729,7 +725,6 @@ size_bytes,unit,function,match_percent,address
 728,g3d/g3d_scnmdlsmpl,__ct__Q34nw4r3g3d12ScnMdlSimpleFP12MEMAllocatorQ34nw4r3g3d6ResMdlPQ34nw4r4math5MTX34PUlPQ34nw4r4math5MTX34PQ34nw4r4math5MTX33PQ34nw4r4math5MTX34ii,98.7912,0x80080C60
 728,lobby/lb_pane_ui,lobby_scene_setup_step,92.1154,0x801FB80C
 728,menu/menu_placeinfo,lb_community_list_draw,97.3901,0x80439290
-728,quest/quest_entry,quest_supply_drop_step,99.8352,0x803B6B14
 732,ef/eft_res,eft_res_archive_load_callback,96.4208,0x800F8358
 732,enemy/em003_prog,em003_act7_3,99.4536,0x80158FF0
 732,g3d/g3d_calcview,mtx34_calc_billboard_y_persp,99.8907,0x80070134

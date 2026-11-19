@@ -21,6 +21,7 @@
  *   `calc_xz_angle`; the GUESS class `PlCollSphere` (0x8029573C's own constructor), the rows `pl_land_data_reset`,
  *   `pl_ground_check_all_layers`.
  * FLAGS. `#pragma optimization_level 4` scoped to pl_wall_resolve (93.14 to 94.65, same size).
+ * FLAGS. `pl_coll_shape_hits` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  * RESIDUALS.
  *  - `GetGroundHit2`, `hit_ground_comon`: the five-hit cap leaves both loops with one branch in retail (`goto`-shaped);
  *    the conformant double `break` costs three instructions in each (100 % with a `goto`, refused by rule 8). An
@@ -1674,6 +1675,8 @@ void pl_coll_shape_set(_PLW* self, u8 mode, u16 layers) {
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x80295290 (0x2B4): slides the player's sphere `radius` along `seg` against the walls, then records the walls it
  * touched in its move-work chunk (a floor-kind wall moved to the front) and their directions in +0x364. */
 void pl_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _PLW* self) {
@@ -1730,6 +1733,7 @@ void pl_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _P
         }
     }
 }
+#pragma pop
 
 /* 0x80295578 (0x1C4): sweeps the enemy's body sphere (its move-parameter offset turned by its yaw, sized from its
  * data and scale) from its previous position to its current one through the walls; `mode` 0 first clears the

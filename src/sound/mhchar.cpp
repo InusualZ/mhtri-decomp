@@ -18,6 +18,7 @@
  *   `scn_mdl_vis_access_valid_ck` (the nw4r inline accessors this TU keeps out of line), `MHcharBankFile`;
  *   the bank tables `mhchar_bank*`, `mhchar_world_callback`.
  * FLAGS. `mhchar_model_release` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %).
+ * FLAGS. `mhchar_motion_layer_set` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  * RESIDUALS.
  *   - `MHcharModel` repeats pl.h's `MHchar` prefix: pl.h's record stops at +0x140 and its embedders pad the
  *     rest, so the full layout cannot move into pl.h without re-cutting every embedder.  Modelling `MHchar` as
@@ -601,6 +602,8 @@ extern "C" void mhchar_motion_start_no(MHchar* chr, s32 layer, u16 motion, s32 b
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x800E12CC (0x274): Starts bank motion `motion` on layer `layer` (0..2); layer 0 goes through
  * `mhchar_motion_set`. */
 extern "C" void mhchar_motion_layer_set(MHchar* chr, s32 layer, u32 kind, s32 index, u16 motion, s32 hold,
@@ -648,6 +651,7 @@ extern "C" void mhchar_motion_layer_set(MHchar* chr, s32 layer, u32 kind, s32 in
         }
     }
 }
+#pragma pop
 
 /* 0x800E1540 (0x100): Sets layer `layer`'s end frame from its animation and its loop frame: none for a
  * one-time animation, the end with `to_end`, otherwise `loop` (0 when negative). */

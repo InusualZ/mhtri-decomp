@@ -43,8 +43,9 @@
  * residual write-up are in the outbox; the short version:
  *   - every symbol below 100 % is instruction-for-instruction equal to retail - the differences are
  *     register colouring, one range-test encoding, or a pool name, never a missing operation.
- *   - `se_fishing_cast` (73.3 %): the two-voice crossfade. Every operation is present, but the callee-saved
- *     colouring puts `work` in r31 where retail has r30 (~10 declaration orders and source shapes tried).
+ *   - `se_fishing_cast`: the two-voice crossfade. The id is built per branch (`mode + 111` / `mode + 11`) and the crossfade
+ *     length is read into a `u32` before the voice load, as retail orders them; what is left is `extsh r4,r0` where retail
+ *     has `lwz r4; extsh r4,r4` (an `s32`/`s16` amount local measures worse) and the pool name.
  *   - `se_slot_kind_dispatch` (81.9 %): the switch's 3/4 range test is two compares where retail uses
  *     `addi r,r,-3; cmplwi r,1`.
  *   - `fn_800D87B8` (89.6 %): retail reaches the stop body by a direct jump from case 4; the `goto`-free
@@ -3270,15 +3271,16 @@ extern "C" void se_fishing_cast(s32 unused, u32 mode) {
     if (handle == 0) {
         return;
     }
-    id = (u8)mode + ((work->voice_slot & 1) ? 111 : 11);
+    id = (work->voice_slot & 1) ? (u8)mode + 111 : (u8)mode + 11;
     if ((u8)mode == 0) {
         s32 voice = fn_800E80DC_c1(handle, id, 0);
         work->voices[work->voice_slot] = voice;
         if (work->voice_slot != work->field_0x295EF) {
             fn_800E8354_c1(work->voices[work->voice_slot], 0);
         } else {
-            fn_800E8354_c1(work->voices[work->field_0x295EF],
-                        (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, id)));
+            u32 len = fn_800F2680(handle, id);
+            s32 vc = work->voices[work->field_0x295EF];
+            fn_800E8354_c1(vc, (s16)(s32)(lbl_807963E4 * (f32)len));
         }
         work->voice_slot ^= 1;
         return;

@@ -108,7 +108,7 @@ void THPDecodeBlockV(THPDecoder* state, s16* block);
 
 s32 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
 {
-    u8 result;
+    u16 result;
     u32 marker;
     s32 done;
     s16* base;

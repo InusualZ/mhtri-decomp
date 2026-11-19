@@ -24,6 +24,7 @@
  *   `pl_charge_cycle_get`, `anm_chr_result_rot_get`/`_rot_set`/`_mtx_get`/`_mtx_set`, `mtx34_rot_xyz_deg`,
  *   `mhchar_wld_mtx_array_get`, `pl_rig_hair_style_tbls`, `pl_rig_face_style_tbls`.
  * FLAGS. pl_rig_weapon_load takes a scoped `#pragma opt_lifetimes off`.
+ * FLAGS. `pl_rig_model_setup` takes a scoped `#pragma opt_lifetimes off` (same size, raises its row).
  * RESIDUALS. res_ofs_ptr_get: retail branches `beq` over `add; blr` (28 B) where ours hoists the `add` and returns with `bnelr` (24 B); `!=` form, ternary, a result local and `optimization_level 1/2` do not reach it.
  * RESIDUALS. pl_rig_slot_node_map: the `own`/`body` ResNode temporaries take the stack words 0x0C/0x08 where retail has 0x08/0x0C (a
  *   stack-slot order, not a colouring choice; the declaration orders measured the same).
@@ -2025,6 +2026,8 @@ void pl_equip_color_apply(_PLW* self, u32 slot)
     }
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* 0x80223318 (0x28C): Creates model `slot` from `file` and maps its dyed, skin and hair materials and its parts. */
 void pl_rig_model_setup(PlSeRig* rig, u32* file, u32 slot, u32 flags)
 {
@@ -2108,6 +2111,7 @@ void pl_rig_model_setup(PlSeRig* rig, u32* file, u32 slot, u32 flags)
         break;
     }
 }
+#pragma pop
 
 /* 0x802235A4 (0x3C): The material's name (nw4r's inline `ResMat::GetName`), NULL when unnamed. */
 const char* res_mat_name_get(const nw4r::g3d::ResMat* mat)

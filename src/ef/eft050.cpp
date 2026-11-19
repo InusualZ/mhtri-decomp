@@ -445,7 +445,7 @@ extern "C" void lb_item_box_grid_draw(CockpitItemBlock* self)
     _mh_ivec2_ anchor;
     s32 i;
     s32 found;
-    u16 id;
+    u8 id;
 
     get_lsp_data(0x2081, &anchor);
     draw_sprite_anim_ary(lb_item_box_grid_sprite_ids, 0, &anchor);

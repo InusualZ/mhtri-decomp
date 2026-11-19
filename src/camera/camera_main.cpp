@@ -17,6 +17,7 @@
  *   hands camera_view_apply (0..5).  GUESS (from each body and its callers): every `camera_*` function and table name of the
  *   unit, the field names of `CamWork` and its members, and the foreign callee names proposed in
  *   config/RMHE08/name_registry.jsonl (lane camera-main) with their leaf headers.
+ * FLAGS. `camera_quake_apply` takes a scoped `#pragma optimization_level 4` (same size, matches).
  * RESIDUALS.
  *   - camera_shoulder_update: the plane intersection's `normal.z` takes f2 where retail uses f10 (the mwcc-debugger
  *     dump renders stack operands as fixups; the stack slots all pair, so the residual is float colouring only; the debugger's final dump reproduces the
@@ -4747,6 +4748,8 @@ extern "C" void camera_shake_req(u8 kind)
     camera_quake_arm(&work->quake[2], &origin, (u8)(kind | 0xA0), 0);
 }
 
+#pragma push
+#pragma optimization_level 4
 /* Shakes the g3d camera `index` by one quake slot: the kind's amplitude on a sine of the slot's timer, faded by
  * the distance from the origin, as a lift and a sideways sway. */
 extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
@@ -4804,6 +4807,7 @@ extern "C" void camera_quake_apply(CamWork* work, CamQuake* slot, u8 index)
         camera_view_apply(index, &pos, &target, camera_fovy_get(), camera_roll_get());
     }
 }
+#pragma pop
 
 /* Ages the three quake timers by one and hands the slot the given camera selects to the per-slot update. */
 extern "C" void camera_quake_update(LightWork* self, u8 index)

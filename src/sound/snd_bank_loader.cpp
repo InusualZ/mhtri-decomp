@@ -25,6 +25,7 @@
  *   snd_output_mode_set (snd_stream_reloc).
  * FLAGS. pl_weapon_se_bank_load takes a scoped `#pragma optimization_level 4`.
  * FLAGS. `snd_area_bank_load` takes a scoped `#pragma optimization_level 4` (same size, row at 100 %).
+ * FLAGS. `fn_800F0F9C` takes a scoped `#pragma opt_common_subs off` + `opt_loop_invariants off` (same size, raises its row).
  * RESIDUALS. snd_area_bank_load: dump 03 `lwzx r34,r38,r36` then `add r34,r34,r40` reuses r34 for the table entry and the pointer (coloured r5);
  *   retail loads into r3 and adds into r4 (colouring).
  * RESIDUALS. fn_800F0F9C (692 B): retail's shared load tail sits between the `kind == 1` and `kind == 2` bodies,
@@ -1423,6 +1424,9 @@ extern "C" void snd_em_se_slot_release(u8 id)
     }
 }
 
+#pragma push
+#pragma opt_common_subs off
+#pragma opt_loop_invariants off
 /* Loads an SE id into one of the six stream slots. */
 extern "C" void fn_800F0F9C(u8 id)
 {
@@ -1502,6 +1506,7 @@ extern "C" void fn_800F0F9C(u8 id)
                   snd_wk->tsb_size[snd_wk->se_slot_idx[slot]], (u32)fn_800F0230, 3,
                   args);
 }
+#pragma pop
 
 /* The slot an SE id already occupies, or -1. */
 extern "C" s32 fn_800F1250(u8 id)

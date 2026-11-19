@@ -19,6 +19,7 @@
  *   callers that pass a wider or narrower type than the callee's declaration go through `_c1` cast views.
  * FLAGS. `#pragma optimization_level 4` scoped to `player_move_start_ck` (same size, raises its row).
  * FLAGS. `pl_players_ready_ck` takes a scoped `#pragma opt_propagation off` (98.9, same size; its locals are hoisted in the regsim plan order).
+ * FLAGS. `pl_parts_load_step` and `pl_part_load_request` take a scoped `#pragma optimization_level 4` (same size, raise their rows).
  * RESIDUALS. `pl_part_model_bind` and `pl_part_load_request`: retail keeps `part * 4` and the record-plus-index
  *   pointers in saved registers for the whole body, ours recomputes them after calls (no source order found that keeps
  *   them). `player_move_start_ck`, `pl_players_ready_ck`, `pl_net_slot_ready_ck`, `pl_parts_load_step`,
@@ -1056,6 +1057,8 @@ void pl_part_load_callback(s32 result, u32 unused, s32 mode, PlPartLoadCtx* ctx)
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x80268E70 - starts reading one part's requested file into resource memory (the weapon parts wait for the
  * weapon body's read). */
 void pl_part_load_request(_PLW* plw, _PLOBJ* obj, u8 part) {
@@ -1127,7 +1130,10 @@ void pl_part_load_request(_PLW* plw, _PLOBJ* obj, u8 part) {
     load_file_req(name, (u32)dst, size, (u32)pl_part_load_callback, 4, (u32*)&ctx);
     obj->state[part] = 4;
 }
+#pragma pop
 
+#pragma push
+#pragma optimization_level 4
 /* 0x8026910C - steps every live player's loads: the face textures, the voice bank, then each part's file state
  * (request, read, bind, show). */
 void pl_parts_load_step(_PLGLOBAL* global) {
@@ -1206,6 +1212,7 @@ void pl_parts_load_step(_PLGLOBAL* global) {
         }
     }
 }
+#pragma pop
 
 /* 0x80269394 - no slot of this record has advanced past "empty". */
 s32 pl_obj_ready_ck(_PLOBJ* obj) {

@@ -22,6 +22,7 @@
  *   names; the
  *   foreign callee names proposed in config/RMHE08/name_registry.jsonl by lane stage-stg-w (`eft_res_file_load`,
  *   `map_com_eft_file_tbl`, `map_com_efm_file_tbl`, ...) are GUESSes too.
+ * FLAGS. `stage_area_models_seat` takes a scoped `#pragma opt_loop_invariants off` + `opt_strength_reduction off` (same size, raises its row).
  * RESIDUALS.
  *   - stage_map_obj_load reads `map_com_eft_name_ptr`/`eft_map_common_mdl_name_ptr` (.sbss 0x80794A88/0x80794A8C,
  *     between ef/eft_res.cpp's and enemy/enemy_control.cpp's claims; no registered unit owns them, rule 12); retail
@@ -1213,6 +1214,9 @@ extern "C" void stage_area_ambient_apply(void)
     set_amblight(0, SW->areas[SW->areano].color);
 }
 
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* Seats the current slot's four models as the stage's models, builds their animations and resets the light
  * state for the area. */
 extern "C" void stage_area_models_seat(void)
@@ -1295,6 +1299,7 @@ extern "C" void stage_area_models_seat(void)
         w->joint_state[1][i] = 0;
     }
 }
+#pragma pop
 
 /* Enters area `areano` of map `mapno`: seats the slot, the models, effects, lights and the area's bodies. */
 extern "C" void stage_area_enter(u8 mapno, u8 areano)

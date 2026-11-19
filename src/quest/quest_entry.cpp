@@ -6647,7 +6647,7 @@ Q_QuestStat* quest_stat_get(void) {
 void quest_supply_drop_step(void) {
     QuestWork* work = &quest_work;
     u8* step;
-    u8 kind;
+    s8 kind;
     u16 id;
 
     if (work == NULL) {

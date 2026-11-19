@@ -24,6 +24,7 @@
  *   `cockpit_menu_0x5C0`, and `_AINPC_W::digit_state_0x3C4`.  The registry names this unit proposed for
  *   foreign rows are GUESS too (the `pl_item_*`, `pl_*_ck`, `ai_npc_*_ck`, `draw_*`, `cockpit_*_ids` rows in
  *   config/RMHE08/name_registry.jsonl under lane hud-cockpit-quest).
+ * FLAGS. `quest_gauge_bar_draw` takes a scoped `#pragma optimization_level 4` (same size, matches).
  * RESIDUALS. register colouring or scheduling only (same instructions): `quest_mark_draw` (`mullw` operand order: both
  *   source orders give `mullw r0,r30,r0`, retail `r0,r0,r30`), `cockpit_ammo_gauge_draw`/
  *   `cockpit_split_ammo_gauge_draw` (`icons` is a backend temporary of the table address and colours before
@@ -1770,6 +1771,8 @@ void quest_gauge_update(CockpitWork* work, u8 mode) {
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x802E7CFC.  Draws one gauge bar of sprite `id`: the filled part up to `shown` (blending from the first to the
  * second colour, or on to the third past the half), and a tail quad from `shown` to `ghost` in the tag colour. */
 void quest_gauge_bar_draw(u16 id, s32 shown, s32 ghost, s32 capacity, s32 units, const HudBlend* colors,
@@ -1831,6 +1834,7 @@ void quest_gauge_bar_draw(u16 id, s32 shown, s32 ghost, s32 capacity, s32 units,
     drawshape_set_scale_ivec2(&origin.x, scale);
     drawshape_exec();
 }
+#pragma pop
 
 s16 quest_gauge_shake_scale = 2;
 

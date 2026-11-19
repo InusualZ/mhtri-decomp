@@ -13499,7 +13499,7 @@ s32 fn_8025FF0C(_PLW* self, u8 mode) {
 
     self->field_0x369 = 0;
     if (self->field_0x364 != 0) {
-        s32 i;
+        s16 i;
 
         for (i = 0; i < 10; i++) {
             u16 kind = pl_move_work[self->chunk_ofs][i].kind;
