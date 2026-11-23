@@ -63,6 +63,7 @@
  * RESIDUALS. lb_hunt_day_roll: `and r0,r0,x` where ours folds `andi. r0,r0,0x50`; `80 > roll`, `!(roll >= 80)` and a named `s32 roll`
  *            all fold the same way.
  * SHAPES. lb_farm_seed_info_draw declares `id` before `row` (`mt.py hill` order search; raises its row).
+ * SHAPES. lb_trade_page_draw: `id` is an `s32` holding the u16 row id (0..0xFFFF) that `key[0]` and the cell draw take.
  */
 #include "types.h"
 

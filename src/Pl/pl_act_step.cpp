@@ -146,6 +146,9 @@
  * RESIDUALS. mwcc-debugger dump, `pl_gather_item_take`: regsim 2/2 callee-saved, 6/6 volatile (EXACT); first
  *            divergence insn 24: retail `cmplwi r0, 0x2` vs ours `cmplwi r0, 0x3`
  * SHAPES. fn_8024676C: `angle` is s32 (the u32 entry angle, 0..0xFFFF, passed on to a u16 parameter).
+ * SHAPES. pl_act_stun: `need` is an `s32` holding a u8 `pl_stun_shake_needs` entry (and its doubling, narrowed by the
+ *   `(s8)` casts at the use; a `u8` local measures 99.14 % at 4 B over).  pl_act_step_pitfall_hold and fn_8025FF0C: `i` is
+ *   an `s16` counter (bounds 3 and 10; an `s32` lowers the rows: 97.70 % and 99.05 %).
  */
 
 #include "types.h"

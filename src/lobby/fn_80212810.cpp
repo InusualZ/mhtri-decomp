@@ -46,6 +46,8 @@
  *   filter (lb_seisan_materials_get).
  * RESIDUALS. mwcc-debugger dump, `lb_text_center_print`: regsim 8/8 callee-saved, 9/11 volatile, best plan cost 0;
  *            first divergence insn 21: retail `lha r0, 0x14(r1)` vs ours `lha r6, 0xc(r1)`
+ * SHAPES. lb_seisan_row_flags_get: `cond` is a `u16` (it holds the u8 unlock byte of the blade or gun row, passed on to
+ *   an `s16` parameter; row 99.02 %).
  */
 #include "types.h"
 

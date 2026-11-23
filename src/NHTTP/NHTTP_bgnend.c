@@ -90,7 +90,8 @@
  *     field list back through `request->postDataList->next`.
  *   - `NHTTPRequestNode.id` / `NHTTPi_cancelRequest`'s `id` are `s32`: retail's comparison is `cmpw`,
  *     not `cmplw`.
- * RESIDUALS. NHTTPi_Startup: the `error` local is `s16` (the row rises; ours is then 396 B against the target's 400 B).
+ * RESIDUALS. NHTTPi_Startup: the `error` local is an `s16` (it holds `NCDGetCurrentIpConfig`'s small negative error codes and is only
+ *            tested `< 0` and printed; the row rises, size off target by 4 B: 396 B against 400 B; an `s32` is 400 B).
  */
 
 #include "NHTTP/NHTTP_bgnend.h"

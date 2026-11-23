@@ -47,6 +47,8 @@
  * SHAPES. `pig_dress_list_draw` declares `i`, `color`, then `sel` and `cur` (the regsim plan order).
  * RESIDUALS. name_menu_step: retail adds the kind to the block base as `add r3,kind,base`, ours `add r3,base,kind` (the
  *            only difference; `kind[...]` and a named picked-name local measure the same).
+ * SHAPES. name_menu_step: `kind` is an `s32` holding the u8 npc kind (an index into `name_by_kind_0x3F81`, compared through
+ *   `(s32)` casts).
  */
 
 #include "types.h"

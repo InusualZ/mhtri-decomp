@@ -51,6 +51,7 @@
  * FLAGS. snd_player_banks_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  * FLAGS. snd_area_env_bank_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  * FLAGS. snd_quest_bgm_set: scoped `#pragma optimization_level 4` (98.78 -> 100, size equal).
+ * SHAPES. fn_800F06AC: `bank` is a `u16` holding the u8 bank index `p[1]` (it indexes the bank-name table).
  */
 
 #include "types.h"

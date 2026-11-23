@@ -37,6 +37,8 @@
  *            (`item_pair_copy(dst++, rec++)`) reproduce the call setup; the loop counter and `dst` take r31/r30 where retail
  *            has r30/r31 (a function-scope counter and `rec` moves measured)
  * SHAPES. `quest_item_pair_copy_row` passes post-incremented pointers (`item_pair_copy(dst++, rec++)`).
+ * SHAPES. quest_item_slot_add: `i` is an `s16` (counts 0..4 over the five slots; ours is 436 B against the target's 432 B,
+ *   an `s32` is 420 B).
  */
 
 #include "quest/quest_item_slot.h"

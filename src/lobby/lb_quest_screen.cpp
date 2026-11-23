@@ -88,7 +88,8 @@
  * RESIDUALS. mwcc-debugger dump, `note_value_to_slot`: regsim 0/0 callee-saved, 8/11 volatile, best plan cost 0;
  *            first divergence insn 3: retail `addi r5, r4, note_slot_table@l` vs ours `addi r6, r4,
  *            note_slot_table@l`
- * SHAPES. note_trade_open's `roll` is a `u32` (raises its row; ours is then 4 B short).
+ * SHAPES. note_trade_open's `roll` is a `u32` (`seed % 100`, 0..99, so any width holds it; it raises the row, size off
+ *   target by 4 B: 416 B against 420 B, a `u16` is 420 B).
  */
 
 #include "types.h"

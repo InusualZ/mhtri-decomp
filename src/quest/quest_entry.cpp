@@ -98,6 +98,8 @@
  *            first divergence insn 11: retail `addi r6, r3, quest_work@l` vs ours `addi r4, r3, quest_work@l`
  * RESIDUALS. mwcc-debugger dump, `quest_slot_byte_get`: regsim 2/2 callee-saved, 16/18 volatile, best plan cost 0;
  *            first divergence insn 35: retail `slwi r6, r0, 3` vs ours `slwi r5, r0, 3`
+ * SHAPES. quest_supply_drop_step: `kind` is an `s8`, the width of `supply_kind_0x8B` (0..3) it copies and of the `s8`
+ *   parameters it is passed to.
  */
 
 #include "quest/quest_entry.h"

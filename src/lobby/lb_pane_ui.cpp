@@ -98,6 +98,8 @@
  *            the plan's backend temporary (`mr r48,r3`) is not nameable
  * RESIDUALS. lb_dye_pane_draw: retail keeps the two loop counters unmasked and narrows at each use (`u32 i` with `(u8)i` uses measures 97.00 against 97.52), passes `lit` to
  *   `lb_list_row_draw` without a `clrlwi` (an `s32 lit` measures 95.50) and stores `sel_id_0x014` through `clrlwi 16` (a `u16` field measures 97.33).
+ * SHAPES. lb_dye_inner_draw: `count` is a `u32` holding `fn_801F3EDC`'s page count (a few tens at most); the loop bound
+ *   narrows it with `(u16)` as retail does.
  */
 #include "types.h"
 #include "id_value.h"

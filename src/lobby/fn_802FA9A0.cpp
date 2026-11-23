@@ -51,6 +51,7 @@
  * SHAPES. `lb_barter_refs_kind_build` walks the first table through its own pointer `src_a` (declared after
  *            `src`), the plan's extra named local.
  * FLAGS. lb_barter_entry_flags takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
+ * SHAPES. lb_kujira_day_step: `i` is an `s16` (counts 0..2 against a bit mask; an `s32` measures 98.04 %).
  */
 #include "types.h"
 #include "lobby/fn_802FA9A0.h"

@@ -10,6 +10,7 @@ Experiments and pre-flights that answer "which flags was this unit built with?" 
 | `mwcc_matrix.py` | Compiles a unit across the installed `mw_version`s (playbook 17). |
 | `optsweep.py` | Sweeps `-opt` sub-options on one unit. |
 | `tryvar.py` | Applies a named flag variant to one unit. |
+| `tywidth.py` | Sweeps the integer width of a function's locals; a range guard skips widths that cannot hold the values. |
 | `variants/<lib>.py` | The named variants `tryvar.py` knows. |
 
 ## `infer.py` - the flag inferencer

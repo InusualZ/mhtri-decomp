@@ -27,7 +27,7 @@
  *    (declaration orders were hill-climbed); `THPParseQuantTable` 0x804E1650: register numbering and the operand
  *    order of the scaled `fmul`/`fsubs` (declaration orders were hill-climbed).
  *    flipcheck: .text bytes differ (the three rows above).
- * SHAPES. `THPVideoDecode` returns the SDK's `s32` and keeps the parse status in a `u8`: every case `continue`s on
+ * SHAPES. `THPVideoDecode` returns the SDK's `s32` and keeps the parse status (a u8 return) in a `u16`: every case `continue`s on
  *    success and `break`s on a parse error to one `return result` after the switch (retail's shared `clrlwi r3,r3,24`);
  *    `done = 0` follows the cursor store so the 0 for `rowY` stays its own `li` (which aligns the 0xFF-skip loop as
  *    retail's `nop` does); the marker switch lists its case bodies in the target's block order (0xC4, 0xC0, 0xDD,

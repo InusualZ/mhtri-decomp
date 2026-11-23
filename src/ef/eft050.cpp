@@ -24,8 +24,9 @@
  *    where ours strength-reduces it to one pointer (frame 0x20); retail reads `lb_s13_status_skill_name_ids` `@sda21`
  *    (a 6-byte table; declaring it `[3]` gives the `@sda21` but scores lower, so the `[6]` spelling stays);
  *  - `eft050_fish_appear`: register assignment only (retail: the shared zero in r31, `work` r30, `self` r29);
- *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16`; u16/s32 locals and a cast
- *    do not reproduce it.
+ *  - `lb_item_box_grid_draw`: retail narrows the sprite-id ternary with a `clrlwi r3, r3, 16` (4 B); u16/s16/s32/u32
+ *    locals, a `(u16)` cast and an if/else do not reproduce it (672 B).  A `u8` local does (676 B) but truncates
+ *    0x2092/0x209B to 0x92/0x9B, so it is wrong code and is not used.
  *   Data: `.sdata2` (0x50) is byte-identical to the claim; `.data` (0x670: the sprite-id and layout tables, the fish
  *   kinds, the roll tables and two jump tables) and `.sdata` (0x64: the roll pointer pairs and small id tables) are
  *   claimed but not emitted (the tables are `extern`; the object emits only the two jump tables, 0x90).  flipcheck
@@ -445,7 +446,7 @@ extern "C" void lb_item_box_grid_draw(CockpitItemBlock* self)
     _mh_ivec2_ anchor;
     s32 i;
     s32 found;
-    u8 id;
+    u16 id;
 
     get_lsp_data(0x2081, &anchor);
     draw_sprite_anim_ary(lb_item_box_grid_sprite_ids, 0, &anchor);

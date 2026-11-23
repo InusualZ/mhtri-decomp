@@ -30,7 +30,7 @@
  *  - `note_page_draw`, `lb_screen16_step`: retail lowers the 0..1 / 0..2 case ranges to one `cmplwi` and the other
  *    cases to `cmpwi`; ours either keeps `cmpwi 0; blt` (int switch) or `cmplwi` throughout (the `(u32)` switch kept,
  *    95.00 against 92.78); `lb_screen16_step` keeps a branch where retail if-converts `off_mask |= 2`.
- *  - `chat_log_lines_draw` (`shown` as `s16` raises the row; ours is then 4 B over), `note_slot_find` (`want` takes r3 where retail has r0 and the three
+ *  - `chat_log_lines_draw` (`shown` is an `s16` holding a u8 line count, which raises the row; size off target by 4 B: 436 B against 432 B, a `u8` is 432 B), `note_slot_find` (`want` takes r3 where retail has r0 and the three
  *    state/kind byte temporaries r0 where retail has r3; regsim's decl-order plans do not reach them), `chat_log_page_draw`: register colouring only
  *    (declaration orders searched with `permdecl`/`hill`).
  *  - `note_page_step`: retail computes `lines - 1` after the cursor store.

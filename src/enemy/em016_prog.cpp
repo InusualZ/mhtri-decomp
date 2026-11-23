@@ -39,6 +39,8 @@
  *   The aim fade step is a named `.sdata2` word: a literal `x - -0.005f` folds into `x + 0.005f`.
  * RESIDUALS. mwcc-debugger dump, `em016_strafe_point_get`: regsim 3/3 callee-saved, 4/5 volatile, best plan cost 0;
  *            first divergence insn 25: retail `li r3, 0x11c7` vs ours `li r4, 0x11c7`
+ * SHAPES. em016_frame_effect: `ang` is a `u16` (the `(u16)calcVecAngX` heading, only ever tested as `(u16)(ang + 0x8000)`;
+ *   an `s16` measures 99.14 % at 4 B over).
  */
 
 #include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */
