@@ -18,6 +18,7 @@
  * SHAPES. The work block is a view of `_EFT::work_0x38`.  The pool is written as literals in retail's creation order:
  *   the water scale's 0.5/1.0, the model scale 1.0, the vector 14/0/0, then -1.0, 2.0 and 0.8 inline at their uses
  *   (hoisting them into locals pools -1.0 before 14.0).
+ * SHAPES. fn_8010BDE4: `base_c` stays s32 (0x400 does not fit u8; a u8 spelling measured +0.55 but truncates).
  */
 
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */

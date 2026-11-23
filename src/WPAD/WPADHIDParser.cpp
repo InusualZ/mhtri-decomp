@@ -55,6 +55,7 @@
  *            is not the cause); first divergence insn 6: retail `lwzx r6, r7, r8` vs ours `<DIFF_DELETE>`
  * RESIDUALS. mwcc-debugger dump, `wpadReportButtonsDpd10Ext9`: regsim 4/4 callee-saved, 4/4 volatile (EXACT);
  *            first divergence insn 14: retail `lbz r0, 0x2(r4)` vs ours `lbz r6, 0x2(r4)`
+ * FLAGS. wpadReportReadData: scoped `#pragma opt_dead_assignments off` (98.74 -> 98.81, size equal).
  */
 
 #include "types.h"
@@ -736,6 +737,8 @@ void wpadReportStatus(u8 chan, u8* report, WPADSample* sample)
     OSRestoreInterrupts(level);
 }
 
+#pragma push
+#pragma opt_dead_assignments off
 /* Handles the memory-read reply: copies the payload and runs the read's follow-up when the last block arrives. */
 void wpadReportReadData(u8 chan, u8* report, WPADSample* sample)
 {
@@ -818,6 +821,7 @@ void wpadReportReadData(u8 chan, u8* report, WPADSample* sample)
     }
     OSRestoreInterrupts(level);
 }
+#pragma pop
 
 /* Handles the acknowledge report: completes the pending command when the acknowledged id is the one in flight. */
 void wpadReportAck(u8 chan, u8* report, WPADSample* sample)

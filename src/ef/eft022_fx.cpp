@@ -21,6 +21,7 @@
  *   cast keeps a `clrlwi` under peephole off); type tests that retail compares signed are `(s32)` casts.
  *   `fn_8011661C` bumps its phase twice (`field_0x07++; field_0x07++;`: one `clrlwi` between the adds) and tests
  *   `--timer <= 0` first.
+ * SHAPES. ExecCallbackC: `k` is u16 (counts 4..0x1A against a 0x1B bound, passed to a u32 parameter); the narrow loop counter measures closer to retail.
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -530,7 +531,7 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
     _EFT* effect;
     _EFT_WORK_B* work;
     nw4r::math::MTX34* src;
-    s32 k;
+    u16 k;
     s32 group;
     s32 inner;
     f32 f31 = 0.5f;

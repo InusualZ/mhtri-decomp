@@ -58,6 +58,7 @@
  * RESIDUALS. mwcc-debugger dump, `eft_res_blocks_get`: regsim 0/0 callee-saved, 2/7 volatile, best plan cost 16;
  *            first divergence insn 1: retail `addi r9, r4, eft_control@l` vs ours `addi r6, r4, eft_control@l`; size differs
  *            from retail (308 B vs 312 B)
+ * FLAGS. eft_res_archive_load_callback: scoped `#pragma optimization_level 4` (96.42 -> 97.65, size equal).
  */
 
 #include "types.h"
@@ -1541,6 +1542,8 @@ extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* id
 }
 #pragma pop
 
+#pragma push
+#pragma optimization_level 4
 /* 0x800F8358 (0x2DC): the archive-load callback: files every member of the loaded archive under the proID
  * slot `eft_common_load`'s run reserved for it (searched from the run's first ordinal) and registers it. */
 extern "C" void eft_res_archive_load_callback(char* path, void* data, u32 size, EftFileLoadCtx* ctx) {
@@ -1614,6 +1617,7 @@ extern "C" void eft_res_archive_load_callback(char* path, void* data, u32 size, 
         proids++;
     }
 }
+#pragma pop
 
 /* 0x800F8634 - the resource-file request: pull the file into memory and start the async load whose
  * callback is eft_res_archive_load_callback. */

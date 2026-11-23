@@ -109,6 +109,7 @@
  * RESIDUALS. hbmPanelClearText, Reset, Relayout, SetWordWrap: the one non-register difference of the four is the
  *            free-list index after the inlined unlink (retail `slwi r0,rN,3`, ours `clrlslwi r0,rN,16,3`: retail
  *            reloads the count where ours reuses the masked loop counter); the rest is volatile-register numbering.
+ * FLAGS. hbmPanelCheckWordWrap: scoped `#pragma opt_lifetimes off` (99.79 -> 99.84, size equal).
  */
 
 #include "types.h"
@@ -3517,6 +3518,8 @@ s32 hbmPanelFindLink(HbmPanelView* self, u32* linkStart, u32* linkEnd, const u16
     return found;
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* 0x80546D98 (0x35C): Decides whether the word that starts at the panel's draw position must wrap before `x`: measures
  * the word, notes a hyphen inside it, and moves the draw position past it. */
 s32 hbmPanelCheckWordWrap(HbmPanelView* self, const u16* text, u32 position, f32 x)
@@ -3612,6 +3615,7 @@ s32 hbmPanelCheckWordWrap(HbmPanelView* self, const u16* text, u32 position, f32
     self->drawPosition = i + 1;
     return 0;
 }
+#pragma pop
 
 /* 0x805470F4 (0x20): Returns the caret's character index while the caret is shown, otherwise 0x7FFFFFFF. */
 s32 hbmTextWriterGetCaretIndex(HbmPanelSubView* writer)

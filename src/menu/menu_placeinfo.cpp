@@ -78,6 +78,8 @@
  *   288 and 292 (`#line`).
  * RESIDUALS. mwcc-debugger dump, `place_model_load`: regsim 3/8 callee-saved, 7/7 volatile, best plan cost 4; first
  *            divergence insn 6: retail `mr r25, r4` vs ours `mr r26, r4`; size differs from retail
+ * FLAGS. lb_city_list_draw: scoped `#pragma optimization_level 4` (99.23 -> 99.28, size equal).
+ * SHAPES. draw_search_city_dialog: `help` stays s32 (message ids 0x1EE.. do not fit u8; a u8 spelling measured +0.41 but truncates).
  */
 
 #include "types.h"
@@ -1003,6 +1005,8 @@ void lb_city_help_draw(u16 id) {
     }
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x80438740 (0x308): the city list dialog: name, event and population of each city of the page. */
 void lb_city_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
@@ -1073,6 +1077,7 @@ void lb_city_list_draw(LbCitySelectWork* work, bool active) {
     flfntStackReset();
     lb_city_help_draw(0x1EC);
 }
+#pragma pop
 
 /* 0x80438A48 (0x374): the city list dialog of server type 3: name, first and second filter, event and population. */
 void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {

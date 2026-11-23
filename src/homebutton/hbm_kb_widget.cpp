@@ -93,6 +93,7 @@
  *            inline destructor's own null test.
  * RESIDUALS. mwcc-debugger dump, `hbmKbWidgetDestroy`: no regsim plan (dump unavailable for this row); first
  *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `beq 0x20c`
+ * FLAGS. hbmKbCandDraw: scoped `#pragma opt_lifetimes off` (98.36 -> 98.48, size equal).
  */
 
 #include "types.h"
@@ -1942,6 +1943,8 @@ extern "C" void hbmKbCandSetWords(HbmKbCandidateList* self) {
     hbmKbCandLayout(self);
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* Draws the candidate words clipped to the candidate area, keeping the selected and the pressed words in view while
  * the list scrolls. */
 extern "C" void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInfo* drawInfo) {
@@ -1990,6 +1993,7 @@ extern "C" void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInf
     }
     GXSetScissor(scissorLeft, scissorTop, scissorWidth, scissorHeight);
 }
+#pragma pop
 
 /* The first word after `index` that does not fit when the window starts at `index`, minus one; -1 at the end. */
 extern "C" s32 hbmKbCandNextWindow(HbmKbCandidateList* self, s32 index) {

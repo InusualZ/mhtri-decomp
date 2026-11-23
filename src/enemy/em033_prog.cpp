@@ -41,6 +41,7 @@
  *   `em_move_vec_set` takes its vector by value (`em_move_vec_set_c1`).  The sound programs are
  *   defined after `em033_act11_se_play` (declared `extern` above) so the dispatchers load each table by name and the
  *   switch tables keep their places around them.
+ * FLAGS. em033_event_notify: scoped `#pragma opt_propagation off` (98.38 -> 100, 836 -> 828 B).
  */
 
 #include "types.h"
@@ -275,6 +276,8 @@ extern "C" {
 void em033_noop(void) {
 }
 
+#pragma push
+#pragma opt_propagation off
 void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
     EmPopRec* rec;
     u8 id;
@@ -399,6 +402,7 @@ void em033_event_notify(struct _ENEMY_WORK* self, u8 kind, u8 sub) {
         break;
     }
 }
+#pragma pop
 
 void em033_frame_update(struct _ENEMY_WORK* self) {
     em033_aim_sync(self);

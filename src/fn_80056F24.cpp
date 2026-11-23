@@ -38,6 +38,7 @@
  *            divergence insn 6: retail `addi r6, r3, fade_work@l` vs ours `addi r3, r3, fade_work@l`
  * SHAPES. `filter_panel_upper_set`/`_lower_set` compute the half height in a local before scaling (retail's
  *            `fmuls` operand order).
+ * SHAPES. screen_tex_draw/screen_capture_draw: `h` is u16 (the (s16) screen height, 0..480, passed to an s16 parameter).
  */
 
 #include "types.h"
@@ -1038,7 +1039,7 @@ extern "C" void screen_capture_draw(GameDrawState* s, u8 mode) {
     Mtx view;
     u8 shade;
     s16 w;
-    s16 h;
+    u16 h;
 
     if (s->capture_buf != NULL) {
         shade = pad_hold_ck() == 0 ? 0xFF : 0x78;
@@ -1130,7 +1131,7 @@ void screen_tex_draw(u8 dim) {
     Mtx view;
     u8 shade;
     s16 w;
-    s16 h;
+    u16 h;
     GameDrawState* s = &lbl_8066ACF8;
 
     if (s->screen_tex != NULL) {

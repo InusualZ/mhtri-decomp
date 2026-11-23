@@ -24,6 +24,7 @@
  *   0x3E bytes (the `memset` lengths); the map's 0xAC/0x44 include alignment padding.
  * SHAPES. Flags handed to `GetMenuFontColor`'s `bool` parameters are `bool` locals; the quest-mode range test is
  *   spelled `(u32)(mode - 3) > 3`; page 14's owned-title test is an inline helper (the `neg/or/srwi` retest).
+ * SHAPES. menu_item_sub_page14_title_draw: `picked` is s16 (a u8 cursor index, 0..0xFF, used as an array index).
  */
 
 #include "types.h"
@@ -650,7 +651,7 @@ static void menu_item_sub_page14_title_draw(MenuSlot* slot) {
     _mh_ivec2_ base;
     _SPR_DATA_ spr;
     bool marked;
-    s8 picked;
+    s16 picked;
     s32 title;
     _mh_ivec2_ pos;
     u8** titles;

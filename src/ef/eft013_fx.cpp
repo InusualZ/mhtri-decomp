@@ -56,6 +56,7 @@
  *   retail compares `cmpwi` are `switch`es; the small-data tables are declared with their sizes (`@sda21`); empty
  *   switch arms that retail compares explicitly `return` while the default `break`s (`eft013_em_set`); a flag retail
  *   compares against the zero it just stored is written as a compare with that field (`fn_80109A84`).
+ * FLAGS. eft013_setup_uv_model: scoped `#pragma opt_propagation off` (95.31 -> 95.60, size equal).
  */
 
 #include "types.h"
@@ -2113,6 +2114,8 @@ extern "C" void eft013_setup_effect(_EFT013* self) {
 
 #pragma optimization_level 4
 
+#pragma push
+#pragma opt_propagation off
 /* 0x801086C4 (0x2FC): state 0 of the model effects (types 9, 13, 26-29): creates the pooled effects and the UV
  * model, seats the effects on the source joint, picks the start timer and plays the start sound. */
 extern "C" void eft013_setup_uv_model(_EFT013* self) {
@@ -2210,6 +2213,7 @@ extern "C" void eft013_setup_uv_model(_EFT013* self) {
     }
     fn_80108A2C(self);
 }
+#pragma pop
 #pragma optimization_level reset
 
 #pragma optimization_level 4

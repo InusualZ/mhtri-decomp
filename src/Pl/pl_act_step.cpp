@@ -145,6 +145,7 @@
  *            B)
  * RESIDUALS. mwcc-debugger dump, `pl_gather_item_take`: regsim 2/2 callee-saved, 6/6 volatile (EXACT); first
  *            divergence insn 24: retail `cmplwi r0, 0x2` vs ours `cmplwi r0, 0x3`
+ * SHAPES. fn_8024676C: `angle` is s32 (the u32 entry angle, 0..0xFFFF, passed on to a u16 parameter).
  */
 
 #include "types.h"
@@ -1505,7 +1506,7 @@ extern "C" void fn_802466C4(_PLW* self) {
 extern "C" void fn_8024676C(_PLW* self) {
     u8 map;
     u8 area;
-    u16 angle;
+    s32 angle;
     MHchar* chr;
     u16 slot;
     s32 i;

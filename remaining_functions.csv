@@ -735,7 +735,6 @@ size_bytes,unit,function,match_percent,address
 736,lobby/lb_screen_step,lb_smith_make_preview_set,99.9348,0x803602A4
 740,Network/network_pat_control,importLayerPeers,98.2973,0x80427C00
 740,lobby/lb_companion_ui,lb_dance_list_step,99.7297,0x8033D1F8
-740,sound/snd_bank_loader,snd_quest_bgm_set,98.7838,0x800EF270
 744,TRK/exi2_comm,__EXI2Imm,97.6882,0x80522668
 744,ef/eft022_fx,ExecCallbackC__16EftModelCallbackFPQ34nw4r4math5MTX34Q34nw4r3g3d6ResMdlPQ34nw4r3g3d16FuncObjCalcWorld,82.7742,0x80116080
 744,lobby/fn_80212810,lb_item_need_list_draw,99.4892,0x80216A68
@@ -792,7 +791,6 @@ size_bytes,unit,function,match_percent,address
 820,g3d/g3d_draw,"__sort<PQ34nw4r3g3d4MdlZ,RPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b>__3stdFPQ34nw4r3g3d4MdlZPQ34nw4r3g3d4MdlZRPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b_v",99.439,0x80079B38
 820,g3d/g3d_draw,"sort<PQ34nw4r3g3d4MdlZ,PFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b>__3stdFPQ34nw4r3g3d4MdlZPQ34nw4r3g3d4MdlZPFRCQ34nw4r3g3d4MdlZRCQ34nw4r3g3d4MdlZ_b_v",97.7805,0x80079604
 824,SC/SCSystemConfig,SCFlushStep,82.7718,0x804DC6A0
-828,enemy/em033_prog,em033_event_notify,98.3816,0x8035BC28
 828,lobby/lb_quest_board,draw_quest_board,98.9613,0x80394DA4
 828,userdata_item,face_spr_draw,95.2995,0x80048964
 832,Network/NetworkSessionManagerPat,networkSessionReflect0,98.6779,0x803DD750

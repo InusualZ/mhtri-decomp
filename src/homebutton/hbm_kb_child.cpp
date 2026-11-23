@@ -33,6 +33,7 @@
  *            declaration, init-order and split-init permutations score the same.
  * RESIDUALS. __sinit: the epilogue's `lwz r31` / `lwz r30` restores sit before the last stores in retail and after
  *            them in ours (scheduling).
+ * FLAGS. HbmKbChild::create: scoped `opt_loop_invariants off` + `opt_strength_reduction off` (97.70 -> 98.56, size equal).
  */
 
 #include "types.h"
@@ -178,6 +179,9 @@ HbmKbChild::~HbmKbChild() {
 /* 0x80555BF4 (0x40): Destroys the pane handler. */
 HbmKbChildPaneHandler::~HbmKbChildPaneHandler() {}
 
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* 0x80555C34 (0x328): Creates the pane handler and the pane manager, hides the root, and creates one part per key with
  * its animations. */
 void HbmKbChild::create(MEMAllocator* allocator) {
@@ -223,6 +227,7 @@ void HbmKbChild::create(MEMAllocator* allocator) {
     }
     init();
 }
+#pragma pop
 
 /* 0x80555FB4 (0xAC): Puts the key-top pane back, hides it and lays the panes out. */
 void HbmKbChild::init() {

@@ -61,6 +61,7 @@
  *            or after `work` measures 8.2 B lower.
  * RESIDUALS. mwcc-debugger dump, `em_pop_work_alloc`: regsim 6/8 callee-saved, 3/3 volatile, best plan cost 4; first
  *            divergence insn 15: retail `lis r31, 0x1` vs ours `lis r30, 0x1`
+ * SHAPES. em_pop_obj_tint_set: `r`/`g`/`b` are s16, the width of the (s16) casts that fill them; the 0xFF clamps compare the s16 values.
  */
 
 
@@ -1252,9 +1253,9 @@ void em_pop_obj_tint_set(EmPopRec* rec) {
     u8 index;
     s32 num;
     s32 i;
-    s32 r;
-    s32 g;
-    s32 b;
+    s16 r;
+    s16 g;
+    s16 b;
     s32 max;
     u32 color0;
     u32 color1;

@@ -31,6 +31,7 @@
  *            out in another order than retail's.
  * RESIDUALS. HbmAnimPanelBase's table is not this unit's: its key function is slot 0x40, kept at 0x80454970 by another
  *            unit, so the member is declared and never defined here.
+ * FLAGS. HbmAnimPanel::create: scoped `opt_loop_invariants off` + `opt_strength_reduction off` (97.98 -> 98.74, size equal).
  */
 
 #include "types.h"
@@ -334,6 +335,9 @@ extern "C" void* fn_80557310(void* self, int flag) {
 /* 0x80557350 (0x40): Destroys the pane handler. */
 HbmAnimPanelPaneHandler::~HbmAnimPanelPaneHandler() {}
 
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* 0x80557390 (0x35C): Creates the pane handler and the pane manager, hides the root, and creates one part per key with
  * its animations. */
 void HbmAnimPanel::create(MEMAllocator* allocator) {
@@ -379,6 +383,7 @@ void HbmAnimPanel::create(MEMAllocator* allocator) {
     }
     init();
 }
+#pragma pop
 
 /* 0x80557744 (0x1CC): Resets the page, the key-top pane and the page buttons, restores the default sign texts, labels
  * the keys and lays the panes out. */

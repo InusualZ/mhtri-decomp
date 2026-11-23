@@ -50,6 +50,7 @@
  *            r31,demo_stream_slot@sda21`, ours the reverse (two constant vregs, instruction order).
  * FLAGS. snd_player_banks_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  * FLAGS. snd_area_env_bank_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
+ * FLAGS. snd_quest_bgm_set: scoped `#pragma optimization_level 4` (98.78 -> 100, size equal).
  */
 
 #include "types.h"
@@ -670,6 +671,8 @@ extern "C" s32 snd_banks_loaded_ck(void)
     return loaded >= snd_wk->load_count;
 }
 
+#pragma push
+#pragma optimization_level 4
 /* 0x800EF270 (0x2E4): loads the quest's NPC banks: the Felyne or plain common bank, the two Chacha dances and the mask. */
 extern "C" void snd_quest_bgm_set(u8 track, u8 a, u8 b)
 {
@@ -719,6 +722,7 @@ extern "C" void snd_quest_bgm_set(u8 track, u8 a, u8 b)
     sprintf(name, "16/tsb/%s%02d.tsb", "npc_kamen", track);
     load_file_req(name, snd_wk->tsb_ofs[0x24], snd_wk->tsb_size[0x24], (u32)fn_800F0230, 3, args);
 }
+#pragma pop
 
 /* The Chacha companion's "kamen" voice bank. */
 s32 get_chacha_kamen_bank(void)

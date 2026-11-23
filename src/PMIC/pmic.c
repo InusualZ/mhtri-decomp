@@ -36,6 +36,7 @@
  *    `PMICPopPlay`; `PMICSetBuffers` carves both rings from the `area` parameter itself.
  *    Functions are defined in address order (forward declarations above `PMICInit`), so the .text layout is the
  *    target's; the shared macros and `PMICPopQueue` are defined ahead of the first body.
+ * FLAGS. PMICFilterSamples: scoped `#pragma opt_lifetimes off` (92.05 -> 94.54, size equal).
  */
 
 #include "types.h"
@@ -1951,6 +1952,8 @@ s32 PMICGetParam(u32 index, u32* reply, PMICUserCallback callback, s32 arg)
 
 #pragma fp_contract off
 
+#pragma push
+#pragma opt_lifetimes off
 /* 0x80526980 (0x30C): runs the two-channel level follower over `count` sample pairs, scaling each channel by its
  * gain; reports through `silent` whether most of the block was gated. */
 s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
@@ -2078,5 +2081,6 @@ s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
     }
     return 0;
 }
+#pragma pop
 
 #pragma fp_contract reset
