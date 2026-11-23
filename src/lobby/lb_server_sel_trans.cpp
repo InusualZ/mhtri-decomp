@@ -54,6 +54,7 @@
  * FLAGS. lb_server_select_types_draw and lb_server_select_servers_draw take a scoped `#pragma optimization_level 4` (same size, raises both rows).
  * FLAGS. npc_talk_start takes a scoped `#pragma optimization_level 4` (524 B, row at 100 %); lb_server_select_rooms_draw the same (same size, raises its row).
  * FLAGS. lb_screen26_trade_build takes a scoped `#pragma opt_loop_invariants off` (same size, raises its row).
+ * SHAPES. `lb_server_select_screen_step` declares `row` before `i` (regsim plan 1).
  */
 
 
@@ -2775,8 +2776,8 @@ void lb_server_select_close(void)
 void lb_server_select_screen_step(void)
 {
     LbServerSelWork* work = lobby_w.server_sel_0x0AC;
-    s32 i;
     NetMenuRow* row;
+    s32 i;
 
     if (work->list.anim_0x004 < 6) {
         work->list.anim_0x004++;

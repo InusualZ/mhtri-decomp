@@ -22,6 +22,7 @@
  *   result with `return`; `eft029_start_effects` picks its parameter through a `switch`; the frame counters are
  *   pre-incremented into a local before the key reads; the charge-act test is `(u16)(act + (u16)-24) <= 6`; the
  *   eft030 alpha is a `u8` local and its fade `x / 8.0f`; the `default:` case of the variant switch comes first.
+ * SHAPES. `eft029_move_charge2` declares `joint` first (regsim plan 1: callee-saved 4/4).
  */
 
 #include "types.h"
@@ -950,10 +951,10 @@ extern "C" void eft029_move_effects(_EFT* self)
  * the scale, sound and release burst; the effect sits on the stage's joint and moves at the record's scale. */
 extern "C" void eft029_move_charge2(_EFT* self)
 {
+    u32 joint;
     nw4r::math::VEC2 uv;
     _PLW* plw;
     _EFT029FX_WORK* work;
-    u32 joint;
     f32 s;
     s32 frame;
 

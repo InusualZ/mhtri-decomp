@@ -37,6 +37,7 @@
  *   evaluates it; `(u8)(cond) & 0xFF` keeps the `clrlwi` on a returned bool; `Em025Block* blk = &self->em025_0x328`
  *   gives retail's `addi rN,r3,0x328` base.  The data is defined in retail order between the functions (the jump
  *   tables fall between the definitions; the sound programs sit before `em025_act10_se_play`).
+ * FLAGS. `em025_head_track` takes a scoped `#pragma opt_propagation off`.
  */
 
 #include "types.h"
@@ -4454,6 +4455,8 @@ void em025_sway_update(struct _ENEMY_WORK* self) {
     self->em025_0x328.rot_x_0x344 = (u16)(s32)(0.5f + (65536.0f * angle) / 360.0f);
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x801A98F8 (0x374): the head tracking: turns joints 23 and 24 toward the nearest player on their side who is in
  * the area, within 600 and at the joint's height, inside each joint's angle limits. */
 void em025_head_track(struct _ENEMY_WORK* self) {
@@ -4525,6 +4528,7 @@ void em025_head_track(struct _ENEMY_WORK* self) {
         blk->rot_y_0x33C[i] = em_angle_approach(turn, blk->rot_y_0x33C[i], 0x80);
     }
 }
+#pragma pop
 
 } /* extern "C" */
 

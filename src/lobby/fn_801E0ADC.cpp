@@ -44,6 +44,7 @@
  *   A table index written in place (`a[idx * 3 + 1]`) keeps retail's `addi` beside its `lbzx` (em007_model_colors_get).
  *   The two locals that open lb_goods_hold_step are declared `ret` first.
  * SHAPES. `eft_em_spawn_joint` compares the id as `(s32)(u8)id == 0x21` (retail's signed `cmpwi`).
+ * SHAPES. `eft033_move_gun` declares `work`, `slot`, `c0`..`c3`, then `plw` (regsim plan 1).
  */
 
 #include "types.h"
@@ -1864,6 +1865,11 @@ void eft033_move_joint(_EFT* eft)
 void eft033_move_gun(_EFT* eft)
 {
     Eft033Work* work = (Eft033Work*)eft->work_0x38;
+    u8 slot;
+    s32 c0;
+    s32 c1;
+    s32 c2;
+    s32 c3;
     _PLW* plw = (_PLW*)eft->source_0x30;
     nw4r::math::VEC3 ofs;
     nw4r::math::VEC3 scale;
@@ -1872,12 +1878,7 @@ void eft033_move_gun(_EFT* eft)
     nw4r::math::MTX34 joint;
     _GXColor color;
     s8 level;
-    u8 slot;
     s32 i;
-    s32 c0;
-    s32 c1;
-    s32 c2;
-    s32 c3;
 
     if (eft_res_spawn_gate_ck(eft, 0) == 0) {
         eft->flag_0x01 = 0;

@@ -44,6 +44,7 @@
  * RESIDUALS. mwcc-debugger dump, `exportEquipRecord`: regsim 2/5 callee-saved, 12/12 volatile, best plan cost 4
  *            EXACT; first divergence insn 6: retail `lwz r29, lobby_world_block@sda21` vs ours `lwz r31,
  *            lobby_world_block@sda21`
+ * SHAPES. `write_wpad_memory`'s counter `i` is `u32` (a 0..16 loop index; +0.05, the size gap is unchanged).
  */
 
 #pragma peephole off
@@ -1673,7 +1674,7 @@ s32 write_wpad_memory(u8 player, u8 mode)
     u16 pressed;
     _vs_user_data* vs;
     s32 ret;
-    int i;
+    u32 i;
 
     if (lobby_net_busy_ck() == 1) {
         pressed = 0;

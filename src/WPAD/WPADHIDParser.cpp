@@ -28,8 +28,8 @@
  *   combined in a different order (register numbering follows).  `wpadExtCalibrationReadDone` adds the block offset to the
  *   buffer in the other operand order.  `wpadDecodeDpd` numbers the rotation loop's array bases and two float temporaries
  *   differently.  `wpadDecodeExtDualStick` loads the default layout's button high byte into r5 where the original uses
- *   r7 (no spelling of the button word moves it).  `wpadReportReadData`, `wpadReportStatus` and
- *   `wpadReportButtonsAccelExt16` differ in register numbering (no declaration order moves it); `wpadReportStatus` also
+ *   r7 (no spelling of the button word moves it).  `wpadReportReadData` and
+ *   `wpadReportStatus` differ in register numbering (no declaration order moves it); `wpadReportStatus` also
  *   keeps an extsh on the extension bit (the original's rlwinm+srawi pair without it is what `#pragma peephole off`
  *   emits for a plain `(b & 2) >> 1`, but the pragma costs the rest of the function 8 points).  `wpadReportStatus`,
  *   `wpadReportReadData` and `wpadReportAck` build the merged button word in the other register of the rlwimi pair.
@@ -56,6 +56,7 @@
  * RESIDUALS. mwcc-debugger dump, `wpadReportButtonsDpd10Ext9`: regsim 4/4 callee-saved, 4/4 volatile (EXACT);
  *            first divergence insn 14: retail `lbz r0, 0x2(r4)` vs ours `lbz r6, 0x2(r4)`
  * FLAGS. wpadReportReadData: scoped `#pragma opt_dead_assignments off` (98.74 -> 98.81, size equal).
+ * FLAGS. `wpadReportButtonsAccelExt16` takes a scoped `#pragma opt_dead_assignments off`.
  */
 
 #include "types.h"
@@ -1252,6 +1253,8 @@ void wpadReportExt19(u8 chan, u8* report, WPADSample* sample)
     }
 }
 
+#pragma push
+#pragma opt_dead_assignments off
 /* Decodes the 0x35 report: buttons, accelerometer and 16 extension bytes. */
 void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample)
 {
@@ -1282,6 +1285,7 @@ void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample)
         }
     }
 }
+#pragma pop
 
 /* Decodes the 0x36 report: buttons, 10 bytes of pointer data and 9 extension bytes. */
 void wpadReportButtonsDpd10Ext9(u8 chan, u8* report, WPADSample* sample)

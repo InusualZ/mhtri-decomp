@@ -32,7 +32,7 @@
  *   case 1 falling into it and case 2 branching back - a `goto` layout; rule 8 forbids it and the conformant shapes
  *   measure switch + tail 54.77, if/else chain 52.49, for/break 52.49. This row blocks a flip.
  *   snd_quest_bgm_set: register colouring only (retail keeps the three parameters in r25..r27, ours r27..r29).
- *   pl_weapon_se_bank_load (97.77): register colouring and one scheduled load.
+ *   pl_weapon_se_bank_load (98.39): register colouring and one scheduled load.
  *   snd_area_bank_load, demo_bgm_ready_ck, snd_chunk_handle_get (`s8 handle = (s8)snd_wk->chunk_handle[..]`:
  *   retail loads and extends in the handle's own register, the plain s8 load measures worse), snd_area_env_bank_load,
  *   demo_bgm_load: register choice / operand order only.
@@ -52,6 +52,7 @@
  * FLAGS. snd_area_env_bank_load takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  * FLAGS. snd_quest_bgm_set: scoped `#pragma optimization_level 4` (98.78 -> 100, size equal).
  * SHAPES. fn_800F06AC: `bank` is a `u16` holding the u8 bank index `p[1]` (it indexes the bank-name table).
+ * SHAPES. `pl_weapon_se_bank_load` takes the hill-climbed declaration order.
  */
 
 #include "types.h"
@@ -975,11 +976,11 @@ extern "C" void pl_weapon_se_bank_load(_PLW* work)
 {
     char name[0x88];
     u32 args[3];
+    s32 next;
     s32 type;
     s32 variant;
-    s32 chunk;
-    s32 next;
     s32 sub;
+    s32 chunk;
     const u8* tbl;
     u32* size;
     s32 i;

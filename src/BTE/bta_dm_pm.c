@@ -21,6 +21,7 @@
  * SHAPES. plain C. The pm_cback timer stop loop uses its own block-scoped index (the register order of an inlined
  *   helper); bta_dm_pm_park, bta_dm_pm_sniff and bta_dm_pm_active are static helpers
  *   the compiler inlines into their callers (retail has no out-of-line copy).
+ * FLAGS. `bta_dm_pm_set_mode` takes a scoped `#pragma opt_propagation off`.
  */
 
 #include "BTE/bta_dm_pm.h"
@@ -167,6 +168,8 @@ static void bta_dm_pm_active(u8* peer_addr) {
     BTM_SetPowerMode(bta_dm_cb.pm_id, peer_addr, &pm);
 }
 
+#pragma push
+#pragma opt_propagation off
 /* 0x8047E05C (0x380): Picks the power mode the services connected to `peer_addr` allow and applies it, after their
  * delay unless `timed_out`. */
 static void bta_dm_pm_set_mode(u8* peer_addr, u8 timed_out) {
@@ -266,6 +269,7 @@ static void bta_dm_pm_set_mode(u8* peer_addr, u8 timed_out) {
         bta_dm_pm_active(peer_addr);
     }
 }
+#pragma pop
 
 /* 0x8047E3DC (0x78): Posts the power mode change BTM reports for `bd_addr`. */
 static void bta_dm_pm_btm_cback(const u8* bd_addr, u32 status, u16 value, u8 hci_status) {

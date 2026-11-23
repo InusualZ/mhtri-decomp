@@ -39,6 +39,7 @@
  * SHAPES. `filter_panel_upper_set`/`_lower_set` compute the half height in a local before scaling (retail's
  *            `fmuls` operand order).
  * SHAPES. screen_tex_draw/screen_capture_draw: `h` is u16 (the (s16) screen height, 0..480, passed to an s16 parameter).
+ * SHAPES. `filter_panel_draw` takes the hill-climbed declaration order.
  */
 
 #include "types.h"
@@ -569,13 +570,13 @@ extern "C" void filter_panel_draw(FilterPanel* panel) {
     Mtx44 proj;
     Mtx view;
     _MH_VEC2 screen;
-    s16 width;
-    s16 upper;
     s16 mid;
     u32 c0;
     u32 c1;
     u32 c2;
+    s16 upper;
     u32 c3;
+    s16 width;
     u32 c4;
     u32 c5;
 

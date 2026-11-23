@@ -22,6 +22,7 @@
  *   `fn_8011661C` bumps its phase twice (`field_0x07++; field_0x07++;`: one `clrlwi` between the adds) and tests
  *   `--timer <= 0` first.
  * SHAPES. ExecCallbackC: `k` is u16 (counts 4..0x1A against a 0x1B bound, passed to a u32 parameter); the narrow loop counter measures closer to retail.
+ * FLAGS. `fn_801156A0` takes a scoped `#pragma optimization_level 4` (932 B, the target size).
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -269,17 +270,19 @@ extern "C" void fn_80115664(_EFT* self)
  * eft022 (fn_801164F0 release, fn_8011652C dispatch)
  * ------------------------------------------------------------------------------------------------- */
 
+#pragma push
+#pragma optimization_level 4
 /* Moves the eft021 record's models and tints them from the shared key tables. */
 extern "C" void fn_801156A0(_EFT* self)
 {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
     _EFT_WORK_B* work;
-    _PLW* plw;
     EftModelCallback* obj;
     _GXColor color;
     s32 i;
     s32 j;
+    _PLW* plw;
     f32 z;
 
     work = (_EFT_WORK_B*)self->work_0x38;
@@ -360,6 +363,7 @@ extern "C" void fn_801156A0(_EFT* self)
         }
     }
 }
+#pragma pop
 
 /* 0x80115A44 (0x3C): Constructs the model callback: the world-callback base, then this class's table. */
 EftModelCallback::EftModelCallback()

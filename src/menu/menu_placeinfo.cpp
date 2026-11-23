@@ -80,6 +80,7 @@
  *            divergence insn 6: retail `mr r25, r4` vs ours `mr r26, r4`; size differs from retail
  * FLAGS. lb_city_list_draw: scoped `#pragma optimization_level 4` (99.23 -> 99.28, size equal).
  * SHAPES. draw_search_city_dialog: `help` stays s32 (message ids 0x1EE.. do not fit u8; a u8 spelling measured +0.41 but truncates).
+ * SHAPES. `lb_city_member_list_draw` takes the hill-climbed declaration order.
  */
 
 #include "types.h"
@@ -1160,10 +1161,10 @@ void lb_city_list_ex_draw(LbCitySelectWork* work, bool active) {
 void lb_city_member_list_draw(LbCitySelectWork* work, bool active) {
     s32 x;
     s32 icon_x;
-    s32 i;
     bool cursor;
-    s32 color;
     s16 y;
+    s32 color;
+    s32 i;
     s32 text_x;
     s16 name_x;
     s16 area_x;

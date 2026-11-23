@@ -50,6 +50,7 @@
  *   `cmplwi`; the two-value tests `x == 1 || x == 2` are `(u32)(x - 1) <= 1`.
  * RESIDUALS. eft_slot_work_update: regsim plan 1 wants a zero local (`li r40,0`) declared after `record`; `u8 zero` assigned at the
  *            top or before the scan is folded away (no change).
+ * SHAPES. `eft_slot_track_step` declares `i` before `shape` (regsim plan 1).
  */
 
 #include "enemy/em_area_entry_tbl.h" /* em_area_entry_tbl (rule 2: the owner's header) */
@@ -2329,10 +2330,10 @@ extern "C" u32 eft_slot_enemy_counts_ck(EftSlot* slot)
 extern "C" void eft_slot_track_step(EftSlot* slot)
 {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    u8 shape;
     u32 max = get_move_work_max(3);
     _ENEMY_WORK* bound = (_ENEMY_WORK*)slot->field_0x18;
     s32 i;
+    u8 shape;
     u8 index = 0;
     u8 state;
     _ENEMY_WORK* target = NULL;

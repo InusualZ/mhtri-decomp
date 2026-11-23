@@ -100,6 +100,7 @@
  *   `lb_list_row_draw` without a `clrlwi` (an `s32 lit` measures 95.50) and stores `sel_id_0x014` through `clrlwi 16` (a `u16` field measures 97.33).
  * SHAPES. lb_dye_inner_draw: `count` is a `u32` holding `fn_801F3EDC`'s page count (a few tens at most); the loop bound
  *   narrows it with `(u16)` as retail does.
+ * SHAPES. `lb_equip_box_wear_step` declares `entry` after `id` (regsim plan 1); `lb_color_pane_draw` takes the hill-climbed declaration order.
  */
 #include "types.h"
 #include "id_value.h"
@@ -3007,10 +3008,10 @@ extern "C" s32 lb_entry_pane_select_step(LbEntryPane* self, LbEquipBoxWork* owne
  * first). */
 extern "C" s32 lb_equip_box_wear_step(LbEquipBoxWork* self)
 {
-    LbEntryPane* entry;
     LbEquipRec* rec;
     s32 result;
     u16 id;
+    LbEntryPane* entry;
     s32 i;
 
     result = 0;
@@ -7591,16 +7592,16 @@ void lb_color_slot_draw(s16* pos, u32 color, u8 selected, s16 entry, u8 mode)
 void lb_color_pane_draw(LbColorPane* self)
 {
     _SPR_DATA_ spr;
-    _mh_ivec2_ pos;
     _mh_ivec2_ grid;
     _mh_ivec2_ origin;
+    _mh_ivec2_ pos;
     u32 color;
-    const s16* cells;
     u16* head;
     u16 picked;
     u16 count;
     u16 frame;
     u8 i;
+    const s16* cells;
     u8 selected;
     bool lit;
     s16 help;

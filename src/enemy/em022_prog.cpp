@@ -15,13 +15,14 @@
  *   (`em022_se_tbl_<sub>`, `_b_` for the mode-1 set; records are named after the first table that points at
  *   them).  The pre-existing `em_*` row names are kept; `Em022UserData` is the accessor class.
  * RESIDUALS. All 85 rows written.
- *  - `em022_act6_wander`: retail converts the spread width 20 to float at run time (`li r0,20; xoris; lfd; fsubs`)
- *    after the modulo part; every source spelling folds it (literal, inline, macro) or hoists it (local `s32`).
  *  - `.sdata2`: the claim starts at 0x8079AF48 (2.0f), which only hud/lobby_hud's `draw_lsp_anim_ary` loads;
  *    our pool starts at the 1300.0f word, so the double 0.0 lands 4 bytes later than retail's (seam request).
  *  - `.sbss`: ours is 5 bytes (the 4-byte sound parameter and the 1-byte static-init object), retail's claim 8.
  *   flipcheck: the sdata2 seam and `lbl_8079AF48` (referenced from lobby_hud.o).
- * SHAPES. `Em022UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
+ * FLAGS. `em022_act6_wander` takes a scoped `#pragma fp_contract off` (retail keeps the `fmuls`+`fsubs` pair).
+ * SHAPES. `em022_act6_wander` assigns `width = 20` (s32, a constant) before each spread so the width converts to float at run time as in retail; the half is `/ 2.0f` (`* 0.5f` keeps the
+ *   operands the other way round).
+ *   `Em022UserData` derives from `ResUserDataAc` (`enemy/res_user_data_ac.h`), so MWCC emits its table; it is
  *   allocated with `operator new` and built with placement `new` (a new-expression adds a `__dl__FPv`
  *   landing pad retail does not have).
  *   A `u8` compared through `(s32)` gives retail's `cmpwi`; `switch (self->state) { case 0: self->state++;`
@@ -1566,8 +1567,11 @@ void em022_act6_idle(_ENEMY_WORK* self, u8 mode) {
 
 /* Action 6's wander (modes 0/1): mode 0 approaches at a random pace, slowing near the area's data point;
  * mode 1 turns a random -30..29 degrees and walks out motion 1. */
+#pragma push
+#pragma fp_contract off
 void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
     nw4r::math::VEC3 point;
+    s32 width;
 
     switch (self->state) {
     case 0:
@@ -1578,7 +1582,8 @@ void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
             if (em_get_mot_no(self) == 3) {
                 self->state = 2;
                 em_mot_set_ck(self, 3, 6, 0);
-                self->field_0x318 = EM022_SPREAD(30.0f, 20);
+                width = 20;
+                self->field_0x318 = 30.0f + (f32)(self->bits_0x1EC % 20) - (f32)width / 2.0f;
                 self->timer_0x020 = (self->bits_0x1EC & 0x1F) + 30;
             } else {
                 em_mot_set(self, 4, 6, 0);
@@ -1597,7 +1602,8 @@ void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
         if ((s32)mode != 1) {
             if (em_mot_end_ck(self) == 1U) {
                 self->state++;
-                self->field_0x318 = EM022_SPREAD(30.0f, 20);
+                width = 20;
+                self->field_0x318 = 30.0f + (f32)(self->bits_0x1EC % 20) - (f32)width / 2.0f;
                 self->timer_0x020 = (self->bits_0x1EC & 0x1F) + 30;
                 em_mot_set(self, 3, 6, 0);
             }
@@ -1615,7 +1621,8 @@ void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
             em_action_finish_stand(self);
         } else {
             if (--self->timer_0x020 <= 0) {
-                self->field_0x318 = EM022_SPREAD(30.0f, 20);
+                width = 20;
+                self->field_0x318 = 30.0f + (f32)(self->bits_0x1EC % 20) - (f32)width / 2.0f;
                 self->timer_0x020 = (self->bits_0x1EC & 0x1F) + 30;
             }
             em_move_offset_rot_apply(self, &self->field_0x1BC);
@@ -1629,6 +1636,7 @@ void em022_act6_wander(_ENEMY_WORK* self, u8 mode) {
         break;
     }
 }
+#pragma pop
 
 /* Action 6's motion 29: lifts the height by 34 a frame over frames 0..18 (capped at 0), then ends. */
 void em022_act6_mot29(_ENEMY_WORK* self) {

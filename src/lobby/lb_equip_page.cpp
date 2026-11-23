@@ -78,6 +78,8 @@
  *            spelling that names it.
  * RESIDUALS. pl_rig_slot_bind, pl_rig_model_setup: regsim plans need an unnamed temporary declared as a local (the
  *            tool refuses: the temporary is not a local plus field offset); register colouring is the only difference.
+ * FLAGS. `pl_rig_model_move` takes a scoped `#pragma opt_lifetimes off`.
+ * SHAPES. `pl_rig_model_move` declares `i` before `flag` (declaration-order hill climb).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -2781,12 +2783,14 @@ void pl_rig_draw_mode_end(PlSeRig* rig)
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x80224AC4 */
 
+#pragma push
+#pragma opt_lifetimes off
 /* Clears the actor's live flag when any gate says the model must not move, then drives every model
  * record the rig carries: gate byte, model helper, placement and the model's own `move`. */
 extern "C" void pl_rig_model_move(PlSeRig* rig)
 {
-    u32 flag = rig->plw->field_0x001;
     u32 i;
+    u32 flag = rig->plw->field_0x001;
     u32 v;
 
     if ((u8)GameMode_ck() == 1) {
@@ -2890,6 +2894,7 @@ extern "C" void pl_rig_model_move(PlSeRig* rig)
         }
     }
 }
+#pragma pop
 
 /* ------------------------------------------------------------------------------------------------ */
 /* 0x80224E28 */

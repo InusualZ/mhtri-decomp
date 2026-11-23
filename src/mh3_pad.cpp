@@ -71,6 +71,7 @@
  *            divergence insn 26: retail `<DIFF_INSERT>` vs ours `lwz r3, lbl_807947C0@sda21`
  * FLAGS. `pad_wpad_read` takes a scoped `#pragma optimization_level 4` + `#pragma opt_lifetimes off` (size unchanged, raises its row).
  * FLAGS. kpad_read_acc takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
+ * FLAGS. `pad_wpad_init` takes a scoped `#pragma opt_lifetimes off`.
  */
 
 #pragma peephole off
@@ -1104,13 +1105,15 @@ void TestModeExec(void)
 {
 }
 
+#pragma push
+#pragma opt_lifetimes off
 /* Sets up the remote side: the MEM2 heap WPAD allocates from, the WPAD callbacks, the button tables and every
  * channel's pad records. */
 extern "C" void pad_wpad_init(void)
 {
+    PadChanState* state;
     PlayerPad* pad;
     PlayerPad* prev;
-    PadChanState* state;
     s32 chan;
     s32 i;
 
@@ -1150,6 +1153,7 @@ extern "C" void pad_wpad_init(void)
         state++;
     }
 }
+#pragma pop
 
 /* Reads every pad of this frame: the GameCube pads, then each channel's remote and GameCube records. */
 extern "C" void pad_frame_read(void)

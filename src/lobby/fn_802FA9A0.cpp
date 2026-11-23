@@ -52,6 +52,7 @@
  *            `src`), the plan's extra named local.
  * FLAGS. lb_barter_entry_flags takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
  * SHAPES. lb_kujira_day_step: `i` is an `s16` (counts 0..2 against a bit mask; an `s32` measures 98.04 %).
+ * SHAPES. `eft036_move` declares `i` before `player` (regsim plan 1).
  */
 #include "types.h"
 #include "lobby/fn_802FA9A0.h"
@@ -230,8 +231,8 @@ void eft036_move(struct _ENEMY_WORK* work) {
     u8 hide;
     Eft036Sphere* sphere;
     EmAreaWork* players;
-    EmAreaWork* player;
     u32 i;
+    EmAreaWork* player;
 
     dist = 0.0f;
     alpha_max = 1.0f;

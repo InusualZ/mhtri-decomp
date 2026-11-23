@@ -94,6 +94,7 @@
  * RESIDUALS. mwcc-debugger dump, `hbmKbWidgetDestroy`: no regsim plan (dump unavailable for this row); first
  *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `beq 0x20c`
  * FLAGS. hbmKbCandDraw: scoped `#pragma opt_lifetimes off` (98.36 -> 98.48, size equal).
+ * FLAGS. `hbmKbWidgetCreateParts` takes scoped `#pragma opt_loop_invariants off` and `#pragma opt_strength_reduction off`.
  */
 
 #include "types.h"
@@ -1139,6 +1140,9 @@ static inline void hbmKbAddComponent(HbmPaneManager* manager, HbmKey* part) {
     nw4r::ut::List_Append(&manager->mComponents, part);
 }
 
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* 0x80550128 (0x360): Creates one part per key of the prediction window and gives it its animations. */
 extern "C" void hbmKbWidgetCreateParts(HbmKbWidget* self, MEMAllocator* allocator) {
     u32 numAnims;
@@ -1180,6 +1184,7 @@ extern "C" void hbmKbWidgetCreateParts(HbmKbWidget* self, MEMAllocator* allocato
         }
     }
 }
+#pragma pop
 
 /* Clears the part's state. */
 void HbmKbWidgetPart::reset() {

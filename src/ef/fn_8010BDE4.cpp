@@ -10,8 +10,8 @@
  *   every callee it reaches is a C++ mangling (`MHchar` members, nw4r functions).
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps the unfused `clrlwi`/`cmpwi` pairs).
  * RESIDUALS.
- *  - `fn_8010C0E0`: ours keeps the work pointer where retail reloads `+0x30`'s byte (`lbz r0,0(r3)`), and the
- *    registers are coloured one lower;
+ *  - `fn_8010C0E0`: the two loop-exit `bgt` branches land on the shared tail where retail's land on the nearer
+ *    blocks (the instructions are equal);
  *  - `fn_8010BDE4`: retail keeps the three step bases 0x300/0x900/0x400 in `r30`/`r31`/`r21` (a 0x10 larger frame,
  *    `_savegpr_21`) where ours folds them into the `addi`s (`_savegpr_24`).
  *   flipcheck: `.text` differs (the two rows above); `.sdata2` is byte-identical.
@@ -19,6 +19,7 @@
  *   the water scale's 0.5/1.0, the model scale 1.0, the vector 14/0/0, then -1.0, 2.0 and 0.8 inline at their uses
  *   (hoisting them into locals pools -1.0 before 14.0).
  * SHAPES. fn_8010BDE4: `base_c` stays s32 (0x400 does not fit u8; a u8 spelling measured +0.55 but truncates).
+ * SHAPES. `fn_8010C0E0` declares `i` before `work`; the source record is read as `_ENEMY_WORK` (`active`, `state_0x006`).
  */
 
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
@@ -159,9 +160,9 @@ extern "C" void fn_8010BDE4(_EFT* self)
 /* Places each frame record's model along its angles for the record's state. */
 extern "C" void fn_8010C0E0(_EFT* self)
 {
+    s32 i;
     _EFT_FRAME_WORK* work = (_EFT_FRAME_WORK*)self->work_0x38;
     nw4r::math::MTX34 mtx;
-    s32 i;
 
     VEC3 vec;
 
@@ -179,9 +180,9 @@ extern "C" void fn_8010C0E0(_EFT* self)
         }
         switch (work->entries[i].state_0x00) {
         case 0:
-            if (self->source_0x30 == NULL) {
+            if (((_ENEMY_WORK*)self->source_0x30)->active == 0) {
                 work->entries[i].timer_0x44 = 0;
-            } else if (*(u8*)self->source_0x30 != 0) {
+            } else if (((_ENEMY_WORK*)self->source_0x30)->state_0x006 != 0) {
                 work->entries[i].timer_0x44 = 0;
             }
             if (work->entries[i].timer_0x44 <= 0) {

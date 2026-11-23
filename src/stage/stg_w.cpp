@@ -44,7 +44,7 @@
  *     interleaved; one inline helper gives all three the first one's colouring.
  *   - stage_area_load: retail narrows `areano` after the stage_map_group_get call and reuses it as the r7 argument;
  *     its id buffer size (0x28) is read from the frame.
- *   - stage_parts_seat / stage_part_scatter_step: retail keeps `part + k * 12` live across mhchar_res_node_get, ours
+ *   - stage_part_scatter_step: retail keeps `part + k * 12` live across mhchar_res_node_get, ours
  *     re-derives it after the call.
  *   - stage_eft_strips_spawn (the two hoisted float constants swap f30/f31), stage_part_bodies_set (r27..r29
  *     permuted), stage_area_model_load_req, stage_part_joints_hide, stage_parts_check, stage_area_timer_arm,
@@ -90,6 +90,7 @@
  *            (r37 r4/r0, r38 r0/r3, r40 r3/r4); `1u`, `bit <<= index` and an `s32 bit` do not move them.
  * RESIDUALS. mwcc-debugger dump, `stage_area_colour_update`: regsim 1/1 callee-saved, 14/14 volatile (EXACT);
  *            first divergence insn 10: retail `addi r3, r1, 0xc` vs ours `addi r3, r1, 0x10`
+ * SHAPES. `stage_parts_seat` declares `j` and `part` first at function scope (regsim plan 1).
  */
 
 #include "types.h"
@@ -2037,12 +2038,13 @@ extern "C" void stage_parts_seat(StageWork* w)
 {
     nw4r::g3d::ResNode node(0);
     VEC3 rot;
+    u8 j;
+    StagePart* part;
     MHchar* chr;
     MHchar* water;
     MHchar* alt;
     StagePartDef** defs;
     u8 hidden;
-    u8 j;
     u8 k;
 
     chr = &w->chars[0]->chr;
@@ -2062,7 +2064,6 @@ extern "C" void stage_parts_seat(StageWork* w)
             alt->setVisibility(k, 0);
     }
     for (j = 0; j < 4; j++) {
-        StagePart* part;
         if (defs[j] == 0)
             continue;
         if (w->alt_model == 1) {

@@ -19,11 +19,10 @@
  *   GUESS (from each body and its callers): `effect_layer_reset`, `eft_rand_unit`, `eft_rand_signed_half`,
  *   `eft_shape_init`.
  * FLAGS. fn_800F9E04 takes scoped `#pragma opt_propagation off` + `opt_loop_invariants off`.
+ * SHAPES. fn_800F9E04: `color` and the second loop's index `j` (s32, a field index 0..0xFF) are function-scope locals declared first
+ *   (regsim plan 1).
  * RESIDUALS. effect_retire: calling `nw4r::ef::Effect::Calc` through `ef/ef_effect.h` does not compile here (`ef.h` carries the stub `Effect`).
- * RESIDUALS. 5 partial rows:
- *  - `fn_800F9E04` (-4 B): retail hoists the address of `setMatColor`'s by-value colour copy (`addi r31,r1,8`)
- *    out of the material loop and keeps the loop index in r28, and builds `change_color_eff`'s colour argument
- *    before `r3`; ours materialises the copy's address in each iteration;
+ * RESIDUALS. 4 partial rows:
  *  - `fn_800FA450`: retail sets `j = 0` before copying `stage_effect_block_get()` into `rec` (`li r30,0` ahead of `mr r31,r3`;
  *    a `for (j = 0, rec = ...)` header and a separate `j = 0;` measure no better); declarations follow regsim's plan;
  *  - `effect_retire`, `effect_layer_reset`: retail's virtual calls stage the table in r12 (`lwz r12,0(r3);
@@ -537,6 +536,8 @@ static inline void eft_color_from_u32(_GXColor* dst, u32 color) {
 #pragma opt_propagation off
 #pragma opt_loop_invariants off
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag) {
+    u32 color;
+    s32 j;
     _GXColor out;
     union {
         u32 word;
@@ -545,7 +546,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
     _GXColor cur;
     u32 v;
     nw4r::math::VEC3 pos;
-    u32 color = get_stg_eft_col(get_now_areano(), flag);
+    color = get_stg_eft_col(get_now_areano(), flag);
     eft_color_from_u32(&stage.color, color);
 
     switch (mode) {
@@ -590,10 +591,10 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
                 chr->setTevKColor(i, GX_KCOLOR3, &out);
             }
         } else if ((owner->flags_0x14 & 2) != 0) {
-            for (s32 i = owner->field_0x16; i < owner->field_0x17; i++) {
-                chr->getMatColor(i, GX_COLOR0A0, &cur);
+            for (j = owner->field_0x16; j < owner->field_0x17; j++) {
+                chr->getMatColor(j, GX_COLOR0A0, &cur);
                 out.a = cur.a;
-                chr->setMatColor(i, GX_COLOR0A0, out, false);
+                chr->setMatColor(j, GX_COLOR0A0, out, false);
             }
         }
         break;
