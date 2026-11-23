@@ -936,7 +936,6 @@ size_bytes,unit,function,match_percent,address
 1232,quest/arenatask,arena_result_next,97.3312,0x80446EE8
 1240,quest/quest_entry,quest_enter_load,99.4032,0x803AF4B4
 1244,Pl/pl_act_step,fn_802602A0,98.6174,0x802602A0
-1248,menu/menu_item,menu_split_item_page_draw,99.6635,0x802A3BD0
 1260,ef/eft053,eft053_get_shell_data__FP4_PLWUcPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3PQ34nw4r4math4VEC3,99.3651,0x803669A0
 1264,lobby/fn_8030121C,lb_kujira_menu_step,99.9051,0x8030121C
 1268,stage/stg_w,stage_part_scatter_step,99.7161,0x802B1814

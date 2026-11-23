@@ -30,6 +30,7 @@
  *            segment value before the `li r6`/`clrlwi r7` argument setup (a u8 count, a count-less compare, a value local and
  *            casts measured)
  * SHAPES. `fn_801B4694` keeps the random phase in a `u32`.
+ * SHAPES. `fn_801B47A4` keeps `count` in a `u32` and `i`/`j` in `u16` (loop counters over the area records, each below 0x100).
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
@@ -374,12 +375,12 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
     EmSeatRec* list;
     _ENEMY_WORK* work;
     EmAreaWork* area;
-    u8 count;
-    u8 i;
-    u8 j;
+    u16 i;
+    u16 j;
     u8 k;
     u8 n;
     u8 seated;
+    u32 count;
     u8 any;
     u16 max;
 

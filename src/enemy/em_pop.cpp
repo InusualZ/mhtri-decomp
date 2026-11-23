@@ -40,6 +40,7 @@
  * RESIDUALS. mwcc-debugger dump, `em_set_move_start`: regsim 1/1 callee-saved, 0/0 volatile (EXACT, colouring is not
  *            the cause); first divergence insn 22: retail `clrlwi r0, r3, 24` vs ours `<DIFF_DELETE>`; size differs
  *            from retail
+ * SHAPES. `em_set_work_init` and `em_set_kill_record` declare their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -209,10 +210,10 @@ void em_set_work_init(void) {
     EmSetDefault* def;
     EmSetEntry* entry;
     EmSetSave* save;
-    LbParamWork* param;
     s32 i;
     s32 count;
     s32 ofs;
+    LbParamWork* param;
     s32 j;
 
     work = (Q_MoveWork*)get_move_work_adrs(0);
@@ -743,14 +744,14 @@ s32 em_set_reward_item_add(u16 item) {
  * capture (capped at 99) in the work and the save block, adds the kill's points, logs it on the cockpit and
  * rolls the monster's reward row once per kill (twice for a large kill, four times for a capture). */
 void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini) {
-    s32 tries;
-    struct _ENEMY_WORK* large_enemy;
-    s32 size;
     s32 large;
+    s32 tries;
     u16 order;
-    u8 monster;
     u32 hit;
     u8 end_kind;
+    struct _ENEMY_WORK* large_enemy;
+    s32 size;
+    u8 monster;
     QuestSpawnRec* rec;
     EmSetReward* reward;
     s32 count;

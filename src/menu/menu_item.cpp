@@ -52,6 +52,7 @@
  *  - `ItemDataRecord`'s +0x000 is a union of both views (`kind_0x00`/`level_0x01` beside one `u16`).
  * FLAGS. scoped `#pragma optimization_level 2` around menu_item_frame_update (retail masks the argument with `clrlwi
  *        r3,r30,24`).
+ * SHAPES. `menu_split_item_page_draw` keeps `confirm` in an `s8` (takes -1, 0 or 1).
  */
 
 #include "types.h"
@@ -2611,7 +2612,7 @@ extern "C" void menu_split_item_page_draw(MenuSlot* slot)
     u32 flags = 0;
     u32 draw_panel = 0;
     s32 draw_arrow = 0;
-    s32 confirm = -1;
+    s8 confirm = -1;
     s32 draw_guide = 0;
     s8 player = slot->field_0x011;
     _mh_ivec2_ pos;

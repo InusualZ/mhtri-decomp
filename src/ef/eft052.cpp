@@ -46,6 +46,7 @@
  *            enable test as `if (total == 0 && i != 2) enabled = false; else enabled = true;` (retail's arm order).
  * FLAGS. `eft052_item_get_step` takes a scoped `#pragma optimization_level 4` (size unchanged, raises its row).
  * SHAPES. hud_msg_free's scan loop is `for (queue = ..., i = 0; i < 16; queue++, i++)` (row 100 %); the same header measures lower in hud_msg_enqueue.
+ * SHAPES. `fn_80358B40` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 
 #include "types.h"
@@ -251,13 +252,13 @@ extern "C" void eft052_place(_EFT* self)
  * at a random speed with its joint animation, then hides for a random wait. */
 extern "C" void fn_80358B40(_EFT* self)
 {
+    EftPartSlot* slot;
+    s32 i;
     EftPartWork* work = (EftPartWork*)self->work_0x38;
     s32 reverse = 0;
     VEC3 dir;
     VEC3 from;
     VEC3 to;
-    s32 i;
-    EftPartSlot* slot;
     s32 j;
     f32 dist;
     u8 speed;

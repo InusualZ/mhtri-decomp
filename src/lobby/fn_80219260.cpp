@@ -43,6 +43,7 @@
  * RESIDUALS. mwcc-debugger dump, `lb_menu_row_insert`: regsim 5/5 callee-saved, 11/11 volatile (EXACT); first
  *            divergence insn 16: retail `mr r5, r27` vs ours `mr r6, r27`
  * FLAGS. lb_equip_detail_blade_draw takes a scoped `#pragma optimization_level 4` (same size, row 100 %).
+ * SHAPES. `lb_award_check_all` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 #include "types.h"
 
@@ -1320,8 +1321,8 @@ s16 lb_award_hunt_bits_count(LbSaveView* save) {
 #pragma push
 #pragma optimization_level 4
 void lb_award_check_all(void) {
-    LbSaveView* save = (LbSaveView*)lobby_world_block;
     s32 i;
+    LbSaveView* save = (LbSaveView*)lobby_world_block;
 
     for (i = 0; i < 24; i++) {
         if (userdata_award_bit_ck(save, i) != 0) {

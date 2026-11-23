@@ -149,6 +149,7 @@
  * SHAPES. pl_act_stun: `need` is an `s32` holding a u8 `pl_stun_shake_needs` entry (and its doubling, narrowed by the
  *   `(s8)` casts at the use; a `u8` local measures 99.14 % at 4 B over).  pl_act_step_pitfall_hold and fn_8025FF0C: `i` is
  *   an `s16` counter (bounds 3 and 10; an `s32` lowers the rows: 97.70 % and 99.05 %).
+ * SHAPES. `fn_802602A0` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 
 #include "types.h"
@@ -13568,14 +13569,14 @@ void fn_80260248(_PLW* self, s32 mode, s16 delta) {
  * guarding or locked on), leaning the body (`_PLW`+0x0B0) into the turn, and blends the run motions' lean pose. */
 extern "C" void fn_802602A0(_PLW* self) {
     f32 lean;
-    s32 pitchRate;
-    s32 yawRate;
     u16 bank;
     u16 diff;
     u16 motion;
     u16 body;
     u16 pitch;
     u16 pose;
+    s32 yawRate;
+    s32 pitchRate;
     u8 sub;
     u16 act;
 

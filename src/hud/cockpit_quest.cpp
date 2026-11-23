@@ -70,6 +70,7 @@
  * RESIDUALS. mwcc-debugger dump, `cockpit_npc_digit_draw`: regsim 2/2 callee-saved, 7/7 volatile (EXACT); first
  *            divergence insn 48: retail `lfs f0, lbl_8079A920@sda21` vs ours `lfs f4, 0x4c(r1)`
  * FLAGS. `quest_gauge_draw` and `cockpit_split_gauge_draw` take a scoped `#pragma optimization_level 4` (same size, match).
+ * SHAPES. `cockpit_split_item_ring_draw` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 
 #include "types.h"
@@ -5242,8 +5243,8 @@ void cockpit_split_item_ring_draw(_PLW* plw, u8* anim, u8 player) {
     const u16* alt;
     const u16* ids;
     const _SPR_DATA_* rec;
-    u16 item;
     s16 num;
+    u16 item;
 
     set_blendmode(4, 5, 1);
     get_lsp_data(cockpit_split_item_ring_anchors[player], &pos);

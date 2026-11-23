@@ -101,6 +101,7 @@
  * SHAPES. lb_dye_inner_draw: `count` is a `u32` holding `fn_801F3EDC`'s page count (a few tens at most); the loop bound
  *   narrows it with `(u16)` as retail does.
  * SHAPES. `lb_equip_box_wear_step` declares `entry` after `id` (regsim plan 1); `lb_color_pane_draw` takes the hill-climbed declaration order.
+ * SHAPES. `fn_801EDC4C` and `lb_box_lists_draw` declare their locals in the order the declaration hill-climb measured best.
  */
 #include "types.h"
 #include "id_value.h"
@@ -1184,12 +1185,12 @@ extern "C" u8 fn_801EDB34(LbListPane* self, u16 index, u16 item_id)
 extern "C" s32 fn_801EDC4C(LbDigitPane* self, LbListPane* list)
 {
     IdValue tmp;
-    LbItemDb* db;
     IdValue* entry;
     s32 result;
     u16 value;
     s16 index;
     s32 limit;
+    LbItemDb* db;
     s16 move;
     s32 free;
     s32 extra;
@@ -5380,14 +5381,14 @@ void lb_box_top_draw(LbBoxMenu* self)
  * question is up. */
 u8 lb_box_lists_draw(::LbListPane* self, u16 parts)
 {
+    s32 sorting;
     _mh_ivec2_ pos;
     MenuListEntry entries[8];
-    MenuListEntry* entry;
     u8 page;
     u8 sort_sorted;
     u16 mode;
-    s32 sorting;
     s32 marking;
+    MenuListEntry* entry;
     s32 i;
     s16 index;
     s16 marked;

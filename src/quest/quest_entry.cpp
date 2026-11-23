@@ -100,6 +100,7 @@
  *            first divergence insn 35: retail `slwi r6, r0, 3` vs ours `slwi r5, r0, 3`
  * SHAPES. quest_supply_drop_step: `kind` is an `s8`, the width of `supply_kind_0x8B` (0..3) it copies and of the `s8`
  *   parameters it is passed to.
+ * SHAPES. `quest_enter_load` declares its locals in the order the declaration hill-climb measured best.
  */
 
 #include "quest/quest_entry.h"
@@ -2987,11 +2988,11 @@ void quest_enter_load(void) {
     s32 minutes;
     s32 time_class;
     u8 stage;
-    u8* ids;
     u8 id;
     u8 kind;
     s32 res;
     ResFileEntry* file;
+    u8* ids;
 
     clear_qResult_work();
     work = (Q_MoveWork*)get_move_work_adrs(0);

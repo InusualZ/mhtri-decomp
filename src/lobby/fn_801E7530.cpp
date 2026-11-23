@@ -64,6 +64,7 @@
  *            all fold the same way.
  * SHAPES. lb_farm_seed_info_draw declares `id` before `row` (`mt.py hill` order search; raises its row).
  * SHAPES. lb_trade_page_draw: `id` is an `s32` holding the u16 row id (0..0xFFFF) that `key[0]` and the cell draw take.
+ * SHAPES. `lb_hunt_info_draw` declares its locals in the order the declaration hill-climb measured best.
  */
 #include "types.h"
 
@@ -755,8 +756,8 @@ void lb_hunt_info_draw(LbMenuWork* self)
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     LbUserDataView* user;
-    const LbHuntMonsterRow* rows;
     const u8* monster;
+    const LbHuntMonsterRow* rows;
     const u16* idp;
     s32 type;
     s32 t;

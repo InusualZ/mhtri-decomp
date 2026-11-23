@@ -59,6 +59,7 @@
  *            first divergence insn 1: retail `addi r9, r4, eft_control@l` vs ours `addi r6, r4, eft_control@l`; size differs
  *            from retail (308 B vs 312 B)
  * FLAGS. eft_res_archive_load_callback: scoped `#pragma optimization_level 4` (96.42 -> 97.65, size equal).
+ * SHAPES. `eft_res_files_load` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 
 #include "types.h"
@@ -1376,13 +1377,13 @@ extern "C" void eft_res_load_callback(u8* name, void* data, EftLoadCtx* unused, 
 #pragma push
 #pragma optimization_level 4
 extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* ids) {
-    EftControl* ctrl = &eft_control;
-    u32 count = 0;
-    EftProTable* table = (EftProTable*)lbl_806A2D34;
     EftLoadCtx ctx;
     s32 handle;
     void* data;
     u8 area;
+    EftControl* ctrl = &eft_control;
+    u32 count = 0;
+    EftProTable* table = (EftProTable*)lbl_806A2D34;
     u32 from_area;
     u8 id;
 

@@ -70,6 +70,7 @@
  *  - every `NetworkStreamWriter`/`NetworkStreamWriterDefault` and `address` (`NetworkUniqueId`) local is a real class
  *    object: its scope-exit destructor emits retail's `extab` cleanup record; a stream retail builds mid-function is
  *    declared at that point, and `setNetworkConnectionEvent`'s reader lives in a block so it dies before the address.
+ * SHAPES. `send` keeps `overhead` in a `u32` (holds the u16 frame overhead 0..0xFFFF; the u16 spelling was 4 B off).
  */
 #include "types.h"
 #include "Network/NetworkPeerBase.h"
@@ -1469,7 +1470,7 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
                 s32 put;
 
                 if ((u16)networkPacket_getFrameOverhead() + size > 0x200) {
-                    u16 overhead;
+                    u32 overhead;
 
                     size = networkPacket_getMessageSize(&packet, 0xFF);
                     overhead = networkPacket_getFrameOverhead();

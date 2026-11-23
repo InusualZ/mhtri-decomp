@@ -31,6 +31,7 @@
  *   (0x807920D4/E8/F0: `pl_lance_names[1]`, `pl_long_sword_names`, `pl_switch_axe_names`), which our object carries.
  * RESIDUALS. player_move_start: regsim EXACT; retail's address `add r4,r4,r0` stays in r4 where ours uses r3
  *            (volatile temp, not a regsim target).
+ * SHAPES. `pl_part_model_bind` keeps the part index copy `p` in a `u8` (the `u8 part` parameter, 0..0xFF).
  */
 
 #include "types.h"
@@ -893,7 +894,7 @@ void pl_part_model_bind(_PLW* plw, _PLOBJ* obj, u8 part, s32 unused) {
     u16 size;
     u32 count;
     u32 i;
-    s32 p = part;
+    u8 p = part;
     s32 id;
 
     obj->gate[p] = NULL;

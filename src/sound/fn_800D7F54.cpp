@@ -91,6 +91,7 @@
  *            `fn_800F2680`'s result in a `u8` local and folds cases 139 and 395 into one return.
  * RESIDUALS. se_hit_bank_req: colouring only (regsim plan 1 folds `louder`'s temporary into the local, which no spelling
  *            tried reaches: `louder = f(pos) == 1`, a two-step form and a split `bank` declaration measure equal or worse).
+ * SHAPES. `se_slot_level_calc` keeps `i` in an `s32` and `mode` in a `u8` (mode takes 0..3).
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -2846,10 +2847,10 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
     u8 levels[2];
     u16 params[2];
     f32 scale;
-    u32 i;
-    u32 mode;
+    u8 mode;
     u32 a;
     u32 b;
+    s32 i;
 
     ids[0] = s->id;
     ids[1] = s->field_0x30;

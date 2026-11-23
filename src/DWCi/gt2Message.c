@@ -34,6 +34,7 @@
  *   inside the scan reusing its index. `gti2HandleServerChallenge` and `gti2HandleClientResponse` sit in an
  *   `auto_inline off` block: defined ahead of `gti2HandleReliableMessage` in retail order, `-inline auto` would fold
  *   both into it (0x7BC -> 0xD54 B); `dont_inline` there also stops their own static inlines from folding.
+ * SHAPES. `gti2HandleReliablePacket` declares its locals in the order the register-allocation simulation (regsim) names.
  */
 #include "DWCi/gt2Message.h"
 #include "DWCi/dwc_nasfunc.h"
@@ -486,8 +487,8 @@ static inline s32 gti2DeliverBufferedMessagesInline(DWCiReq* connection) {
  * drops a duplicate. */
 s32 gti2HandleReliablePacket(DWCiReq* connection, s32 type, u8* message, s32 len) {
     DWCiConn* socket = connection->conn;
-    s32 headerLength = socket->protocolOffset + 7;
     u8* header;
+    s32 headerLength = socket->protocolOffset + 7;
     u16 serialNumber;
     u16 ackSerialNumber;
     s32 dataLength;

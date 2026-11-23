@@ -29,6 +29,7 @@
  *    the table allocation; `OSTitleHasContent` takes a non-const view and reads the title id as one `u64` (with a const
  *    view the scheduler hoists the loads above the count stores); in `OSLaunchShopChannelHelp` `argv` is declared before
  *    `url`.
+ * SHAPES. `OSLaunchTitleWithArgs` keeps `argc` in a `u32` (the argv count, 0..0xFFFFFFFF).
  */
 
 #include "types.h"
@@ -353,7 +354,7 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
     char name[24] __attribute__((aligned(32)));
     u64 bootTitleId __attribute__((aligned(32)));
     BOOL ok;
-    s32 argc;
+    u32 argc;
     s32 i;
     s32 result;
 

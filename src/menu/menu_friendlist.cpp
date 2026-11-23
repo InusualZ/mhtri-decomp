@@ -36,6 +36,7 @@
  *    the compare after it in every spelling tried (if/else, ternary, int locals).
  * FLAGS. `friend_pick_step` takes a scoped `#pragma opt_propagation off` (size unchanged, raises its row).
  * FLAGS. page17_rows_build takes a scoped `#pragma opt_loop_invariants off` (same size, row 100 %).
+ * SHAPES. `movie_page17_draw` declares its locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -2161,10 +2162,10 @@ void movie_page17_draw(MenuSlot* slot) {
     _SPR_DATA_ spr;
     u8 pages;
     u8 arrows;
-    MenuEntry* row;
     u16* names;
     u16* values;
     s32 i;
+    MenuEntry* row;
     s8* text;
     s32 color;
     u16* sprites;

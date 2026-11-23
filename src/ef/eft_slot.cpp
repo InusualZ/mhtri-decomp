@@ -51,6 +51,7 @@
  * RESIDUALS. eft_slot_work_update: regsim plan 1 wants a zero local (`li r40,0`) declared after `record`; `u8 zero` assigned at the
  *            top or before the scan is folded away (no change).
  * SHAPES. `eft_slot_track_step` declares `i` before `shape` (regsim plan 1).
+ * SHAPES. `eft_slot_unbound_step` and `eft_slot_linked_step` declare their locals in the order the declaration hill-climb measured best.
  */
 
 #include "enemy/em_area_entry_tbl.h" /* em_area_entry_tbl (rule 2: the owner's header) */
@@ -2498,7 +2499,6 @@ extern "C" void eft_slot_unbound_step(EftSlot* slot)
     _ENEMY_WORK* work;
     s16 frames;
     EftTargetRecord* record = (EftTargetRecord*)em_area_entry_tbl;
-    u8 state;
     u32 max;
     u32 all_here;
     _ENEMY_WORK* works[32];
@@ -2508,6 +2508,7 @@ extern "C" void eft_slot_unbound_step(EftSlot* slot)
     u8 found;
     EftTargetRecord* records[32];
     u8 here = 0;
+    u8 state;
     u8 force;
     u8 area;
     u8 flagged = 0;
@@ -2783,12 +2784,12 @@ extern "C" void eft_slot_link_marks_get(EftSlot* slot, u8* a, u8* b)
  * 3 crowded), requests the state, then walks the enemy along the linked shape blocks as it reaches each. */
 extern "C" void eft_slot_linked_step(EftSlot* slot)
 {
-    _ENEMY_WORK* work;
     u32 max;
-    u8 i;
     u8 count;
     u8 base;
     s32 state;
+    _ENEMY_WORK* work;
+    u8 i;
     u8 index;
     u8 n;
     EftShapeBlock* block;
