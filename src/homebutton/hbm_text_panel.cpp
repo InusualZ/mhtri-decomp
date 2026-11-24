@@ -4827,9 +4827,7 @@ void hbmPanelCursorUp(HbmPanelView* self)
         }
         hbmPanelSetItemCaret(self, self->textField, 0);
     } else {
-        if (!(y >= 0.0f)) {
-            y = 0.0f;
-        }
+        y = (y >= 0.0f) ? y : 0.0f;
         hbmPanelSetItemCaret(self, self->textField, self->v_0x184(self->caretX, 1.0f + (y - self->writer.v_0x028())));
         self->v_0x17C(5);
     }

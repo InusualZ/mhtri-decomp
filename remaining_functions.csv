@@ -218,7 +218,6 @@ size_bytes,unit,function,match_percent,address
 228,Pl/pl_act,pl_attack_range_tier_get,99.2105,0x80278590
 228,ef/eft_res,eft_res_slot_get,94.5614,0x800F8788
 228,enemy/em020_prog,em020_arm_mot1_side_wait80,99.8246,0x80370FC8
-228,enemy/em_pop,em_set_move_start,97.9825,0x803B849C
 228,sound/sound_obj,snd_obj_play_chain,98.9474,0x800E6C60
 232,Network/NetworkWiiMediator,pushTransferRecord__18NetworkWiiMediatorFScPCUcl,98.7069,0x80416E38
 232,enemy/em004_act,em004_route_points_get,99.4828,0x801CA170

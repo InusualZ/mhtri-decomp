@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (305)
+## Ideas that work (306)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -314,6 +314,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 326 | [A count-after-append equality kept as a materialised 0/1 (cntlzw) is a local assigned the comparison and then tested](326-count-after-append-equality.md) | works | source-shape | Retail computes `a == b` with `subf; cntlzw; srwi.` and branches on the result; `if (a != b)` compiles to a bare `cmpw`/`beq`. |
 | 327 | [A regsim plan that says fold r(-) into a local means drop the local; declare r(-) names the value](327-regsim-fold-or-name-backend-temp.md) | works | allocator, source-shape | Regsim's EXACT plan carries an edit line (`fold r43(-) into local r35(i)` or `declare r40(@4112) as a local`) that `--apply-local` refuses to write, so a row with an exact colouring plan stays short |
 | 328 | [Three constant-index conditional accumulations are a for loop MWCC unrolls: the first add keeps its extsh](328-constant-index-accumulation-loop.md) | works | source-shape | Retail has `lha r0; extsh r31,r0` for the first of three `if (key == flag[k]) value += v[k]` adds while ours emits a bare `lha r31` |
+| 329 | [A float clamp 'if (!(y >= lo)) y = lo' materialises the compare: write it as y = (y >= lo) ? y : lo](329-float-clamp-if-y.md) | works | source-shape | A float `>=` test written as `if (!(y >= 0.0f)) y = 0.0f;` compiles to `fcmpo; cror eq,gt,eq; mfcr; extrwi.; bne` (the condition is built as a value and tested), where retail branches on `cror` directly with `bne; b`. |
 
 ## Ruled out - tried and it did not work, do not re-run (14)
 

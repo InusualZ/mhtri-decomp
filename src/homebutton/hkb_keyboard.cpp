@@ -28,8 +28,9 @@
  *   gives them this range; they need the owners' class models first.
  * RESIDUALS. unwritten: 0x8053658C, 0x805365D4, 0x805365DC, 0x80536DB8 (88 bytes): inline accessors of band classes
  *   (homebutton/hbm_text_panel.cpp's panel and three widget classes) emitted here first; their classes are not modelled.
- * RESIDUALS. HkbKeyboardBase::updateView (0x805366D0): retail merges the two lamp notifications of each switch into one
- *   call; no source shape tried (one or two lamp variables, a struct argument, an inline helper) merges them.
+ * RESIDUALS. HkbKeyboardBase::updateView (0x805366D0): the notification buffers sit at 0x9/0x8 (retail 0xc/0x8, event at 0x10 against
+ *   our 0xc); no declaration order or scope moves them. The merged lamp call comes from `do { switch (..) {..default: continue;}
+ *   sendEvent(); } while (0)`.
  * RESIDUALS. findCommandByName: the loop index and the scaled offset swap r30/r31; createKeys: retail keeps only the
  *   key kind 1 in a register (ours also 2); HkbRecentKeys::push: retail strength-reduces the second half of the
  *   shift loop through r3+8; HkbKeyButton::HkbKeyButton: retail stores the vptr after the three argument fields.
@@ -1139,27 +1140,33 @@ void HkbKeyboardBase::updateView() {
     sendEvent(0x12, &ev);
     sendEvent(0x27, NULL);
     if (mKeyState.mbFullWidth == 0) {
-        switch (mKeyState.getMode()) {
-        case 1:
-            bCaseLamp = 1;
+        do {
+            switch (mKeyState.getMode()) {
+            case 1:
+                bCaseLamp = 1;
+                break;
+            case 2:
+                bCaseLamp = 0;
+                break;
+            default:
+                continue;
+            }
             sendEvent(0x13, &bCaseLamp);
-            break;
-        case 2:
-            bCaseLamp = 0;
-            sendEvent(0x13, &bCaseLamp);
-            break;
-        }
+        } while (0);
     } else {
-        switch (mKeyState.getKanaFrame()) {
-        case 6:
-            bKanaLamp = 1;
+        do {
+            switch (mKeyState.getKanaFrame()) {
+            case 6:
+                bKanaLamp = 1;
+                break;
+            case 7:
+                bKanaLamp = 0;
+                break;
+            default:
+                continue;
+            }
             sendEvent(0x13, &bKanaLamp);
-            break;
-        case 7:
-            bKanaLamp = 0;
-            sendEvent(0x13, &bKanaLamp);
-            break;
-        }
+        } while (0);
     }
     updateEnterKey();
 }

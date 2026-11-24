@@ -16,8 +16,9 @@
  *   GUESS `DWCi_gt2ReceiveBuffer`. The file name is the GameSpy SDK's `gt2Message.c` (no `__FILE__` string).
  * RESIDUALS. Register colouring and block order remain in the larger message handlers
  *   (`gti2HandleReliableMessage`, `gti2HandleMessage`, `gti2ReceiveMessages`).
- *   `gti2HandleReliablePacket` re-tests the scan index after a delivered message where retail branches straight
- *   back to the scan, and colours the header length / header pointer and two delivery locals the other way round.
+ *   `gti2HandleReliablePacket` restarts the delivery scan through the loop's own `i--` (the shift loop leaves `i` at
+ *   the new count) where retail branches back to the scan's head and keeps a second `b` (4 B short); it also colours
+ *   the header length / header pointer and two delivery locals the other way round.
  *   `gti2HandleNack`'s inlined resend adds the buffer before the header offset where the standalone
  *   `DWCi_appendTransfer` (and retail) add the offsets first. `gti2HandleMessage` folds the delivery's 0/1 into
  *   a select where retail re-tests it, and `gti2ReceiveMessages` the same for the inlined `DWCi_requestRetry`
@@ -442,45 +443,40 @@ static inline s32 gti2DeliverBufferedMessagesInline(DWCiReq* connection) {
     s32 i;
     GTI2IncomingBufferMessage* bufferedMessage;
 
-    for (;;) {
-        for (i = ArrayLength(connection->incomingBufferMessages) - 1; i >= 0; i--) {
-            bufferedMessage = (GTI2IncomingBufferMessage*)ArrayNth(connection->incomingBufferMessages, i);
-            if (bufferedMessage->serialNumber == connection->expectedSerialNumber) {
-                if (!gti2HandleReliableMessage(connection, bufferedMessage->type,
-                                               connection->incomingBuffer.buffer + bufferedMessage->start,
-                                               bufferedMessage->len)) {
-                    return 0;
-                }
-                {
-                    GTI2IncomingBufferMessage* other;
-                    s32 shiftEnd = 0;
-                    s32 end;
-                    s32 count;
-                    s32 len = bufferedMessage->len;
-                    s32 start = bufferedMessage->start;
+    for (i = ArrayLength(connection->incomingBufferMessages) - 1; i >= 0; i--) {
+        bufferedMessage = (GTI2IncomingBufferMessage*)ArrayNth(connection->incomingBufferMessages, i);
+        if (bufferedMessage->serialNumber == connection->expectedSerialNumber) {
+            if (!gti2HandleReliableMessage(connection, bufferedMessage->type,
+                                           connection->incomingBuffer.buffer + bufferedMessage->start,
+                                           bufferedMessage->len)) {
+                return 0;
+            }
+            {
+                GTI2IncomingBufferMessage* other;
+                s32 shiftEnd = 0;
+                s32 end;
+                s32 count;
+                s32 len = bufferedMessage->len;
+                s32 start = bufferedMessage->start;
 
-                    ArrayDeleteAt(connection->incomingBufferMessages, i);
-                    count = ArrayLength(connection->incomingBufferMessages);
-                    for (i = 0; i < count; i++) {
-                        other = (GTI2IncomingBufferMessage*)ArrayNth(connection->incomingBufferMessages, i);
-                        if (other->start > start) {
-                            other->start -= len;
-                            end = other->start + other->len;
-                            if (shiftEnd > end) {
-                                end = shiftEnd;
-                            }
-                            shiftEnd = end;
+                ArrayDeleteAt(connection->incomingBufferMessages, i);
+                count = ArrayLength(connection->incomingBufferMessages);
+                for (i = 0; i < count; i++) {
+                    other = (GTI2IncomingBufferMessage*)ArrayNth(connection->incomingBufferMessages, i);
+                    if (other->start > start) {
+                        other->start -= len;
+                        end = other->start + other->len;
+                        if (shiftEnd > end) {
+                            end = shiftEnd;
                         }
+                        shiftEnd = end;
                     }
-                    gti2BufferShorten(&connection->incomingBuffer, start, len);
                 }
-                break;
+                gti2BufferShorten(&connection->incomingBuffer, start, len);
             }
         }
-        if (i < 0) {
-            return 1;
-        }
     }
+    return 1;
 }
 
 /* 0x8050F3C0 (0x450): a reliable packet: acknowledges our messages, then delivers it in order, buffers it or

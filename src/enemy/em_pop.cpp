@@ -28,8 +28,6 @@
  *  - em_set_kill_record: register numbering, the `capped == 1` exit as `bne; b` in retail, a `mr` copy of the first
  *    reward rate, and `em_mini_kill_kind_get`'s s32 prototype (retail masks a u8 result at each use, request
  *    enemy-em-pop#2);
- *  - em_set_move_start: `stage_map_area_count_get` returns u8 and `quest_area_spawn_setup`'s count is not u8 in
- *    retail (requests enemy-em-pop#3/#4, owners' headers);
  *  - em_set_field_setup and quest/quest_entry.cpp's quest_enter_load: retail keeps `stage * 8` in a saved
  *    register across `stage_dcm_path_get` (register colouring; decl permutes and local types tried);
  *  - data: `.bss`/`.ctors`/`.sdata`/`.sdata2` byte-identical; `.data` 1329 of 1336 B (trailing alignment).
@@ -37,9 +35,7 @@
  *   `__sinit` as in retail and the entry's ground record is cleared in its body; the rotation fill walks a byte
  *   offset beside the count; the point rows copy field by field through pointers; em_set_result_store takes the
  *   player work before `my_player_no`.
- * RESIDUALS. mwcc-debugger dump, `em_set_move_start`: regsim 1/1 callee-saved, 0/0 volatile (EXACT, colouring is not
- *            the cause); first divergence insn 22: retail `clrlwi r0, r3, 24` vs ours `<DIFF_DELETE>`; size differs
- *            from retail
+ * SHAPES. `em_set_move_start` stores the area count as `(u8)stage_map_area_count_get(..)` (retail's `clrlwi` before the word store).
  * SHAPES. `em_set_work_init` and `em_set_kill_record` declare their locals in the order the declaration hill-climb measured best.
  */
 
@@ -597,7 +593,7 @@ s32 em_set_move_start(Q_MoveWork* work) {
     stage_map_res_load(work->phase_0xE9);
     stage_map_obj_load(work->phase_0xE9);
     stage_area_load(0, work->phase_0xE9, work->sub_0xEA);
-    em_set_work_ptr.work->area_count_0x0018 = stage_map_area_count_get(work->phase_0xE9);
+    em_set_work_ptr.work->area_count_0x0018 = (u8)stage_map_area_count_get(work->phase_0xE9);
     snd_stage_bank_load(work->phase_0xE9, work->sub_0xEA, work->rank_sel_0x22D8);
     snd_player_banks_load();
     state = work->state_0x22D4;
