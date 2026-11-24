@@ -23,6 +23,7 @@
  *   SystemWork field names added for this range.  `userdata_item_total_count` is the map's older name for a pouch-room
  *   query (the sibling of `userdata_item_room_get`), kept.
  * FLAGS. `equip_record_register` and `equip_worn_color_set` take a scoped `#pragma dont_inline on`: the `GXColor` assignment stays a call to the implicit `_GXColor::operator=`, whose kept copy is `__as__8_GXColorFRC8_GXColor` (0x8004C4F0, emitted here).
+ * SHAPES. `item_box_take` holds the box capacity (a `u16` return) in an `s32`.
  * RESIDUALS. register allocation or scheduling only (no source shape found): item_box_take, item_box_store, item_slots_store,
  *   userdata_item_consume, userdata_equip_box_rec_get/set/add/add_new, userdata_new_game_init (the arena-row loop's
  *   registers and the flag-bit loop's test), item_room_get/item_room_or_full_get (retail keeps the found count in r31),
@@ -1631,7 +1632,7 @@ extern "C" s16 item_box_take(u16 id, s16 delta)
 {
     Q_UserData* user = userdata_block();
     IdValue* slot;
-    u16 cap;
+    s32 cap;
     u32 n;
     s16 rest;
     s32 i;

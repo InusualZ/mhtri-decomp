@@ -60,6 +60,7 @@
  * FLAGS. hkbGuiSetBoundingTriggerTargets takes a scoped `#pragma opt_loop_invariants off`.
  * SHAPES. hkbManagerSetMap indexes `self->channels[i]` at each use (a `ch` local takes r29 where retail has r27);
  *            hkbGuiSetBoundingTriggerTargets holds the pane (`n->mKey`) in a function-scope local declared first.
+ * SHAPES. `hkbSetModifierState` holds the masked modifier bits (0..0x700) in an `s16`.
  * RESIDUALS. fn_8056A638: retail schedules `lfs f31,4(r4)` before `mr r28,r4`; every declaration order tried keeps the
  *            move first.
  * RESIDUALS. HkbManagerNode::onDisconnect: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
@@ -1361,7 +1362,7 @@ void hkbSetModifierState(HkbManager* self, u32 value, u32 mask)
     for (u8 i = 0; i < 1; i++) {
         HkbChannel* ch = &self->channels[i];
         u32 locks = self->lockModifiers & 0x700;
-        u32 old = ch->modifiers & 0x700;
+        s16 old = ch->modifiers & 0x700;
         ch->modifiers &= ~0x700;
         u32 changed = ((old - locks) | (locks - old)) >> 31;
         ch->modifiers |= self->lockModifiers;

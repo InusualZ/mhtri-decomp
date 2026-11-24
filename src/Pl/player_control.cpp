@@ -20,6 +20,7 @@
  * FLAGS. `#pragma optimization_level 4` scoped to `player_move_start_ck` (same size, raises its row).
  * FLAGS. `pl_players_ready_ck` takes a scoped `#pragma opt_propagation off` (98.9, same size; its locals are hoisted in the regsim plan order).
  * FLAGS. `pl_parts_load_step` and `pl_part_load_request` take a scoped `#pragma optimization_level 4` (same size, raise their rows).
+ * SHAPES. `pl_players_ready_ck` declares `i` after `ready2` (the regsim plan order).
  * RESIDUALS. `pl_part_model_bind` and `pl_part_load_request`: retail keeps `part * 4` and the record-plus-index
  *   pointers in saved registers for the whole body, ours recomputes them after calls (no source order found that keeps
  *   them). `player_move_start_ck`, `pl_players_ready_ck`, `pl_net_slot_ready_ck`, `pl_parts_load_step`,
@@ -212,8 +213,8 @@ s32 pl_players_ready_ck(void) {
     s32 i;
     u8* flags;
     s32 loaded;
-    s32 ready2;
     s32 i2;
+    s32 ready2;
     _PLW* plw;
     s32 expected;
 

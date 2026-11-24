@@ -25,6 +25,7 @@
  *   `lb_cursor_box_step`, `lb_progress_rewards_check`, `lobby_scene_setup_step`, `lb_digit_pane_value`,
  *   `lb_list_pane_init`, `lb_list_pane_pos_set`, `lb_page_walk_head`, `lb_pane_draw`) and every named `.data`/`.sdata`
  *   table.  Foreign callees named through the registry (lane lobby-pane-ui) are GUESS names too.
+ * SHAPES. `lb_dye_inner_draw` declares `slotRows` after the loop counter (the regsim plan order).
  * RESIDUALS. fn_801EDA34: retail emits `bge; b` around the `mr` (104 B) where ours emits `blt` over it (100 B); ternary and early-return spellings reach 104 B at 91.9 % (the join moves through r0), the pragma sweep does not move it.
  * RESIDUALS. All 129 rows are written; 38 short of 100, by cause:
  *  - `lobby_enter_seq_step`/`lobby_scene_setup_step`: retail keeps one "system file done" block (`field_0x865 = 0;
@@ -7856,11 +7857,11 @@ void lb_dye_inner_draw(LbChgColorWork* self)
     _mh_ivec2_ pos;
     u32 count;
     s16 value;
+    u16* slotRows;
     s32 color;
     s32 selected;
     u32 i;
     bool active;
-    u16* slotRows;
     s16* slotValues;
 
     get_lsp_data(0x1C61U, &origin);

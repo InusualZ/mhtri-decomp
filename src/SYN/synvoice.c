@@ -14,6 +14,7 @@
  *    0x8079D380..0x8079D3A0 its float constants (the first is the int-to-double constant again, see
  *    `SYN/syn.c`); the last pool value `0x4330000000000000` (0x8079D390) is held again at 0x8079D3A0 by
  *    `THP/THPDec.c`.
+ * SHAPES. `SYNVoiceSetupAdpcm` counts the ten coefficients with an `s16` index.
  * RESIDUALS. `SYNVoicePitchRatio` 0x804E0750: the target materialises the table base and three derived pointers
  *    (+0x190, +0x1C0, +0x1F0) before the loads; one-TU spellings (struct, four statics) leave it.
  *    `SYNVoiceSetupAdpcm` 0x804E09F0: the loop-start/length loads and the ADPCM address sums take other registers;
@@ -400,7 +401,7 @@ void SYNVoiceSetupAdpcm(SYNVoice* voice)
     u32 base;
     u32 loopAddress;
     u32 endAddress;
-    s32 i;
+    s16 i;
 
     if (layer->loopStart + layer->loopLength != 0) {
         voice->looped = 1;

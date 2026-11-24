@@ -17,6 +17,7 @@
  *    word 0x80795334 the partition-offset helper caches), `OSExecPartition*`/`OSExecTmd`/`OSAppLoaderHeader` and their
  *    fields, the `OS_*` low-memory macros, the DVDLow* names in `DVD/dvd_broadway.h` (from the DI command shapes: open
  *    partition takes offset, ticket, certs, TMD and callback; the ticket-view variant takes seven arguments).
+ * SHAPES. `OSExecPackArgsWide` declares `arg` after `base`, `table` and `str` (the regsim plan order).
  * RESIDUALS. register numbering of the six pointers of `__OSLaunchNextFirmware` (bytes and sizes equal); in
  *    `__OSBootDolSimple` the inlined partition-offset helper keeps its value in r4/r8 where the target uses r6 (and r6 for
  *    the first disc-info load where the target uses r4), and the boot jump keeps the 0x80000000 base and the entry in
@@ -160,9 +161,9 @@ BOOL OSExecPackArgsWide(OSExecArgPage* page, s32 argc, char** argv)
 {
     u8* base = (u8*)page;
     u32* table;
-    char** arg;
     char* str;
     u8* cursor;
+    char** arg;
     u32 count;
     u32 j;
 

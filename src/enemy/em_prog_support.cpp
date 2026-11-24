@@ -22,6 +22,7 @@
  *   Callees named through the registry (GUESS): lb_ship_marks_refresh (0x801FC2F0), note_pane_npc_init (0x80385EEC).
  * FLAGS. `cflags_main` (Wii/1.3) with a file-wide `#pragma peephole off` (retail keeps `clrlwi`/`extsb` before every
  *   narrow compare and call argument: 13 rows gained when it was turned off).
+ * SHAPES. `chat_log_lines_draw` declares its locals in the regsim plan order.
  * RESIDUALS.
  *  - `lb_spot_save_step`: the shared "finish" block (system flag 0, step 3, `lb_npc_act_set`) is written once after
  *    the switch (`do { switch } while (0)`, `continue` on the paths that skip it): 488 B = retail, every instruction
@@ -778,9 +779,9 @@ extern "C" void chat_log_lines_draw(ChatLog* log) {
     s16 x;
     s16 shown;
     s32 idx;
+    s32 i;
     s16 y;
     s16 text_x;
-    s32 i;
     ChatLogLine* line;
     s32 color;
 

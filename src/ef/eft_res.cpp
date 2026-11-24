@@ -27,6 +27,7 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` over the file (retail keeps every `clrlwi`+`cmpwi` pair and the
  *   narrowing `clrlwi` of the `u8`/`u16` parameters; with the pass on most rows score lower).
  * FLAGS. eft_res_files_load takes a scoped `#pragma optimization_level 4`.
+ * SHAPES. `eft_res_blocks_get` declares its locals in the order the declaration hill-climb found best.
  * RESIDUALS.
  *  - `eft_res_file_load`: retail tests the descriptor's size word in r4, ours in r0 (both branches);
  *  - `eft_res_models_spawn`: the texture loop loads the model's +0x118 before its +0x10C link in retail; ours loads
@@ -1807,14 +1808,14 @@ void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count) {
 
 /* 0x800F8B44 - hand out a run of `count` 0x40-byte blocks from the block heap. */
 extern "C" void* eft_res_blocks_get(u32 count) {
-    EftControl* ctrl = &eft_control;
-    u8* flags = ctrl->heap_flags_0x2C;
-    u8* start;
-    s32 first;
-    s32 run;
-    s32 i;
     s32 k;
+    s32 run;
+    s32 first;
+    EftControl* ctrl = &eft_control;
+    u8* start;
     s32 max;
+    s32 i;
+    u8* flags = ctrl->heap_flags_0x2C;
 
     if ((s32)count <= 0) {
         return NULL;

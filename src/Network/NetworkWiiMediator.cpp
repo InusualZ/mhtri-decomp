@@ -34,6 +34,7 @@
  *   `purchaseNetworkPoolItem`, ...) and the voice helpers after their callees (`writeVoice`, `encodeVoice`,
  *   `getEncodedVoiceSize`, `suppressVoiceEcho`).  The six PatInterface sub-state tests keep
  *   their semantic names (`isSubState_8254_3`, `isSubState_894F_2..6`).
+ * SHAPES. `parseReflectPacket` holds the first input byte in an `s32` (`in` is `const char*`, so every value fits).
  * RESIDUALS. Every row has a body.  `flipcheck`: 22 functions retail's `.comment`
  *   marks force-active are not marked in ours (row 36: unreferenced, the linker would deadstrip them) -
  *   `disableMediatorLinkError`, `getMediatorField24`, `updateServerTime`, `queryOpeningFlag250`, `queryOpeningFlag290`,
@@ -1144,7 +1145,7 @@ s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 
             return 2;
         }
     }
-    u8 c = in[0];
+    s32 c = in[0];
     if ((u8)(c - 97) <= 25) {
         out[0] = (char)(c - 32);
     } else if (allowSymbolMap != 0) {

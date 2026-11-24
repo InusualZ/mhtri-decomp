@@ -39,7 +39,8 @@
  *   `place_rec_zenny_set`, `lb_npc_choice_draw`, `ai_npc_behaviour_get`, `lb_npc_entry_flag_set`, `lb_screen13_draw`,
  *   `ai_npc_skill_group_get`, `ai_npc_pair_values_get`, `ai_npc_level_rank_get`.
  * FLAGS. `lb_entry_flags_clear` takes a scoped `#pragma opt_propagation off`.
- * FLAGS. `lb_s13_dance_values_draw` takes a scoped `#pragma opt_strength_reduction off` (99.0, same size).
+ * FLAGS. `lb_s13_dance_values_draw` takes a scoped `#pragma opt_strength_reduction off`; its locals are declared with `i` after
+ *   `value` (the regsim plan order), which makes the row exact.
  * RESIDUALS. Every row is written.
  *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
  *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local, a counted loop over both arrays and a `u8` index do
@@ -48,8 +49,6 @@
  *  - `lb_act_announce`: ours adds one `b`; `lb_act_handover`: ours saves one register fewer and its branch targets
  *    shift;
  *  - `lb_combo_rate_get`: the `get_move_work_adrs` result and the row pointer swap r29/r31 (colouring only);
- *  - `lb_s13_dance_values_draw`: retail keeps the pair index in its own register beside the `lb_s13_value_pairs` base,
- *    ours strength-reduces it into a pointer (a `[4][2]` table measures worse);
  *  - `lb_s13_skill_list_draw`, `lb_s13_entry_list_draw`: one argument load scheduled before the flag test, and the
  *    callee-saved colours (the best declaration orders are applied);
  *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`,
@@ -3222,10 +3221,10 @@ void lb_s13_dance_values_draw(LbScreen13Work* work) {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     u16 values[4];
-    s32 i;
     s32 j;
     u16* layout;
     u16* value;
+    s32 i;
     u8 first;
     u8 second;
 

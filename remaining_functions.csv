@@ -377,7 +377,6 @@ size_bytes,unit,function,match_percent,address
 340,ef/eft050,lb_s13_status_skills_draw,95.6353,0x8033F40C
 340,ef/eft_res,eft_res_file_load,99.4823,0x800F8634
 340,enemy/enemy_control,em_stat_level_pick,93.6471,0x80142638
-340,lobby/lb_companion_ui,lb_s13_dance_values_draw,94.8824,0x8033E80C
 344,Network/NetworkWiiMediator,buildReflectPacket,99.9419,0x8041547C
 344,OS/OSPlayTime,__OSInitPlayTime,97.5581,0x804D7090
 344,WUD/wud,WUDiSyncCheckSearch,99.0116,0x804F9C60

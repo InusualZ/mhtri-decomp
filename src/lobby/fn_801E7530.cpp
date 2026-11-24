@@ -23,6 +23,7 @@
  * FLAGS. lb_hunt_info_draw takes a scoped `#pragma opt_loop_invariants off`.
  * FLAGS. lb_farm_seed_ck takes a scoped `#pragma opt_common_subs off`.
  * FLAGS. lb_daily_menu_roll takes a scoped `#pragma opt_strength_reduction off` (584 B, equal to retail).
+ * SHAPES. `lb_farm_plot_tabs_draw` declares `plot` before `frame` (the regsim plan order).
  * RESIDUALS. lb_talk_screen_open: retail reloads the `kind` byte (`lbz r0,2(r31)`) for the page-count test where ours reuses the
  *   masked parameter (`clrlwi r0,r30,24`); reading it through `lobby_w.menu_0xAC` again measures 91.7 (+12 B) and an
  *   inline `kind == 1` predicate measures equal.
@@ -2196,10 +2197,10 @@ void lb_farm_plot_tabs_draw(LbFarmWork* self)
 {
     _mh_ivec2_ anchor;
     const LbFarmTabRow* tab;
-    u16 frame;
     u16 blink;
-    u8 plot;
     s32 i;
+    u8 plot;
+    u16 frame;
 
     for (i = 0; i < 3; i++) {
         plot = lb_farm_tab_order[self->plot_0x08 * 3 + i];
