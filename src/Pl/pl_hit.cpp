@@ -55,6 +55,7 @@
  *   `pl_elem_resist_get` lists `default:` first; `hit_id_list_absent_ck` is one 20-entry loop reading each entry into a
  *   local; `hit_owner_reaction_set` takes the reaction into an `s16`; the defence cut is the inline `hit_defense_apply`.
  * SHAPES. `hit_damage_pl` declares their locals in the order the regsim plan gave (the plan's order measures best).
+ * SHAPES. hit_damage_em declares its locals in the order regsim plan 1 gave (99.39 -> 99.87).
  */
 
 #pragma optimization_level 4
@@ -1035,17 +1036,17 @@ extern "C" void hit_damage_em(_ENEMY_WORK* em, _HIT_W* hit, EmWeakPoint* part, _
     f32 elem;
     f32 elem_d;
     f32 elem_e;
+    s32 cut_ok;
+    s16 damage;
+    s32 side_kind;
+    u8 status;
+    u8 heavy;
+    u8 halved;
     EmPartRates* rates;
     _PLW* plw;
     u16 mask;
-    s32 cut_ok;
-    u8 heavy;
-    s16 damage;
-    u8 status;
     s16 wear;
     s16 half;
-    u8 halved;
-    s32 side_kind;
     s16 build;
 
     hit_id_list_push(em->hit_ids_0xAC0, &em->hit_id_count_0xAE8, hit->hit_id_0x0C);

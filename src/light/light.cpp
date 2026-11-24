@@ -31,6 +31,8 @@
  * SHAPES. `light_flare_setup` loops its second pass on its own counter `flare_index` (declared before `i`), which
  *            is what colours the loop counter and the model pointer like retail.
  * SHAPES. light_init's `num` is an `s16` (raises its row).
+ * SHAPES. light_update: `k` is an `s16` loop counter 0..3 (96.03 against 95.86 as `u8`, size 2592 B against 2588 B target, same as `u8`).
+ * SHAPES. light_update declares its locals in the order regsim plan 1 gave (96.03 -> 96.28).
  */
 
 #include "types.h"
@@ -1233,24 +1235,24 @@ extern "C" void light_update(LightPointWork* w)
     u32 under0;
     u32 under1;
     u32 water;
+    u16 max;
     s32 base;
     g3d::LightObj* obj;
-    s32 i;
-    u16 max;
     s32 j;
     LightPlayerView* pl;
     LightPoint* p;
+    s32 i;
     u8 me;
     g3d::LightSetting* setting;
-    u32 under;
-    g3d::LightSet* pset0;
     g3d::LightSet* pset1;
-    LightNpcView* npc;
     _ENEMY_WORK* em;
+    g3d::LightSet* pset0;
+    u32 under;
+    LightNpcView* npc;
     s32* src;
     u32* word;
     s32 obj_no;
-    u8 k;
+    s16 k;
     u8 c;
     f32 depth;
 

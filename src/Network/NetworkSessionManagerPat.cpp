@@ -68,6 +68,7 @@
  * RESIDUALS. mwcc-debugger dump, `updatePlayerRecord__24NetworkSessionManagerPatFScPCUcPCcUl`: regsim 6/6
  *            callee-saved, 7/7 volatile (EXACT); first divergence insn 38: retail `lwz r12, 0x0(r3)` vs ours `lwz r12,
  *            0x540(r31)`
+ * SHAPES. networkSessionReflect1: `kind` is a `u16` holding the `u8` field `kind_08` (0..255; 99.70 against 99.66, size equal).
  */
 
 #include "Network/NetworkSessionManager.h"
@@ -2737,7 +2738,7 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
         const PatBinaryField* field = ((const PatBinaryNotice*)data)->fields_0C;
 
         if ((s8)((const PatBinaryNotice*)data)->address_00[0] != 0 && field->type_00 == 1) {
-            u8 kind = field->kind_08;
+            u16 kind = field->kind_08;
 
             if (field->type_10 == 2) {
                 u32 value = field->value_18;

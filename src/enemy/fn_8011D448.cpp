@@ -37,6 +37,7 @@
  *   the owner's declared parameters differ from the registers retail passes.
  * RESIDUALS. em_parts_break: `li r0,1` and the group mask swap registers (r35 r5 vs retail r0, r36 r0 vs r5), so
  *            retail's `slw r31,r0,r5` reads in the other operand order; regsim has no cost-0 source plan.
+ * SHAPES. em_damage_eval takes the declaration order the hill-climb measured best (98.34 -> 98.40).
  */
 
 #include "types.h"
@@ -814,10 +815,10 @@ extern "C" s32 em_damage_eval(_ENEMY_WORK* self)
     s16 damage;
     s32 left;
     EmPartLimitRec* rec;
-    s16 first;
     s16 second;
     s16 worn;
     s8 slot;
+    s16 first;
     u8 ailment;
 
     if (self->hit_flag_0x918 == 1) {

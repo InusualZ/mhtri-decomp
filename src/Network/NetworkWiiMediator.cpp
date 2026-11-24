@@ -71,6 +71,7 @@
  *            a register), ours `li r3,0`; a `result` local (80.69) and an else assignment (98.46) do not produce it.
  * RESIDUALS. mwcc-debugger dump, `pushTransferRecord`: regsim 2/3 callee-saved, 13/13 volatile, best plan cost 4;
  *            first divergence insn 8: retail `mr r31, r6` vs ours `mr r29, r6`
+ * SHAPES. filterReflectText declares its locals in the order regsim plan 1 gave (96.90 -> 96.98).
  */
 
 #include "types.h"
@@ -1289,12 +1290,12 @@ s32 filterReflectText(NetworkWiiMediator* self, char* text, s32 table)
     s32 k;
     u32 textLength;
     s32 j;
+    s32 end;
     s32 removed;
     s32 count;
-    s32 end;
+    s32 base;
     s32 run;
     s32 extra;
-    s32 base;
     s32 dst;
     s32 consumed;
     u32 match;

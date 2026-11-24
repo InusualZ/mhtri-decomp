@@ -53,6 +53,7 @@
  * FLAGS. scoped `#pragma optimization_level 2` around menu_item_frame_update (retail masks the argument with `clrlwi
  *        r3,r30,24`).
  * SHAPES. `menu_split_item_page_draw` keeps `confirm` in an `s8` (takes -1, 0 or 1).
+ * SHAPES. menu_main_draw declares its locals in the order regsim plan 1 gave (99.81 -> 99.87).
  */
 
 #include "types.h"
@@ -1541,12 +1542,12 @@ extern "C" void menu_main_draw(u32 idx)
     _mh_ivec2_ cell;
     _SPR_DATA_ spr;
     MenuEntry* entry;
-    s32 i;
+    u32 flags;
     s16 offset;
+    s32 i;
     u16 frame;
     u32 selected;
     u32 top;
-    u32 flags;
     u16* table;
     u16 help;
     s8* text;

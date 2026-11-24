@@ -38,6 +38,8 @@
  *    predictions are an order loop `pred += x[i + 1 - k] * coef[v * 2 + k]` over a flat coefficient table: the
  *    unrolled `i + 1` index and the per-vector `coef + 4 * v` row are what retail's loads show (the closed form
  *    strength-reduces both to pointer walks and hoists the pair).
+ * SHAPES. computeAdpcmCoefs: `j` is an `s16` (a column index 0..2; 98.58 against 97.28 as `s32`, size 3300 B against 3288 B target, `s32` was 3276 B).
+ * SHAPES. computeAdpcmCoefs declares its locals in the order regsim plan 1 gave (98.58 -> 98.59).
  */
 
 #pragma function_align 16
@@ -409,11 +411,11 @@ s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work
     f64 mat[9];
     s32 index[3];
     f64 book[24];
-    f64* frame;
-    s32 frames;
     s16* coefs = info->coef[0];
+    s32 frames;
+    f64* frame;
     s32 i;
-    s32 j;
+    s16 j;
     s32 n;
     s32 round;
     f64* split;

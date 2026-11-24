@@ -1072,7 +1072,6 @@ size_bytes,unit,function,match_percent,address
 2368,ef/eft053,eft053_slot_gimmick_step,99.2314,0x80369D50
 2384,Network/NetworkLayerPat,move__15NetworkLayerPatFv,99.9664,0x803E1B2C
 2408,ef/ef_animcurve,ef_anim_curve_f32,99.5764,0x8009F85C
-2412,lobby/fn_8030121C,eft_em_model_create,99.942,0x8030487C
 2452,ef/ef_drawstrategyimpl,SetupGPTexture__Q34nw4r2ef16DrawStrategyImplFP14EfDrawParticleRC20EfEmitterDrawSettingRCQ34nw4r2ef8DrawInfob,99.5024,0x800C7CE0
 2468,ef/ef_animcurve,ef_anim_curve_u8,99.5543,0x8009DEB0
 2468,g3d/g3d_draw1mat1shp,Draw1Mat1ShpDirectly__Q24nw4r3g3dFQ34nw4r3g3d6ResMatQ34nw4r3g3d6ResShpPCQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34UlPQ34nw4r3g3d16Draw1Mat1ShpSwapP17G3dIndMtxCallback,99.4619,0x800769F4
@@ -1083,7 +1082,6 @@ size_bytes,unit,function,match_percent,address
 2524,WPAD/wpad,wpadSamplingFiber,98.9731,0x804EC650
 2532,DWCi/dwc_nonport,DWCi_Np_CPUCopyFast,91.1058,0x80507C40
 2552,fn_80047398,face_draw,99.4514,0x80047D6C
-2568,lobby/lb_screen_step,lb_smith_make_step,99.9844,0x80360A58
 2572,ef/ef_animcurve,ef_anim_curve_rotate,99.7667,0x800A02F8
 2588,light/light,light_update,95.8609,0x802C10BC
 2604,Pl/pl_act,pl_input_refresh,99.9539,0x8026AF08
@@ -1105,7 +1103,6 @@ size_bytes,unit,function,match_percent,address
 3288,DSPADPCM/dspadpcm,computeAdpcmCoefs,97.2762,0x80472390
 3296,menu/menu_item,menu_main_draw,99.8058,0x802A1714
 3312,menu/menu_placeinfo,lb_community_select_step,98.2669,0x8043A720
-3316,lobby/fn_801E0ADC,em007_model_eft_update,98.468,0x801E0D38
 3464,fn_80059550,strap_task,92.3395,0x800595E4
 3532,ef/ef_particlemanager,Calc__Q34nw4r2ef15ParticleManagerFv,99.9434,0x800AC2F8
 3552,menu/menu_sysmsg,kbd_step__FlUsUsUs,99.0484,0x804535A4

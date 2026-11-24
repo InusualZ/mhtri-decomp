@@ -15,7 +15,7 @@
  *   - the enemy effect spawner (0x80304508-0x80305924, its `.data` tables and jump tables, `.sdata2` 0x8079ADA8-
  *     0x8079ADB8) reads as its own TU (effect type 0x27; the neighbouring types 0x28, 0x29 and 0x2A are each their own
  *     TU by duplicated pool words), but no pool word, string or record pins the 0x80304508 edge.
- *   - `eft_em_model_create` (`group`/`i` swapped), `lb_kujira_menu_draw`,
+ *   - `lb_kujira_menu_draw`,
  *     `lb_kujira_menu_step` (the ship-bit toggle's registers): register colouring that no
  *     declaration order reaches.
  *   - `lb_barter_cart_draw`: retail keeps a `clrlwi` on the first `get_lsp_data` id (a phi of two constants).
@@ -33,6 +33,7 @@
  *   not read (retail's caller passes it).
  * SHAPES. `lb_barter_list_draw` declares `enabled`, `tab`, `type` in that order (regsim plan 1).
  * SHAPES. `eft_em_move` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. eft_em_model_create declares its locals in the order regsim plan 1 gave (99.94 -> 100).
  */
 #include "types.h"
 #include "ef.h"
@@ -1722,10 +1723,10 @@ void eft_em_model_create(_EFT* self) {
     nw4r::math::VEC3 ofs;
     nw4r::math::MTX34 mtx;
     EftEmWork* work;
-    u16 group;
     struct _ENEMY_WORK* enemy;
-    u16 res;
     s32 i;
+    u16 res;
+    u16 group;
 
     work = (EftEmWork*)self->work_0x38;
     enemy = (struct _ENEMY_WORK*)self->source_0x30;

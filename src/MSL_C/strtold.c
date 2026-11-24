@@ -9,7 +9,7 @@
  *    the bare-return row 0x804681C4 (owned by `MSL/w_math.cpp`).
  * EVIDENCE. `.sdata2` 0x8079CA08..0x8079CA28 pools `NAN(`, `0.0`, `DBL_MIN`, `DBL_MAX` and the string `INFINITY` is
  *    `.rodata` 0x80572B78; the value `0.0` repeats at 0x8079C9F8 and 0x8079CA28, so it is a TU of its own.
- * RESIDUALS. .text 4896 B against 4900 B with the same instruction stream except four sites: (1) the callee-saved
+ * RESIDUALS. .text 4904 B against 4900 B with the same instruction stream except four sites: (1) the callee-saved
  *    colouring - the named locals take retail's registers in retail's order (hex_state r31 .. n_mant r22), but the
  *    parameters `overflow`/`read_arg`/`read` and the `_current_locale` address stall in simplify and are coloured first
  *    (r31..r28) where retail colours them after the locals (r19/r18/r17, locale r15), which renames every register in
@@ -26,6 +26,7 @@
  *    puts the named locals in retail's registers; the digit stores are `text[length++]`, the NaN tag loop is a `while`
  *    with the class tests in its condition, the success test is one conditional expression, `sh` is initialised with
  *    `bit + 12` before the mask and reduced after it, and the result pointer is set before the normalising shift.
+ * SHAPES. `n_mant` is a `u16` (counts mantissa nibbles, at most 14: the `n_mant < 14` guards; 97.92 against 97.89 as `u32`, size 4904 B against 4900 B target, `u32` was 4896 B).
  */
 #include "MSL_C/ansi_fp.h"
 #include "MSL_C/ctype.h"
@@ -94,7 +95,7 @@ f64 __strtold(int max_width, ReadProc read, ReadArg* read_arg, int* chars_scanne
     int bin_exp = 0;
     int nibble;
     int bin_exp_negative = 0;
-    u32 n_mant = 0;
+    u16 n_mant = 0;
 
     *overflow = 0;
     c = read(read_arg, 0, 0);

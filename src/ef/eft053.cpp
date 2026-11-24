@@ -46,6 +46,7 @@
  *   copy costs 6-8 points), except `eft053_slot_gimmick_step`'s sinking arm, which takes the slot once per arm;
  *   `eft053_slot_gimmick_step` declares its shot angles after the matrix constructor call.
  * SHAPES. `eft053_init` declares their locals in the order the regsim plan gave (the plan's order measures best).
+ * SHAPES. eft053_slot_gimmick_step declares its locals in the order regsim plan 1 gave (99.23 -> 99.32).
  */
 #include "types.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -1698,7 +1699,7 @@ extern "C" s32 eft053_slot_steer_step(_EFT* self, s32 index, s32 table_off)
  * gimmick to the ground. */
 extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
 {
-    Eft053Work* work = (Eft053Work*)self->work_0x38;
+    s32 p;
     MTX34 mtx;
     u32 ang[3] = {0, 0x8000, 0};
     VEC3 joint;
@@ -1706,12 +1707,12 @@ extern "C" void eft053_slot_gimmick_step(_EFT* self, s32 index)
     VEC3 dir;
     VEC3 ground;
     VEC3 offset;
+    Eft053Work* work = (Eft053Work*)self->work_0x38;
     _ENEMY_WORK* enemy;
     _ENEMY_WORK* target;
     MHchar** model;
     u32 max;
     s32 i;
-    s32 p;
     _PLW* plw;
     s32 e;
     u8 phase;

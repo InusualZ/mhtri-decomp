@@ -51,6 +51,7 @@
  * SHAPES. `pl_tri2d_cross` keeps its two products in a local array (retail stores and reloads them around the
  *   one-ulp test); the grid cell index is `index = (x * dim_y + y) * dim_z` then `cells[index + z]` (the last `add`
  *   keeps the product first); the shape-hit yaw is the call's raw result narrowed in a second statement.
+ * SHAPES. pl_wall_resolve declares its locals in the order regsim plan 1 gave (94.65 -> 94.71).
  */
 
 /* ==== 0x8029135C-0x80295EF4: the collision queries ==== */
@@ -810,8 +811,8 @@ s32 pl_wall_resolve(PlSlideWork* work, VEC3* pos, u8* flag) {
     s8 edges[10];
     s8 drop_kind[10];
     s8 dropped[10];
-    PlCollPoly* a;
     PlCollPoly* b;
+    PlCollPoly* a;
     nw4r::math::VEC3* corner;
     s8* face_at;
     s8* edge_at;

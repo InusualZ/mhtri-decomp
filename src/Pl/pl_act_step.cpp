@@ -150,6 +150,7 @@
  *   `(s8)` casts at the use; a `u8` local measures 99.14 % at 4 B over).  pl_act_step_pitfall_hold and fn_8025FF0C: `i` is
  *   an `s16` counter (bounds 3 and 10; an `s32` lowers the rows: 97.70 % and 99.05 %).
  * SHAPES. `fn_802602A0` declares its locals in the order the register-allocation simulation (regsim) names.
+ * SHAPES. pl_scan_act_select declares its locals in the order regsim plan 1 gave (98.53 -> 98.58).
  */
 
 #include "types.h"
@@ -14798,11 +14799,11 @@ s32 pl_scan_act_select(_PLW* self) {
     u16* remap;
     s32 shell;
     u8* fired;
-    s32 j;
     s32 at_end;
+    u16 slot_item;
     s32 no_act;
     s32 i;
-    u16 slot_item;
+    s32 j;
     u16 slot;
     f32 end;
     f32 start;

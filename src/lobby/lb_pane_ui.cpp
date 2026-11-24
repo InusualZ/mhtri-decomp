@@ -18,7 +18,7 @@
  *   `lobby_scene_setup_dispatch`) and their callers; measured in docs/lobby.md.  Per function (playbook 108/208, each measured
  *   against the unit): `optimization_level 4` on `fn_801EEDC4`, `lb_equip_set_pane_init`,
  *   `lb_entry_pane_scroll_refresh`, `lb_color_pane_step`, `lb_dye_pane_step`; `opt_common_subs off` on `fn_801EDC4C`
- *   and `lb_pane_draw`.  The whole page band at `-O4` scores the same but for `lb_box_grid_draw` (-1.2 B).
+ *   and `lb_pane_draw`; `opt_strength_reduction off` on `lb_pane_draw` (97.51 -> 97.66, 5008 B = target).  The whole page band at `-O4` scores the same but for `lb_box_grid_draw` (-1.2 B).
  * NAMES. `lb_pane_ui` is a GUESS from what the three bands draw; no `__FILE__` string or dump name covers the range.
  *   GUESS (from each body and its callers): every `lb_*` row of the range (`lb_box_*`, `lb_entry_pane_*`, `lb_equip_*`,
  *   `lb_my_set_*`, `lb_gun_set_*`, `lb_color_*`, `lb_dye_*`, `lb_model_pane_*`, `lb_set_pane_draw`, `lb_count_box_draw`,
@@ -105,6 +105,8 @@
  * SHAPES. lb_box_menu_draw: `str` is an `s32` (a string id, -1 or 0xC7..0xCD; s16 reads 98.51, s32 98.91, size 2172 vs target 2176 both ways).
  * SHAPES. `lb_entry_pane_scroll_refresh` and `lb_my_set_list_draw` declare their locals in the order the declaration hill-climb measured best.
  * SHAPES. `lb_my_set_list_draw` declares their locals in the order the regsim plan gave (the plan's order measures best).
+ * SHAPES. lb_box_grid_draw: `count` and `marked` are `s32` holding a record count and a picked index (small values; 95.65 against 94.99 as `s16`, size 2348 B against 2356 B target, same as `s16`).
+ * SHAPES. lb_entry_pane_menu_step declares its locals in the order regsim plan 1 gave (98.90 -> 99.03).
  */
 #include "types.h"
 #include "id_value.h"
@@ -2528,14 +2530,14 @@ extern "C" s32 lb_entry_pane_menu_step(LbEntryPane* self, LbEquipBoxWork* owner,
     s32 picked;
     u8 weapon;
     u16 count;
-    u16 i;
-    u16 j;
     u8 order;
+    LbEquipRec* rec;
     s16 rows;
+    u16 i;
     s16 id_a;
     s16 id_b;
     s16 id_c;
-    LbEquipRec* rec;
+    u16 j;
 
     switch (self->sort_step_0x023) {
     case 0:
@@ -5636,7 +5638,7 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
 {
     _SPR_DATA_ spr;
     s16 reason;
-    s16 count;
+    s32 count;
     u8 counts;
     u8 selected;
     const u16* cols;
@@ -5648,7 +5650,7 @@ void lb_box_grid_draw(::LbDigitPane* digits, ::MenuSelCursor* cursor, const _mh_
     const u16* rows;
     s32 index;
     s16 row;
-    s16 marked;
+    s32 marked;
     s32 marking;
     s16 picked;
     s32 c;
@@ -6062,6 +6064,7 @@ void lb_equip_icon_cell_draw(const _mh_ivec2_* pos, ::LbEquipRec* rec, u8 framed
  * scroll list, the count box, the open sort menu, and the help line with the reason a pick is refused. */
 #pragma push
 #pragma opt_common_subs off
+#pragma opt_strength_reduction off
 void lb_pane_draw(::LbEntryPane* self, s16 x, s16 y, LbBoxMenu* owner)
 {
     _SPR_DATA_ spr;

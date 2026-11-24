@@ -158,6 +158,7 @@
  *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam` (one 0x2C block
  *    read two ways: this unit names the allocator/game words, the owner keeps `gameInfo[8]`; folding them is a rule-1
  *    item).
+ * SHAPES. updateNetworkPatControl takes the declaration order the hill-climb measured best (98.28 -> 98.36).
  */
 
 #include "Network/network_pat_control.h"
@@ -3582,9 +3583,9 @@ s32 pat_ca_cert_size = 0x39C;
 void updateNetworkPatControl(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
-    NetListMenu* menu = work->list_0xBF34;
     NetDialog* dialog = work->dialog_0xBF30;
     u16 pressed = Psw[0].button_0x2C0.pressed_0x04;
+    NetListMenu* menu = work->list_0xBF34;
     u16 held = Psw[0].button_0x2C0.held_0x14 | pressed;
     u8 sub_state;
 

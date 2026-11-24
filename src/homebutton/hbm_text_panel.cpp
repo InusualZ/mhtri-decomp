@@ -110,6 +110,7 @@
  *            free-list index after the inlined unlink (retail `slwi r0,rN,3`, ours `clrlslwi r0,rN,16,3`: retail
  *            reloads the count where ours reuses the masked loop counter); the rest is volatile-register numbering.
  * FLAGS. hbmPanelCheckWordWrap: scoped `#pragma opt_lifetimes off` (99.79 -> 99.84, size equal).
+ * SHAPES.    hbmPanelHandleMessage: `length` is a `u32` holding the `u16` cell length after the decrement (0..65535; 97.284 against 97.281, size equal).
  */
 
 #include "types.h"
@@ -2388,7 +2389,7 @@ void hbmPanelHandleMessage(HbmPanelView* self, u32 id, u32* arg)
         if (self->textField->v_0x094() == 0) {
             deleted = 0;
         } else {
-            u16 length = --self->cursorCell->length;
+            u32 length = --self->cursorCell->length;
 
             if (self->cursorOffset == length && self->cells.at(self->cells.usedList()->prev) != self->cursorCell) {
                 HbmTextCell* next = self->cells.at(self->cursorCell->next);

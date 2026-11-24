@@ -22,8 +22,6 @@
  * SHAPES. lb_eqshop_help_draw keeps `msg` an `s32` and tests `(u16)msg != 0xFFFF` (retail leaves the pick unnarrowed).
  * RESIDUALS. Every row is written.  `Em007ModelCopy` is declared in enemy/em007_act.h; MaskEftView is this unit's view
  *   of `Em007EftWork` (enemy/em007_act.cpp, request lobby-801e0adc#4).
- *   - em007_model_eft_update: register colouring only - retail gives the hoisted zero copies r21-r31/r14 and the
- *     effect, work, NPC and counter r16-r20, ours the reverse.  Declaration permutes of its scalars do not move it.
  *   - em007_model_eft_job_draw: register colouring only (the hold angle of the second pose).
  *   - Em007ModelCopy::ExecCallbackB: retail moves `pManip` into r3 before the node index load (scheduling).
  *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
@@ -46,6 +44,7 @@
  * SHAPES. `eft_em_spawn_joint` compares the id as `(s32)(u8)id == 0x21` (retail's signed `cmpwi`).
  * SHAPES. `eft033_move_gun` declares `work`, `slot`, `c0`..`c3`, then `plw` (regsim plan 1).
  * SHAPES. `eft033_move_joint` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. em007_model_eft_update takes the declaration order the hill-climb measured best (99.52 -> 100).
  */
 
 #include "types.h"
@@ -564,12 +563,12 @@ void em007_model_eft_sparks(_EFT* eft)
 #pragma opt_loop_invariants off
 void em007_model_eft_update(_EFT* eft)
 {
+    u32 i;
     MaskEftView* work = (MaskEftView*)eft->work_0x38;
     nw4r::math::MTX34 joint_mtx;
     nw4r::math::MTX34 mtx;
     f32 scale;
     f32 scale_b;
-    u32 i;
     _AINPC_W* npc;
     _LB_NPC* lb_npc;
     s32 se_arg;

@@ -78,6 +78,7 @@
  * FLAGS. `multi_box_phase_input` takes a scoped `#pragma opt_lifetimes off` (same size, raises its row).
  * SHAPES. `q_result_page_set` declares their locals in the order the declaration hill-climb measured best.
  * SHAPES. `q_result_page_set` and `q_result_points_page_draw` declare their locals in the order the regsim plan gave, the latter then moved by the declaration hill-climb (the measured best).
+ * SHAPES. q_result_task declares its locals in the order regsim plan 1 gave (98.24 -> 98.50).
  */
 
 #pragma pool_data off
@@ -722,10 +723,10 @@ BOOL q_result_task(Q_MoveWork* move)
     Q_ItemWork* work;
     Q_ResultWork* q;
     struct _PLW* plw;
-    SystemWork* sys;
-    Q_UserData* user;
     Q_ResultRow* row;
     s32 i;
+    SystemWork* sys;
+    Q_UserData* user;
     f32 scale;
     u8 arena;
     s32 word;
