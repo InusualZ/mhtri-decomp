@@ -211,6 +211,33 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   `g3d/g3d_anmclr` (each NOT READY, each with an earlier weak `__ct__Q34nw4r2ut5ColorFv`) and in the 286-unit batch of
   every NonMatching unit, the only READY there; its flip alone fails the DOL hash (`.text` +0x20). Now NOT READY in all of
   them with the `.text` +12 line.
+* **Liveness is transitive over the whole link (2026-11-24).** "Referenced" means referenced from bytes the link keeps.
+  `flipcheck.unit_liveness` reads every link input's dead-strip graph (`object_graph`: `lib.objcompare.dead_symbols`'
+  candidates and always-live bytes, an `extabindex` relocation rooting nothing) with the unit and the batch at their
+  places as built objects, and walks it from the roots: FORCEACTIVE, the entry, every `.comment` export (0x08) and every
+  always-live relocation. A name resolves to the link's definition (the first global in link order, else the first weak
+  one), and an input that cannot be read is treated as wholly live. Two consumers changed. (1) `deadstrip_roots` keeps
+  only names that another input's live bytes reference. A reference from a dead-stripped symbol, or from a weak copy
+  the link drops, no longer keeps anything alive. Before this, a weak copy kept by first-wins (only a later input
+  defines it) was counted even when the later input's only referencer was dead. (2) Row 36's "referenced" is now "live
+  in our object" in that link. One refinement over `dead_symbols`: an `extab` relocation belongs to the function(s)
+  whose record it is (`lib.binary.extab.unwind_entries`). So a live function's destroy-member action keeps the dtor it
+  names, and a dead function's record keeps nothing. A record no `extabindex` entry claims stays always live. Without
+  the link order (`link_ctx["inputs"]`), the old link-wide reference set decides. Measured at `4330c506a`:
+  `homebutton/hkb_layout` with lane/flip-2's source (`9f72f12e8`) goes NOT READY -> READY, unflipped and flipped. Its
+  weak `__dt__Q34nw4r3lyt13AnimTransformFv` (0x40 B) was the `.text` +64: its only referencer is
+  `homebutton/hkb_animation`'s weak `__vt__Q34nw4r3lyt13AnimTransform`, which nothing references, and that lane's trial
+  flip linked `main.dol: OK`. `sound/snd_voice_pool` without the `__declspec(export)` on `__dt__13SndVoiceListsFv`, on
+  the unflipped link, goes NOT READY (row 36) -> READY. The dtor is named only by `__ct__12SndVoicePoolFv`'s extab
+  record and by the dead `__dt__12SndVoicePoolFv`, and that lane's trial link without the annotation gave `main.dol:
+  OK`. All 679 built units: READY 448 -> 449. The gain is `Runtime.PPCEABI.H/CPlusLibPPC` (already `Object(Matching)`,
+  DOL green): its `__dt__26__partial_array_destructorFv` is named only by the extab records of `__construct_array`
+  and `__construct_new_array`. No unit lost READY. 18 NOT READY units change refusal text only. In 17 of them the
+  row-36 line grows or appears, because the target object's own references no longer count: the target leaves the
+  link at the flip, so `Pl/pl_motion`'s `quest_stage_*` (named by a `.data` table our object does not emit) are now
+  flagged. In the 18th, `homebutton/hkb_layout` on main's source, the same dtor leaves `.text` (no size line, new
+  byte counts). A full run takes 118 s, up from 70 s: one walk per unflipped unit, about 0.1 s each, plus 2.5 s to read
+  the graphs.
 * **`ninja diff` is not a flip signal.** `dtk dol diff` fails on main itself with `Expected to find symbol @eti_8001E558`:
   420 `@etb_`/`@eti_` symbols of the already-Matching units (objextab renames them global) are absent from the linked ELF's
   symbol table although their bytes are present and the DOL hash holds. No dead-strip is involved (`__nwa__FUl`,
@@ -325,6 +352,15 @@ library's candidates (the initialiser it alone kept dies with it, FORCEACTIVE ke
 anonymous word keep theirs, the `$NN` spellings); the fixpoint drops hkb_window beside a NOT READY hkb_layout, then what
 relied on it, keeps a unit that relies on nobody and leaves an all-READY batch alone. Against the previous flipcheck: 6 of
 10 checks fail.
+The whole-link liveness: `tools/tests/units/test_flipcheck_liveness.py` (14 checks). It uses
+hkb_layout/hkb_animation-shaped objects: the weak copy whose only referencer is a later input's dead weak vtable is
+stripped and READY, whether the vtable is weak or global, and transitively when the vtable's user is called only by a
+dead function of a third input. It is kept and refused when an exported function or a live caller loads the vtable,
+or when an unreadable input names it. It also uses snd_voice_pool-shaped objects (one extab record and one extabindex
+entry per function): no row 36 when only the live ctor's record names the member dtor; row 36 when only a dead
+function's record names it, when only its own extabindex entry does, when the ctor itself is dead, and when there is no
+link order. `object_graph`'s edges are pinned too. Against main's flipcheck 5 of 12 checks fail. Mutations: the extab
+record counted as always live fails 3, and every edge fired regardless of liveness fails 5.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
@@ -332,3 +368,8 @@ Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`G
 * READY is necessary, not sufficient (pipeline 8); the relocation half does not run for an already-Matching unit.
 * WP3a (behaviour change, 1 unit on this tree): the link's reference set now reads every relocation section of an input, as undefrefs and the linker do; the old reader kept only the last of dtk's two `.rela.data` in `Network/NetworkCommunityPat`, so `Network/NetworkLayerPatStep`'s `stepRequest__15NetworkLayerPatFP14NetworkRequest` read as unreferenced (a false row-36 trim risk) and is READY now.
 * Its spelling note (a target reference starting with the name) is not `objcompare.spelling_hint`; unifying changes the refusal text lanes parse.
+* `flipcheck.object_graph` restates `lib.objcompare.dead_symbols`' candidate and always-live rules for the whole-link
+  walk, so the rules now exist twice. Its one difference, extab records owned by their function, is not in
+  `dead_symbols`, which keeps a unit's `extab` whole: inside our object, a dead function's record still keeps what it
+  names. The graph and the walk belong in `lib.objcompare`, with `dead_symbols` as a view of them (a lib lane).
+* The whole-link walk runs once per unflipped unit (about 0.1 s each); a full run goes from 70 s to 118 s at `4330c506a`.

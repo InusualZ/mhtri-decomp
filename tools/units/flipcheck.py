@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
+import bisect
+import itertools
 import os
 import re
 import sys
@@ -798,13 +800,342 @@ TABLE_STRIP_LINE = ("%s: the link dead-strips the named table entry(ies) %s - no
                     "variable")
 
 
+#: The relocation sections whose source bytes are an exception record: they belong to the function it covers.
+EXTAB_SECTION = "extab"
+_GRAPHS: dict = {}
+_LIVENESS: dict = {}
+#: How many substituted links `unit_liveness` keeps (the unflipped link recurs between a run's units).
+LIVENESS_CACHED = 4
+
+
+class _UnwindView:
+    """What `lib.binary.extab.unwind_entries` reads of an object (`symbols`, `relocs(section)`, `section(name)`), each
+    relocation section parsed once: `object_graph` asks it once per function."""
+
+    def __init__(self, elf) -> None:
+        self._elf, self._relocs = elf, {}
+        self.symbols = elf.symbols
+
+    def relocs(self, section: str | None = None) -> list:
+        if section not in self._relocs:
+            self._relocs[section] = self._elf.relocs(section)
+        return self._relocs[section]
+
+    def section(self, name: str):
+        return self._elf.section(name)
+
+
+def object_graph(path: str) -> dict | None:
+    """The dead-strip graph of one object, read once per `(path, mtime, size)`, or None when it cannot be read.
+
+    The rules are `lib.objcompare.dead_symbols`' (a candidate is a named symbol of size > 0 in a strippable or table
+    section, not a section symbol, not a `RESERVED_TABLE_SYMBOLS` name; bytes outside every candidate, and every byte
+    of another section, are always live; an `extabindex` relocation roots nothing) with one refinement: a relocation in
+    an `extab` record belongs to the function(s) the record unwinds (`lib.binary.extab.unwind_entries`), so it fires
+    only once that function is live - mwld keeps what a live function's destroy action names (`sound/snd_voice_pool`'s
+    `__dt__13SndVoiceListsFv`) and drops a dead function's record with it. A record no `extabindex` entry claims is
+    always live. `{"defs": {name: (index, strong)}, "cand", "shndx": {index: section index}, "strippable",
+    "members": {section index: [index]}, "always": [target], "edges": {index: [target]}, "exported": [index],
+    "names": {index: name}}`; a target is `("name", n)` (a global, weak or undefined symbol: the link resolves it),
+    `("node", index)` or `("section", section index)` (a local the strip cannot tell apart keeps its section)."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (os.path.abspath(path), st.st_mtime_ns, st.st_size)
+    if key in _GRAPHS:
+        return _GRAPHS[key]
+    elf = _elf(path)
+    if elf is None or elf.symtab is None:
+        _GRAPHS[key] = None
+        return None
+    syms = elf.symbols
+    nsym, nsec = len(syms), len(elf.sections)
+    strippable = {s.index for s in elf.sections
+                  if s.name in objcompare.STRIPPABLE_SECTIONS or objcompare.table_section(s.name)}
+    cand = {s.index for s in syms
+            if s.name and s.size > 0 and 0 < s.shndx < nsec and s.shndx in strippable
+            and s.type != objcompare.STT_SECTION and s.name not in objcompare.RESERVED_TABLE_SYMBOLS}
+    members: dict[int, list[int]] = {}
+    for i in cand:
+        members.setdefault(syms[i].shndx, []).append(i)
+    spans = {shndx: sorted((syms[i].value, syms[i].value + syms[i].size, i) for i in idx)
+             for shndx, idx in members.items()}
+    defs: dict[str, tuple[int, bool]] = {}
+    for s in syms:
+        if s.name and s.defined and s.bind in (objcompare.STB_GLOBAL, objcompare.STB_WEAK) and s.name not in defs:
+            defs[s.name] = (s.index, s.bind == objcompare.STB_GLOBAL)
+    relocs = elf.relocs()
+    # which functions each extab record unwinds: {(record start, end): [function index]}
+    owners: dict[tuple[int, int], list[int]] = {}
+    if any(r.section == EXTAB_SECTION for r in relocs):
+        by_name: dict[str, list[int]] = {}
+        for i in cand:
+            if syms[i].section == ".text":
+                by_name.setdefault(syms[i].name, []).append(i)
+        view = _UnwindView(elf)
+        for name, idx in by_name.items():
+            for start, size in unwind_entries(view, {name}).get(EXTAB_SECTION, {}).items():
+                owners.setdefault((start, start + size), []).extend(idx)
+    records = sorted(owners)
+    record_starts = [lo for lo, _hi in records]
+
+    def target(r) -> tuple[str, object] | None:
+        if not 0 < r.symbol < nsym:
+            return None
+        s = syms[r.symbol]
+        if not s.defined:
+            return ("name", s.name) if s.name else None
+        if s.bind in (objcompare.STB_GLOBAL, objcompare.STB_WEAK) and s.name:
+            return ("name", s.name)
+        if s.index in cand:
+            return ("node", s.index)
+        if 0 < s.shndx < nsec and s.shndx in strippable:
+            return ("section", s.shndx)
+        return None                       # a local of a section the strip keeps whole
+
+    los = {shndx: [lo for lo, _hi, _i in rows] for shndx, rows in spans.items()}
+    reach = {shndx: list(itertools.accumulate((hi for _lo, hi, _i in rows), max)) for shndx, rows in spans.items()}
+
+    def covering(shndx: int, off: int) -> list[int]:
+        """The candidates of section `shndx` whose bytes hold offset `off` (aliases overlap)."""
+        rows = spans.get(shndx, ())
+        at = bisect.bisect_right(los.get(shndx, ()), off)
+        out = []
+        while at and reach[shndx][at - 1] > off:
+            at -= 1
+            lo, hi, i = rows[at]
+            if lo <= off < hi:
+                out.append(i)
+        return out
+
+    applies = {rela.index: rela.info for rela, _target in elf.rela_sections()}
+    always: list = []
+    edges: dict[int, list] = {}
+    for r in relocs:
+        if r.section.startswith(objcompare.NON_ROOTING_SECTIONS):
+            continue
+        t = target(r)
+        if t is None:
+            continue
+        shndx = applies.get(r.rela_index, 0)
+        sources: list[int] = []
+        if shndx in strippable:
+            sources = covering(shndx, r.offset)
+        elif r.section == EXTAB_SECTION and records:
+            at = bisect.bisect_right(record_starts, r.offset) - 1
+            if at >= 0 and records[at][0] <= r.offset < records[at][1]:
+                sources = owners[records[at]]
+        if sources:
+            for i in sources:
+                edges.setdefault(i, []).append(t)
+        else:
+            always.append(t)
+    comment = elf.comment
+    exported = [i for i, entry in enumerate(comment.entries if comment is not None else ())
+                if entry.active_flags & objcompare.FORCE_ACTIVE_FLAG and i < nsym and syms[i].defined]
+    graph = {"defs": defs, "cand": cand, "shndx": {s.index: s.shndx for s in syms}, "strippable": strippable,
+             "members": members, "always": always, "edges": edges, "exported": exported,
+             "names": {s.index: s.name for s in syms}}
+    graph["seed"] = _seed(graph)
+    _GRAPHS[key] = graph
+    return graph
+
+
+def _seed(g: dict) -> tuple[frozenset, frozenset, frozenset]:
+    """`(live candidates, sections kept whole, names referenced)` of one graph from its own roots alone - its
+    always-live relocations and `.comment` exports, closed over its local edges. No other input changes it, so
+    `link_liveness` starts each link from it instead of walking every exported object again."""
+    live: set[int] = set()
+    whole: set[int] = set()
+    names: set[str] = set()
+    work = [g["always"]]
+
+    def node(i: int) -> None:
+        if i not in live:
+            live.add(i)
+            work.append(g["edges"].get(i, ()))
+
+    def section(shndx: int) -> None:
+        if shndx not in whole:
+            whole.add(shndx)
+            for i in g["members"].get(shndx, ()):
+                node(i)
+
+    for i in g["exported"]:
+        if i in g["cand"]:
+            node(i)
+        elif g["shndx"].get(i) in g["strippable"]:
+            section(g["shndx"][i])
+    while work:
+        for kind, value in work.pop():
+            if kind == "name":
+                names.add(value)
+            elif kind == "node":
+                node(value)
+            else:
+                section(value)
+    return frozenset(live), frozenset(whole), frozenset(names)
+
+
+def link_liveness(inputs: list[str], paths: dict[str, str], extra_refs: dict[str, set[str]]) -> dict:
+    """Which symbols of the link survive mwld's dead-strip, transitively: `{"refs": {rel: names its LIVE bytes
+    reference}, "live": {rel: live candidate indices}, "sections": {rel: section indices kept whole}, "graphs"}`.
+
+    `inputs` are the link line's objects in order (MAIN-relative), `paths` maps an input to the object that stands at
+    its place (a flipped unit's built object), `extra_refs` the names an input no graph can be read for references - an
+    unreadable input is wholly live, so each of its names roots (every doubt resolves to live). The roots are the
+    linker script's FORCEACTIVE block, the entry symbol, every `.comment` force-active (export) symbol and every
+    always-live relocation (`object_graph`); a name resolves to the link's definition - the first global in link
+    order, else the first weak one - so a weak copy the link does not keep roots nothing, and a reference made from a
+    symbol the strip removes keeps nothing alive."""
+    graphs = [object_graph(paths.get(rel, os.path.join(MAIN, rel))) for rel in inputs]
+    chosen: dict[str, tuple[int, int, bool]] = {}
+    for k, g in enumerate(graphs):
+        for name, (index, strong) in (g or {}).get("defs", {}).items():
+            cur = chosen.get(name)
+            if cur is None or (strong and not cur[2]):
+                chosen[name] = (k, index, strong)
+    live = [set() for _ in inputs]
+    whole = [set() for _ in inputs]
+    refs = [set() for _ in inputs]
+    names: set[str] = set()
+    work: list[tuple[int, list]] = []
+
+    def node(k: int, i: int) -> None:
+        if i not in live[k]:
+            live[k].add(i)
+            work.append((k, graphs[k]["edges"].get(i, ())))
+
+    def section(k: int, shndx: int) -> None:
+        if shndx not in whole[k]:
+            whole[k].add(shndx)
+            for i in graphs[k]["members"].get(shndx, ()):
+                node(k, i)
+
+    def name(n: str) -> None:
+        if n in names:
+            return
+        names.add(n)
+        got = chosen.get(n)
+        if got is None:
+            return
+        k, i, _strong = got
+        g = graphs[k]
+        if i in g["cand"]:
+            node(k, i)
+        elif g["shndx"].get(i) in g["strippable"]:
+            section(k, g["shndx"][i])
+
+    def fire(k: int, targets) -> None:
+        for kind, value in targets:
+            if kind == "name":
+                refs[k].add(value)
+                name(value)
+            elif kind == "node":
+                node(k, value)
+            else:
+                section(k, value)
+
+    seeded: set[str] = set(forced_active()) | set(ENTRY_SYMBOLS)
+    for got in extra_refs.values():
+        seeded |= got
+    for k, g in enumerate(graphs):
+        if g is None:
+            continue
+        seed_live, seed_whole, seed_names = g["seed"]
+        live[k].update(seed_live)
+        whole[k].update(seed_whole)
+        refs[k].update(seed_names)
+        seeded |= seed_names
+    for n in sorted(seeded):
+        name(n)
+    while work:
+        k, targets = work.pop()
+        fire(k, targets)
+    return {"refs": {rel: refs[k] for k, rel in enumerate(inputs)},
+            "live": {rel: live[k] for k, rel in enumerate(inputs)},
+            "sections": {rel: whole[k] for k, rel in enumerate(inputs)},
+            "graphs": {rel: graphs[k] for k, rel in enumerate(inputs)}}
+
+
+def unit_liveness(unit: str, target_rel: str, link_ctx: dict | None) -> dict | None:
+    """`link_liveness` of the link as it reads once `unit` and the batch are flipped (each unit's built object at its
+    target object's place, or appended when the link line names neither), cached per substituted input list; None
+    without the link order (`link_ctx["inputs"]`). `own` names the unit's input."""
+    inputs = (link_ctx or {}).get("inputs")
+    if not inputs:
+        return None
+    inputs = list(inputs)
+    paths: dict[str, str] = {}
+    own = None
+    for u in sorted(BATCH | {unit}):
+        obj = target_rel if u == unit else os.path.normpath(os.path.join("build", "RMHE08", "obj", u + ".o"))
+        src = os.path.normpath(os.path.join("build", "RMHE08", "src", u + ".o"))
+        if not os.path.exists(os.path.join(MAIN, src)):
+            if u == unit:
+                own = obj if obj in inputs else src
+            continue
+        if obj in inputs:
+            paths[obj] = os.path.join(MAIN, src)
+            rel = obj
+        elif src not in inputs:
+            inputs.append(src)
+            rel = src
+        else:
+            rel = src
+        if u == unit:
+            own = rel
+    extra = {rel: set(names) for rel, names in link_ctx["refs"].items() if rel not in inputs}
+    key = (MAIN, tuple(inputs), tuple(sorted(paths.items())), tuple(sorted((r, tuple(sorted(n)))
+                                                                          for r, n in extra.items())))
+    if key not in _LIVENESS:
+        got = link_liveness(inputs, paths, extra)
+        for rel in inputs:
+            if got["graphs"][rel] is None:      # unreadable: everything it references counts
+                got["refs"][rel] = set(link_ctx["refs"].get(rel, ()))
+        got["refs"].update(extra)
+        while len(_LIVENESS) >= LIVENESS_CACHED:
+            _LIVENESS.pop(next(iter(_LIVENESS)))          # the least recently used
+        _LIVENESS[key] = got
+    _LIVENESS[key] = _LIVENESS.pop(key)                   # most recently used last
+    return dict(_LIVENESS[key], own=own)
+
+
+def live_names_of(lv: dict, rel: str) -> set[str] | None:
+    """The names of the symbols of input `rel` the dead-strip keeps (`link_liveness`): a live candidate, a symbol of a
+    section kept whole, a symbol of a section the strip never takes. None when that input's graph is unreadable."""
+    g = lv["graphs"].get(rel)
+    if g is None:
+        return None
+    live, whole = lv["live"][rel], lv["sections"][rel]
+    out = set()
+    for i, n in g["names"].items():
+        if not n:
+            continue
+        if i in g["cand"]:
+            if i in live:
+                out.add(n)
+        elif g["shndx"].get(i) not in g["strippable"] or g["shndx"].get(i) in whole:
+            out.add(n)
+    return out
+
+
 def deadstrip_roots(unit: str, target_rel: str, link_ctx: dict) -> set[str]:
-    """What keeps a symbol of `unit`'s object alive once it is flipped: every name another link input references,
-    what the batch's own objects reference, the linker script's FORCEACTIVE block and the entry symbol. The unit's own
-    objects are never "another input", so the answer is the same before the flip (the target object is the input) and
-    after it (our object is): their references are what `dead_symbols` follows from the live symbols."""
+    """What keeps a symbol of `unit`'s object alive once it is flipped: every name another link input references
+    from bytes the link keeps (`unit_liveness`: a reference made by a dead-stripped symbol, or by a weak copy the link
+    drops, roots nothing), the linker script's FORCEACTIVE block and the entry symbol. The unit's own objects are never
+    "another input", so the answer is the same before the flip (the target object is the input) and after it (our
+    object is): their references are what `dead_symbols` follows from the live symbols. Without the link order every
+    name another input or a batch object references counts."""
     own = {target_rel, os.path.normpath(os.path.join("build", "RMHE08", "src", unit + ".o"))}
+    lv = unit_liveness(unit, target_rel, link_ctx)
     roots: set[str] = set()
+    if lv is not None:
+        for rel, names in lv["refs"].items():
+            if rel not in own:
+                roots |= names
+        return roots | forced_active() | set(ENTRY_SYMBOLS)
     for rel, names in link_ctx["refs"].items():
         if rel not in own:
             roots |= names
@@ -1111,7 +1442,12 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
     flag_problems, checked, compared = ([], 0, False)
     if refs is not None:
-        risks, checked, compared = comment_trim_candidates(obj_path, src_path, refs)
+        # with the link order, "referenced" is "kept by the dead-strip" (`unit_liveness`: a live function's extab
+        # action counts, a dead symbol's reference does not); without it, the link-wide reference set
+        lv = unit_liveness(unit, target_rel, link_ctx)
+        kept_names = live_names_of(lv, lv["own"]) if lv is not None and lv.get("own") else None
+        risks, checked, compared = comment_trim_candidates(obj_path, src_path,
+                                                           refs if kept_names is None else kept_names)
         flag_problems = row36_lines(unit, risks, verbose)
     problems += flag_problems
     if compared and not flag_problems:
