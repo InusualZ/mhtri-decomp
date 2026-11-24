@@ -13,9 +13,7 @@
  *        destructor, so the `__sinit` only calls its constructor; the global sits after `#pragma dont_inline on`, so
  *        the `__sinit` calls the constructors out of line and MWCC emits them after it, in retail's order.
  *        `SndVoicePool`'s implicit destructor is emitted (weak, unreferenced) before the `__sinit` and the linker
- *        drops it, as it did in retail. `SndVoiceLists`'s destructor is `__declspec(export)`: only the pool
- *        constructor's extab names it, and the export flag is what `flipcheck`'s row-36 check reads (the linker keeps
- *        it either way; the DOL hash is identical with and without it).
+ *        drops it, as it did in retail. `SndVoiceLists`'s destructor is kept by the pool constructor's extab action.
  * RESIDUALS. The object carries the weak `__dt__12SndVoicePoolFv` (0x78 `.text`, 0x24 extab, 0xC extabindex) that the
  *        target lacks; the link drops it. `.bss` is 0x6824 against the 0x6828 range: the next object's 8-byte
  *        alignment fills the gap. The list helpers keep `fn_` names and take `SndNode2`/`SndPool2`, the C views of
@@ -110,7 +108,7 @@ public:
 }; /* size: 0x4 (the interface view: the table pointer at +0x00) */
 
 /* 0x800ED780 (0x6C): destroys the active list's sentinel, then the free list's. */
-__declspec(export) SndVoiceLists::~SndVoiceLists() {}
+SndVoiceLists::~SndVoiceLists() {}
 
 /* 0x800ED7EC (0x5C): destroys one voice record. */
 SndVoiceNode::~SndVoiceNode() {}
