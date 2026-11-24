@@ -35,7 +35,7 @@ typedef struct SndPool {
     /* +0x1D18 */ u8 initialised;
 } SndPool; /* size: 0x1D19 */
 
-/* A 0x110-byte pool node (the second pool, `fn_800ED8DC`/`fn_800EDF1C`). */
+/* A 0x110-byte pool node: the C view of `sound/snd_voice_pool.cpp`'s `SndVoiceNode`. */
 typedef struct SndNode2 {
     /* +0x000 */ const void* vtable;
     /* +0x004 */ struct SndNode2* next;
@@ -49,7 +49,7 @@ typedef struct SndNode2 {
     /* +0x01B */ u8 pad_0x1B[0xF5];
 } SndNode2; /* size: 0x110 */
 
-/* The 96-node second pool (`fn_800EDF1C` constructs it). */
+/* The 96-node second pool: the C view of `sound/snd_voice_pool.cpp`'s `SndVoicePool`. */
 typedef struct SndPool2 {
     /* +0x0000 */ SndNode2 free_list;
     /* +0x0110 */ SndNode2 active_list;
@@ -233,13 +233,6 @@ typedef struct SndEdRec {
     /* +0x24 */ u32 field_0x24;
 } SndEdRec; /* size: 0x28 */
 
-/* The host `dtor_800ED780` destroys: a record at +0 and another at +0x110. */
-typedef struct SndEdHost {
-    /* +0x000 */ SndEdRec base_0x000;
-    /* +0x028 */ u8 pad_0x028[0xE8];
-    /* +0x110 */ SndEdRec member_0x110;
-} SndEdHost; /* size: 0x138 */
-
 /* The voice-manager block `snd_voice_first`/`snd_voice_last` walk: a voice list at +0x110. */
 typedef struct SndVoiceMgr {
     /* +0x0000 */ u8 pad_0x00[0x110];
@@ -282,7 +275,6 @@ typedef struct SndTri16 {
 
 /* --- globals owned elsewhere in the sound band ------------------------------------------------ */
 
-extern SndPool2 lbl_8069A8E8;     /* the 0x110 pool, constructed by fn_800EDF1C/fn_800EDF10 */
 extern u8 g_stream_mgr[0xD8];     /* the stream manager (fn_800E46E8.cpp's StreamWork) */
 extern u16 stream_rand_seed;          /* the 16-bit PRNG seed fn_800E9D00 advances */
 extern u32 snd_exp_heap;          /* the expand heap snd_heap_free frees into */
@@ -291,8 +283,6 @@ extern f32 lbl_807964EC;          /* 1.0f: the ratio denominator */
 extern f32 lbl_80796514;          /* snd_distance_volume's scale */
 extern f32 lbl_80796518;          /* snd_distance_priority's numerator */
 extern f32 lbl_8079651C;          /* snd_distance_priority's scale */
-extern u8 lbl_80598090[0xC];      /* the 0x110-node derived vtable (fn_800EDF74 installs it) */
-extern u8 lbl_8059809C[0xC];      /* the 0x110-node base vtable (fn_800EDFC4 installs it) */
 extern u8 snd_heap_allocator[0x10];     /* the expand-heap allocator snd_heap_alloc allocates from */
 
 /* --- band and SDK functions this unit calls --------------------------------------------------- */

@@ -7,6 +7,9 @@
 
 struct SndNode2;
 struct SndVoiceMgr;
+#ifdef __cplusplus
+class SndVoicePool;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,7 +21,7 @@ void snd_bank1_install(struct StreamWork* table, s32 kind);
 void snd_bank1_install_idx(struct StreamWork* table, s32 kind, u32 idx);
 void snd_bank2_install(struct StreamWork* table, s32 kind);
 void snd_bank3_install(struct StreamWork* table, s32 kind);
-extern u8 lbl_8069A8E8[0x6828]; /* the sound table `snd_bank1_install`/`snd_bank1_install_idx` install into */
+extern SndVoicePool g_snd_voice_pool; /* the 96-voice pool `snd_bank_table_get` returns */
 #ifdef __cplusplus
 }
 #endif

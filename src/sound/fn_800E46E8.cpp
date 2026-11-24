@@ -327,7 +327,7 @@ extern "C" void snd_bank_pending_clear(void* work, s32 mask)
 /* The sound table the bank installers write into. */
 extern "C" StreamWork* snd_bank_table_get(void)
 {
-    return (StreamWork*)lbl_8069A8E8;
+    return (StreamWork*)&g_snd_voice_pool;
 }
 
 /* Tests whether any of the given bank's pending bits is set. */

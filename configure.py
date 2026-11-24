@@ -766,7 +766,7 @@ config.libs = [
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
             Object(Matching, "sound/fn_800E8E60.cpp"),
             Object(Matching, "sound/snd_stream_mgr.cpp"),
-            Object(NonMatching, "sound/snd_voice_pool.cpp"),
+            Object(Matching, "sound/snd_voice_pool.cpp"),
             Object(Matching, "sound/quest_snd.cpp"),
             Object(NonMatching, "sound/snd_bank_loader.cpp"),
             # Registered (a 0x800F2A94 run discovery proposed,
