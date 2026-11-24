@@ -135,7 +135,7 @@ compiled object, `report/` the one-unit objdiff project and its `unitutil_report
 
 ## Lib dependencies
 
-`lib.units` (unit, compile command, `run_tokens`), `lib.report` (the score, the include closure), `lib.declperm`
+`lib.trialrun` (the workspace, the measurer, the keep verdict and the one-candidate runner, shared with `applyorder`), `lib.units` (unit, compile command, `run_tokens`), `lib.report` (the score, the include closure), `lib.declperm`
 (orders, neighbours, `declared`), `lib.cscan` (function bodies, comment masking), `lib.text` (atomic writes),
 `lib.pendingmap`, `lib.repo`; `lib.text.marker_blocks` (the `//@@` block reader `tools/flags/tryvar.py` reads too).
 

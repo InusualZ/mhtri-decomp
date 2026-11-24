@@ -518,15 +518,82 @@ def after_regalloc(directory: Path) -> Path | None:
 @dataclass
 class SourceLocal:
     """One local declaration of the function's body, in textual order: `scope` 0 is the function's own block,
-    1.. the nested blocks in the order they open; `text` is the declaration's line."""
+    1.. the nested blocks in the order they open; `text` is the declaration's line. `shared` is how many names the
+    line declares (`s32 a, b;` is two locals of `shared` 2), `kind` is `for` for a `for` header's variable."""
     name: str
     line: int
     scope: int
     text: str
     init: str
+    shared: int = 1
+    kind: str = "decl"
 
 
 _FOR_DECL = re.compile(r"\bfor\s*\(\s*(?:const\s+)?[A-Za-z_][\w:]*(?:\s*\*)*\s+\**\s*(\w+)\s*=")
+_NOT_A_TYPE = frozenset(("if", "for", "while", "switch", "do", "else", "return", "goto", "case", "break", "continue",
+                         "delete", "new", "throw", "typedef", "using", "sizeof", "default", "asm"))
+_FIRST_DECLARATOR = re.compile(r"^(?P<type>[A-Za-z_][\w:<>]*(?:\s+[\w:<>]+)*?)(?P<sep>\s+\**\s*|\s*\*+\s*)"
+                               r"(?P<name>[A-Za-z_]\w*)\s*(?P<array>(?:\[[^\]]*\]\s*)*)(?:=\s*(?P<init>.*))?$", re.S)
+_NEXT_DECLARATOR = re.compile(r"^(?P<stars>\**)\s*(?P<name>[A-Za-z_]\w*)\s*(?P<array>(?:\[[^\]]*\]\s*)*)"
+                              r"(?:=\s*(?P<init>.*))?$", re.S)
+
+
+@dataclass(frozen=True)
+class Declarator:
+    """One name of a declaration statement: `prefix` the text before the name (the type and its `*`), `array` the
+    `[N]` suffixes, `init` the initialiser text ('' when plain)."""
+    prefix: str
+    name: str
+    array: str
+    init: str
+
+    def text(self, plain: bool = False) -> str:
+        """The statement declaring this name alone (`plain`: without its initialiser)."""
+        return "%s%s%s%s;" % (self.prefix, self.name, self.array,
+                              " = " + self.init if self.init and not plain else "")
+
+
+def split_top_level(code: str, sep: str = ",") -> list[str]:
+    """`code` cut at the `sep`s outside every `()`, `[]`, `{}` (and, before the first `=`, `<>`)."""
+    out, depth, angle, start, seen_eq = [], 0, 0, 0, False
+    for i, ch in enumerate(code):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "=" and depth == 0:
+            seen_eq = True
+        elif ch == "<" and not seen_eq and depth == 0:
+            angle += 1
+        elif ch == ">" and not seen_eq and depth == 0 and angle:
+            angle -= 1
+        elif ch == sep and depth == 0 and angle == 0:
+            out.append(code[start:i])
+            start = i + 1
+    out.append(code[start:])
+    return out
+
+
+def declarators(statement: str) -> list[Declarator]:
+    """The names a one-line declaration statement (`T a;`, `T *a = f(x, y), b;`) declares, in order; [] when the line
+    is not a declaration (a call, an assignment, a keyword statement) or ends in anything but `;`."""
+    stmt = statement.strip()
+    if not stmt.endswith(";") or stmt.endswith(";;"):
+        return []
+    chunks = [c.strip() for c in split_top_level(stmt[:-1])]
+    first = _FIRST_DECLARATOR.match(chunks[0])
+    if not first or first.group("type").split()[0] in _NOT_A_TYPE or "return" in stmt.split():
+        return []
+    base = first.group("type")
+    out = [Declarator(base + first.group("sep"), first.group("name"), first.group("array").strip(),
+                      (first.group("init") or "").strip())]
+    for chunk in chunks[1:]:
+        m = _NEXT_DECLARATOR.match(chunk)
+        if not m:
+            return []
+        out.append(Declarator("%s %s" % (base, m.group("stars")) if m.group("stars") else base + " ",
+                              m.group("name"), m.group("array").strip(), (m.group("init") or "").strip()))
+    return out
 
 
 def _qualifier(code: str, pos: int) -> tuple[str, ...]:
@@ -576,14 +643,19 @@ def source_locals(text: str, function: str) -> list[SourceLocal]:
         if m:
             pending_for.append(m.group(1))
         got = declperm.declared("    " + stripped) if stripped else None
-        if got and not stripped.startswith("for"):
+        several = declarators(stripped) if stripped and not stripped.startswith("for") else []
+        if len(several) > 1:
+            for d in several:
+                out.append(SourceLocal(d.name, line_no, stack[-1], t.line_text(line_no).strip(), d.init,
+                                       len(several)))
+        elif got and not stripped.startswith("for"):
             out.append(SourceLocal(got[0], line_no, stack[-1], t.line_text(line_no).strip(), got[1]))
         for ch in raw:
             if ch == "{":
                 blocks += 1
                 stack.append(blocks)
                 for name in pending_for:
-                    out.append(SourceLocal(name, line_no, blocks, t.line_text(line_no).strip(), ""))
+                    out.append(SourceLocal(name, line_no, blocks, t.line_text(line_no).strip(), "", 1, "for"))
                 pending_for = []
             elif ch == "}" and len(stack) > 1:
                 stack.pop()

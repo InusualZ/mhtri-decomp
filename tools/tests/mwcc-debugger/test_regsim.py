@@ -366,6 +366,14 @@ def test_cli(c):
         c.contains("... while the plan still reaches the rest", out, "EXACT")
         c.raises("search refuses without the parameter count", SystemExit, cli.main,
                  ["search", str(ok), "--want", "r32=r30"])
+        out_json = Path(tmp) / "plans.json"
+        rc, _ = testing.capture(cli.main, ["search", str(ok), "--params", "5", "--want", "r32=r30,r40=r31",
+                                           "--plans-json", str(out_json)])
+        import json
+        data = json.loads(out_json.read_text(encoding="utf-8"))
+        c.check("--plans-json writes the function and its plans with each declaration's vreg, line and scope",
+                (rc, data["function"], bool(data["plans"]), sorted(data["plans"][0]["decl"][0])),
+                (0, data["function"], True, ["line", "name", "scope", "vreg"]))
 
 
 BLOCKS = """extern "C" void take(int* p);
@@ -384,8 +392,9 @@ extern "C" void o(int n)
 
 
 def test_apply_order(c):
-    """`--apply-order`: the best plan that lists block-scope locals is spelled at function scope; a plan with an edit or a
-    plan of function-scope locals only is refused; --dry-run writes and measures nothing."""
+    """`search --apply-order`: the plans' orders are spelled (hoisted block locals, a reorder inside one scope, the order of
+    a plan with an edit of its own); a plan that is the source's own order is refused; --dry-run writes and measures
+    nothing."""
     import argparse
     g = regsim.Graph({32: regsim.Node(32, 31, "n"), 35: regsim.Node(35, 30, "a"), 34: regsim.Node(34, 29, "b"),
                       33: regsim.Node(33, 28, "other")})
@@ -395,18 +404,20 @@ def test_apply_order(c):
     plain = regsim.Plan(base.with_decl([34, 35]), (3, 3), (0, 0), {}, [], 1)
     edited = regsim.Plan(regsim.Layout([32], [33, 35], [], ("declare r40(-) as a local at declaration position 1",)),
                          (3, 3), (0, 0), {}, [], 3)
+    own = regsim.Plan(base, (3, 3), (0, 0), {}, [], 0)
     args = argparse.Namespace(unit="x/y", function="o", dry_run=True)
     rc, out = testing.capture(cli.cmd_apply_order, args, g, [hoist, plain], base, mapping, BLOCKS)
     c.check("a hoistable plan is written to the screen with --dry-run, exit 0", rc, 0)
     c.contains("the summary names the hoisted local", out, "hoist `other` to function scope and declare 3 local(s)")
     c.contains("the new order is shown", out, "+     int other;\n  +     int a;\n  +     int b;")
     c.contains("... and the block keeps the use as an assignment", out, "+         other = a;")
+    c.contains("a function-scope plan is a reorder of its own lines", out, "plan 2 scoped: scope 0: b a")
     c.contains("--dry-run says nothing was measured", out, "--dry-run, nothing written or measured")
-    rc, out = testing.capture(cli.cmd_apply_order, args, g, [plain], base, mapping, BLOCKS)
-    c.check("a plan of function-scope locals only is refused with exit 3", rc, 3)
-    c.contains("... saying the order alone is --tryvar's", out, "--tryvar's")
     rc, out = testing.capture(cli.cmd_apply_order, args, g, [edited], base, mapping, BLOCKS)
-    c.check("a plan that needs an edit is refused", (rc, "every plan needs an edit" in out), (3, True))
+    c.check("a plan with an edit of its own is written as its order alone", rc, 0)
+    c.contains("... saying which local is not written", out, "the plan's edit (declare r40(-)) is not written")
+    rc, out = testing.capture(cli.cmd_apply_order, args, g, [own], base, mapping, BLOCKS)
+    c.check("the source's own order is refused with exit 3", (rc, "every plan is the source's own order" in out), (3, True))
     c.raises("it needs a unit", SystemExit, cli.cmd_apply_order, argparse.Namespace(unit=None, function="o", dry_run=True),
              g, [hoist], base, mapping, BLOCKS)
     import contextlib, io

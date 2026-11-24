@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from tools.lib import localedit, objcompare, regsim, regsimrun, repo, units
@@ -174,7 +175,24 @@ def describe(g: regsim.Graph, v: int, mapping: dict) -> str:
     return "%-10s line %d, %s  (%s)" % (loc.name, loc.line, where, g.nodes[v].label())
 
 
-def cmd_search(args) -> int:
+@dataclass
+class Searched:
+    """What one search found: the graph, the source it read (`path`, `text`, the `mapping` of vregs to its locals),
+    the targets, the simulator (`s`), the current order's layout (`base`) and the ranked `plans`."""
+    g: regsim.Graph
+    path: str | None
+    text: str | None
+    params: int
+    mapping: dict
+    want: dict
+    notes: list
+    s: regsim.Searcher
+    base: regsim.Plan
+    plans: list
+
+
+def search_result(args) -> Searched:
+    """`search` without the printing (`cmd_search` and `tools/units/applyorder.py` both read it)."""
     g = load_graph(args)
     path, text, params, mapping = source_context(args, g)
     if params is None:
@@ -195,6 +213,18 @@ def cmd_search(args) -> int:
     s = regsim.Searcher(g, want, params, max_evals=args.max_evals, seed=args.seed, scope=scope)
     base = s.evaluate(s.base)
     plans = s.run(edits=not args.no_edits, top=args.top)
+    return Searched(g, path, text, params, mapping, want, notes, s, base, plans)
+
+
+def cmd_search(args) -> int:
+    found = search_result(args)
+    g, path, text, params, mapping, want, notes, s, base, plans = (
+        found.g, found.path, found.text, found.params, found.mapping, found.want, found.notes, found.s, found.base,
+        found.plans)
+    if getattr(args, "plans_json", None):
+        Path(args.plans_json).write_text(json.dumps({"function": g.function, "params": params, "mapped": len(mapping),
+                                                     "plans": [plan_json(g, p, mapping) for p in plans]}, indent=1),
+                                         encoding="utf-8")
     if args.json:
         print(json.dumps({"function": g.function, "params": params, "evals": s.evals,
                           "current": plan_json(g, base, mapping), "plans": [plan_json(g, p, mapping) for p in plans],
@@ -278,10 +308,12 @@ def search_namespace(args, dump: Path, symbol: str, ours: str) -> argparse.Names
         source=None, function=None, params=args.params, want=args.want, saved_only=args.saved_only,
         no_edits=args.no_edits, max_evals=args.max_evals, top=args.top, seed=args.seed, require_exact=False,
         tryvar=args.tryvar, keep=args.keep, apply_local=args.apply_local, apply_order=args.apply_order,
-        local_name=args.local_name, dry_run=args.dry_run)
+        local_name=args.local_name, dry_run=args.dry_run, plans_json=args.plans_json)
 
 
-def cmd_run(args) -> int:
+def dump_function(args) -> tuple[Path, str, str]:
+    """`run`'s first half: compile the unit, dump `args.function` with the debugger into this tree's
+    `.pi/tmp/regsim-run/` and print the stand-in check -> (dump directory, the dumped symbol, our object for the search)."""
     root = repo.repo_root()
     unit = units.Unit.resolve(args.unit, root)
     comp, cmd, notes = regsimrun.unit_compile(unit.spelling, root, repo.main_checkout(root))
@@ -330,6 +362,29 @@ def cmd_run(args) -> int:
                   "measure each change with the unit's own compiler" % (why, regsimrun.STAND_IN, symbol, comp.version))
     else:
         print("stand-in check: not needed, the unit's own compiler is %s" % regsimrun.STAND_IN)
+    return out, symbol, ours
+
+
+def applyorder_command(args, root: str | None = None) -> list[str]:
+    """`tools/units/applyorder.py row|batch` with the options `run` was given (a process, never an import: a tool
+    does not import a tool)."""
+    cmd = [sys.executable, str(Path(root or repo.repo_root()) / "tools" / "units" / "applyorder.py")]
+    cmd += ["batch", args.rows_file] if args.rows_file else ["row", args.unit, args.function]
+    cmd += ["--plans", str(args.plans), "--rounds", str(args.rounds), "--top", str(args.top), "--max-evals",
+            str(args.max_evals), "--pass", str(args.pass_no), "--seed", str(args.seed), "--timeout", str(args.timeout),
+            "--workers", str(args.workers), "--row-timeout", str(args.row_timeout)]
+    for flag, value in (("--gdb", args.gdb), ("--size", args.size), ("--params", args.params), ("--want", args.want)):
+        if value is not None:
+            cmd += [flag, str(value)]
+    cmd += [f for f, on in (("--saved-only", args.saved_only), ("--no-edits", args.no_edits), ("--dry-run", args.dry_run),
+                            ("--restore", args.restore), ("--no-refresh", args.no_refresh), ("--json", args.json)) if on]
+    return cmd
+
+
+def cmd_run(args) -> int:
+    if args.rows_file or (args.apply_order and not args.no_search):
+        return subprocess.call(applyorder_command(args), cwd=repo.repo_root())
+    out, symbol, ours = dump_function(args)
     print()
     rc = cmd_verify(argparse.Namespace(dir=str(out), pass_no=args.pass_no, json=False, all=False))
     if args.no_search:
@@ -414,12 +469,20 @@ def hand_to_tryvar(args, g, plan, base, mapping, path, text) -> int:
 def run_unittry(args, g, runs, label: str, restore: bool) -> int:
     """Writes `runs` as one unittry trial under `.pi/tmp/regsim/` and runs it on the unit; unittry keeps the
     rewrite only when it wins (`restore`: puts the source back whatever the score)."""
+    return run_trials(args, g, [(label, runs)], restore)
+
+
+def run_trials(args, g, trials: list[tuple[str, list[tuple[str, str]]]], restore: bool) -> int:
+    """Writes each `(label, [(old, new)])` as one unittry trial of one spec under `.pi/tmp/regsim/` and runs the spec on
+    the unit: each trial is applied to the state the earlier ones kept and stays only when it wins."""
     scratch = Path(repo.repo_root()) / ".pi" / "tmp" / "regsim"
     scratch.mkdir(parents=True, exist_ok=True)
     spec = scratch / ("%s.spec" % re.sub(r"\W", "_", g.function or "function"))
-    body = ["//@@ trial regsim-%s" % label]
-    for old, new in runs:
-        body += ["//@@ replace", old, "//@@ with", new]
+    body = []
+    for label, runs in trials:
+        body.append("//@@ trial regsim-%s" % label)
+        for old, new in runs:
+            body += ["//@@ replace", old, "//@@ with", new]
     spec.write_text("\n".join(body) + "\n", encoding="utf-8", newline="\n")
     cmd = [sys.executable, str(Path(repo.repo_root()) / "tools" / "units" / "unittry.py"), args.unit, "--spec",
            str(spec)] + (["--restore"] if restore else [])
@@ -493,33 +556,90 @@ def cmd_apply_local(args, g, plan, base, want, mapping, path, text) -> int:
     return run_unittry(args, g, runs, "%s-local" % (g.function or "function"), restore=False)
 
 
+def changed_block(old: str, new: str) -> tuple[str, str]:
+    """`(old lines, new lines)` of the smallest line range that differs, with one line of context so it is unique."""
+    a, b = old.split("\n"), new.split("\n")
+    head = 0
+    while head < min(len(a), len(b)) and a[head] == b[head]:
+        head += 1
+    tail = 0
+    while tail < min(len(a), len(b)) - head and a[len(a) - 1 - tail] == b[len(b) - 1 - tail]:
+        tail += 1
+    lo = max(0, head - 1)
+    return "\n".join(a[lo:len(a) - tail]), "\n".join(b[lo:len(b) - tail])
+
+
 def cmd_apply_order(args, g, plans, base, mapping, text) -> int:
-    """`search --apply-order` (idea 324): the best plan that lists block-scope locals and needs no edit, spelled with\n    those locals declared at function scope in the plan's order (`localedit.hoist_order`), measured with unittry and\n    kept only when it wins; refused with the reason when no plan can be written (exit 3, nothing written)."""
+    """`search --apply-order`: every spelling of the plans' declaration orders (`lib/regsimorder`: per-scope reorder,
+    function-scope hoist, hoist with the `for` variables) as one unittry trial each, kept only when they win; refused with
+    the reasons when no plan can be written (exit 3, nothing written). One round: `run --apply-order` re-searches."""
+    from tools.lib import regsimorder
     if not args.unit or text is None:
         raise fail("--apply-order needs -u UNIT")
-    candidates = [p for p in plans if not p.layout.edits and any(mapping[v].scope > 0 for v in p.layout.decl if v in mapping)]
-    if not candidates:
-        print("\napply-order: REFUSED - no plan lists block-scope locals without an edit of its own (%s)"
-              % ("every plan needs an edit: --apply-local" if any(p.layout.edits for p in plans) else
-                 "the order alone is --tryvar's"))
-        return 3
     fn = args.function or g.function
-    plan = candidates[0]
-    try:
-        change = localedit.hoist_order(plan.layout.decl, mapping, text, fn)
-    except localedit.Refused as r:
-        print("\napply-order: REFUSED - %s" % r.reason)
-        if r.manual:
-            print("  by hand: %s" % r.manual)
+    spells, reasons = [], []
+    for n, plan in enumerate(plans, 1):
+        if plan.distance == 0:
+            continue
+        got, why = regsimorder.spellings(plan.layout.decl, mapping, text, fn, plan.layout.edits)
+        spells += [(n, s) for s in got if all(s.text != t.text for _m, t in spells)]
+        reasons += ["plan %d %s: %s" % (n, label, exc.reason) for label, exc in why]
+    if not spells:
+        print("\napply-order: REFUSED - no plan can be written (%s)"
+              % ("; ".join(reasons) or "every plan is the source's own order"))
         return 3
-    print("\napply-order: plan %d: %s" % (plans.index(plan) + 1, change.summary))
-    for old, new in change.blocks:
+    trials = []
+    for n, s in spells:
+        old, new = changed_block(text, s.text)
+        print("\napply-order: plan %d %s: %s" % (n, s.label, s.summary))
         print("  --- old\n%s\n  +++ new\n%s" % ("\n".join("  - " + x for x in old.split("\n")),
                                                 "\n".join("  + " + x for x in new.split("\n"))))
+        trials.append(("%s-plan%d-%s" % (g.function or "function", n, s.label), [(old, new)]))
     if args.dry_run:
         print("apply-order: --dry-run, nothing written or measured")
         return 0
-    return run_unittry(args, g, change.blocks, "%s-order" % (g.function or "function"), restore=False)
+    return run_trials(args, g, trials, restore=False)
+
+
+def run_options(run) -> None:
+    """The options of `run` (and of `tools/units/applyorder.py`'s `row` and `batch`) but the unit and the function."""
+    run.add_argument("--search", action="store_true", help="search the plan (the default; kept for the spelling)")
+    run.add_argument("--no-search", action="store_true",
+                     help="stop after the dump and `verify`: prints no plans (and so ignores --tryvar, --apply-local "
+                          "and --apply-order)")
+    run.add_argument("--gdb", help="the gdb to use (default: this tree's .pi/tmp/mwcc-dbg, PATH, else fetched)")
+    run.add_argument("--size", help="the symbols.txt size that picks one of several functions of a name")
+    run.add_argument("--timeout", type=float, default=900.0, help="seconds the debugger session may take")
+    run.add_argument("--pass", dest="pass_no", type=int, default=1, help="the colouring pass (default 1)")
+    run.add_argument("--params", type=int, help="how many parameters (default: read from the source)")
+    run.add_argument("--want", help="targets by hand, rVREG=rPHYS,... (instead of retail's object)")
+    run.add_argument("--saved-only", action="store_true", help="aim at the callee-saved registers only")
+    run.add_argument("--no-edits", action="store_true", help="declaration orders only, no source edits")
+    run.add_argument("--max-evals", type=int, default=20000, help="simulations per order search")
+    run.add_argument("--top", type=int, default=3, help="plans to print")
+    run.add_argument("--seed", type=int, default=0)
+    run.add_argument("--tryvar", action="store_true", help="measure the best plan with tools/units/unittry.py")
+    run.add_argument("--keep", action="store_true", help="with --tryvar: keep the rewrite when it scores better")
+    run.add_argument("--apply-local", action="store_true",
+                     help="write the best plan's named local into the source, measure it, keep it only if it wins")
+    run.add_argument("--apply-order", action="store_true",
+                     help="write the plans' declaration orders (function and block scope, `tools/units/applyorder.py`), "
+                          "keep each only on a strict gain, round after round; with --rows-file: every row of the list")
+    run.add_argument("--local-name", help="with --apply-local: the name of the new local")
+    run.add_argument("--dry-run", action="store_true",
+                     help="with --apply-local/--apply-order: print the edit, write nothing")
+    run.add_argument("--plans-json", metavar="FILE", help="also write the plans (declarations with line and scope) as JSON")
+    run.add_argument("--plans", type=int, default=3, help="--apply-order: write the best N plans of each round (default 3)")
+    run.add_argument("--rounds", type=int, default=4,
+                     help="--apply-order: dump, search and write again until a round keeps nothing, at most N (default 4)")
+    run.add_argument("--restore", action="store_true", help="--apply-order: measure, then put the source back as found")
+    run.add_argument("--no-refresh", action="store_true",
+                     help="--apply-order: do not rebuild the object and report.json after a keep")
+    run.add_argument("--rows-file", metavar="F",
+                     help="--apply-order over a row list: lines `size,unit,function,pct` (a function may contain commas)")
+    run.add_argument("--workers", type=int, default=3, help="--rows-file: unit-disjoint workers (default 3)")
+    run.add_argument("--row-timeout", type=float, default=3600.0, help="--rows-file: seconds a row may take")
+    run.add_argument("--json", action="store_true", help="--apply-order: a final `RESULT {...}` line")
 
 
 # --- the command line -------------------------------------------------------------------------------------------
@@ -556,41 +676,21 @@ def main(argv=None) -> int:
             p.add_argument("--apply-local", action="store_true",
                            help="write the best plan's named local into the source, measure it, keep it only if it wins")
             p.add_argument("--apply-order", action="store_true",
-                           help="a plan that lists block-scope locals: declare them at function scope in the plan's "
-                                "order (idea 324), measure it, keep it only if it wins")
+                           help="write the plans' declaration orders (per scope, hoisted, with `for` variables), "
+                                "measure each, keep one only if it wins (one round; `run --apply-order` iterates)")
             p.add_argument("--local-name", help="with --apply-local: the name of the new local")
             p.add_argument("--dry-run", action="store_true",
                            help="with --apply-local/--apply-order: print the edit, write nothing")
+            p.add_argument("--plans-json", metavar="FILE", help="also write the plans (declarations with line and scope) as JSON")
     run = sub.add_parser("run", help="dump one function of a unit, verify the replay and search, in one command")
-    run.add_argument("unit", help="the unit (`fn_8004CAD8`, `homebutton/tiHKBManager`, a path)")
-    run.add_argument("function", help="a plain name, a mangled name, Class::method or an address (0x8004DA5C)")
-    run.add_argument("--search", action="store_true", help="search the plan (the default; kept for the spelling)")
-    run.add_argument("--no-search", action="store_true",
-                     help="stop after the dump and `verify`: prints no plans (and so ignores --tryvar, --apply-local "
-                          "and --apply-order)")
-    run.add_argument("--gdb", help="the gdb to use (default: this tree's .pi/tmp/mwcc-dbg, PATH, else fetched)")
-    run.add_argument("--size", help="the symbols.txt size that picks one of several functions of a name")
-    run.add_argument("--timeout", type=float, default=900.0, help="seconds the debugger session may take")
-    run.add_argument("--pass", dest="pass_no", type=int, default=1, help="the colouring pass (default 1)")
-    run.add_argument("--params", type=int, help="how many parameters (default: read from the source)")
-    run.add_argument("--want", help="targets by hand, rVREG=rPHYS,... (instead of retail's object)")
-    run.add_argument("--saved-only", action="store_true", help="aim at the callee-saved registers only")
-    run.add_argument("--no-edits", action="store_true", help="declaration orders only, no source edits")
-    run.add_argument("--max-evals", type=int, default=20000, help="simulations per order search")
-    run.add_argument("--top", type=int, default=3, help="plans to print")
-    run.add_argument("--seed", type=int, default=0)
-    run.add_argument("--tryvar", action="store_true", help="measure the best plan with tools/units/unittry.py")
-    run.add_argument("--keep", action="store_true", help="with --tryvar: keep the rewrite when it scores better")
-    run.add_argument("--apply-local", action="store_true",
-                     help="write the best plan's named local into the source, measure it, keep it only if it wins")
-    run.add_argument("--apply-order", action="store_true",
-                     help="a plan that lists block-scope locals: declare them at function scope in the plan's order "
-                          "(idea 324), measure it, keep it only if it wins")
-    run.add_argument("--local-name", help="with --apply-local: the name of the new local")
-    run.add_argument("--dry-run", action="store_true",
-                     help="with --apply-local/--apply-order: print the edit, write nothing")
+    run.add_argument("unit", nargs="?", help="the unit (`fn_8004CAD8`, `homebutton/tiHKBManager`, a path)")
+    run.add_argument("function", nargs="?",
+                     help="a plain name, a mangled name, Class::method or an address (0x8004DA5C)")
+    run_options(run)
     args = ap.parse_args(argv)
     if args.cmd == "run":
+        if not args.rows_file and not (args.unit and args.function):
+            ap.error("run needs UNIT FUNCTION (or --rows-file F)")
         return cmd_run(args)
     return {"verify": cmd_verify, "want": cmd_want, "search": cmd_search}[args.cmd](args)
 

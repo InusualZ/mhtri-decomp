@@ -22,6 +22,7 @@ Usage:
     python scripts/mt.py sections [-u <unit>]                           (elfsect: section table)
     python scripts/mt.py dwarf  <obj> <function>                        (dwarfmap: var -> slot)
     python scripts/mt.py regsim run <unit> <function> [--tryvar [--keep]] [--apply-local | --apply-order] [--dry-run]   (dump + verify + search, one command)
+    python scripts/mt.py regsim run --rows-file <rows> --apply-order [--workers N] [--restore]   (declaration orders over a row list: size,unit,function,pct)
     python scripts/mt.py regsim verify DIR | want DIR -u <unit> | search DIR -u <unit> [--tryvar]   (mwcc-debugger regsim: GPR colouring)
     python scripts/mt.py ideas  find <words>|show N|where N|new ...|check [--demos]|demo-check (the playbook's ideas)
 

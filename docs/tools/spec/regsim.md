@@ -20,7 +20,8 @@ python tools/mwcc-debugger/regsim.py search DIR -u UNIT [--symbol S] [--source F
                                        [--want rV=rP,...] [--saved-only] [--no-edits] [--max-evals N] [--top N]
                                        [--seed N] [--require-exact] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]] [--apply-order [--dry-run]] [--json]
 python tools/mwcc-debugger/regsim.py run UNIT FUNCTION [--no-search] [--gdb G] [--size N] [--tryvar [--keep]] [--apply-local [--local-name N] [--dry-run]]
-                                       [--apply-order [--dry-run]]
+                                       [--apply-order [--dry-run] [--plans N] [--rounds N] [--restore]]
+python tools/mwcc-debugger/regsim.py run --rows-file ROWS --apply-order [--workers N] [--restore] [--row-timeout S]
 ```
 
 `run` (usage line for lanes: `python .claude/skills/mwcc-unit-matching/scripts/mt.py regsim run <unit> <function>`):
@@ -38,12 +39,14 @@ call result for a temp held across a call that retail computes after it (`spec/l
 unittry trial and keeps it only when the unit's matched bytes rise with no row down. A shape it cannot identify
 unambiguously is refused (exit 3, nothing written) with the edit to make by hand; `--dry-run` prints the edit only.
 
-`--apply-order` (search/run, idea 324) takes the best plan that lists block-scope locals (`other line N, block K`) and
-needs no edit, declares every local it names at function scope in the plan's order (`localedit.hoist_order`: initialisers
-become assignments in place, a name declared in two blocks stays), runs it as one unittry trial and keeps it only when
-the unit's matched bytes rise with no row down. No such plan, or a shape it cannot write, is refused (exit 3);
-`--dry-run` prints the edit only. A kept trial rebuilds the unit's object and `build/RMHE08/report.json`
-(`spec/unittry.md`), so `mt.py diff` reads the kept source.
+`--apply-order` (search/run) writes the plans' declaration orders - function scope and block scope, initialisers, several
+names on one line, `for` header variables - measures each as a unittry trial and keeps one only when the unit's matched
+bytes rise with no row down. `run` hands it to `tools/units/applyorder.py` (`spec/applyorder.md`): the best `--plans` plans
+(default 3) each in up to three spellings (`lib/regsimorder`), a fresh dump and search after every keep, `--rounds` (default 4)
+or until a round keeps nothing; `--dry-run` prints every spelling as a diff and every refusal, `--restore` puts the source
+back at the end. `run --rows-file F --apply-order` does it for a row list (`size,unit,function,pct`, a function may contain
+commas) over `--workers` unit-disjoint workers and prints one status line per row (KEPT, SAME, REVERTED, FEWFS, BADLINE,
+NODEF, FULL, ERROR) and a summary. `search DIR --apply-order` is one round on the dump it is given.
 
 `DIR` is a `mwcc_debugger.py` output directory (`regalloc-gpr-pass-N-all.txt`, `-assigned.txt`, the `backend-*`
 dumps). Get one with `python tools/mwcc-debugger/mwcc_debugger.py --gdb GDB -a '<unit command line>' FUNCTION DIR`
@@ -90,7 +93,7 @@ Reads the dump directory, the two objects and the unit's source; prints to stdou
 
 ## Lib dependencies
 
-regsim, regsimrun, localedit, objcompare (function bytes), units, repo.
+regsim, regsimrun, regsimorder, localedit, objcompare (function bytes), units, repo; `tools/units/applyorder.py` (`run --apply-order`).
 
 ## Test contract
 
@@ -98,8 +101,8 @@ Tier: fixture - `tools/tests/mwcc-debugger/test_regsim.py`: `verify` exits 0 on 
 register is corrupted; `search --want` on the fixture names the `@4192` edit and exits 0, `--no-edits` exits 0
 saying no plan is exact and 1 with `--require-exact`, a target that is no node of the graph is a note, not a crash; the
 `--tryvar` spelling splits an initialiser off a reordered run, writes nothing for the source's own order and refuses
-a plan with an edit; `test_apply_order` (`--apply-order`'s plan choice and refusals, `--dry-run`, and `run --help` saying
-`--no-search` prints no plans); the run writes nothing into the repository. Measured by hand: a `--tryvar` run on
+a plan with an edit; `test_apply_order` (`search --apply-order`'s spellings, the source's own order refused, `--dry-run`; the row/batch tests are
+`tools/tests/units/test_applyorder.py`); the run writes nothing into the repository. Measured by hand: a `--tryvar` run on
 `ef/ef_drawsmoothstripestrategy` scored the rewrite (one row 100 -> 99.89), reverted it and restored the file.
 
 Real rows (2026-11-17): `run fn_8004CAD8 my_set_equip_id_swap --apply-local` writes `u16* part`, the order set/part/i/j
