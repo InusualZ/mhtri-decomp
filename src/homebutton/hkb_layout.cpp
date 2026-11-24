@@ -1,6 +1,6 @@
 /* homebutton/hkb_layout.cpp - the software keyboard layout engine's layout (nw4r::lyt::Layout: it walks an `RLYT`
  *   resource's blocks and builds the pane tree, the groups and the animations).
- * RANGE. .text 0x8052B344-0x8052C330 (21 functions); .data 0x8064A5F8-0x8064A638 (Layout's class table);
+ * RANGE. .text 0x8052B344-0x8052C330 (19 functions); .data 0x8064A5F8-0x8064A638 (Layout's class table);
  *   .sbss 0x80795A20-0x80795A28 (Layout::mspAllocator); .sdata2 0x8079D570-0x8079D578 (0.0 and a second constant).
  *   Edges: the left edge is homebutton/hkb_group.cpp's last function (0x8052B2C8..0x8052B344); the right edge is
  *   homebutton/hkb_picture.cpp's first function (the Picture constructor) at 0x8052C330. The seam evidence is in
@@ -11,10 +11,15 @@
  *   IsIncludeAnimationGroupRef are GUESS names for the file's static helpers.
  * SHAPES. the Layout constructor keeps LinkListNode's two zero stores before the list initialisation because
  *   LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
- * RESIDUALS. our object emits weak LinkList<...>, LinkListNode and ut::NonCopyable destructors the target lacks
- *   (unreferenced, dead-stripped by the link).
+ *   SetTagProcessorImpl is a plain (non-`inline`) function under a scoped `#pragma auto_inline on`: it is emitted
+ *   first, where it is defined, as retail has it, and SetTagProcessor still inlines one level of it. Spelt `inline`, the
+ *   band's `-inline noauto` defers the out-of-line copy to after SetTagProcessor and every later address shifts.
+ * RESIDUALS. none in the link: our object also emits weak LinkList<...>, LinkListNode, ut::NonCopyable and AnimTransform
+ *   destructors the target lacks; nothing live references them and the link dead-strips them (the DOL verifies).
+ *   flipcheck still counts the AnimTransform copy (0x40) as kept, because homebutton/hkb_animation.cpp links after this
+ *   unit and defines it again; that copy's only referencer is the dead implicit AnimTransform vtable.
  * FLAGS. SetTagProcessor and SetTagProcessorImpl take a scoped `#pragma opt_loop_invariants off` (the second inlined level then keeps
- *   retail's `lwz` + `addi` child walk; same sizes, rows 100 %).
+ *   retail's `lwz` + `addi` child walk).
  */
 #include "homebutton/hkb_layout.h"
 
@@ -33,8 +38,9 @@ namespace {
 
 #pragma push
 #pragma opt_loop_invariants off
+#pragma auto_inline on
 /* 0x8052B344 (0x1AC): Gives every text box in the pane's subtree the tag processor. */
-inline void SetTagProcessorImpl(Pane* pPane, ut::TagProcessorBase<wchar_t>* pTagProcessor) {
+void SetTagProcessorImpl(Pane* pPane, ut::TagProcessorBase<wchar_t>* pTagProcessor) {
     if (TextBox* pTextBox = ut::DynamicCast<TextBox>(pPane)) {
         pTextBox->mpTagProcessor = pTagProcessor;
     }

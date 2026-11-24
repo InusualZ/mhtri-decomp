@@ -1733,7 +1733,7 @@ config.libs = [
             # GC/3.0a5.2 + cflags_hkb: evidence on the FLAGS line of src/homebutton/hbm_kb_event.cpp.
             Object(Matching, "homebutton/hkb_pane.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(Matching, "homebutton/hkb_group.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
-            Object(NonMatching, "homebutton/hkb_layout.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(Matching, "homebutton/hkb_layout.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(Matching, "homebutton/hkb_picture.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_textbox.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(Matching, "homebutton/hkb_window.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
