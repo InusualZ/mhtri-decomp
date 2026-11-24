@@ -681,7 +681,6 @@ size_bytes,unit,function,match_percent,address
 680,lobby/lb_npc,lb_player_remote_follow,98.8235,0x8020F544
 684,Network/network_pat_control,initNetworkPatControl,99.9415,0x804292F8
 684,homebutton/hbm_kb_widget,hbmKbCandScrollBy,99.4444,0x80553074
-684,lobby/fn_801E7530,lb_farm_box_page_draw,99.614,0x801EB1B8
 684,lobby/lb_screen_step,lb_smith_attach_draw,98.7719,0x80364EE8
 684,lobby/lb_screen_step,lb_smith_deco_info_draw,99.883,0x8036492C
 684,mh3_pad,pad_gc_stick_read,97.5439,0x80042BA8
@@ -694,8 +693,6 @@ size_bytes,unit,function,match_percent,address
 692,sound/snd_bank_loader,fn_800F0F9C,54.7688,0x800F0F9C
 692,stage/stg_w,stage_area_models_seat,88.1792,0x802AEC44
 696,SO/socket,RecvFrom,98.5057,0x80520670
-696,hud/lobby_hud,draw_lsp_anim_ary,99.3391,0x80324CC4
-696,menu/menu_message,put_message_window,98.6207,0x802A8A08
 700,SYN/synenv,SYNSetupVolumeEnvelope,98.7714,0x804DFC50
 700,lobby/lb_equip_page,lb_ship_box_grid_draw,99.7143,0x80222908
 700,stage/stg_w,stage_part_break,94.8,0x802B1558
@@ -730,11 +727,9 @@ size_bytes,unit,function,match_percent,address
 740,lobby/lb_companion_ui,lb_dance_list_step,99.7297,0x8033D1F8
 744,TRK/exi2_comm,__EXI2Imm,97.6882,0x80522668
 744,ef/eft022_fx,ExecCallbackC__16EftModelCallbackFPQ34nw4r4math5MTX34Q34nw4r3g3d6ResMdlPQ34nw4r3g3d16FuncObjCalcWorld,82.7742,0x80116080
-744,lobby/fn_80212810,lb_item_need_list_draw,99.4892,0x80216A68
 744,lobby/lb_pane_ui,lobby_enter_seq_step,92.2849,0x801FB524
 744,menu/menu_item_sub,menu_item_sub_page14_title_draw,96.371,0x8036BDF0
 748,lobby/lb_quest_ui,lb_scene_eft_move,97.861,0x80393D4C
-752,lobby/fn_801E0ADC,eft033_create,99.9202,0x801E2F48
 752,lobby/fn_80219260,lb_talk_reward_give,99.0691,0x8021CE70
 752,stage/stg_w,stage_area_visibility_build,92.0479,0x802B2F60
 760,enemy/em001_prog,em001_act7_6,99.4737,0x8014C16C
@@ -802,7 +797,6 @@ size_bytes,unit,function,match_percent,address
 856,mh3_pad,kpad_read_dpd,99.6262,0x8004683C
 860,ef/eft052,hud_msg_step,98.093,0x8035AEE4
 860,homebutton/hbm_anim_record,create__12HbmAnimPanelFP12MEMAllocator,97.9767,0x80557390
-860,homebutton/hbm_text_panel,hbmPanelCheckWordWrap,99.7907,0x80546D98
 860,menu/menu_item_sub,menu_item_sub_page15_draw,99.7674,0x8036B2C0
 860,menu/menu_placeinfo,draw_search_city_dialog,98.2791,0x80439894
 860,menu/menu_plsearch,mailbox_draw,99.0233,0x8044DC78
@@ -888,7 +882,6 @@ size_bytes,unit,function,match_percent,address
 1076,lobby/lb_pane_ui,lb_box_lists_draw,96.5613,0x801F59B8
 1076,menu/menu_friendlist,movie_page17_draw,97.5279,0x80443120
 1076,menu/menu_sysmsg,onKey__14SysKbdListenerFP14SysKbdKeyEvent,99.8885,0x804513FC
-1088,ef/eft_res,eft_res_files_load,94.0735,0x800F7F18
 1092,KPAD/kpad,KPADInitEx,99.2491,0x804C08B0
 1096,homebutton/hkb_cellphone_keys,__sinit_\hkb_cellphone_keys_cpp,96.4453,0x8055F728
 1096,lobby/fn_8030121C,lb_barter_cart_draw,99.635,0x8030230C

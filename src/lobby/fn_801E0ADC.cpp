@@ -27,7 +27,7 @@
  *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
  *     operands does not move it (regsim: colouring exact).
  *   - register colouring only: lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
- *     lb_title_frame_draw, eft033_create, and
+ *     lb_title_frame_draw, and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
@@ -1498,9 +1498,9 @@ void eft033_create(_EFT* eft)
     nw4r::math::VEC3 pos;
     nw4r::math::MTX34 mtx;
     s32 i;
+    _PLW* plw;
     u16 group;
     u16 id;
-    _PLW* plw;
 
     eft->state_0x05++;
     group = eft033_groups[eft->type_0x02];

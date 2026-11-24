@@ -2663,10 +2663,10 @@ void q_result_time_page_draw(QResultScreen* self)
     static u8 q_result_time_rank_kind[3] = {0, 1, 2};
     QResultTextBox* box;
     s32 i;
-    QuestRecord* rec = quest_record_get();
     Q_ResultWork* q = get_qResult_work();
     s16 minutes;
     s16 seconds;
+    QuestRecord* rec = quest_record_get();
     s32 elapsed;
 
     if (q_result_file_ready(self) == 1) {

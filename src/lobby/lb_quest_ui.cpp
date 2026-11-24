@@ -269,7 +269,7 @@ void lb_kitchen_open(_PLW* npc, s32 arg) {
     s32 online;
     u16 seed;
     s32 group;
-    s32 row;
+    u16 row;
     s32 base;
     u16 pick;
 

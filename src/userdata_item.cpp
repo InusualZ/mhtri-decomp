@@ -244,11 +244,11 @@ s32 scn_root_camera_id_get(nw4r::g3d::ScnRoot* root);
  * each run's texture loaded. */
 extern "C" void face_spr_draw(u8 index)
 {
-    FaceSprBuf* buf = face_buf_tbl[index];
+    s32 run;
     Mtx44 proj;
     Mtx view;
-    s32 run;
     s32 i;
+    FaceSprBuf* buf = face_buf_tbl[index];
     FaceSpr* spr;
 
     for (run = 0; run < 0x20; run++) {

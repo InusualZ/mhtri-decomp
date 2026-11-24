@@ -159,10 +159,10 @@ s32 ENCiConvertUtf16ToUtf8(u8* dst, s32* dstLength, const u16* src, s32* srcLeng
     s32 dstUnits;
     s32 dstCount = 0;
     s32 result;
+    s32 srcUnits;
     s32 srcCount = 0;
     u32 c;
     s32 breakLength;
-    s32 srcUnits;
     u32 cp;
 
     result = ENCiCheckParameters(dst != NULL, dstLength, &dstLimit, &writeDst, src != NULL, srcLength, &srcLimit,

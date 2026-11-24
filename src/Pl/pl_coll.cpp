@@ -1684,9 +1684,9 @@ void pl_coll_shape_hits(PlBodySegment* seg, f32 radius, u32 kind, u16 layers, _P
     VEC3 unused;
     PlCollPoly* poly;
     s8* free_at;
-    u32 i;
     u32 angle;
     u8 count;
+    u32 i;
     s32 swapped;
     s32 last;
 

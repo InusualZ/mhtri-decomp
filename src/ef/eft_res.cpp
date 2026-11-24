@@ -34,8 +34,7 @@
  *    the link first (the operand order that puts the model pointer in retail's r4);
  *  - `eft_common_load`: retail carries the `eft` run's `j - 1` as its own induction register (three for the loop),
  *    ours derives it with `addi` from `j`;
- *  - `eft_res_files_load`: retail keeps `id * 0x18` and not `id` across the calls (one register fewer, `0` hoisted into
- *    r14); `eft_res_archive_load_callback`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
+ *  - `eft_res_archive_load_callback`: retail hoists the 128-entry `mtctr` count into r18 (one saved register more);
  *  - `eft_res_slot_get`: the search loop's natural exit runs the caller's NULL test (`li r31,0`; `cmpwi`) where
  *    retail returns at once (a jump past the tail); the inline `eft_res_slot_find` scores best of the goto-free
  *    forms (a `found` flag, a `break` plus an index test and the tail moved into the loop all score lower);
@@ -60,7 +59,7 @@
  *            first divergence insn 1: retail `addi r9, r4, eft_control@l` vs ours `addi r6, r4, eft_control@l`; size differs
  *            from retail (308 B vs 312 B)
  * FLAGS. eft_res_archive_load_callback: scoped `#pragma optimization_level 4` (96.42 -> 97.65, size equal).
- * SHAPES. `eft_res_files_load` declares its locals in the order the register-allocation simulation (regsim) names.
+ * SHAPES. `eft_res_files_load` declares its locals in the order the register-allocation simulation (regsim) names (`from_area` before `area`).
  */
 
 #include "types.h"
@@ -1381,11 +1380,11 @@ extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* id
     EftLoadCtx ctx;
     s32 handle;
     void* data;
-    u8 area;
+    u32 from_area;
     EftControl* ctrl = &eft_control;
     u32 count = 0;
     EftProTable* table = (EftProTable*)lbl_806A2D34;
-    u32 from_area;
+    u8 area;
     u8 id;
 
     if ((u16)flags == 2) {

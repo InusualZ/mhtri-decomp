@@ -2935,10 +2935,10 @@ extern "C" void eft_slot_linked_step(EftSlot* slot)
 extern "C" void eft_slot_linked_state_change(EftSlot* slot, u8 previous, _ENEMY_WORK* work)
 {
     u8 index;
-    u8 best_free;
+    u8 free;
     VEC3 center;
     VEC3 best_pos;
-    u8 free;
+    u8 best_free;
     f32 best;
     u8 take;
     u8 count;

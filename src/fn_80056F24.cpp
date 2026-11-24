@@ -570,15 +570,15 @@ extern "C" void filter_panel_draw(FilterPanel* panel) {
     Mtx44 proj;
     Mtx view;
     _MH_VEC2 screen;
+    u32 c5;
+    u32 c4;
     s16 mid;
-    u32 c0;
-    u32 c1;
     u32 c2;
+    u32 c1;
+    u32 c0;
     s16 upper;
     u32 c3;
     s16 width;
-    u32 c4;
-    u32 c5;
 
     if (panel->enable != 0) {
         get_ScreenSize(&screen);

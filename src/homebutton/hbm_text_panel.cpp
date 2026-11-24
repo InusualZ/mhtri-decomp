@@ -45,7 +45,7 @@
  *            and five loop spellings of syncCursorCell were measured, none closes all callers.
  * RESIDUALS. hbmPanelUpdate: retail stores slot 0x10's raw f64 to scrollY and its frsp copy to the writer, and loads
  *            the caret phase before the 0x1A00 word; hbmPanelLayoutLines: retail recomputes start + visible where ours
- *            keeps it; hbmPanelDrawComposition, hbmPanelPrepareGlyph, hbmPanelCheckWordWrap, hbmPanelFindLink: float
+ *            keeps it; hbmPanelDrawComposition, hbmPanelPrepareGlyph, hbmPanelFindLink: float
  *            and saved-register colouring.
  * RESIDUALS. hbmTextPaneListenerOnEvent, hbmKbWidgetUpdate: their only differences are the .data offsets of the pane
  *            names (r31 + 0x46C/0x480/0x490 against ours), which follow the .data layout below.
@@ -109,7 +109,7 @@
  * RESIDUALS. hbmPanelClearText, Reset, Relayout, SetWordWrap: the one non-register difference of the four is the
  *            free-list index after the inlined unlink (retail `slwi r0,rN,3`, ours `clrlslwi r0,rN,16,3`: retail
  *            reloads the count where ours reuses the masked loop counter); the rest is volatile-register numbering.
- * FLAGS. hbmPanelCheckWordWrap: scoped `#pragma opt_lifetimes off` (99.79 -> 99.84, size equal).
+ * FLAGS. hbmPanelCheckWordWrap: scoped `#pragma opt_lifetimes off` (the row is exact with it).
  * SHAPES.    hbmPanelHandleMessage: `length` is a `u32` holding the `u16` cell length after the decrement (0..65535; 97.284 against 97.281, size equal).
  */
 
@@ -3525,8 +3525,8 @@ s32 hbmPanelFindLink(HbmPanelView* self, u32* linkStart, u32* linkEnd, const u16
  * the word, notes a hyphen inside it, and moves the draw position past it. */
 s32 hbmPanelCheckWordWrap(HbmPanelView* self, const u16* text, u32 position, f32 x)
 {
-    const u16* p;
     s32 over;
+    const u16* p;
     u32 start;
     s32 prevKind;
     u32 i;
@@ -5766,8 +5766,8 @@ u32 hbmPanelFindLineOverflow(HbmPanelView* self, u32 maxLines, const u16* text)
 {
     const u16* p = text;
     f32 x;
-    u32 i;
     u32 lines;
+    u32 i;
 
     if (*text == 0) {
         return 0;

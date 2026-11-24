@@ -46,7 +46,7 @@
  *    i r29/frame r27; the three declaration orders tried measure equal or worse);
  *  - `lb_count_add_cap99`: retail returns through `ble` + `clrlwi`, ours through `blelr`;
  *  - `lb_farm_harvest`, `lb_trade_page_draw`, `lb_farm_seed_list_draw`, `lb_farm_seed_info_draw`,
- *    `lb_farm_box_page_draw`, `lb_part_recs_reset`, `lb_talk_screen_open`,
+ *    `lb_part_recs_reset`, `lb_talk_screen_open`,
  *    `lb_farm_edit_draw`, `lb_goods_single_cell_draw`, `lb_farm_plot_info_draw`,
  *    `lb_part_slot_open_ck`, `lb_farm_plot_days_get`: register colouring;
  *  - flipcheck: `.data` (2344 B) and `.sdata` (232 B) are claimed but not emitted (the tables are declared, not
@@ -668,10 +668,10 @@ void lb_goods_slots_draw(LbMenuWork* self)
     _mh_ivec2_ pos;
     char text[16];
     s16 bound;
-    s32 mode;
+    const u16* idp;
     s32 step;
     s16 i;
-    const u16* idp;
+    s32 mode;
 
     get_lsp_data(0x1DB1U, &anchor);
     draw_sprite_ary((const u16*)lbl_805B7CFC, &anchor);
@@ -958,12 +958,12 @@ void lb_trade_page_draw(LbMenuWork* self)
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     u16 key[2];
-    const LbTableRow* row;
-    const u16* idp;
     s32 i;
-    s32 color;
     s32 id;
+    const u16* idp;
+    s32 color;
     bool selected;
+    const LbTableRow* row;
 
     get_lsp_data(0x1E4BU, &anchor);
     draw_sprite_ary((const u16*)lbl_805B7EE0, &anchor);
@@ -2113,9 +2113,9 @@ void lb_farm_box_page_draw(LbItemBoxView* box, u8 page)
     _mh_ivec2_ base;
     _mh_ivec2_ mark;
     _mh_ivec2_ anchor;
-    s32 marked;
     s32 first;
     s32 i;
+    s32 marked;
     s32 slot;
 
     get_lsp_data(lb_farm_box_page_lsp[page], &anchor);

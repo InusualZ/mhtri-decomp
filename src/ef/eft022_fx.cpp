@@ -529,10 +529,10 @@ void EftModelCallback::ExecCallbackC(nw4r::math::MTX34* mtx_arr, nw4r::g3d::ResM
                                      nw4r::g3d::FuncObjCalcWorld* pFuncObj)
 {
     EftModelCallback* obj = this;
+    _EFT* effect;
     nw4r::math::MTX34* dst;
     nw4r::math::VEC3* a;
     nw4r::math::VEC3* b;
-    _EFT* effect;
     _EFT_WORK_B* work;
     nw4r::math::MTX34* src;
     u16 k;

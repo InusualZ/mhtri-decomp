@@ -1512,9 +1512,9 @@ extern "C" void fn_8024676C(_PLW* self) {
     u8 map;
     u8 area;
     s32 angle;
-    MHchar* chr;
     u16 slot;
     s32 i;
+    MHchar* chr;
 
     chr = &((PlBodyWork*)self->physics_0x13C)->chr_0x04;
     self->field_0x004++;

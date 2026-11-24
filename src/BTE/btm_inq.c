@@ -836,21 +836,21 @@ void btm_event_filter_complete(u8* p) {
  * inquiry's result callback and the database change callback. */
 void btm_process_inq_results(u8* p, u8 inq_res_mode) {
     u8 bda[6];
-    u8 page_scan_mode = 0;
     u8 page_scan_rep_mode = 0;
     u8* pbda;
+    u8 num_resp;
     int ijk;
     u8 dc[3];
-    u8 xx;
     u8 rssi = 0;
+    u8 xx;
     tINQ_DB_ENT* p_i;
     tBTM_INQ_INFO* p_cur;
-    u8 page_scan_per_mode = 0;
     tBTM_INQUIRY_VAR_ST* p_inq = &btm_cb.btm_inq_vars;
     u8 is_new = TRUE;
     tBTM_INQ_RESULTS_CB* p_inq_results_cb = p_inq->p_inq_results_cb;
+    u8 page_scan_mode = 0;
+    u8 page_scan_per_mode = 0;
     u16 clock_offset;
-    u8 num_resp;
 
     if (!p_inq->inq_active) {
         return;

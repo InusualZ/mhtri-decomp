@@ -565,8 +565,8 @@ void DWCi_natNegSendInit(DWCiNatNegSocket* node) {
     DWCiNatNegPacket pkt;
     DWCiNatNegPacket* p = &pkt;
     DWCiHostEntry* host;
-    DWCiHostAddr* entry;
     u32 ip;
+    DWCiHostAddr* entry;
     u32 a;
     s32 i;
     u32 wire;

@@ -1416,8 +1416,8 @@ extern "C" void lobby_friend_list_sort(LobbyFriendList* list)
 {
     Q_FriendBook* book = &get_userdata()->friends_0x53AC;
     s32 i;
-    s32 j;
     s32 k;
+    s32 j;
     s32 found;
     s32 index;
     Q_FriendRow* row;

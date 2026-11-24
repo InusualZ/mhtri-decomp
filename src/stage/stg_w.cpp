@@ -2786,15 +2786,15 @@ extern "C" void stage_map_obj_load(u8 mapno)
     s32 count = g->kind;
     u8* buf;
     s32 i;
-    EftResFile* file;
     u8* proids;
     char** names;
+    s32 j;
+    EftResFile* file;
     EftResFile* mfile;
-    u8* mproids;
     char** mnames;
     u8 mdl_ids[16];
     u8 ids[88];
-    s32 j;
+    u8* mproids;
 
     i = 0;
     areas = SW->areas;
@@ -3344,12 +3344,12 @@ extern "C" void stage_area_visibility_build(StageWork* st, u8 kind)
 {
     u8* keep;
     StageJointLists* list;
-    MHchar* chr;
-    u8 group;
     u8* drop;
+    u8 found;
+    u8 group;
     u8 player;
     u8 changed;
-    u8 found;
+    MHchar* chr;
 
     list = NULL;
     group = 0;

@@ -768,19 +768,19 @@ extern "C" s32 eft052_hold_step(void)
  * page (or the entry's empty line). */
 extern "C" void eft052_hold_list_draw(void)
 {
+    const u16* lsp;
     CockpitHoldBlock* block = &cockpit_hold_block;
+    s32 i;
     s32 active;
-    u16 flags;
-    u8 arrow_mode;
     s16 lines;
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
     EftLspRect spr;
-    s32 i;
-    const u16* lsp;
-    EftLspRect* cell;
     s32 picked;
+    u8 arrow_mode;
+    EftLspRect* cell;
     s32 enabled;
+    u16 flags;
     s16 room;
     s32 marked;
 

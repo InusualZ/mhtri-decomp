@@ -645,13 +645,13 @@ static void menu_item_sub_page14_card_draw(MenuSlot* slot) {
 /* 0x8036BDF0 (0x2E8): draws the title list: eight titles a column (unowned ones greyed), the page arrows, the picked
  * title's description and the help line. */
 static void menu_item_sub_page14_title_draw(MenuSlot* slot) {
+    s16 picked;
     bool active;
     u16* ids;
-    u8** notes;
     _mh_ivec2_ base;
     _SPR_DATA_ spr;
+    u8** notes;
     bool marked;
-    s16 picked;
     s32 title;
     _mh_ivec2_ pos;
     u8** titles;

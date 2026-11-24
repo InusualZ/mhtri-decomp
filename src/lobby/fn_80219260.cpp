@@ -2262,8 +2262,8 @@ s32 lb_talk_reward_give(LbTalkState* state) {
             break;
         case 3:
             if (userdata_equip_box_free_count() != 0) {
-                u16 box;
                 u32 name;
+                u16 box;
 
                 if (reward->id_0x02 == 6) {
                     _EQUIP* equip = &lb_talk_reward_equips[reward->count_0x04];

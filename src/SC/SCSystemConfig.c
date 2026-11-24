@@ -393,13 +393,13 @@ static u32 SCParseConfBuffer(u8* buf, u32 size)
     u8* end;
     u32 count;
     u16* offsets;
-    u32 offset;
     const SCItemName* entry = ItemNames;
     const SCItemName* entryEnd;
-    u16* cursor;
     u32 i;
-    u32 pad;
+    u16* cursor;
+    u32 offset;
     const char* name;
+    u32 pad;
     u32 nameLength;
     u16* idTable;
     u16* tail;

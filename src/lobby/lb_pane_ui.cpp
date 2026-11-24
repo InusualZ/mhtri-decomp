@@ -5254,13 +5254,13 @@ s16 fn_801F5534(LbPage* self)
  * pick would be refused (with the reason on the help line), then the guide. */
 void lb_box_top_draw(LbBoxMenu* self)
 {
-    u32 color;
     const u16* sub_panels;
     s16 reason;
-    _mh_ivec2_ base;
     u32 closing;
-    s32 i;
+    _mh_ivec2_ base;
     const u16* panels;
+    s32 i;
+    u32 color;
     _SPR_DATA_ spr;
     s16 reason_row;
     s8* text;
@@ -7605,12 +7605,12 @@ void lb_color_pane_draw(LbColorPane* self)
     _mh_ivec2_ pos;
     u32 color;
     u16* head;
-    u16 picked;
-    u16 count;
-    u16 frame;
-    u8 i;
     const s16* cells;
     u8 selected;
+    u16 frame;
+    u8 i;
+    u16 picked;
+    u16 count;
     bool lit;
     s16 help;
 

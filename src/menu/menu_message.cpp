@@ -34,7 +34,7 @@
  *    `bne` (4 B each), plus register order;
  *  - `draw_sprite_blink`: retail loads the colour word into r3 and masks it after the multiply, ours masks first (the
  *    operand order and a separate local measured the same);
- *  - `item_pairs_shell_sort`, `put_message`, `put_message_window`: register allocation only.
+ *  - `item_pairs_shell_sort`, `put_message`: register allocation only.
  *  - `.data` is 0x190 against 0x18C and `.sdata` 7 against 16 B: one object cannot reproduce the two TUs above (the
  *    second `"%s"` copy and the 4-mod-8 start of the first `.data` object).
  *  - `menu_select_window_draw` is defined with the types its body uses (`s8** texts`, `s16* flags`); its leaf
@@ -1135,24 +1135,24 @@ void put_message(s8* msg, s16 size, u32 color)
 extern "C" void put_message_window(s8* msg, s8* yes, s8* no, s32 sel, s16 size, u32 color)
 {
     s16 lines;
-    s16 center_x;
     s16 center_y;
     s16 text_x;
-    s16 text_y;
     s32 left;
     s32 top;
     s16 width;
     s16 height;
-    u32 yes_len;
-    u32 no_len;
-    u32 len;
     s16 pad;
     s32 bar_w;
-    s32 bottom;
-    s32 bar_y;
-    s32 yes_x;
     s32 no_x;
+    s32 yes_x;
+    u32 len;
     s32 label_y;
+    s16 text_y;
+    s16 center_x;
+    u32 yes_len;
+    u32 no_len;
+    s32 bar_y;
+    s32 bottom;
 
     font_flush();
     if (size == 0) {
