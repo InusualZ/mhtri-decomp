@@ -93,6 +93,8 @@
  * RESIDUALS. em_mot_speed_set: dump 03 `fmuls f1,f33,f32` multiplies the f32 parameter directly; retail's `frsp` + swapped operands is an `f64`
  *   parameter, which the 29-unit prototype (`enemy/em_mot_speed_set.h`) does not allow.  em_delay_act_tick: dump 03 folds the zero index
  *   into `addi r33,r32,0xaf0`; retail keeps `li; mulli` and adds 0xaf0 separately; a one-slot loop and direct indexing measure equal or lower.
+ * SHAPES. `em_fx_scale_get`, `em_hit_fx_scale_get`, `em_paralysis_fx_scale_get` and `em_key_curve_eval` read the multiplied field into a
+ *   local and write `field * scale` (fmuls field,scale); the direct `scale * field` keeps fmuls scale,field.
  * RESIDUALS. Every row is written.
  *  - `em_act_advance`: the recover-band pointer and the stat level take each other's register (r3/r4);
  *    `em_ambient_color_update`: the point-light blend converts the channel before the half difference (the
@@ -9437,7 +9439,8 @@ extern "C" f32 em_key_curve_eval(_ENEMY_WORK* self, f32* keys)
 {
     f32 scale = get_em_base_scale(self);
 
-    return scale * getKeyData(keys, em_mot_frame_get(self));
+    f32 key = getKeyData(keys, em_mot_frame_get(self));
+    return key * scale;
 }
 
 /* 0x801356A8 (0xA0): the distance to the target on the ground plane over `div`, clamped to [lo, hi]. */
@@ -9553,7 +9556,8 @@ extern "C" f32 em_fx_scale_get(_ENEMY_WORK* self)
 {
     f32 scale = get_em_scale(self);
 
-    return scale * get_enemy_data(self)->ailment_fx_0x9C->base_scale;
+    f32 base = get_enemy_data(self)->ailment_fx_0x9C->base_scale;
+    return base * scale;
 }
 
 /* 0x801359F0 (0x58): the paralysis spark scale times the model scale. */
@@ -9561,7 +9565,8 @@ extern "C" f32 em_paralysis_fx_scale_get(_ENEMY_WORK* self)
 {
     f32 scale = get_em_scale(self);
 
-    return scale * get_enemy_data(self)->ailment_fx_0x9C->paralysis_scale;
+    f32 base = get_enemy_data(self)->ailment_fx_0x9C->paralysis_scale;
+    return base * scale;
 }
 
 /* 0x80135A48 (0x58): the hit effect scale times the model scale. */
@@ -9569,7 +9574,8 @@ extern "C" f32 em_hit_fx_scale_get(_ENEMY_WORK* self)
 {
     f32 scale = get_em_scale(self);
 
-    return scale * get_enemy_data(self)->ailment_fx_0x9C->hit_scale;
+    f32 base = get_enemy_data(self)->ailment_fx_0x9C->hit_scale;
+    return base * scale;
 }
 
 /* 0x80135AA0 (0x24): the enemy data's +0xC byte. */

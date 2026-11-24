@@ -20,7 +20,6 @@ size_bytes,unit,function,match_percent,address
 48,menu/menu_item_sub,menu_item_sub_page14_draw,90.0,0x8036BB1C
 52,homebutton/hkb_keyboard,__ct__12HkbKeyButtonFUlP11HkbKeyboardP16HbmSoundListener,98.1539,0x8053E1B4
 52,menu/menu_plsearch,resetPatTermsState,83.8461,0x80450FF0
-56,ef/eft052,eft052_item_half_get,99.2857,0x80358FF4
 56,enemy/em_common,em_delay_act_tick,74.2857,0x80128308
 56,g3d/g3d_anmscn,light_setting_get_light_set,91.7857,0x8006522C
 60,menu/menu_row,menu_row_clear,85.6667,0x8034C4B4
@@ -36,9 +35,6 @@ size_bytes,unit,function,match_percent,address
 84,SO/socket,SOAddressToString,80.1429,0x80520604
 84,lobby/fn_802FA9A0,lb_barter_price_scale,98.5714,0x802FF928
 84,sound/fn_800D7F54,se_torch_slot_req,90.4762,0x800DD3B8
-88,enemy/em_common,em_fx_scale_get,99.5455,0x80135998
-88,enemy/em_common,em_hit_fx_scale_get,99.5455,0x80135A48
-88,enemy/em_common,em_paralysis_fx_scale_get,99.5455,0x801359F0
 88,homebutton/tiHKBManager,onDisconnect__14HkbManagerNodeFP6HkbArg,98.8636,0x8056BE2C
 88,userdata_item,userdata_equip_box_rec_get,98.6364,0x8004C310
 92,Network/network_pat_control,getSelectedServerTypeName__9NetCtrlWkFv,99.0435,0x8042EABC
@@ -55,7 +51,6 @@ size_bytes,unit,function,match_percent,address
 96,sound/fn_800E3CBC,set_zmode__FbUcb,97.5,0x800E4688
 96,sound/snd_bank_loader,snd_chunk_handle_get,99.5833,0x800F0C14
 100,ai/ai_npc,ai_npc_demo_frame_ck,99.6,0x802CB548
-100,enemy/em_common,em_key_curve_eval,99.6,0x80135644
 100,homebutton/hbm_value,__ct__14SysKbdVuObjectFP12MEMAllocatorPQ34nw4r3lyt16ResourceAccessorP17SysKbdHandlerBase,0.0,0x8055CAD0
 100,homebutton/hbm_value,getPaneVisible__14HbmPaneManagerFPCcPUc,91.48,0x8055BFB8
 100,lobby/lb_npc,fn_801FC810,95.8,0x801FC810
@@ -130,7 +125,7 @@ size_bytes,unit,function,match_percent,address
 168,lobby/lb_npc,lb_npc_ground_drop,99.5238,0x801FE20C
 168,menu/menu_message,draw_sprite_blink,94.0476,0x802AA4F4
 168,quest/arenatask,arena_light_init,99.8809,0x80446B8C
-172,MSL_C/mem,__copy_longs_rev_unaligned,95.3488,0x8045B92C
+172,MSL_C/mem,__copy_longs_rev_unaligned,99.0698,0x8045B92C
 172,NHTTP/NHTTP_request,NHTTPi_SocSend,95.3488,0x80516B2C
 172,NHTTP/NHTTP_util,NHTTPi_containsString,93.8372,0x8051738C
 172,Pl/pl_act,fn_8026A178,95.3488,0x8026A178
@@ -160,9 +155,8 @@ size_bytes,unit,function,match_percent,address
 188,draw_shape,drawshape_set_tex_scale,98.8298,0x80054370
 188,hud/layout,note_line_draw,94.8936,0x802E41B4
 188,lobby/fn_80212810,lb_kakou_weapon_cost_flags_get,99.3191,0x80214078
-188,lobby/fn_80219260,lb_award_hunt_bits_count,98.4043,0x8021B088
 188,menu/menu_item,put_menu_cursor__FPUsUsPC10_mh_ivec2_,99.7872,0x802A2564
-192,MSL_C/mem,__copy_longs_unaligned,96.3542,0x8045B86C
+192,MSL_C/mem,__copy_longs_unaligned,97.7083,0x8045B86C
 192,MSL_C/string,strcpy,94.1667,0x8045F554
 192,enemy/fn_802F5138,em032_act0_idle,97.4167,0x802F5B98
 192,hud/pl_frame_sync,em_net_parts_pack,99.4792,0x80335EEC
@@ -277,7 +271,7 @@ size_bytes,unit,function,match_percent,address
 260,font/flfnt,flfntUtf8Decode,92.0769,0x8005BD3C
 264,ef/system_core,work_stack_alloc,99.5455,0x800CFDD0
 264,enemy/em_common,em_nearest_area_get,96.8939,0x801271BC
-264,menu/multi_result,name_menu_page_build,97.7273,0x803A2FD8
+264,menu/multi_result,name_menu_page_build,98.4091,0x803A2FD8
 268,NHTTP/NHTTP_request,NHTTPi_SocRecv_sub,99.5522,0x805167AC
 268,WPAD/WPADHIDParser,wpadReportButtonsDpd10Ext9,97.8358,0x804F6960
 268,WUD/wud,WUDiDeleteAllLinkKeys,99.0299,0x804FB8E0

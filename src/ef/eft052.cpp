@@ -26,8 +26,7 @@
  *   `hud_item_msg_push`, `hud_msg_sub_set`, `hud_msg_shown_id_get`, `hud_msg_work`) and `eft_area_se_req`; the data
  *   `eft052_hold_frame_sprites`, `eft052_hold_row_sprites`, `eft052_hold_arrow_sprites`.
  * FLAGS. `eft052_box_list_draw` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
- * RESIDUALS. eft052_item_half_get: dump 03 gives the shift result its own vreg (`srawi r33,r35,1`) coloured r0, retail reuses r3 (`u32`/`s32` value
- *   spellings measure equal).
+ * SHAPES. `eft052_item_half_get` shifts the loaded field in a separate `value >>= 1` statement (row 100 %).
  * RESIDUALS. Every row is written; 21 partial rows (`measure.py ef/eft052` lists them), including:
  *  - `eft052_place`: the register colouring only (regsim EXACT: retail's `table` is r26 and the loop counter r27, ours r27/r29);
  *  - `eft052_hold_list_draw`, `hud_msg_enqueue`, `fn_80358B40`: register colouring only;
@@ -424,7 +423,9 @@ extern "C" u32 eft052_item_value_get(u16 id)
 /* 0x80358FF4 (0x38): Returns half the item record's +0x0C value, floored at 1. */
 extern "C" s32 eft052_item_half_get(u16 id)
 {
-    s32 value = GetItemData(id)->field_0x00C >> 1;
+    s32 value = GetItemData(id)->field_0x00C;
+
+    value >>= 1;
 
     if (value == 0)
         value = 1;

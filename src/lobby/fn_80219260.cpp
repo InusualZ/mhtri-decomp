@@ -19,9 +19,9 @@
  *   `lb_title_range_find`/`lb_title_owned_ck` are menu_item_sub's names.
  * FLAGS. lb_award_check_all and lb_npc_talk_screen_open take a scoped `#pragma optimization_level 4`.
  * FLAGS. `lb_screen07_step` takes a scoped `#pragma opt_common_subs off` (same size, row at 100 %).
- * FLAGS. `lb_award_hunt_bits_count` takes a scoped `#pragma optimization_level 4` (98.4; same size).
+ * FLAGS. `lb_award_hunt_bits_count` takes a scoped `#pragma optimization_level 4` (same size; row at 100 %).
  * RESIDUALS.
- *  - `lb_award_hunt_bits_count` (98.4) and `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
+ *  - `lb_award_check_all` (98.5): retail hoists the bit loops' `li rN,2` ctr
  *    counts and the `1` shift base out of the loops into saved registers; ours rebuilds them per loop.
  *  - `lb_scroll_side_stage` (98.3): kinds 1/2 copy only, 5/6/10 take the second-page test and every other kind copies
  *    (retail's three `memcpy(a, src)` tails); retail loads the kind after the page test (`lbz r3` after the three base
@@ -35,6 +35,7 @@
  *  - 15 registry names (`weapon_kind_slot_index`, `system_weapon_class_set`, `ai_npc_level_get`, `lb_screen05_open`,
  *    `lb_screen13_open`, `lb_menu_marker_update`, `lb_menu_marker_draw`, the `lb_award_*`/`lb_title_*_rows` tables,
  *    `lb_gun_set_frame_ids`) resolve once the registry lands.
+ * SHAPES. `lb_award_hunt_bits_count` declares `bits` before `count` (the regsim plan order).
  * SHAPES. Locals are declared in the order retail allocates their saved registers (first declared, highest);
  *   switch cases are written in the order retail lays out their bodies (single cases before a case range);
  *   `lb_talk_state` is defined at the foot so every use keeps its own `lis`/`addi`.
@@ -1299,10 +1300,10 @@ void lb_award_progress_ck(LbSaveView* save, s16 award) {
 #pragma optimization_level 4
 /* Counts the set bits of the save block's 64 hunt-bit bytes. */
 s16 lb_award_hunt_bits_count(LbSaveView* save) {
-    s16 count = 0;
+    u8 bits;
     s16 i;
     s16 bit;
-    u8 bits;
+    s16 count = 0;
 
     for (i = 0; i < 0x40; i++) {
         bit = 0;

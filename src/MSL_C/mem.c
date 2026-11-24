@@ -225,15 +225,15 @@ static void __copy_longs_rev_aligned(u8* dst, const u8* src, u32 n)
 static void __copy_longs_unaligned(u8* dst, const u8* src, u32 n)
 {
     u32 i = (-(u32)dst) & 3;
-    u32 lsh;
-    u32 rsh;
     u32* wd;
-    u32 soff;
-    const u32* ws;
-    u8* wb;
-    const u8* sb;
     u32 w0;
     u32 w1;
+    u32 soff;
+    u32 lsh;
+    u8* wb;
+    u32 rsh;
+    const u32* ws;
+    const u8* sb;
 
     src = src - 1;
     dst = dst - 1;
@@ -284,13 +284,13 @@ static void __copy_longs_rev_unaligned(u8* dst, const u8* src, u32 n)
 {
     u8* d = dst + n;
     u32 i = (u32)d & 3;
-    u32 rsh;
-    u32 lsh;
-    u32* wd;
-    u32 soff;
-    const u32* ws;
     u32 w0;
     u32 w1;
+    u32 soff;
+    u32 lsh;
+    const u32* ws;
+    u32 rsh;
+    u32* wd;
 
     src = src + n;
     if (i != 0) {

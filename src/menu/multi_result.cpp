@@ -40,7 +40,7 @@
  *   flipcheck: `.text` 0x281C against the claimed 0x277C (the duplicated blocks of `lobby_flow_boot_step`),
  *   extab/extabindex differing; the `.sdata`/`.sdata2` pools are partial (a candidate fold with `lobby/lb_quest_screen`,
  *   which owns the `.sdata2` word 0x8079C448 that `note_pane_player_near_ck` reads).
- * SHAPES. None.
+ * SHAPES. `name_menu_page_build` declares `ofs` first (the regsim plan order).
  * RESIDUALS. mwcc-debugger dump, `name_menu_list_draw`: regsim 4/6 callee-saved, 20/20 volatile, best plan cost 4
  *            EXACT; first divergence insn 22: retail `addi r31, r3, name_menu_row_tbl@l` vs ours `addi r30, r3,
  *            name_menu_row_tbl@l`
@@ -1038,10 +1038,10 @@ extern "C" void name_menu_close(void) {
 
 /* 0x803A2FD8 (0x108): fills page `page` of the name menu (five names a page) from the NPC kind's name table. */
 extern "C" void name_menu_page_build(LbNameMenuWork* w, s32 page) {
+    s32 ofs;
     s16 first = (s16)page * 5;
     s16 last = first + 4;
     u8 kind;
-    s32 ofs;
     s16 i;
 
     w->rows_0x0A = 0;
