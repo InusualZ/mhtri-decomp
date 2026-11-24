@@ -2509,11 +2509,11 @@ extern "C" void eft_slot_unbound_step(EftSlot* slot)
     EftTargetRecord* records[32];
     u8 here = 0;
     u8 state;
-    u8 force;
     u8 area;
+    s32 i;
+    u8 force;
     u8 flagged = 0;
     u8 pick;
-    s32 i;
 
     for (i = 0; i < 32; i++) {
         works[i] = NULL;

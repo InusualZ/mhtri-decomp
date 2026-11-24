@@ -538,9 +538,9 @@ HkbCellphonePaneListener::~HkbCellphonePaneListener() {}
 /* 0x8053F7BC (0x488): Sets the keypad up: the input, the pane listener and the text field, then one key button
  * per key window and one tag button per mode tag, each with its animations. */
 void HkbCellphoneKeypad::create(MEMAllocator* alloc) {
-    u16 i;
     u16 j;
     HkbCellphoneKeyButton* button;
+    u16 i;
     const char* group;
     HkbCellphoneWindow* window;
 

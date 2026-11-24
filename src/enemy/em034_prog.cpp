@@ -374,14 +374,14 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
     u8 flags[0x0A];
     EmSeatRec* list;
     _ENEMY_WORK* work;
+    u8 any;
+    u8 seated;
     EmAreaWork* area;
     u16 i;
     u16 j;
     u8 k;
     u8 n;
-    u8 seated;
     u32 count;
-    u8 any;
     u16 max;
 
     any = 0;

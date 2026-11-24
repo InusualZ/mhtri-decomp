@@ -758,13 +758,13 @@ void lb_hunt_info_draw(LbMenuWork* self)
     _mh_ivec2_ pos;
     LbUserDataView* user;
     const u8* monster;
-    const LbHuntMonsterRow* rows;
     const u16* idp;
+    const LbHuntMonsterRow* rows;
     s32 type;
     s32 t;
-    u8 variant;
     u8 kind;
     s32 i;
+    u8 variant;
     u16 shown;
     u8 m;
 

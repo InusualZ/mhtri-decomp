@@ -1337,8 +1337,8 @@ void lb_award_check_all(void) {
             lb_award_flag_runs_ck(save, i, 1);
             break;
         case 2: {
-            s32 empty = 0;
             s16 j;
+            s32 empty = 0;
 
             for (j = 0; j < 10; j++) {
                 if (save->record_a_0x52E4[j] == 0 && save->record_b_0x530C[j] == 0) {
@@ -1433,8 +1433,8 @@ void lb_award_check_all(void) {
             break;
         case 19:
             if (lb_award_hunt_bits_count(save) >= 100) {
-                s16 count = 0;
                 s16 j;
+                s16 count = 0;
                 s16 bit;
 
                 for (j = 0; j < 8; j++) {

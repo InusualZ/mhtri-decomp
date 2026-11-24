@@ -1174,9 +1174,9 @@ extern "C" void arena_result_next(ArenaWork* work) {
         work->item_mask_0x0A = 0;
         slots = work->slot_0x14;
         for (i = 0, slot = slots; i < count; i++, slot++) {
+            s32 k;
             const u32* items;
             s32 bit;
-            s32 k;
 
             arena_eqdata_reset(work, slot, i);
             slot->user_0x14 = get_vsUser_work(i);

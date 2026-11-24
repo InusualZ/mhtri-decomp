@@ -2847,10 +2847,10 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
     u8 levels[2];
     u16 params[2];
     f32 scale;
-    u8 mode;
-    u32 a;
-    u32 b;
     s32 i;
+    u32 b;
+    u32 a;
+    u8 mode;
 
     ids[0] = s->id;
     ids[1] = s->field_0x30;

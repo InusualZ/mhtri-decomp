@@ -926,7 +926,6 @@ size_bytes,unit,function,match_percent,address
 1264,lobby/fn_8030121C,lb_kujira_menu_step,99.9051,0x8030121C
 1268,stage/stg_w,stage_part_scatter_step,99.7161,0x802B1814
 1272,homebutton/hbm_value,hbmTextWriterDraw,99.9057,0x8055A8A0
-1272,hud/cockpit_quest,cockpit_split_item_ring_draw,99.8428,0x802F02EC
 1276,Pl/pl_coll,pl_coll_sweep_ck,99.4514,0x8029403C
 1276,lobby/lb_quest_screen,note_trade_offers_roll,99.5141,0x803A5B60
 1284,stage/stg_w,stage_colour_cycle_update,98.5358,0x802B4E58
@@ -949,7 +948,6 @@ size_bytes,unit,function,match_percent,address
 1364,WUD/wud,__wudSecurityEventStackCallback,99.7654,0x804FEF10
 1372,Pl/pl_coll,findInterSection3__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3PQ34nw4r4math4VEC3UcUlUcUsPUcP8LandDataUc,99.3732,0x80295998
 1380,DSPADPCM/dspadpcm,refineAdpcmCodebook,89.887,0x80473070
-1380,lobby/fn_80212810,lb_item_cell_draw_layout,99.1159,0x80215F8C
 1384,homebutton/hkb_textbox,DrawSelf__Q34nw4r3lyt7TextBoxFRCQ34nw4r3lyt8DrawInfo,99.7977,0x8052CE98
 1384,nw_resource,__ct__18NwResMemoryManagerFUlUlllll,98.6127,0x800D3D70
 1388,homebutton/hbm_text_panel,hbmPanelHitTest,91.9481,0x80547D00

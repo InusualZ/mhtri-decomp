@@ -32,7 +32,7 @@
  *   - register colouring or scheduling only: `lb_text_center_print` (retail loads `spr.width` before `spr.pos.x`),
  *     `lb_list_draw_ex`, `lb_item_window_draw`, `lb_seisan_row_flags_get`, `lb_kakou_weapon_flags_get`,
  *     `lb_kakou_icon_build`, `lb_gun_recipe_material_flags_get`,
- *     `lb_item_cell_draw_layout`, `lb_kakou_source_draw`,
+ *     `lb_kakou_source_draw`,
  *     `lb_scene_npc_refresh` (retail steps the NPC pointer before the counter).
  *   - this unit's views of foreign records (`LbArmorView`, `LbArmorExView`, `LbBladeView`, `LbGunView` over the Pl rows,
  *     `LbSmithRow`/`LbSmithGunRow`/`LbSmithKakouRow` over `lobby/lb_screen_step.cpp`'s recipes, `LbShopGoodsRow` over
@@ -2136,13 +2136,13 @@ void lb_item_cell_draw_layout(u16 item, s32 count, _mh_ivec2_* pos, bool enabled
 {
     char buf[32];
     _SPR_DATA_ spr;
-    u16* layout;
     u16* frame;
-    u16* cursor;
     s32 font_flags;
+    u16* layout;
     s32 no_count;
-    u16 id;
     s32 pick;
+    u16 id;
+    u16* cursor;
     s32 monster;
 
     font_flags = 0;

@@ -30,7 +30,7 @@
  *   source orders give `mullw r0,r30,r0`, retail `r0,r0,r30`), `cockpit_ammo_gauge_draw`/
  *   `cockpit_split_ammo_gauge_draw` (`icons` is a backend temporary of the table address and colours before
  *   `step`), `cockpit_item_tag_update` (the second search loop's counters),
- *   `cockpit_split_item_ring_draw`, `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
+ *   `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
  *   `quest_gauge_bar_draw` (the `origin.x`/`origin.y` volatile temporaries r7/r6 swapped).
  *   `cockpit_name_tags_draw`: the first `Pl_area_flag_get` result lives in r26 in retail, r25 in ours.
  *   `cockpit_take_menu_draw`, `cockpit_hunt_log_draw`, `cockpit_item_list_entry_draw`, `quest_gauge_update`,
@@ -5246,9 +5246,9 @@ void cockpit_split_item_ring_draw(_PLW* plw, u8* anim, u8 player) {
     s16 count;
     u32 dead;
     const u16* alt;
+    s16 num;
     const u16* ids;
     const _SPR_DATA_* rec;
-    s16 num;
     u16 item;
 
     set_blendmode(4, 5, 1);
