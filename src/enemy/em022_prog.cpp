@@ -14,11 +14,12 @@
  *   `em022_action_run` dispatches on (`em022_act<N>_*`) or the sub-state that plays a sound table
  *   (`em022_se_tbl_<sub>`, `_b_` for the mode-1 set; records are named after the first table that points at
  *   them).  The pre-existing `em_*` row names are kept; `Em022UserData` is the accessor class.
- * RESIDUALS. All 85 rows written.
- *  - `.sdata2`: the claim starts at 0x8079AF48 (2.0f), which only hud/lobby_hud's `draw_lsp_anim_ary` loads;
- *    our pool starts at the 1300.0f word, so the double 0.0 lands 4 bytes later than retail's (seam request).
- *  - `.sbss`: ours is 5 bytes (the 4-byte sound parameter and the 1-byte static-init object), retail's claim 8.
- *   flipcheck: the sdata2 seam and `lbl_8079AF48` (referenced from lobby_hud.o).
+ *   GUESS: `lsp_slide_depth_scale` (0x8079AF48), from the one load of it, `hud/lobby_hud`'s item-list depth scale.
+ * RESIDUALS. None: all 85 rows written and the unit is Matching.
+ *   `.sdata2` opens with `lsp_slide_depth_scale` (2.0f), a named global const this unit defines and only
+ *   `hud/lobby_hud` loads; em022's own `/ 2.0f` uses its pooled copy at +0x28.  Defined ahead of the functions it
+ *   precedes the pool, so the 8-byte entries stay 8-aligned as at 0x8079AF48.  The 4-byte tails of `.sdata2` and
+ *   `.sbss` (ours 0x1BC/0x4 against the claims' 0x1C0/0x8) are alignment fill before the next 8-aligned section.
  * FLAGS. `em022_act6_wander` takes a scoped `#pragma fp_contract off` (retail keeps the `fmuls`+`fsubs` pair).
  * SHAPES. `em022_act6_wander` assigns `width = 20` (s32, a constant) before each spread so the width converts to float at run time as in retail; the half is `/ 2.0f` (`* 0.5f` keeps the
  *   operands the other way round).
@@ -74,9 +75,13 @@
 #include "enemy/em_curve_key.h" /* EmCurveKey */
 #include "ef/eft_slot.h"    /* enemy_data_find / enemy_data_grp (rule 2: their owner's header) */
 #include "g3d/g3d_resanmchr.h"
+#include "enemy/lsp_slide_depth_scale.h"
 
 #pragma peephole off
 #pragma pool_data off
+
+/* The lobby HUD's depth scale: a named constant, emitted ahead of the unit's pooled literals. */
+const f32 lsp_slide_depth_scale = 2.0f;
 
 /* `em_fall_start` and `em_ground_ck` through the signatures their bodies have: both read a float in f1 (the
  * shared declarations take none). */

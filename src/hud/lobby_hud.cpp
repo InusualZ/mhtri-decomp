@@ -15,10 +15,9 @@
  *   `lobby_hud_reset`, the table names; foreign (registry): `mhchar_node_id_get`, `lb_npc_mark_state_get`,
  *   `hud_info_toggle_step`.
  * RESIDUALS. Register allocation residuals: `hud_key_table_draw` (the `ids` walker and the strength-reduced
- *   `cockpit_state` pointer swap r27/r28).  `.sdata2`: `draw_lsp_anim_ary` also loads 2.0f at 0x8079AF48, the first word of
- *   `enemy/em022_prog.cpp`'s claim; our pool is 0x3C (with the 2.0f) and em022's 4 bytes short, but a seam at
- *   0x8079AF4C does not link (`ELF_gen.c` 2802: em022's 8-byte entries would start 4 mod 8, also with `align:4`).
- *   flipcheck: `.text` (the two rows above) and `.sdata2` (0x3C against the 0x38 claim).
+ *   `cockpit_state` pointer swap r27/r28).  `.sdata2`: the 2.0f `draw_lsp_anim_ary` scales the depth by is
+ *   `enemy/em022_prog`'s named global `lsp_slide_depth_scale` (0x8079AF48), not a pool literal of this unit.
+ *   flipcheck: `.text` (the two rows above).
  */
 
 #include "types.h"
@@ -38,6 +37,7 @@
 #include "hud/cockpit_state.h"
 #include "lobby/lb_item_list_depth_get.h"
 #include "lobby/lb_npc_talk_mark_ck.h"
+#include "enemy/lsp_slide_depth_scale.h"
 #include "lobby/lobby_hunter_cards.h"
 #include "lobby/lb_menu_pos_tbl.h" /* getItemListSelection */
 #include "sound/mhchar_node_id_get.h"
@@ -411,7 +411,7 @@ extern "C" void draw_lsp_anim_ary(void) {
     }
     if (bars != NULL) {
         depth = lb_item_list_depth_get();
-        depth *= 2.0f;
+        depth *= lsp_slide_depth_scale;
         if (getItemListSelection() == 1) {
             depth -= 1.0f;
         }
