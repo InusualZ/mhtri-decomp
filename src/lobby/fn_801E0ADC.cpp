@@ -29,7 +29,7 @@
  *   - lb_goods_hold_give: retail multiplies `mullw r3,r3,r0` (price first) where ours emits `r0,r3`; swapping the
  *     operands does not move it (regsim: colouring exact).
  *   - register colouring only: lb_eqshop_armor_page_build, lb_eqshop_goods_draw,
- *     lb_title_frame_draw, eft033_create, eft033_move_joint (the second loop counter), and
+ *     lb_title_frame_draw, eft033_create, and
  *     lb_eqshop_goods_screen_draw (the stats page's mode argument).
  *   - lb_eqshop_weapon_step: retail recomputes the goods row after `userdata_equip_mask_get`, ours keeps it in r29.
  *   flipcheck: `.data`/`.sdata`/`.sbss` claimed, not emitted, `.sdata2` emitted in source order (not retail's); `.text`/
@@ -45,6 +45,7 @@
  *   The two locals that open lb_goods_hold_step are declared `ret` first.
  * SHAPES. `eft_em_spawn_joint` compares the id as `(s32)(u8)id == 0x21` (retail's signed `cmpwi`).
  * SHAPES. `eft033_move_gun` declares `work`, `slot`, `c0`..`c3`, then `plw` (regsim plan 1).
+ * SHAPES. `eft033_move_joint` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -1623,10 +1624,10 @@ void eft033_move_joint(_EFT* eft)
     nw4r::math::VEC2 scale;
     _GXColor color;
     _PLW* plw;
-    struct _ENEMY_WORK* em;
     u8* alpha;
     u8 level;
     s32 i;
+    struct _ENEMY_WORK* em;
     u32 col;
 
     if (--eft->timer_0x0C < 0) {

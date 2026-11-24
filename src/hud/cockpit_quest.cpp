@@ -14,6 +14,7 @@
  *   with `CockpitMove`/`CockpitText`, whose layout drifts by 4 bytes past +0x180); everything else uses
  *   `hud/cockpit_quest.h` and `hud/cockpit_work_types.h`.  Folding that view removes the namespace.
  * FLAGS. `#pragma optimization_level 4` and `#pragma opt_lifetimes off` scoped to `cockpit_item_tag_update` (same size, raises its row).
+ * FLAGS. `#pragma opt_loop_invariants off` and `#pragma opt_strength_reduction off` scoped to `cockpit_supply_box_draw` (same size, matches).
  * NAMES. GUESS (each read off its body and its callers): every `cockpit_*` and `quest_*` function of the unit,
  *   `pit_trap_construct`, the record types `CockpitItemTag`, `HuntLogEntry`, `CockpitSlotPair`, `CockpitWeaponIds`,
  *   `CockpitStaggerIds` and their fields, the `.data`/`.sdata` table names (`cockpit_act_mask_*`, `cockpit_split_*`,
@@ -28,7 +29,7 @@
  * RESIDUALS. register colouring or scheduling only (same instructions): `quest_mark_draw` (`mullw` operand order: both
  *   source orders give `mullw r0,r30,r0`, retail `r0,r0,r30`), `cockpit_ammo_gauge_draw`/
  *   `cockpit_split_ammo_gauge_draw` (`icons` is a backend temporary of the table address and colours before
- *   `step`), `cockpit_supply_box_draw`, `cockpit_item_tag_update` (the second search loop's counters),
+ *   `step`), `cockpit_item_tag_update` (the second search loop's counters),
  *   `cockpit_split_item_ring_draw`, `cockpit_prompt_draw` (the string index `slwi` lands before the `li r3,0xC10`),
  *   `quest_gauge_bar_draw` (the `origin.x`/`origin.y` volatile temporaries r7/r6 swapped).
  *   `cockpit_name_tags_draw`: the first `Pl_area_flag_get` result lives in r26 in retail, r25 in ours.
@@ -1109,6 +1110,9 @@ static inline u8 quest_mark_notice_flag_get(s32 visible) {
     return flag;
 }
 
+#pragma push
+#pragma opt_loop_invariants off
+#pragma opt_strength_reduction off
 /* 0x802E5E90 (0x5DC): Draws the supply box: the 5x8 grid of the quest's supply items (taken cells empty) with the
  * cursor, the item flying to the pointer, the selected item's name, count, rarity and room warning, and the help. */
 void cockpit_supply_box_draw(void) {
@@ -1242,6 +1246,7 @@ void cockpit_supply_box_draw(void) {
         }
     }
 }
+#pragma pop
 #pragma fp_contract on
 
 /* 0x802E646C (0x640): Draws the take-item menu: the three item rows (name and count, or the empty/none text) with

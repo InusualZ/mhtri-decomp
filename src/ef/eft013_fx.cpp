@@ -57,6 +57,7 @@
  *   switch arms that retail compares explicitly `return` while the default `break`s (`eft013_em_set`); a flag retail
  *   compares against the zero it just stored is written as a compare with that field (`fn_80109A84`).
  * FLAGS. eft013_setup_uv_model: scoped `#pragma opt_propagation off` (95.31 -> 95.60, size equal).
+ * SHAPES. `eft013_setup_effect` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -1836,8 +1837,8 @@ extern "C" void fn_8010B198(_EFT013* self) {
 extern "C" void eft013_setup_effect(_EFT013* self) {
     _EFT013_WORK_F* work;
     _ENEMY_WORK* src;
-    u16 id;
     u16 grp;
+    u16 id;
     s8 delta;
     work = (_EFT013_WORK_F*)self->work_0x38;
     nw4r::math::VEC3 off;

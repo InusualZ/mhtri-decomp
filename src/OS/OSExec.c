@@ -35,6 +35,7 @@
  *    calls it from `__OSBootDolSimple`); the partition-offset helper loads the disc info's offset into `dataOffset` before
  *    adding the base word; the apploader callbacks and their out-parameters are declared in the reverse of their stack
  *    order.
+ * SHAPES. `__OSLaunchNextFirmware` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -281,8 +282,8 @@ void __OSLaunchNextFirmware(void)
     u32 tmdSize = 0;
     s32 result = -1;
     ESTicketView* ticketView;
-    OSExecPartitionEntry* table;
     OSExecPartitionHeader* header;
+    OSExecPartitionEntry* table;
     OSExecPartitionEntry* partition;
     OSExecTmd* tmd;
     OSExecPartitionEntry* entry;

@@ -95,6 +95,8 @@
  *            divergence insn 10: retail `<DIFF_INSERT>` vs ours `beq 0x20c`
  * FLAGS. hbmKbCandDraw: scoped `#pragma opt_lifetimes off` (98.36 -> 98.48, size equal).
  * FLAGS. `hbmKbWidgetCreateParts` takes scoped `#pragma opt_loop_invariants off` and `#pragma opt_strength_reduction off`.
+ * SHAPES. `hbmKbCandLayout` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. `hbmKbCandLayout` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #include "types.h"
@@ -1807,10 +1809,10 @@ extern "C" void hbmKbCandLayout(HbmKbCandidateList* self) {
     f32 x = self->scroll;
     f32 left = self->area->pane->mTranslate.x;
     f32 areaWidth = self->area->pane->mSize.width;
-    s32 selected = self->selected;
     s32 i;
-    s32 slot;
     s32 index;
+    s32 slot;
+    s32 selected = self->selected;
     bool whole;
 
     for (i = 0; i < 20; i++) {
@@ -1825,8 +1827,8 @@ extern "C" void hbmKbCandLayout(HbmKbCandidateList* self) {
     slot = 20;
     index = self->window->isPaged() ? self->first : 0;
     while (x > 0.0f) {
-        HbmKbTextPane* text;
         nw4r::lyt::Pane* frame;
+        HbmKbTextPane* text;
         f32 width;
         f32 pos;
         if (index == 0) {

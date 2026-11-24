@@ -72,6 +72,8 @@
  * FLAGS. `pad_wpad_read` takes a scoped `#pragma optimization_level 4` + `#pragma opt_lifetimes off` (size unchanged, raises its row).
  * FLAGS. kpad_read_acc takes a scoped `#pragma opt_propagation off` (same size, row 100 %).
  * FLAGS. `pad_wpad_init` takes a scoped `#pragma opt_lifetimes off`.
+ * SHAPES. pad_menu_merge: `bit` is an `s32` mask walker (a bit index 0..15 (`o->bit`); u16 99.75, s32 99.79, size 1676 both ways).
+ * SHAPES. `pad_wpad_read` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #pragma peephole off
@@ -1193,8 +1195,8 @@ extern "C" void pad_wpad_read(s32 chan)
 {
     PlayerPad* pad;
     WPADStatus* core;
-    WPADCLStatus* cl;
     WPADFSStatus* fs;
+    WPADCLStatus* cl;
     PlayerPad* probe;
     WPADStatus* sample;
     PadStickBlock* clb;
@@ -3085,7 +3087,7 @@ extern "C" void pad_menu_merge(u8 chan)
     s32 i;
     u16 kind;
     u16 mask;
-    u16 bit;
+    s32 bit;
     u16 out;
     u16 dirbtn;
     u8 dir;

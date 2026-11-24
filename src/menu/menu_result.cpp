@@ -76,6 +76,8 @@
  *   `q_result_phase_input` runs case 4's body for every phase it does not name (`case 4: default:` last, `case 0:`
  *   empty); `seconds` is `elapsed - minutes * per_minute`, not a second division.
  * FLAGS. `multi_box_phase_input` takes a scoped `#pragma opt_lifetimes off` (same size, raises its row).
+ * SHAPES. `q_result_page_set` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. `q_result_page_set` and `q_result_points_page_draw` declare their locals in the order the regsim plan gave, the latter then moved by the declaration hill-climb (the measured best).
  */
 
 #pragma pool_data off
@@ -2353,24 +2355,24 @@ void q_result_grid_draw(QResultScreen* self, u8 which, u32 active)
  * the grid, and the help line the state calls for. */
 void q_result_page_set(QResultScreen* self, u8 mode)
 {
-    u8 note_line;
-    s32 note;
-    s32 with_value;
-    s32 help;
     s32 show_cmds;
     s32 value;
+    u16* rows;
+    s32 help;
+    s32 note;
     u32 list_mode;
-    u32 left;
     u16 frame_id;
+    s32 i;
+    bool enabled;
     _SPR_DATA_ spr;
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
-    u16* rows;
-    s32 i;
-    bool enabled;
     bool selected;
-    char** lines;
     bool active;
+    u32 left;
+    s32 with_value;
+    u8 note_line;
+    char** lines;
     IdValue* cell;
     ItemDataRecord* data;
     s16 fit;
@@ -2880,12 +2882,12 @@ void q_result_reward_page_draw(QResultScreen* self)
  * faint penalty and the total, then the hunter points and the rank (with its rank-up animation). */
 void q_result_points_page_draw(QResultScreen* self)
 {
-    s32 total = 0;
-    Q_UserData* user = get_userdata();
     s32 faint_shown = 0;
+    Q_UserData* user = get_userdata();
     u8 hunt = 0;
-    s32 skill_shown = 0;
     u32 normal;
+    s32 i;
+    s32 value;
     _mh_ivec2_ frame_pos;
     _mh_ivec2_ row_pos;
     _mh_ivec2_ anchor;
@@ -2895,15 +2897,15 @@ void q_result_points_page_draw(QResultScreen* self)
     char count_text[0x10];
     char text[0x40];
     u8 hunt_done[2];
-    s32 i;
+    s32 total = 0;
+    u16 frame;
+    s32 skill_shown = 0;
+    u16* lsp;
     s32 draw_values;
     s32 have;
-    u8 count;
-    s32 value;
-    u16* lsp;
     u16* total_lsp;
     u16 rank;
-    u16 frame;
+    u8 count;
 
     normal = q_result_phase_is_2(self) != 1;
     q_result_header_draw(self);

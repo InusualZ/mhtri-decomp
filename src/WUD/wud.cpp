@@ -96,6 +96,8 @@
  *            4; first divergence insn 5: retail `lis r29, wudCB@ha` vs ours `lis r30, ...bss.0@ha`
  * SHAPES. The four list-move bodies (`WUDiMoveDeviceToHead`/`ToTail`, `WUDiMoveWbcToHead`/`ToTail`) declare `node`
  *            at function scope, then `cb`, `level`, `i` (the regsim plan order).
+ * SHAPES. `WUDiLoadDeviceInfo` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. `WUDiLoadDeviceInfo` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #include "types.h"
@@ -1483,14 +1485,14 @@ static inline void wudPrintDevice(WUDDevice* device)
 #pragma optimization_level 3
 u8 WUDiLoadDeviceInfo(void)
 {
-    u8 registered;
     WUDCB* cb;
+    s32 j;
     WUDScDeviceArray* array;
-    WUDDevice* device;
+    u8 registered;
     u8 zero[6];
+    WUDDevice* device;
     s32 remaining;
     s32 i;
-    s32 j;
 
     memset(&wudBtDeviceInfo, 0, sizeof(WUDScDeviceArray) - sizeof(wudBtDeviceInfo.pad_0x461));
     memset(&wudBtCmpDeviceInfo, 0, sizeof(WUDScCmpDeviceArray) - sizeof(wudBtCmpDeviceInfo.pad_0x205));

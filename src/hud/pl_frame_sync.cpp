@@ -54,6 +54,7 @@
  *     both rows than the two calls.
  * FLAGS. `eft_frame_state_step` takes a scoped `#pragma optimization_level 4` (same size, raises its row).
  * FLAGS. pl_act_handler_10 and pl_act_handler_29 take a scoped `#pragma opt_common_subs off` (same size, both rows 100 %).
+ * SHAPES. `eft_frame_state_step` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #include "types.h"
@@ -268,9 +269,9 @@ void eft_frame_state_step(_EFT* self) {
     VEC3 joint_b;
     VEC3 spawn_pos;
     EftFrameStateWork* work;
-    EftFrameStateRec* rec;
-    s32 mode;
     s32 i;
+    s32 mode;
+    EftFrameStateRec* rec;
     _GXColor color;
 
     work = (EftFrameStateWork*)self->work_0x38;

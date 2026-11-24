@@ -30,8 +30,6 @@
  *    (declaration orders and moving `work`'s declaration do not reach it);
  *  - `eft053_get_shell_data`: the `vec3_scale_in_place` pointer argument is copied before the scale, retail after
  *    (`ang /= 4.0f` first moves the copy but adds an `fmr`);
- *  - `eft053_init`: `stg_place_timers`'s base and the loop counter `i` swap r23/r20 (splitting `gate`'s
- *    initialiser or reordering it is neutral, indexing the global directly loses 2 points);
  *  - `eft053_slot_lever_step`: `moved` and `tilt` swap r30/r29.
  *   Data: `.data` is emitted and matches (the 7 model lists, their pointer table, the two `Vec` tables, the six jump
  *   tables in retail order; the claim's last 4 bytes are dtk's trailing gap); `.rodata` is the shot angle initialiser
@@ -47,6 +45,7 @@
  *   waits end (retail has no branch between); the slot programs reload `work->models[index]` at every use (a local
  *   copy costs 6-8 points), except `eft053_slot_gimmick_step`'s sinking arm, which takes the slot once per arm;
  *   `eft053_slot_gimmick_step` declares its shot angles after the matrix constructor call.
+ * SHAPES. `eft053_init` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 #include "types.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -657,10 +656,10 @@ extern "C" void eft053_dispatch(_EFT* self)
 extern "C" void eft053_init(_EFT* self)
 {
     Eft053Work* work = (Eft053Work*)self->work_0x38;
-    PlSlotGate* gate = stg_place_timers;
+    s32 i;
     EftModelRec* rec;
     u16 id;
-    s32 i;
+    PlSlotGate* gate = stg_place_timers;
     s32 j;
     _ENEMY_WORK* enemy;
     s32 found;

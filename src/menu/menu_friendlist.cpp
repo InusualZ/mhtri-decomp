@@ -37,6 +37,8 @@
  * FLAGS. `friend_pick_step` takes a scoped `#pragma opt_propagation off` (size unchanged, raises its row).
  * FLAGS. page17_rows_build takes a scoped `#pragma opt_loop_invariants off` (same size, row 100 %).
  * SHAPES. `movie_page17_draw` declares its locals in the order the declaration hill-climb measured best.
+ * SHAPES. `friend_pick_step` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. `friend_pick_step` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #include "types.h"
@@ -228,13 +230,13 @@ s32 friend_pick_step(FriendPickWork* work) {
     MenuScroll* scroll;
     PlayerPad* pad;
     LobbyFriendList* list;
-    u8 index;
+    const char* id;
     NetPeerCard* card;
     u8 col;
     s32 count;
     u8 fetched;
     s32 row;
-    const char* id;
+    u8 index;
     char* args;
 
     ret = 0;

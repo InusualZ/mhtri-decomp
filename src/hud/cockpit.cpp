@@ -62,6 +62,7 @@
  * RESIDUALS. mwcc-debugger dump, `ainpc_page_select_button_ck`: regsim 4/4 callee-saved, 13/13 volatile (EXACT,
  *            colouring is not the cause); first divergence insn 48: retail `<DIFF_INSERT>` vs ours `cmpwi r31, 0x0`;
  *            size differs from retail
+ * SHAPES. `hud_edge_dir_get` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -1994,11 +1995,11 @@ s32 hud_edge_dir_get(_mh_ivec2_* out, const _mh_ivec2_* from, const _mh_ivec2_* 
     s16 dx;
     s16 dy;
     s32 dir;
-    s16 near;
     s16 right;
-    s16 bottom;
     s16 edge;
     s16 top;
+    s16 bottom;
+    s16 near;
 
     get_ScreenSize(&screen);
     dx = from->x - to->x;

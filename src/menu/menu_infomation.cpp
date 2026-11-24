@@ -89,6 +89,7 @@
  *    `ef/fn_8030681C.cpp`); its +0x190 `equip` is the `_PLW` (`Pl/plw.h`).  `_EQUIP_INDEX` (the shown/worn view the
  *    resolvers fill) and `EquipListWork` are this unit's own; `PlSkillRec`/`PlWeaponRec`/`PlSlotRec`/`PlRgba`/
  *    `PlStatusSheet` live in `Pl/fn_8027D684.h`.
+ * SHAPES. `skill_table_body_draw` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #include "types.h"
@@ -1052,12 +1053,12 @@ void skill_table_body_draw(_PLW* plw, _EQUIP* columns, u8* trees, s8* points, u8
     _mh_ivec2_ table;
     _mh_ivec2_ header;
     _mh_ivec2_ mark;
-    s32 shown;
     s32 drawn;
     s32 i;
     s32 start;
     s32 total;
     s32 torso;
+    s32 shown;
     u16* rows;
     u8* tree;
     u32 normal_color;

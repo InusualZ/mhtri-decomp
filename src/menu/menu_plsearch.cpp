@@ -66,6 +66,7 @@
  *   2140 B: `resume` takes r31 and moves `ret` and the pointers one register; writing the tails out per sub-step
  *   92.9 % at 2268 B, one `do { switch } while (0)` holding both tails after the switch 90.9 %);
  *   `save_nand_read_step` breaks out of its result switch into the one failure report after it.
+ * SHAPES. `plsearch_page19_step` declares their locals in the order the declaration hill-climb measured best.
  */
 
 #include "types.h"
@@ -2872,13 +2873,13 @@ void plsearch_page19_open(MenuSlot* slot) {
 s32 plsearch_page19_step(MenuSlot* slot) {
     s32 ret = 0;
     MenuScroll* scroll = &slot->scroll;
-    FriendCardView* view = &friend_card_view;
     LobbyTimerBlock* lobby = &lobby_state_block;
+    FriendCardView* view = &friend_card_view;
     NetFriendListView* friends = (NetFriendListView*)lobby->block_0x0488;
-    u16 input = slot->buttons_trig | (slot->field_0x008 & 0xF);
     NetPeerCard* card;
     const s32* args;
     s32 resume = 0;
+    u16 input = slot->buttons_trig | (slot->field_0x008 & 0xF);
 
     slot->move_result_0x238 = 0;
     switch (slot->field_0x001) {

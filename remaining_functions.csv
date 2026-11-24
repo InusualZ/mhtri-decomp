@@ -981,7 +981,6 @@ size_bytes,unit,function,match_percent,address
 1436,g3d/g3d_draw,PrepareIndMtxOp__Q24nw4r3g3dFQ34nw4r3g3d6ResMatQ34nw4r3g3d7ResNodeQ34nw4r3g3d6ResShp,99.9777,0x800777B0
 1436,lobby/lb_quest_ui,lb_kitchen_meal_serve,99.415,0x80390984
 1444,USB/usb,__CtrlMsgInt,98.338,0x804E57C0
-1444,lobby/lb_pane_ui,lb_my_set_list_draw,99.6122,0x801F8B3C
 1452,lobby/lb_equip_page,pl_rig_kind0_pose,95.2672,0x80227354
 1456,Pl/pl_motion,quest_scene_load,99.5604,0x8028C6CC
 1460,AX/AXFXReverbStdExp,AXFXReverbStdExpCallback,91.9343,0x80476120
@@ -992,7 +991,6 @@ size_bytes,unit,function,match_percent,address
 1476,lobby/lb_quest_screen,quest_area_spawn_apply,94.3442,0x803A8128
 1484,KPAD/kpad,calc_dpd_variable,96.6307,0x804BEAE0
 1484,quest/arenatask,arena_task,96.6307,0x804463C4
-1500,hud/cockpit_quest,cockpit_supply_box_draw,99.5467,0x802E5E90
 1508,enemy/em_kind,em_prog_partner_cond_ck,99.9602,0x8013EFD4
 1508,quest/quest_entry,quest_start_load,99.9072,0x803AEED0
 1512,lobby/lb_npc,fn_8020623C,98.7116,0x8020623C
@@ -1005,7 +1003,6 @@ size_bytes,unit,function,match_percent,address
 1588,Network/NetworkSessionStable,setNetworkConnectionEvent__20NetworkSessionStableFlScUllPCUc,99.9748,0x803D1CE0
 1592,WUD/wud,WUDiLoadDeviceInfo,90.5427,0x804FBBB0
 1592,menu/menu_result,q_result_reward_page_draw,98.8945,0x8039B9C0
-1596,ef/eft053,eft053_init,99.8747,0x80367124
 1596,quest/quest_entry,quest_successive_step,99.6993,0x803B177C
 1600,hud/cockpit_quest,cockpit_take_menu_draw,99.5,0x802E646C
 1620,Pl/pl_motion,quest_scene_end,99.2346,0x8028D778
@@ -1037,7 +1034,6 @@ size_bytes,unit,function,match_percent,address
 1792,enemy/em_prog_support,note_page_step,99.5312,0x80384434
 1800,homebutton/hbm_kb_widget,hbmKbCandHandleInput,99.9556,0x80553848
 1820,lobby/lb_pane_ui,fn_801EE1E4,98.8352,0x801EE1E4
-1832,lobby/fn_8030121C,eft_em_move,99.5415,0x803051E8
 1832,sound/fn_800F2A94,snd_quest_frame_begin,99.5851,0x800F4A90
 1836,KPAD/kpad,KPADiRead,97.0915,0x804C0170
 1840,lobby/lb_npc,lb_player_control,99.0326,0x8020EE14
@@ -1056,14 +1052,12 @@ size_bytes,unit,function,match_percent,address
 1980,DWCi/gt2Message,gti2HandleReliableMessage,96.8182,0x8050EA30
 1988,Pl/pl_act_step,pl_act_evade,99.9598,0x80249A84
 2000,Pl/pl_hit,hit_damage_pl,98.62,0x8029AFF8
-2020,lobby/lb_screen_step,lb_smith_kakou_step,99.9802,0x80363248
 2020,quest/quest_entry,quest_intruder_step,99.7624,0x803B0F98
 2024,homebutton/hbm_text_panel,hbmPanelDrawComposition,99.4506,0x8054734C
 2056,homebutton/hkb_cellphone,onPaneEvent__17HkbCellphoneInputFUlPCc,99.6401,0x8053E968
 2056,hud/pl_frame_sync,eft_frame_state_step,97.2977,0x803305F8
 2084,sound/fn_800F2A94,bgm_lobby_area_update,99.6065,0x800F5B10
 2088,lobby/fn_801E0ADC,lb_eqshop_weapon_step,99.569,0x801E5000
-2096,lobby/fn_801E0ADC,eft033_move_joint,99.9618,0x801E324C
 2140,menu/menu_plsearch,plsearch_page19_step,98.0636,0x8044BF38
 2152,ef/eft013_fx,eft013_setup_effect,99.1822,0x80107E5C
 2156,quest/quest_entry,quest_part_reward_roll,98.4434,0x803ABE44

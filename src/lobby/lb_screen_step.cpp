@@ -26,7 +26,7 @@
  *    own register (`clrlwi r4,r4`/`extsb r4,r4`), ours through r0;
  *  - `lb_smith_pl_turn_step`: retail returns from the busy test through `bne`/`b` (4 bytes; nested, else-return and
  *    inline-helper shapes all give `beq`);
- *  - `lb_smith_make_step`, `lb_smith_kakou_step`: the previous tab byte sits in r26 (the set pane's slot register) in
+ *  - `lb_smith_make_step`: the previous tab byte sits in r26 (the set pane's slot register) in
  *    retail, in r29 here.
  *   Data: `.sbss` is 4 bytes short of the claimed 8 (only `deco_sei_tbl_ptr` is referenced; 0x80794BEC is not), and
  *   `.sdata` ends 4 zero bytes short of the target's 104 (alignment fill).
@@ -44,6 +44,7 @@
  * RESIDUALS. mwcc-debugger dump, `lb_smith_deco_draw`: regsim 1/1 callee-saved, 3/3 volatile (EXACT, colouring is
  *            not the cause); first divergence insn 8: retail `<DIFF_INSERT>` vs ours `addi r3, r3, 0x154`
  * SHAPES. `lb_smith_detach_list_build` declares `deco`, `id`, `flags`, `i` in that order (regsim plan order).
+ * SHAPES. `lb_smith_kakou_step` declares their locals in the order the declaration hill-climb measured best.
  */
 #include "types.h"
 
@@ -1955,7 +1956,6 @@ s32 lb_smith_kakou_step(LbSmithWork* self)
     LbSmithPane* pane = &self->pane_0x3A4;
     _EQUIP* box;
     u8 tab;
-    s16 prev_tab;
     _EQUIP row;
     _EQUIP part_b;
     _EQUIP part_c;
@@ -1966,6 +1966,7 @@ s32 lb_smith_kakou_step(LbSmithWork* self)
     u16 box_b;
     u16 box_c;
     s32 slot;
+    s16 prev_tab;
     s32 i;
 
     self->pane_0x3A4.redraw_0x008 = 0;

@@ -78,8 +78,7 @@
  *  - `lb_arm_wrestle_step`: the opponent search's found path branches to the post-switch `step == 3` test where ours
  *    `return`s to the epilogue (one branch target); no goto-free spelling reaches it (playbook 217: MWCC threads no
  *    flag or inlined return, the flag's `li`/`cmpi` survive every backend pass);
- *  - `lb_player_control`: `self` and `spot` take r31/r30 the other way round (the allocator colours `self` first,
- *    57 interferences against `spot`'s 31; declaration orders tried);
+ *  - `lb_player_control`: three early branches (insns 17, 21, 24) reach a join 0x20 B from retail's (same instructions otherwise).
  *  - `lb_player_remote_follow`: the family-0 `return` group leaves a dead `b` to the epilogue after the compare tree
  *    and a `b` over it (playbook 218; the goto spelling of the function has the same two branches);
  *  - `lb_npc_act_set`, `fn_801FC810`: retail stores a `ran_suu` result into a halfword with no `clrlwi`/`extsh`;
@@ -125,6 +124,7 @@
  * SHAPES. `lb_npc_walk_blend_set` takes its frame count as `s16` (`lb_npc.h`): the `sth` then stores the raw register.
  * RESIDUALS. mwcc-debugger dump, `lb_npc_map_setup`: regsim 6/6 callee-saved, 12/13 volatile, best plan cost 0;
  *            first divergence insn 43: retail `lbz r3, 0x0(r30)` vs ours `lbz r0, 0x0(r30)`
+ * SHAPES. `lb_player_control` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 #pragma optimization_level 4
 #include "types.h"
@@ -10167,11 +10167,11 @@ void lb_player_control(_PLW* self)
         do {
             if ((lobby_w.state_0x000 == 0 || lobby_w.state_0x000 == 10) && menu_busy_ck() == 0 &&
                 lb_cmd_pressed_ck(0x10) != 0) {
-                LbSpot* spot;
                 _LB_NPC* npc = lb_target_npc_get();
                 struct LbPlSearch* search = lb_plsearch_target_get();
-                LbPlaceRec* place;
                 u8 family;
+                LbPlaceRec* place;
+                LbSpot* spot;
                 u16 act;
 
                 spot = lb_spot_cur_get();

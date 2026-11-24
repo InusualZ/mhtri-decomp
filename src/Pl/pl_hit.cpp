@@ -54,6 +54,7 @@
  *   reads the NPC through a local pointer; the sound levels go through an `if`/`else if` chain into an `s32` local;
  *   `pl_elem_resist_get` lists `default:` first; `hit_id_list_absent_ck` is one 20-entry loop reading each entry into a
  *   local; `hit_owner_reaction_set` takes the reaction into an `s16`; the defence cut is the inline `hit_defense_apply`.
+ * SHAPES. `hit_damage_pl` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 #pragma optimization_level 4
@@ -803,9 +804,9 @@ extern "C" void hit_damage_pl(_PLW* plw, _HIT_W* hit, nw4r::math::VEC3* contact,
     f32 scale;
     f32 damage;
     f32 status;
-    u16 guard_angle;
     s16 resist;
     s16 amount;
+    u16 guard_angle;
     u16 elem;
 
     hit->result = 2;

@@ -53,6 +53,7 @@
  *   members are called as C++.  ExecCallbackC calls `calcMtxAngX` through a `u32` view (retail converts its
  *   result unmasked).  The destructor is compiled under `#pragma dont_inline on`: retail calls the base destructor
  *   out of line (`li r4,0; bl`), `-inline noauto` inlines it away.
+ * SHAPES. `ExecCallbackC` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
@@ -1368,11 +1369,11 @@ void ResUserDataAc::ExecCallbackC(nw4r::math::MTX34* pMtxArray, nw4r::g3d::ResMd
     item = em_user_data_items_get(work);
     count = mdl.GetResNodeNumEntries();
     for (i = 0; i < count; i++) {
-        const char* joint0;
-        const char* joint1;
-        f32 weight;
         u8 kind;
+        const char* joint0;
+        f32 weight;
         u32 k;
+        const char* joint1;
         {
             nw4r::g3d::ResNode found = mdl.GetResNode(i);
             res_node_assign(&node, &found);

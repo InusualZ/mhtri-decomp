@@ -90,6 +90,7 @@
  *            note_slot_table@l`
  * SHAPES. note_trade_open's `roll` is a `u32` (`seed % 100`, 0..99, so any width holds it; it raises the row, size off
  *   target by 4 B: 416 B against 420 B, a `u16` is 420 B).
+ * SHAPES. quest_area_spawn_apply: `j` is a `u16` slot counter (0..6; s32 leaves the size at 1428, u16 reaches the target's 1476).
  */
 
 #include "types.h"
@@ -733,7 +734,7 @@ extern "C" void quest_area_spawn_apply(Q_MoveWork* work, u8 index, u8 sub) {
     s32 n;
     QuestEntrySlot* slot;
     s8 keep[6];
-    s32 j;
+    u16 j;
     u8 slot_index;
     u16 max;
     entry = &em_area_entry_tbl[0][0];

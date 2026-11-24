@@ -49,7 +49,7 @@
  *    `lb_model_pane_draw` (the row text id from the
  *    unmasked counter), `lb_my_set_detail_draw`/`lb_gun_set_detail_draw` (the page row count re-masked at the use),
  *    (`lb_gun_set_detail_draw` also lacks two `b` after the `Gunner_opt_ok_ck` call, whose result retail discards inside an if/else shell)
- *    `lb_box_top_draw`, `lb_my_set_list_draw`, `lb_equip_set_pane_step`, `lb_equip_set_pane_init` (parameter homes),
+ *    `lb_box_top_draw`, `lb_equip_set_pane_step`, `lb_equip_set_pane_init` (parameter homes),
  *    `lb_equip_box_wear_step`, `lb_entry_pane_scroll_refresh` (the `kind == 10` test is `cmplwi`), `fn_801EE1E4`,
  *    `fn_801EDC4C`, `fn_801ED184`, `fn_801ED200`, `fn_801ED464`, `fn_801ED688`, `fn_801EDB34`;
  *  - `lb_equip_icon_cell_draw`: retail loads the `draw_frame_rect_z` float before `r7`/`r8` (a named
@@ -102,6 +102,9 @@
  *   narrows it with `(u16)` as retail does.
  * SHAPES. `lb_equip_box_wear_step` declares `entry` after `id` (regsim plan 1); `lb_color_pane_draw` takes the hill-climbed declaration order.
  * SHAPES. `fn_801EDC4C` and `lb_box_lists_draw` declare their locals in the order the declaration hill-climb measured best.
+ * SHAPES. lb_box_menu_draw: `str` is an `s32` (a string id, -1 or 0xC7..0xCD; s16 reads 98.51, s32 98.91, size 2172 vs target 2176 both ways).
+ * SHAPES. `lb_entry_pane_scroll_refresh` and `lb_my_set_list_draw` declare their locals in the order the declaration hill-climb measured best.
+ * SHAPES. `lb_my_set_list_draw` declares their locals in the order the regsim plan gave (the plan's order measures best).
  */
 #include "types.h"
 #include "id_value.h"
@@ -1976,8 +1979,8 @@ extern "C" void lb_entry_pane_scroll_refresh(LbEntryPane* self)
 {
     LbEquipRec set[3];
     LbEquipRec show[3];
-    LbItemDb* db;
     LbEquipRec* rec;
+    LbItemDb* db;
     u16 id;
     s16 rows;
     s16 row;
@@ -7053,11 +7056,11 @@ void lb_my_set_list_draw(::LbMySetPane* self)
     _mh_ivec2_ mark_pos;
     LbMySet* set;
     LbMySet* moved;
-    s32 room;
+    LbItemDb* db;
     s16 help;
     s16 reason;
-    LbItemDb* db;
     s16 reason_row;
+    s32 room;
     u8 same;
 
     db = (::LbItemDb*)lobby_world_block;
@@ -8084,7 +8087,7 @@ void lb_box_menu_draw(void)
     LbEquipPane* set;
     LbDyePane* dye;
     MenuSelCursor* cursor;
-    s16 str;
+    s32 str;
     s16 index;
     s32 count;
     u16 id;
