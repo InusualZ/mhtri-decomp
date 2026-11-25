@@ -71,6 +71,8 @@
  *    object: its scope-exit destructor emits retail's `extab` cleanup record; a stream retail builds mid-function is
  *    declared at that point, and `setNetworkConnectionEvent`'s reader lives in a block so it dies before the address.
  * SHAPES. `send` keeps `overhead` in a `u32` (holds the u16 frame overhead 0..0xFFFF; the u16 spelling was 4 B off).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: send: scope 0 order `queue`,
+ *   `connection`, `queues`, `result`, `sentTotal`, `sent`, `total`, `congestion`, `usable` | move: hoisted `queue`.
  */
 #include "types.h"
 #include "Network/NetworkPeerBase.h"
@@ -370,29 +372,30 @@ void NetworkSessionStable::move()
 {
     s8 j;
     s32 k;
-    s32 queued;
     s32 room;
     s32 consumed;
     s32 sendResult;
     s8 usable;
     s32 connectedCount;
+    s32 hostsOver;
     s32 hostsWarn;
     s32 subhostsOver;
-    s32 hostsOver;
     s32 subhostsWarn;
-    s32 sizes[4];
     s32 peers;
-    s32 length;
     s32 overhead;
-    u16 recordLength;
     u16 encoded;
-    f32 timeout;
     u8* buffer;
+    u8* queue;
     NetworkSessionSlot* first;
-    s32 channel;
-    NetworkConnectionStable* connection;
     NetworkSessionSlot* slot;
+    NetworkConnectionStable* connection;
     s8 index;
+    s32 channel;
+    s32 queued;
+    s32 sizes[4];
+    s32 length;
+    u16 recordLength;
+    f32 timeout;
 
     time_16CDC = getNetworkLogger()->getTime_60();
     for (index = 0, first = slots_14828, slot = first, buffer = sendBuffer_0D; index < 4; slot++, index++) {
@@ -588,7 +591,7 @@ void NetworkSessionStable::move()
                 length = 0;
                 consumed = 0;
                 if (slot->queueUsed_518[channel] > 0 && room > 0) {
-                    u8* queue = slot->queue_118 + (channel << 10);
+                    queue = slot->queue_118 + (channel << 10);
 
                     memcpy(&recordLength, queue, 2);
                     encoded = getNetworkLogger()->flag_48(recordLength);
@@ -1410,8 +1413,8 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
 {
     NetworkStreamWriterDefault writer;
     NetworkStreamWriter packet;
-    NetworkConnectionStable* connection;
     NetworkStreamQueue* queue;
+    NetworkConnectionStable* connection;
     NetworkSlotQueues* queues;
     s32 result;
     s32 sentTotal;

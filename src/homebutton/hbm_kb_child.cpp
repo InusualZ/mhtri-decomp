@@ -34,6 +34,8 @@
  * RESIDUALS. __sinit: the epilogue's `lwz r31` / `lwz r30` restores sit before the last stores in retail and after
  *            them in ours (scheduling).
  * FLAGS. HbmKbChild::create: scoped `opt_loop_invariants off` + `opt_strength_reduction off` (97.70 -> 98.56, size equal).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: create: hoisted `j`, `pPart`,
+ *   `numAnims`.
  */
 
 #include "types.h"
@@ -186,6 +188,10 @@ HbmKbChildPaneHandler::~HbmKbChildPaneHandler() {}
  * its animations. */
 void HbmKbChild::create(MEMAllocator* allocator) {
     const char* group;
+    u16 j;
+    u16 i;
+    HbmKbChildPart* pPart;
+    u32 numAnims;
 
     HbmKbChildBase::create(allocator);
     HbmKbChildPaneHandler* pHandler =
@@ -194,9 +200,9 @@ void HbmKbChild::create(MEMAllocator* allocator) {
     HbmPaneManager::create(allocator, pHandler);
     mpRoot->setVisible(0);
     mpRoot->setEnable(1);
-    for (u16 i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {
         const HbmKbChildKeyDef* def = &hbmKbChildKeyDefs[i];
-        HbmKbChildPart* pPart = NULL;
+        pPart = NULL;
         switch (def->type) {
         case 2:
             pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbChildPartC)))
@@ -213,8 +219,8 @@ void HbmKbChild::create(MEMAllocator* allocator) {
         }
         nw4r::ut::List_Append(&mComponents, pPart);
         group = def->group;
-        u16 j = 0;
-        u32 numAnims = def->numAnims;
+        j = 0;
+        numAnims = def->numAnims;
         for (; j < numAnims; j++) {
             const void* res = mpResAccessor->GetResource(0, def->anims[j]->name, NULL);
             nw4r::lyt::AnimTransform* anim = getLayout()->CreateAnimTransform(res, mpResAccessor);

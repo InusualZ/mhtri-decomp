@@ -25,6 +25,8 @@
  *   the accessor copies are defined by the NW4R_G3D_RESOURCE_* macros (g3d/g3d_rescommon.h) in retail order.
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: fn_8007270C: scope 24 order
+ *   `numKeyShape`, `out`, `count`, `end`, `pKeyEnd`; scope 38 order `numKeyShape`, `out`, `count`, `end`, `pKeyEnd`.
  */
 
 #include "types.h"
@@ -322,7 +324,12 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             if (!resVtxNrm.IsValid()) {
                 nw4r::db::Panic("g3d_calcvtx.cpp", 0xC4, "NW4R:Failed assertion resVtxNrm.IsValid()");
             }
-            s32 numKeyShape = 0;
+            s32 numKeyShape;
+            nw4r::math::VEC3* out;
+            u32 count;
+            nw4r::math::VEC3* end;
+            BlendKey* pKeyEnd;
+            numKeyShape = 0;
             ResVtxNrm dst(const_cast<void*>(vtxNrmTable[resVtxNrm.GetID()]));
             nw4r::math::VEC3* dstVtx = (nw4r::math::VEC3*)dst.GetData();
             BlendKey keys[33];
@@ -354,10 +361,10 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             if (numKeyShape <= 0) {
                 nw4r::db::Panic("g3d_calcvtx.cpp", 0xF0, "NW4R:Failed assertion numKeyShape > 0");
             }
-            u32 count = resVtxNrm.GetNumVtxNrm();
-            nw4r::math::VEC3* out = dstVtx;
-            nw4r::math::VEC3* end = out + count;
-            BlendKey* pKeyEnd = &keys[numKeyShape];
+            count = resVtxNrm.GetNumVtxNrm();
+            out = dstVtx;
+            end = out + count;
+            pKeyEnd = &keys[numKeyShape];
             while (out < end) {
                 register f32 w = keys[0].mWeight;
                 register const f32* pSrc = keys[0].mpVtx;
@@ -394,7 +401,12 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             if (!resVtxClr.IsValid()) {
                 nw4r::db::Panic("g3d_calcvtx.cpp", 0x146, "NW4R:Failed assertion resVtxClr.IsValid()");
             }
-            s32 numKeyShape = 0;
+            s32 numKeyShape;
+            f32* out;
+            u32 count;
+            f32* end;
+            BlendKey* pKeyEnd;
+            numKeyShape = 0;
             ResVtxClr dst(const_cast<void*>(vtxClrTable[resVtxClr.GetID()]));
             f32* dstVtx = (f32*)dst.GetData();
             BlendKey keys[33];
@@ -426,10 +438,10 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             if (numKeyShape <= 0) {
                 nw4r::db::Panic("g3d_calcvtx.cpp", 0x172, "NW4R:Failed assertion numKeyShape > 0");
             }
-            u32 count = resVtxClr.GetNumVtxClr();
-            f32* out = dstVtx;
-            f32* end = out + count;
-            BlendKey* pKeyEnd = &keys[numKeyShape];
+            count = resVtxClr.GetNumVtxClr();
+            out = dstVtx;
+            end = out + count;
+            pKeyEnd = &keys[numKeyShape];
             while (out < end) {
                 register f32 w = keys[0].mWeight;
                 register const f32* pSrc = keys[0].mpVtx;

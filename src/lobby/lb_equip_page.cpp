@@ -80,6 +80,9 @@
  *            tool refuses: the temporary is not a local plus field offset); register colouring is the only difference.
  * FLAGS. `pl_rig_model_move` takes a scoped `#pragma opt_lifetimes off`.
  * SHAPES. `pl_rig_model_move` declares `i` before `flag` (declaration-order hill climb).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: pl_rig_hair_parts_map: hoisted
+ *   `len` | pl_rig_slot_bind: hoisted `len`, `mdl` | lb_ship_holds_fill: hoisted `roll`, `cell`, `rolls`, `order`,
+ *   `voyages`, `i`, `table`, `chance`, `got`, `missed`, `bonus`.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -327,22 +330,23 @@ void lb_ship_voyage_tick(void)
 void lb_ship_holds_fill(LbShipWork* work, LbShipBlock* trade)
 {
     s32 ship;
+    s32 roll;
+    Eft052BoxCell* cell;
+    s32 rolls;
+    LbShipOrder* order;
+    s16 voyages;
+    s32 i;
+    s16 table;
+    u16 chance;
+    u16 got;
+    u16 missed;
+    u16 bonus;
 
     memset(work->holds_0x0E0, 0, sizeof(work->holds_0x0E0));
     for (ship = 0; ship < 3; ship++) {
-        LbShipOrder* order = &trade->orders_0x04[ship];
-        s16 voyages;
+        order = &trade->orders_0x04[ship];
 
         for (voyages = order->voyages_seen_0x05 - order->voyages_0x04; voyages > 0; voyages--) {
-            Eft052BoxCell* cell;
-            s32 i;
-            s32 rolls;
-            s16 table;
-            u16 chance;
-            u16 got;
-            u16 missed;
-            u16 bonus;
-            s32 roll;
 
             for (i = 0; i < 30; i++) {
                 if (work->holds_0x0E0[ship][i].item_0x00 == 0) {
@@ -2195,10 +2199,12 @@ void pl_rig_hair_color_set(PlSeRig* rig, _GXColor* color)
 /* 0x80223878 (0xD0): Maps each node of the hair model to the hair part its name starts with. */
 void pl_rig_hair_parts_map(PlSeRig* rig)
 {
-    u8 part;
-    MHchar* model = &rig->models_0x004[5].model;
+    s32 len;
+    MHchar* model;
     u32 count;
     u32 node;
+    u8 part;
+    model = &rig->models_0x004[5].model;
 
     if (model->field_0x118 == 0) {
         return;
@@ -2210,7 +2216,7 @@ void pl_rig_hair_parts_map(PlSeRig* rig)
     for (node = 0; node < count; node++) {
         for (part = 0; part < 9; part++) {
             nw4r::g3d::ResNode res = pl_rig_res_mdl(model)->GetResNode(node);
-            s32 len = strlen(pl_rig_hair_part_names[part]);
+            len = strlen(pl_rig_hair_part_names[part]);
 
             if (memcmp(pl_rig_hair_part_names[part], em007_res_node_name((ResHandle*)&res), len) == 0) {
                 rig->hair_part_0x9E3[node] = part;
@@ -2594,6 +2600,8 @@ void pl_rig_slot_bind(PlSeRig* rig, PlSeSlot* slot, u32 index)
 {
     nw4r::g3d::ResNode res(0);
     u32 count;
+    s32 len;
+    nw4r::g3d::ResMdl* mdl;
     u32 node;
 
     slot->body_0x08 = &rig->models_0x004[0].model;
@@ -2676,13 +2684,13 @@ void pl_rig_slot_bind(PlSeRig* rig, PlSeSlot* slot, u32 index)
         slot->node_map_0x10[0] = res_node_mtx_id_get((ResHandle*)&res);
     }
     {
-        nw4r::g3d::ResMdl* mdl = pl_rig_res_mdl(&rig->models_0x004[index].model);
+        mdl = pl_rig_res_mdl(&rig->models_0x004[index].model);
 
         count = mdl->GetResNodeNumEntries();
         if (index - 4 <= 1) {
             for (node = 1; node < count; node++) {
                 nw4r::g3d::ResNode own = mdl->GetResNode(node);
-                s32 len = strlen(pl_rig_node_cl);
+                len = strlen(pl_rig_node_cl);
 
                 if (memcmp(em007_res_node_name((ResHandle*)&own), pl_rig_node_cl, len) != 0) {
                     pl_rig_slot_node_map(rig, slot, index, node);

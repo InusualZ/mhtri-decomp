@@ -274,6 +274,9 @@
  *            order).
  * RESIDUALS. equip_skill_tree_has_ck: an if chain `(u8)(kind - 7) > 8 / (u8)(kind - 1) <= 4 / kind == 6` measured worse than the
  *            switch.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: pl_kind_item_equip_find: hoisted
+ *   `slot` | equip_gun_clip_get: scope 0 order `rec`, `kind`, `clip` | pl_weapon_parts_refresh: scope 0 order `rig`,
+ *   `barrel`, `stock`, `changed`, `variant`, `obj`, `forced`, `cur`, `id`, `type`.
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -813,12 +816,12 @@ void pl_id_bit_clear(_PLW* self, s32 id)
 #pragma optimization_level 4
 u32 pl_weapon_parts_refresh(s32 player, _EQUIP* weapon, _EQUIP* parts)
 {
-    _PLOBJ* obj;
     PlSeRig* rig;
-    u16 variant;
-    s32 changed;
     u16 barrel;
     u16 stock;
+    s32 changed;
+    u16 variant;
+    _PLOBJ* obj;
     s32 forced;
     s32 cur;
     s32 id;
@@ -10194,6 +10197,7 @@ extern "C" u16 pl_kind_item_slot_find(_PLW* self, s32 arg1) {
 
 /* Scans the same id table for the equipped slot that carries the id. */
 extern "C" u16 pl_kind_item_equip_find(_PLW* self, s32 arg1) {
+    u16 slot;
     u16* table;
     switch (arg1) {
     case 0:
@@ -10209,7 +10213,7 @@ extern "C" u16 pl_kind_item_equip_find(_PLW* self, s32 arg1) {
         return 0xFFFF;
     }
     while (*table != 0xFFFF) {
-        u16 slot = self->field_0x304;
+        slot = self->field_0x304;
         if (*table == self->slot_id[slot].item_id && self->slot_id[slot].value > 0) {
             return slot;
         }
@@ -10775,8 +10779,10 @@ u8 equip_bowgun_frame_kind_get(_EQUIP* equip)
 s32 equip_gun_clip_get(_EQUIP* equip, u8 shell)
 {
     PlWeaponRec* rec;
-    u8 clip = 0;
-    s32 kind = equip->kind;
+    s32 kind;
+    u8 clip;
+    clip = 0;
+    kind = equip->kind;
 
     if ((u32)(kind - 12) > 1) {
         if (kind == 11) {

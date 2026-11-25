@@ -49,6 +49,8 @@
  *        base).
  * RESIDUALS. mwcc-debugger dump, `fn_80100330`: regsim 1/1 callee-saved, 19/22 volatile, best plan cost 1; first
  *            divergence insn 5: retail `li r4, 0x1` vs ours `li r5, 0x1`
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: fn_80100330: scope 0 order `ok2`,
+ *   `ok1`, `ok3`, `ok4`, `ok5`, `ok6`, `top`.
  */
 
 #include "types.h"
@@ -2058,8 +2060,20 @@ extern "C" void* fn_8010030C(void* p)
 /* Asserts that the value is a valid console pointer and returns it. */
 extern "C" u32 fn_80100330(u32* p)
 {
-    BOOL ok1 = TRUE, ok2 = TRUE, ok3 = TRUE, ok4 = TRUE, ok5 = TRUE, ok6 = TRUE;
-    u32 top = *p & 0xFF000000u;
+    BOOL ok2;
+    BOOL ok1;
+    BOOL ok3;
+    BOOL ok4;
+    BOOL ok5;
+    BOOL ok6;
+    u32 top;
+    ok1 = TRUE;
+    ok2 = TRUE;
+    ok3 = TRUE;
+    ok4 = TRUE;
+    ok5 = TRUE;
+    ok6 = TRUE;
+    top = *p & 0xFF000000u;
 
     if (!(top == 0x80000000u) && !((*p & 0xFF800000u) == 0x81000000u))
         ok6 = FALSE;

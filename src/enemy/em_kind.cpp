@@ -37,6 +37,8 @@
  *            fn_80140E48/fn_80140FB0: regsim differs on the mulli result (r38 r4 vs retail r5) while the flag mask
  *            sits in r6; `u32 ctx = flag` declared first measures 94.5 %.
  * SHAPES. fn_8013D054's `value` is a `u8` (row 100 %).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: fn_80140354: scope 2 order
+ *   `found`, `hit_team`, `count`.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -2641,9 +2643,12 @@ s16 fn_80140354(_ENEMY_WORK* self, u8* in) {                    /* 0x67 */
 
     switch (in[0]) {
     case 0: {
-        u8 hit_team = in[1];
-        u8 found = 0;
-        u16 count = get_move_work_max(3);
+        u8 found;
+        u8 hit_team;
+        u16 count;
+        hit_team = in[1];
+        found = 0;
+        count = get_move_work_max(3);
         _ENEMY_WORK* rec = (_ENEMY_WORK*)get_move_work_adrs(3);
         for (u16 i = 0; i < count; i++, rec++) {
             if (self->group != i && rec->active != 0 && rec->team == hit_team &&

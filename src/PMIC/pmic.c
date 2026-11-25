@@ -37,6 +37,12 @@
  *    Functions are defined in address order (forward declarations above `PMICInit`), so the .text layout is the
  *    target's; the shared macros and `PMICPopQueue` are defined ahead of the first body.
  * FLAGS. PMICFilterSamples: scoped `#pragma opt_lifetimes off` (92.05 -> 94.54, size equal).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: PMICInit: scope 0 order `level`,
+ *   `capData0`, `capSizes0`, `capData1`, `base`, `playIso1`, `playIso0`, `playData1`, `playData0`, `playSizes0`, `i`,
+ *   `playSizes1`, `packet`, `capSizes1`, `capIso1`; scope 0 order `level`, `capSizes0`, `base`, `capData0`, `packet`,
+ *   `playIso1`, `playData0`, `playData1`, `capData1`, `playSizes1`, `playSizes0`, `playIso0`, `i`, `capSizes1`,
+ *   `capIso1`; scope 0 order `level`, `capSizes0`, `base`, `capData0`, `packet`, `playIso1`, `playIso0`, `playData1`,
+ *   `playData0`, `playSizes1`, `i`, `capData1`, `playSizes0`, `capSizes1`, `capIso1`.
  */
 
 #include "types.h"
@@ -327,21 +333,21 @@ static inline PMICRequest* PMICPopQueue(void)
 s32 PMICInit(u8* work, s32 size)
 {
     u32 level;
-    u8* base;
-    u8* chunk;
-    u8* capData0;
     u8* capSizes0;
+    u8* chunk;
+    u8* base;
+    u8* capData0;
+    u8* packet;
     u8* playIso1;
-    u8* capData1;
-    u8* playData1;
     u8* playIso0;
-    u8* playSizes0;
-    u8* playSizes1;
+    u8* playData1;
     u8* playData0;
+    u8* playSizes1;
+    s32 i;
+    u8* capData1;
+    u8* playSizes0;
     u8* capSizes1;
     u8* capIso1;
-    u8* packet;
-    s32 i;
     s32 result;
 
     level = OSDisableInterrupts();

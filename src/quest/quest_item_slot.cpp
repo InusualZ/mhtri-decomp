@@ -39,6 +39,8 @@
  * SHAPES. `quest_item_pair_copy_row` passes post-incremented pointers (`item_pair_copy(dst++, rec++)`).
  * SHAPES. quest_item_slot_add: `i` is an `s16` (counts 0..4 over the five slots; ours is 436 B against the target's 432 B,
  *   an `s32` is 420 B).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: quest_item_pair_copy_block:
+ *   hoisted `n`, `flagged`, `rec`.
  */
 
 #include "quest/quest_item_slot.h"
@@ -155,11 +157,13 @@ s32 quest_record_b_count_get_wide(s32 kind) {
 /* Zeroes the first slot, then copies the item record's leading slice into it: 0x10 slots while the
  * caller's `kind` is 2 or the slot's own progress flag is set, 0x18 otherwise. */
 void quest_item_pair_copy_block(Q_ItemPair* dst, u16 id, u8 kind) {
+    s32 n;
+    s32 flagged;
+    Q_ItemPair* rec;
     dst[0].id = 0;
     dst[0].num = 0;
     if (id != 0xFFFF) {
-        Q_ItemPair* rec;
-        s32 flagged = 0;
+        flagged = 0;
 
         if (id >= 0x64) {
             rec = q_item_pair_tbl_high[id - 0x64];
@@ -173,7 +177,7 @@ void quest_item_pair_copy_block(Q_ItemPair* dst, u16 id, u8 kind) {
             flagged = 1;
         }
         if (rec != 0) {
-            s32 n = 0x10;
+            n = 0x10;
             if (flagged == 0) {
                 n = 0x18;
             }

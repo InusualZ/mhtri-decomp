@@ -43,6 +43,8 @@
  *            insn 33: retail `b 0x164` vs ours `<DIFF_DELETE>`; size differs from retail (280 B vs 276 B)
  * RESIDUALS. mwcc-debugger dump, `em032_act11_se_play`: regsim 0/0 callee-saved, 16/16 volatile (EXACT); first
  *            divergence insn 39: retail `ble 0x397c` vs ours `ble 0x39b0`
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: em032_frame_update: hoisted `em`,
+ *   `max`, `i`, `pl`, `shell`.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -418,8 +420,15 @@ extern "C" u32 em032_area_attacker_ck(u8 area) {
  * live attack aimed at the record (a player's, another enemy's or a shell's) to dodge from. */
 extern "C" void em032_frame_update(_ENEMY_WORK* work) {
     f32 reach;
-    s32 found = 0;
-    s32 remain = quest_time_limit_get();
+    _ENEMY_WORK* em;
+    s32 found;
+    s32 remain;
+    u32 max;
+    u16 i;
+    EmAreaWork* pl;
+    _SHELL_W* shell;
+    found = 0;
+    remain = quest_time_limit_get();
 
     remain -= quest_time_elapsed_get();
     em_shake_req_set(work);
@@ -451,11 +460,6 @@ extern "C" void em032_frame_update(_ENEMY_WORK* work) {
         case 6:
             switch (work->field_0x43B) {
             case 0: {
-                u32 max;
-                EmAreaWork* pl;
-                u16 i;
-                _ENEMY_WORK* em;
-                _SHELL_W* shell;
 
                 max = get_move_work_max(2);
                 pl = (EmAreaWork*)get_move_work_adrs(2);

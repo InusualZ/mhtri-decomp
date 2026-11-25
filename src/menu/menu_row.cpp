@@ -32,6 +32,8 @@
  *   callers narrow its result with `clrlwi 16`).
  * RESIDUALS. mwcc-debugger dump, `note_slot_cursor_step`: regsim 3/3 callee-saved, 8/9 volatile, best plan cost 0;
  *            first divergence insn 34: retail `lbz r4, 0x0(r29)` vs ours `lbz r3, 0x0(r29)`
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: place_list_overlap_find: hoisted
+ *   `rec_x2`, `rec_y2`.
  */
 
 #include "types.h"
@@ -338,10 +340,14 @@ extern "C" void place_list_deactivate_all(void) {
 /* Returns the index of the first active record whose rectangle overlaps the given box. */
 extern "C" s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height) {
     s16 left;
-    s16 right;
-    MenuPlaceRec* rec = menu_work.slot[0].place_entries;
     s16 top;
+    s16 right;
+    MenuPlaceRec* rec;
+    s16 rec_x2;
+    s16 rec_y2;
+    s32 i;
     s16 bottom;
+    rec = menu_work.slot[0].place_entries;
 
     if (rec == 0) {
         return -1;
@@ -350,10 +356,10 @@ extern "C" s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height) {
     right = (s16)(x + width / 2);
     top = (s16)(y - height / 2);
     bottom = (s16)(y + height / 2);
-    for (s32 i = 0; i < menu_work.slot[0].place_count; i++, rec++) {
+    for (i = 0; i < menu_work.slot[0].place_count; i++, rec++) {
         if (rec->active != 0) {
-            s16 rec_x2 = (s16)(rec->pos_x + rec->width);
-            s16 rec_y2 = (s16)(rec->pos_y + rec->height);
+            rec_x2 = (s16)(rec->pos_x + rec->width);
+            rec_y2 = (s16)(rec->pos_y + rec->height);
             s16 rec_x = rec->pos_x;
             s16 rec_y = rec->pos_y;
 

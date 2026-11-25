@@ -67,6 +67,8 @@
  *   92.9 % at 2268 B, one `do { switch } while (0)` holding both tails after the switch 90.9 %);
  *   `save_nand_read_step` breaks out of its result switch into the one failure report after it.
  * SHAPES. `plsearch_page19_step` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: plsearch_page19_step: scope 0
+ *   order `scroll`, `ret`, `lobby`, `view`, `friends`, `card`, `resume`, `input`.
  */
 
 #include "types.h"
@@ -2871,15 +2873,22 @@ void plsearch_page19_open(MenuSlot* slot) {
 
 /* 0x8044BF38 (0x85C): steps the player search page; 2 when it closes, 3 on a request failure, 4 when it ends. */
 s32 plsearch_page19_step(MenuSlot* slot) {
-    s32 ret = 0;
-    MenuScroll* scroll = &slot->scroll;
-    LobbyTimerBlock* lobby = &lobby_state_block;
-    FriendCardView* view = &friend_card_view;
-    NetFriendListView* friends = (NetFriendListView*)lobby->block_0x0488;
+    MenuScroll* scroll;
+    s32 ret;
+    LobbyTimerBlock* lobby;
+    FriendCardView* view;
+    NetFriendListView* friends;
     NetPeerCard* card;
+    s32 resume;
+    u16 input;
+    ret = 0;
+    scroll = &slot->scroll;
+    lobby = &lobby_state_block;
+    view = &friend_card_view;
+    friends = (NetFriendListView*)lobby->block_0x0488;
     const s32* args;
-    s32 resume = 0;
-    u16 input = slot->buttons_trig | (slot->field_0x008 & 0xF);
+    resume = 0;
+    input = slot->buttons_trig | (slot->field_0x008 & 0xF);
 
     slot->move_result_0x238 = 0;
     switch (slot->field_0x001) {

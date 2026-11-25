@@ -66,6 +66,8 @@
  * SHAPES. lb_farm_seed_info_draw declares `id` before `row` (`mt.py hill` order search; raises its row).
  * SHAPES. lb_trade_page_draw: `id` is an `s32` holding the u16 row id (0..0xFFFF) that `key[0]` and the cell draw take.
  * SHAPES. `lb_hunt_info_draw` declares its locals in the order the declaration hill-climb measured best.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: lb_farm_seed_list_draw: scope 0
+ *   order `cell`, `id`, `i`, `ok`, `enabled`, `seed`, `sel`.
  */
 #include "types.h"
 
@@ -2563,10 +2565,10 @@ void lb_farm_seed_list_draw(LbFarmWork* self)
     _mh_ivec2_* cell;
     const u16* id;
     s32 i;
-    s32 sel;
     s8 ok;
     s32 enabled;
     u8 seed;
+    s32 sel;
 
     get_lsp_data(0x17EB, &anchor);
     draw_sprite_ary(lb_farm_seed_list_frame, &anchor);

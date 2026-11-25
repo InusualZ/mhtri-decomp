@@ -58,6 +58,10 @@
  *   compares against the zero it just stored is written as a compare with that field (`fn_80109A84`).
  * FLAGS. eft013_setup_uv_model: scoped `#pragma opt_propagation off` (95.31 -> 95.60, size equal).
  * SHAPES. `eft013_setup_effect` declares their locals in the order the declaration hill-climb measured best.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: eft013_setup_uv_model: hoisted
+ *   `pl`, `enemy`, `npc` | fn_8010B198: hoisted `joint`, `sc`, `id`, `s`; scope 0 order `i`, `slot`, `n`, `work`,
+ *   `src`, `scales`, `sc`, `id`, `joint`, `ids`, `joints`, `phases`, `counts`, `max_time`, `s` | eft013_setup_effect:
+ *   hoisted `pl`, `enemy`, `npc`.
  */
 
 #include "types.h"
@@ -1735,15 +1739,21 @@ extern "C" void fn_8010B198(_EFT013* self) {
     s32 i;
     s32 slot;
     s32 n;
-    _EFT014_POOL_A* work = (_EFT014_POOL_A*)self->work_0x38;
-    _ENEMY_WORK* src = self->source_0x30;
-    nw4r::math::MTX34 mtx;
+    _EFT014_POOL_A* work;
+    _ENEMY_WORK* src;
     f32** scales;
+    f32* sc;
+    u16* id;
+    s32* joint;
+    u16** ids;
     s32** joints;
     u32 phases;
-    u16** ids;
     s8* counts;
     s32 max_time;
+    _EFT014_SLOT_A* s;
+    work = (_EFT014_POOL_A*)self->work_0x38;
+    src = self->source_0x30;
+    nw4r::math::MTX34 mtx;
     nw4r::math::VEC3 v;
     switch (self->type_0x02) {
     case 0:
@@ -1774,8 +1784,8 @@ extern "C" void fn_8010B198(_EFT013* self) {
     if (self->field_0x10 <= 0) {
         if (work->phase_0xCF < phases) {
             n = counts[work->phase_0xCF];
-            u16* id = ids[work->phase_0xCF];
-            s32* joint = joints[work->phase_0xCF];
+            id = ids[work->phase_0xCF];
+            joint = joints[work->phase_0xCF];
             for (i = 0; i < n; i++) {
                 for (slot = 0; slot < 16; slot++) {
                     if (work->slots[slot].active == 0) {
@@ -1785,7 +1795,7 @@ extern "C" void fn_8010B198(_EFT013* self) {
                 if (slot >= 16) {
                     break;
                 }
-                _EFT014_SLOT_A* s = &work->slots[slot];
+                s = &work->slots[slot];
                 s->effect = res_eft_create(*id, 38, 0);
                 if (s->effect == NULL) {
                     fn_8010BBDC(self);
@@ -1799,7 +1809,7 @@ extern "C" void fn_8010B198(_EFT013* self) {
                 joint++;
             }
             if (scales != NULL) {
-                f32* sc = scales[work->phase_0xCF];
+                sc = scales[work->phase_0xCF];
                 for (i = 0; i < n; i++) {
                     change_paramscale_eff(work->slots[slot].effect, *sc);
                     sc++;
@@ -1836,17 +1846,20 @@ extern "C" void fn_8010B198(_EFT013* self) {
  * start sound. */
 extern "C" void eft013_setup_effect(_EFT013* self) {
     _EFT013_WORK_F* work;
-    _ENEMY_WORK* src;
-    u16 grp;
+    _EFT013_PL4* pl;
     u16 id;
+    u16 grp;
     s8 delta;
+    _EFT013_ENEMY_VIEW* enemy;
+    _EFT013_NPC* npc;
+    _ENEMY_WORK* src;
     work = (_EFT013_WORK_F*)self->work_0x38;
     nw4r::math::VEC3 off;
     nw4r::math::MTX34 mtx;
     switch (work->field_0x44) {
     case 0: {
         src = self->source_0x30;
-        _EFT013_PL4* pl = (_EFT013_PL4*)src;
+        pl = (_EFT013_PL4*)src;
         if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -1885,7 +1898,7 @@ extern "C" void eft013_setup_effect(_EFT013* self) {
     }
     case 1: {
         src = self->source_0x30;
-        _EFT013_ENEMY_VIEW* enemy = (_EFT013_ENEMY_VIEW*)src;
+        enemy = (_EFT013_ENEMY_VIEW*)src;
         if (em_work_die_ck((_ENEMY_WORK*)enemy) != 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -1964,7 +1977,7 @@ extern "C" void eft013_setup_effect(_EFT013* self) {
     }
     case 2: {
         src = self->source_0x30;
-        _EFT013_NPC* npc = (_EFT013_NPC*)src;
+        npc = (_EFT013_NPC*)src;
         if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -2120,10 +2133,15 @@ extern "C" void eft013_setup_effect(_EFT013* self) {
 /* 0x801086C4 (0x2FC): state 0 of the model effects (types 9, 13, 26-29): creates the pooled effects and the UV
  * model, seats the effects on the source joint, picks the start timer and plays the start sound. */
 extern "C" void eft013_setup_uv_model(_EFT013* self) {
+    s32 i;
+    _EFT013_PL4* pl;
+    _ENEMY_WORK* enemy;
+    _EFT013_NPC* npc;
+    _EFT013_WORK_M* work;
     nw4r::math::VEC3 pos;
-    _EFT013_WORK_M* work = (_EFT013_WORK_M*)self->work_0x38;
+    work = (_EFT013_WORK_M*)self->work_0x38;
     self->state_0x05++;
-    for (s32 i = 0; i < work->count; i++) {
+    for (i = 0; i < work->count; i++) {
         work->effects[0] = res_eft_create(241, 29, 0);
         if (work->effects[0] == NULL) {
             fn_8010A318(self);
@@ -2149,7 +2167,7 @@ extern "C" void eft013_setup_uv_model(_EFT013* self) {
     self->flag_0x01 = 1;
     switch (work->state_0x28) {
     case 0: {
-        _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+        pl = (_EFT013_PL4*)self->source_0x30;
         if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -2159,7 +2177,7 @@ extern "C" void eft013_setup_uv_model(_EFT013* self) {
         break;
     }
     case 1: {
-        _ENEMY_WORK* enemy = self->source_0x30;
+        enemy = self->source_0x30;
         if (em_work_die_ck(enemy) != 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
@@ -2169,7 +2187,7 @@ extern "C" void eft013_setup_uv_model(_EFT013* self) {
         break;
     }
     case 2: {
-        _EFT013_NPC* npc = (_EFT013_NPC*)self->source_0x30;
+        npc = (_EFT013_NPC*)self->source_0x30;
         if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;

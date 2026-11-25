@@ -98,6 +98,8 @@
  *            at function scope, then `cb`, `level`, `i` (the regsim plan order).
  * SHAPES. `WUDiLoadDeviceInfo` declares their locals in the order the declaration hill-climb measured best.
  * SHAPES. `WUDiLoadDeviceInfo` declares their locals in the order the regsim plan gave (the plan's order measures best).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: WUDiInsertWbcNode: hoisted `node`,
+ *   `other`, `head`, `cur` | : hoisted `history`.
  */
 
 #include "types.h"
@@ -2566,20 +2568,24 @@ void WUDiMoveWbcToTail(WUDDevice* device)
 #pragma opt_common_subs off
 void WUDiInsertWbcNode(WUDDevice* device)
 {
-    u32 level;
-    WUDCB* cb = &wudCB;
+    WUDDeviceNode* node;
+    WUDCB* cb;
     s32 i;
+    u32 level;
+    WUDDevice* other;
+    WUDDeviceNode* head;
+    WUDDeviceNode* cur;
+    cb = &wudCB;
 
     level = OSDisableInterrupts();
     for (i = 0; i < 6; i++) {
-        WUDDeviceNode* node = &cb->wbcNodes[i];
+        node = &cb->wbcNodes[i];
 
         if (memcmp(node->device->bdAddr, device->bdAddr, 6) == 0) {
-            WUDDeviceNode* head = cb->wbcHead;
-            WUDDeviceNode* cur;
+            head = cb->wbcHead;
 
             for (cur = head; cur != NULL; cur = cur->next) {
-                WUDDevice* other = cur->device;
+                other = cur->device;
 
                 if (memcmp(other->bdAddr, device->bdAddr, 6) != 0 && other->linkState <= 1) {
                     if (memcmp(head->device->bdAddr, cb->wbcNodes[i].device->bdAddr, 6) == 0) {
@@ -2813,12 +2819,14 @@ void CleanupCallback(s32 result)
  * request with the host address, keeps the link key of a completed authentication and counts the links. */
 void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
 {
-    WUDCB* cb = &wudCB;
-    WUDDevice* device;
+    WUDCB* cb;
     const u8* pinAddr;
-    u8 pin[6];
+    WUDDevice* device;
     u32 level;
+    u8* history;
     u32 i;
+    cb = &wudCB;
+    u8 pin[6];
 
     WUDiDebugPrint("__wudCleanupStackCallback: ");
     switch (event) {
@@ -2918,7 +2926,7 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
             }
             if (data->link_down.status == 0x15) {
                 for (i = 0; i < 4; i++) {
-                    u8* history = wudBtDeviceInfo.devices[(u8)i + 10].bdAddr;
+                    history = wudBtDeviceInfo.devices[(u8)i + 10].bdAddr;
 
                     if (memcmp(history, data->link_down.bd_addr, 6) == 0) {
                         memset(history, 0, sizeof(WUDScDevice));

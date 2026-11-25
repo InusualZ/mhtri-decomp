@@ -32,6 +32,8 @@
  * RESIDUALS. HbmAnimPanelBase's table is not this unit's: its key function is slot 0x40, kept at 0x80454970 by another
  *            unit, so the member is declared and never defined here.
  * FLAGS. HbmAnimPanel::create: scoped `opt_loop_invariants off` + `opt_strength_reduction off` (97.98 -> 98.74, size equal).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: create: hoisted `j`, `pPart`,
+ *   `numAnims`.
  */
 
 #include "types.h"
@@ -342,6 +344,10 @@ HbmAnimPanelPaneHandler::~HbmAnimPanelPaneHandler() {}
  * its animations. */
 void HbmAnimPanel::create(MEMAllocator* allocator) {
     const char* group;
+    u16 j;
+    u16 i;
+    HbmAnimPart* pPart;
+    u32 numAnims;
 
     HbmAnimPanelBase::create(allocator);
     HbmAnimPanelPaneHandler* pHandler =
@@ -350,9 +356,9 @@ void HbmAnimPanel::create(MEMAllocator* allocator) {
     HbmPaneManager::create(allocator, pHandler);
     mpRoot->setVisible(0);
     mpRoot->setEnable(1);
-    for (u16 i = 0; i < 25; i++) {
+    for (i = 0; i < 25; i++) {
         const HbmKbChildKeyDef* def = &hbmAnimPanelKeyDefs[i];
-        HbmAnimPart* pPart = NULL;
+        pPart = NULL;
         switch (def->type) {
         case 2:
             pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmAnimPartA)))
@@ -369,8 +375,8 @@ void HbmAnimPanel::create(MEMAllocator* allocator) {
         }
         nw4r::ut::List_Append(&mComponents, pPart);
         group = def->group;
-        u16 j = 0;
-        u32 numAnims = def->numAnims;
+        j = 0;
+        numAnims = def->numAnims;
         for (; j < numAnims; j++) {
             const void* res = mpResAccessor->GetResource(0, def->anims[j]->name, NULL);
             nw4r::lyt::AnimTransform* anim = getLayout()->CreateAnimTransform(res, mpResAccessor);

@@ -34,6 +34,8 @@
  * SHAPES. `lb_barter_list_draw` declares `enabled`, `tab`, `type` in that order (regsim plan 1).
  * SHAPES. `eft_em_move` declares their locals in the order the declaration hill-climb measured best.
  * SHAPES. eft_em_model_create declares its locals in the order regsim plan 1 gave (99.94 -> 100).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: lb_kujira_menu_draw: scope 0 order
+ *   `sel`, `i`, `count`, `flags`.
  */
 #include "types.h"
 #include "ef.h"
@@ -1353,9 +1355,9 @@ void lb_kujira_menu_draw(LbBarterWork* work) {
     _mh_ivec2_ panel;
     _mh_ivec2_ pos;
     _SPR_DATA_ spr;
-    u8 count;
-    u8 i;
     bool sel;
+    u8 i;
+    u8 count;
     u32 flags;
 
     get_lsp_data(0x23D9, &base);

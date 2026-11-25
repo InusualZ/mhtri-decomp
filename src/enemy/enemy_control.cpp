@@ -38,6 +38,10 @@
  * RESIDUALS. mwcc-debugger dump, `em_variant_element_pick`: regsim 7/7 callee-saved, 18/18 volatile (EXACT); first
  *            divergence insn 31: retail `lwz r3, 0x4(r27)` vs ours `lwz r5, 0x4(r27)`
  * FLAGS. em_sub_buffer_release also takes `#pragma opt_loop_invariants off` + `opt_strength_reduction off` (same size, raises its row).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: em_size_scale_pick: scope 0 order
+ *   `roll`, `pct` | em_stat_level_pick: scope 0 order `roll`, `delta`, `level`; scope 4 order `total`, `r` |
+ *   emc_event_targets_ready_ck: hoisted `found`, `i`, `work`; scope 0 order `found`, `waiting`, `t`, `ev`, `i`,
+ *   `all`, `target`, `work`, `works`, `max` | em_sub_buffer_release: hoisted `index`, `set`, `i`.
  */
 
 #include "types.h"
@@ -1012,9 +1016,11 @@ u8* em_stat_tbl_get(u8 kind) {
 
 /* The stat level `base` moved by a roll of list `variant` with `seed`, clamped to 0..60. */
 u8 em_stat_level_pick(u8 base, u8 variant, u16 seed) {
-    s16 delta = 0;
-    EmStatRoll* roll = em_stat_roll_tbl[variant];
+    EmStatRoll* roll;
+    s16 delta;
     s16 level;
+    delta = 0;
+    roll = em_stat_roll_tbl[variant];
 
     if (isServerSelectState() == 0) {
         s16 i;
@@ -1026,8 +1032,10 @@ u8 em_stat_level_pick(u8 base, u8 variant, u16 seed) {
         }
     }
     if (roll != NULL && roll->weight != 0xFFFF) {
-        EmStatRoll* r = roll;
-        s16 total = 0;
+        s16 total;
+        EmStatRoll* r;
+        r = roll;
+        total = 0;
         for (; r->weight != -1; r++) {
             total += r->weight;
         }
@@ -1068,8 +1076,10 @@ EmSizeRoll* em_size_tbl_get(u8 variant) {
 
 /* The size scale for size `size` (percent) moved by a roll of list `variant` with `seed`. */
 f32 em_size_scale_pick(u8 size, u8 variant, u16 seed) {
-    u16 pct = 100;
-    EmSizeRoll* roll = em_size_tbl_get(variant);
+    EmSizeRoll* roll;
+    u16 pct;
+    pct = 100;
+    roll = em_size_tbl_get(variant);
     if (roll != NULL && roll->weight != 0xFFFF) {
         EmSizeRoll* r;
         s16 total = 0;
@@ -2327,16 +2337,19 @@ void emc_event_move(void) {
 /* Matches event `event`'s targets to the live enemies in the player's area: 1 when every target has one, 0 when
  * some has none, -1 when a matched enemy is not entered yet. */
 s32 emc_event_targets_ready_ck(u8 event) {
-    s16 max;
+    s32 found;
     u32 waiting;
     s16 t;
-    _ENEMY_WORK* works;
     EmcEvent* ev;
+    s16 i;
     s32 all;
+    EmcEventTarget* target;
+    _ENEMY_WORK* work;
+    _ENEMY_WORK* works;
+    s16 max;
     works = (_ENEMY_WORK*)get_move_work_adrs(3);
     max = get_move_work_max(3);
     ev = emc_event_tbl_get(event);
-    EmcEventTarget* target;
 
     if (ev == NULL) {
         return 0;
@@ -2349,9 +2362,7 @@ s32 emc_event_targets_ready_ck(u8 event) {
     waiting = 0;
     t = 0;
     for (; target->kind != 0; target++, t++) {
-        s32 found = 0;
-        s16 i;
-        _ENEMY_WORK* work;
+        found = 0;
         for (i = 0, work = works; i < max; i++, work++) {
             if (work->active != 0 && (work->event_slot_0x46B == -1 || work->event_slot_0x46B == t) &&
                 work->team == target->kind && (target->area_match == 0 || work->field_0x00A == target->area) &&
@@ -3304,10 +3315,15 @@ EmResBuffer* em_sub_buffer_claim(u8 kind) {
 /* Drops one reference of monster kind `kind`'s sub-buffer; the last one releases its effect resources and clears it.
  * Returns the references left. */
 u8 em_sub_buffer_release(u8 kind) {
-    EmcWork* work = &emc_work;
-    s32 slot = em_kind_slot_find(kind);
+    s32 slot;
     EmResBuffer* buf;
     s32 n;
+    s32 index;
+    EmcEftSet* set;
+    s32 i;
+    EmcWork* work;
+    work = &emc_work;
+    slot = em_kind_slot_find(kind);
     if (slot != 0xFF) {
         kind = work->slot_0x000[slot].field_0x04;
         if (kind == 0) {
@@ -3317,15 +3333,12 @@ u8 em_sub_buffer_release(u8 kind) {
     buf = work->sub_buf;
     for (n = 6; n != 0; n--, buf++) {
         if (buf->used != 0 && buf->owner == kind) {
-            s32 index;
-            EmcEftSet* set;
             buf->refs--;
             if (buf->refs != 0) {
                 return buf->refs;
             }
             index = em_sub_buffer_index_get(kind, 1);
             if (index >= 0) {
-                s32 i;
                 set = &emc_work.eft_set[index];
                 if (set->id_a != 0xFF) {
                     eft_res_release(set->id_a);

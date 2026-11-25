@@ -40,6 +40,9 @@
  *            `fmuls` operand order).
  * SHAPES. screen_tex_draw/screen_capture_draw: `h` is u16 (the (s16) screen height, 0..480, passed to an s16 parameter).
  * SHAPES. `filter_panel_draw` takes the hill-climbed declaration order.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: filter_panel_draw: scope 0 order
+ *   `c5`, `c4`, `c3`, `c2`, `c1`, `c0`, `upper`, `width`, `mid`; scope 5 order `lower_width`, `lower`, `bottom`,
+ *   `top`; hoisted `lower_width`, `lower`, `bottom`, `top`.
  */
 
 #include "types.h"
@@ -572,13 +575,17 @@ extern "C" void filter_panel_draw(FilterPanel* panel) {
     _MH_VEC2 screen;
     u32 c5;
     u32 c4;
-    s16 mid;
+    u32 c3;
     u32 c2;
     u32 c1;
     u32 c0;
+    s16 lower_width;
+    s16 lower;
+    s16 bottom;
+    s16 top;
     s16 upper;
-    u32 c3;
     s16 width;
+    s16 mid;
 
     if (panel->enable != 0) {
         get_ScreenSize(&screen);
@@ -646,10 +653,10 @@ extern "C" void filter_panel_draw(FilterPanel* panel) {
         panel_gx_color1u32(c5);
         panel_gx_end();
         if (screen_split_ck() != 0) {
-            s16 lower_width = (s16)screen.x;
-            s16 top = (s16)(Screen_w.height_f * panel_f32_half);
-            s16 lower = top + panel->lower_height;
-            s16 bottom = (s16)Screen_w.height_f;
+            lower_width = (s16)screen.x;
+            top = (s16)(Screen_w.height_f * panel_f32_half);
+            lower = top + panel->lower_height;
+            bottom = (s16)Screen_w.height_f;
             c0 = panel->lower_color[0];
             c1 = panel->lower_color[1];
             c2 = panel->lower_color[2];

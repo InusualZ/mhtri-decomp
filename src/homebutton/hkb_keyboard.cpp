@@ -51,6 +51,7 @@
  *            the saved set).
  * RESIDUALS. mwcc-debugger dump, `DrawQuad`: no regsim plan (dump unavailable for this row); first divergence insn
  *            18: retail `mr r24, r30` vs ours `mr r25, r30`
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: createKeys: hoisted `pKey`.
  */
 #include "homebutton/hkb_keyboard.h"
 
@@ -1702,9 +1703,12 @@ void HkbKeyboard::create(MEMAllocator* pAllocator) {
 /* 0x805389F8 (0x300): Creates one key component per key definition, with its animations, and lists them in the
  * pane manager. */
 void HkbKeyboard::createKeys(MEMAllocator* pAllocator) {
-    for (u16 i = 0; i < 142; i++) {
+    u16 j;
+    u16 i;
+    HkbKey* pKey;
+    for (i = 0; i < 142; i++) {
         const HkbKeyDef* def = &hkbKeyDefs[i];
-        HkbKey* pKey = NULL;
+        pKey = NULL;
         switch (def->type) {
         case 0:
             pKey = new (MEMAllocFromAllocator(pAllocator, sizeof(HkbCharKey))) HkbCharKey(findTextBox(def->name));
@@ -1721,7 +1725,7 @@ void HkbKeyboard::createKeys(MEMAllocator* pAllocator) {
         }
         nw4r::ut::List_Append(&mComponents, pKey);
         const char* group = def->group;
-        for (u16 j = 0; j < def->numAnims; j++) {
+        for (j = 0; j < def->numAnims; j++) {
             const HkbAnimDef* pAnimDef = def->anims[j];
             const void* res = mpResAccessor->GetResource(0, pAnimDef->name, NULL);
             nw4r::lyt::AnimTransform* anim = getLayout()->CreateAnimTransform(res, mpResAccessor);

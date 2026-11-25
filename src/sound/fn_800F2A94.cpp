@@ -32,6 +32,8 @@
  *   slots 0/1) or the lobby tracks. Retail's u8 range tests are `(u8)(x + 0xFB) <= 2`-style (addi of the
  *   complement): `(u8)(x - 5)` compiles to `subi` and loses the row. A loop that ends after three hits is
  *   `for (i < 6) { if (n >= 3) break; }`. `cond ? 1 : 2` gives retail's cntlzw/extrwi/neg/addi select.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: demo_stream_stop_ck: scope 0 order
+ *   `ch2`, `up`, `ch0`.
  */
 #pragma peephole off
 #pragma optimization_level 4
@@ -423,9 +425,12 @@ void demo_stream_play(u8 id) {
 
 /* 0x800F2E38 (0x13C): whether the channels demo `id` uses have run to their end (pausing them on the way). */
 u32 demo_stream_stop_ck(u8 id) {
-    u8 up = 0;
-    u8 ch2 = bgm_demo_ch_tbl[id * 2];
-    u8 ch0 = bgm_demo_ch_tbl[id * 2 + 1];
+    u8 ch2;
+    u8 up;
+    u8 ch0;
+    up = 0;
+    ch2 = bgm_demo_ch_tbl[id * 2];
+    ch0 = bgm_demo_ch_tbl[id * 2 + 1];
     if (demo_play_ck() == 1) {
         if (id == 0x2C || id == 0x2F || id == 0x2B || id == 0x0E) {
             ch2 = 1;

@@ -92,6 +92,8 @@
  * RESIDUALS. se_hit_bank_req: colouring only (regsim plan 1 folds `louder`'s temporary into the local, which no spelling
  *            tried reaches: `louder = f(pos) == 1`, a two-step form and a split `bank` declaration measure equal or worse).
  * SHAPES. `se_slot_level_calc` keeps `i` in an `s32` and `mode` in a `u8` (mode takes 0..3).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: se_slot_level_calc: hoisted
+ *   `volumes`, `index`, `volume`.
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -2840,17 +2842,23 @@ void paralyzeTrap_SE_req(u8 kind, u8 trap, nw4r::math::VEC3* pos) {
  */
 #pragma optimization_level 4
 extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
-    SeWorkVol* w = (SeWorkVol*)work;
-    SeSlotView* s = (SeSlotView*)slot;
-    SeSysWorkVol* sys = (SeSysWorkVol*)se_pool;
+    SeWorkVol* w;
+    SeSlotView* s;
+    SeSysWorkVol* sys;
+    s32 i;
+    u32 b;
+    u8* volumes;
+    u32 a;
+    u8 mode;
+    s32 index;
+    u8 volume;
+    w = (SeWorkVol*)work;
+    s = (SeSlotView*)slot;
+    sys = (SeSysWorkVol*)se_pool;
     s32 ids[2];
     u8 levels[2];
     u16 params[2];
     f32 scale;
-    s32 i;
-    u32 b;
-    u32 a;
-    u8 mode;
 
     ids[0] = s->id;
     ids[1] = s->field_0x30;
@@ -2908,7 +2916,7 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
             params[1] = 15;
         }
         f32 near = lbl_80597260[params[0]];
-        u8* volumes = se_volume_curve_tbl[params[1]] + mode * 100;
+        volumes = se_volume_curve_tbl[params[1]] + mode * 100;
         f32 dist;
 
         if (PlayMode_ck() == 2) {
@@ -2932,8 +2940,8 @@ extern "C" void se_slot_level_calc(_se_w* work, SeSlot* slot) {
             s->field_0x1C = 0.0f;
             continue;
         }
-        s32 index = (s32)(dist / (near / 100.0f));
-        u8 volume = volumes[index];
+        index = (s32)(dist / (near / 100.0f));
+        volume = volumes[index];
 
         if (i == 0) {
             s->field_0x1C = 0.00787f * (f32)volume;

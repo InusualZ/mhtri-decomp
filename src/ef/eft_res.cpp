@@ -60,6 +60,8 @@
  *            from retail (308 B vs 312 B)
  * FLAGS. eft_res_archive_load_callback: scoped `#pragma optimization_level 4` (96.42 -> 97.65, size equal).
  * SHAPES. `eft_res_files_load` declares its locals in the order the register-allocation simulation (regsim) names (`from_area` before `area`).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: eft_res_archive_load_callback:
+ *   scope 0 order `ctrl`, `resource`, `proids`, `table`, `count`, `file`, `names`, `slot`, `mode`, `i`, `j`.
  */
 
 #include "types.h"
@@ -1548,17 +1550,24 @@ extern "C" void eft_res_files_load(EftResFile* file, s32 mode, u32 flags, u8* id
 /* 0x800F8358 (0x2DC): the archive-load callback: files every member of the loaded archive under the proID
  * slot `eft_common_load`'s run reserved for it (searched from the run's first ordinal) and registers it. */
 extern "C" void eft_res_archive_load_callback(char* path, void* data, u32 size, EftFileLoadCtx* ctx) {
-    EftControl* ctrl = &eft_control;
-    u8* table = lbl_806A2D34;
-    u8* proids = ctx->proids_0x00;
-    EfResourceManager* resource = ef_resource_instance();
-    char** names = ctx->names_0x08;
-    s32 count = pack_entry_count(data);
-    s32 mode = ctx->mode_0x0C;
-    EftProSlot* slot;
+    EftControl* ctrl;
+    EfResourceManager* resource;
+    u8* proids;
+    u8* table;
+    s32 count;
     void* file;
+    char** names;
+    EftProSlot* slot;
+    s32 mode;
     s32 i;
     s32 j;
+    ctrl = &eft_control;
+    table = lbl_806A2D34;
+    proids = ctx->proids_0x00;
+    resource = ef_resource_instance();
+    names = ctx->names_0x08;
+    count = pack_entry_count(data);
+    mode = ctx->mode_0x0C;
     u16 pos;
     u32 index;
 

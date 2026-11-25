@@ -47,6 +47,8 @@
  *            `cmplwi 1; ble` with the other cases signed); `prim_queue_draw` switches on `mode` and on the record kind; its kind-2
  *            handle is a class (`PrimKind2Obj`, a 0x1C-byte base then five placeholder virtuals) so the call is the canonical
  *            `lwz r12,0x1c(r3)` / `lwz r12,0x1c(r12)`; no table is emitted (nothing constructs it).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: fn_800E4390: hoisted `cur`, `raw`
+ *   | prim_list_exec: hoisted `p`, `h`.
  */
 
 #include "types.h"
@@ -228,15 +230,20 @@ extern "C" void prim_list_exec(void* a, u8 mode)
     /* `b40` is the camera matrix the callbacks below read through the `WorkBuf` view. */
     GXInvalidateVtxCache();
     ((nw4r::g3d::Camera*)a)->GetCameraMtx(&b40);
-    DrawCtx* ctx = (DrawCtx*)word_read(a);
-    u32 sel = stage_water_enabled_ck();
+    DrawCtx* ctx;
+    u32 sel;
+    u32 sub;
+    PrimRec* p;
+    Obj* h;
+    ctx = (DrawCtx*)word_read(a);
+    sel = stage_water_enabled_ck();
     if (sel == 1) {
         f31 = lbl_80796458;
         fn_80074AA8(a, 0, &scalef, 0);
     }
-    u32 sub = stage_water_b_enabled_ck();
+    sub = stage_water_b_enabled_ck();
     for (u32 i = 0; i < 2; i++) {
-        PrimRec* p = (PrimRec*)prim_rec_pool[i];
+        p = (PrimRec*)prim_rec_pool[i];
         for (u32 j = 0; j < prim_rec_count[i]; j++, p++) {
             if (!(p->flags & 0x200)) {
                 if (system_lobby_flag_get()) {
@@ -267,7 +274,6 @@ extern "C" void prim_list_exec(void* a, u8 mode)
                     continue;
                 }
             }
-            Obj* h;
             if (p->kind <= 1) {
                 h = (Obj*)p->handle;
                 if (p->started == 0) {
@@ -402,16 +408,19 @@ extern "C" void fn_800E4284(PrimRec* self, u8 layer, f32 f1, f32 f2)
  * chain's tail, so it is masked off when a node is walked.  `flag == 0` inserts at the head. */
 extern "C" void fn_800E4390(u32* link, PrimRec* node, u32 flag)
 {
-    u32 f = flag & 0xFF;
+    PrimRec* cur;
+    u32 raw;
+    u32 f;
+    f = flag & 0xFF;
 
     for (;;) {
-        u32 raw = *link;
+        raw = *link;
         if (raw == 0 || (raw & 1) == 0) {
             *link = (u32)node | 1;
             node->next = raw;
             return;
         }
-        PrimRec* cur = (PrimRec*)(raw & ~1u);
+        cur = (PrimRec*)(raw & ~1u);
         u32 cond;
         if (f == 0) {
             cond = 1;

@@ -81,6 +81,8 @@
  * FLAGS. lb_city_list_draw: scoped `#pragma optimization_level 4` (99.23 -> 99.28, size equal).
  * SHAPES. draw_search_city_dialog: `help` stays s32 (message ids 0x1EE.. do not fit u8; a u8 spelling measured +0.41 but truncates).
  * SHAPES. `lb_city_member_list_draw` takes the hill-climbed declaration order.
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: place_model_release: scope 0 order
+ *   `model`, `last`, `work`, `chr`, `i`, `slot`.
  */
 
 #include "types.h"
@@ -2937,12 +2939,15 @@ void place_model_load(u8 mode, u8 index, u8 id, u8 map, u8 area) {
 /* 0x8043CD98 (0x1D0): releases slot `index`: its animation works, model and interior, and the resource when no
  * other slot uses it. */
 void place_model_release(u8 index) {
-    PlaceModelWork* work = &place_model_work;
-    u32 last = 1;
+    PlaceModel* model;
+    u32 last;
+    PlaceModelWork* work;
     MHchar* chr;
     s32 i;
     PlaceModel* slot;
-    PlaceModel* model = &work->models[index];
+    work = &place_model_work;
+    last = 1;
+    model = &work->models[index];
     u8 res;
 
     if (model->used != 0) {

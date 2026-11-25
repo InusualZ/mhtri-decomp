@@ -56,6 +56,9 @@
  *   local; `hit_owner_reaction_set` takes the reaction into an `s16`; the defence cut is the inline `hit_defense_apply`.
  * SHAPES. `hit_damage_pl` declares their locals in the order the regsim plan gave (the plan's order measures best).
  * SHAPES. hit_damage_em declares its locals in the order regsim plan 1 gave (99.39 -> 99.87).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: hit_registry_update: hoisted
+ *   `npc`, `body`, `plw`, `em`, `count`, `i`, `target` | hit_damage_em: scope 0 order `build`, `cut_ok`, `damage`,
+ *   `side_kind`, `status`, `heavy`, `halved`, `rates`, `plw`, `mask`, `wear`, `half`.
  */
 
 #pragma optimization_level 4
@@ -363,14 +366,20 @@ extern "C" s32 body_hit_mask_ck(_BODY_W* body, _HIT_W* hit)
 #pragma opt_lifetimes off
 extern "C" void hit_registry_update(void)
 {
-    _HIT_W* hit;
+    _AINPC_W* npc;
     HitRegistry* reg;
+    _HIT_W* hit;
+    _BODY_W* body;
+    _PLW* plw;
+    _ENEMY_WORK* em;
+    u16 count;
+    s32 i;
+    _BODY_W* target;
 
     reg = &hit_registry;
     hit = reg->head_0x00;
     hit_targets_reset();
     if (Pl_motion_input_ck(1) != 1) {
-        _BODY_W* body;
 
         for (body = reg->body_head_0x04; body != NULL; body = body->next_0x00) {
             if (body->field_0x005 != 0 && body->hit_timer_0x0A > 0) {
@@ -378,10 +387,6 @@ extern "C" void hit_registry_update(void)
             }
         }
         for (; hit != NULL; hit = hit->next_0x00) {
-            _PLW* plw;
-            _ENEMY_WORK* em;
-            u16 count;
-            s32 i;
 
             if (hit_life_update(hit) == 0) {
                 continue;
@@ -441,8 +446,7 @@ extern "C" void hit_registry_update(void)
                 }
             }
             if ((u32)(hit->kind_0x42 - 0xA) > 1) {
-                _BODY_W* target;
-                _AINPC_W* npc = &ainpc_w;
+                npc = &ainpc_w;
 
                 if (npc->active != 0 && npc->field_0x216 == 0
                     && hit_area_match_ck(hit->area_0x0F, npc->area) != 0
@@ -1036,6 +1040,7 @@ extern "C" void hit_damage_em(_ENEMY_WORK* em, _HIT_W* hit, EmWeakPoint* part, _
     f32 elem;
     f32 elem_d;
     f32 elem_e;
+    s16 build;
     s32 cut_ok;
     s16 damage;
     s32 side_kind;
@@ -1047,7 +1052,6 @@ extern "C" void hit_damage_em(_ENEMY_WORK* em, _HIT_W* hit, EmWeakPoint* part, _
     u16 mask;
     s16 wear;
     s16 half;
-    s16 build;
 
     hit_id_list_push(em->hit_ids_0xAC0, &em->hit_id_count_0xAE8, hit->hit_id_0x0C);
     em->field_0x833 = 1;

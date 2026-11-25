@@ -39,6 +39,8 @@
  * SHAPES. `movie_page17_draw` declares its locals in the order the declaration hill-climb measured best.
  * SHAPES. `friend_pick_step` declares their locals in the order the declaration hill-climb measured best.
  * SHAPES. `friend_pick_step` declares their locals in the order the regsim plan gave (the plan's order measures best).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: movie_page04_draw: scope 0 order
+ *   `names`, `values`, `color`, `text`, `row`, `i`, `sprites`, `msgs`, `index`.
  */
 
 #include "types.h"
@@ -1592,10 +1594,10 @@ void movie_page04_draw(MenuSlot* slot) {
     u8 arrows;
     u16* names;
     u16* values;
-    s32 i;
+    s32 color;
     s8* text;
     MenuEntry* row;
-    s32 color;
+    s32 i;
     u16* sprites;
     u8** msgs;
     u16 index;

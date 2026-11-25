@@ -48,6 +48,8 @@
  *            first divergence insn 21: retail `lha r0, 0x14(r1)` vs ours `lha r6, 0xc(r1)`
  * SHAPES. lb_seisan_row_flags_get: `cond` is a `u16` (it holds the u8 unlock byte of the blade or gun row, passed on to
  *   an `s16` parameter; row 99.02 %).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: lb_kakou_source_draw: scope 3
+ *   order `row`, `i`.
  */
 #include "types.h"
 
@@ -2534,8 +2536,8 @@ void lb_kakou_source_draw(_EQUIP* equips, u8 kind, u16 state, _EQUIP* source, _m
         case 10:
         case 14:
         case 15: {
-            s32 i;
             u16* row;
+            s32 i;
             for (i = 0, row = lb_kakou_row_ids; i < 4; i++) {
                 if (equips->kind != 0) {
                     bool ok;

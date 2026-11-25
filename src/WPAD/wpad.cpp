@@ -89,6 +89,8 @@
  *            cost 0; first divergence insn 23: retail `clrlwi r5, r3, 16` vs ours `clrlwi r3, r3, 16`
  * FLAGS. `wpadSampleChanged` takes a scoped `#pragma opt_dead_assignments off` (size unchanged, raises its row).
  * FLAGS. `wpadFilterButtons` takes a scoped `#pragma opt_common_subs off` (size unchanged; the back-sample pointer then takes r6 as retail).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: wpadSamplingFiber: hoisted
+ *   `level`, `sensitivity`, `setting`, `volume`, `cb`, `sentAux`, `sent`, `mainCb`.
  */
 
 #include "types.h"
@@ -979,8 +981,16 @@ static inline BOOL wpadReconnectPending(void)
  * and samples every connected remote. */
 void wpadSamplingFiber(void)
 {
-    s32 chan;
     s32 status;
+    u32 level;
+    u8 sensitivity;
+    u8 setting;
+    u8 volume;
+    WPADCB* cb;
+    BOOL sentAux;
+    BOOL sent;
+    s32 chan;
+    WPADCB* mainCb;
 
     status = WUDGetStatus();
     if (status != 3) {
@@ -998,7 +1008,7 @@ void wpadSamplingFiber(void)
             WPADiDebugPrint("Check the update of WiFi using channel\n");
             WPADiDebugPrint("WiFi uses channel = %d\n", WPAD_WIFI_CHANNEL);
             if (wpadWifiChannel != WPAD_WIFI_CHANNEL) {
-                u32 level = OSDisableInterrupts();
+                level = OSDisableInterrupts();
                 wpadWifiChannel = WPAD_WIFI_CHANNEL;
                 OSRestoreInterrupts(level);
                 WUDSetDisableChannel(wpadWifiChannel);
@@ -1007,9 +1017,7 @@ void wpadSamplingFiber(void)
         if (SCCheckStatus() == 0) {
             WUDiFlushDeviceInfo();
             if (wpadWifiCheckEnabled != 0) {
-                u8 sensitivity = SCGetBtDpdSensibility();
-                u8 setting;
-                u8 volume;
+                sensitivity = SCGetBtDpdSensibility();
 
                 if (sensitivity < 1) {
                     sensitivity = 1;
@@ -1033,11 +1041,10 @@ void wpadSamplingFiber(void)
             }
         }
         for (chan = 0; chan < 4; chan++) {
-            WPADCB* cb = wpadCBTable[chan];
+            cb = wpadCBTable[chan];
 
             if (cb->used != 0) {
-                BOOL sentAux = FALSE;
-                BOOL sent;
+                sentAux = FALSE;
 
                 if (wpadChanStateA[chan] == 5) {
                     WPADCommand cmd;
@@ -1052,7 +1059,7 @@ void wpadSamplingFiber(void)
                 }
                 wpadChanStateA[chan] = (wpadChanStateA[chan] == 5) ? wpadChanStateA[chan] : wpadChanStateA[chan] + 1;
                 {
-                    WPADCB* mainCb = wpadCBTable[chan];
+                    mainCb = wpadCBTable[chan];
                     if (sentAux) {
                         sent = TRUE;
                     } else {

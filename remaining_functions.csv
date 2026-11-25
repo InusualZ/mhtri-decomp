@@ -68,7 +68,6 @@ size_bytes,unit,function,match_percent,address
 112,homebutton/hkb_material,Init__Q34nw4r3lyt8MaterialFv,67.4286,0x805313A8
 116,Network/NetworkWiiMediator,postMediatorRecord,96.5517,0x80415FAC
 116,Pl/player_control,pl_net_slot_ready_ck,98.7931,0x80268308
-116,Pl/player_control,player_move_start_ck__Fv,88.7931,0x802681EC
 116,ef/system_core,resident_file_load,98.6207,0x800CFBF0
 116,enemy/em_common,em_part_slot_get,98.7931,0x80126690
 116,enemy/em_prog_support,note_slot_find,97.2414,0x803850A4
@@ -149,7 +148,6 @@ size_bytes,unit,function,match_percent,address
 188,HID/hid,hid_set_suspend,94.8936,0x805273E0
 188,MSL_C/mem,__copy_longs_aligned,97.3404,0x8045B708
 188,Pl/pl_act,equip_deco_slots_free,98.2979,0x8027F21C
-188,Pl/pl_act,equip_gun_clip_get,96.7021,0x8027F008
 188,WPAD/wpad,wpadCountIdleReports,99.3617,0x804EC3F0
 188,draw_shape,drawshape_set_offset_f32,98.8298,0x8005420C
 188,draw_shape,drawshape_set_tex_scale,98.8298,0x80054370
@@ -316,7 +314,6 @@ size_bytes,unit,function,match_percent,address
 300,Network/net_session_close,sendProfileHead,93.52,0x80435740
 300,ai/ai_npc,fn_802D6A00,97.2,0x802D6A00
 300,enemy/fn_802F5138,em032_act11_se_play,99.8667,0x802F89F8
-300,lobby/fn_801E7530,lb_farm_seed_list_draw,98.9333,0x801EC36C
 304,lobby/fn_80219260,lb_menu_row_insert,99.079,0x8021DDA8
 304,menu/multi_result,name_menu_list_draw,99.4079,0x803A3374
 308,NHTTP/NHTTP_request,NHTTPi_findHeaderField,97.1429,0x80516270
@@ -346,7 +343,6 @@ size_bytes,unit,function,match_percent,address
 316,enemy/enemy_control,em_size_scale_pick,97.3418,0x8014281C
 316,lobby/fn_801E0ADC,lb_eqshop_draw,99.8734,0x801E6C20
 316,menu/menu_result,q_result_phase_next,98.6076,0x803970FC
-316,sound/fn_800F2A94,demo_stream_stop_ck,99.2405,0x800F2E38
 320,Pl/pl_act,pl_area_spot_valid_ck,97.375,0x80278310
 320,RVLGX/GXBump,GXSetIndTexMtx,82.55,0x804B8F70
 320,WPAD/WPADHIDParser,wpadReportAck,99.6875,0x804F4F10
@@ -387,13 +383,11 @@ size_bytes,unit,function,match_percent,address
 352,Network/net_session_close,installCommunityCallback,95.3977,0x80435570
 352,Pl/player_control,pl_players_ready_ck,97.9545,0x802673E8
 352,enemy/em_common,em_area_next_get,97.7273,0x80126C4C
-352,enemy/enemy_control,emc_event_targets_ready_ck,98.6932,0x8014517C
 352,lobby/lb_npc,lb_player_menu_area_return,97.5,0x80209328
 352,menu/menu_placeinfo,lb_city_timer_draw,97.6705,0x80439D98
 352,menu/menu_placeinfo,place_model_area_load,99.8295,0x8043C840
 356,Network/NetworkSessionStable,downPerformance__20NetworkSessionStableFSc,97.5281,0x803D4354
 356,Pl/pl_act,pl_weapon0_hit_feedback,98.8764,0x80280248
-356,enemy/em_kind,fn_80140354,99.7191,0x80140354
 356,enemy/enemy_control,enemy_control_move,98.8202,0x80143C14
 356,homebutton/hkb_keyboard,updateComponents__11HkbKeyboardFv,99.8876,0x8053C868
 360,WUD/wud,WUDiInsertWbcNode,96.9556,0x804FE770
@@ -867,7 +861,6 @@ size_bytes,unit,function,match_percent,address
 1040,SEQ/seq,SEQRunAudioFrame,96.5385,0x804DD460
 1040,lobby/lb_pane_ui,lb_dye_pane_step,98.6731,0x801F4804
 1044,MSL_C/strtoul,__strtoul,96.2529,0x80460D0C
-1044,fn_80056F24,filter_panel_draw,98.8467,0x800579A4
 1044,lobby/fn_801E0ADC,em007_model_eft_job_draw,99.9425,0x801E2260
 1044,menu/menu_placeinfo,lb_city_select_draw,97.1034,0x80439EF8
 1052,lobby/fn_802FA9A0,eft036_move,99.7338,0x802FAB98

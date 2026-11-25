@@ -33,6 +33,8 @@
  * RESIDUALS. player_move_start: regsim EXACT; retail's address `add r4,r4,r0` stays in r4 where ours uses r3
  *            (volatile temp, not a regsim target).
  * SHAPES. `pl_part_model_bind` keeps the part index copy `p` in a `u8` (the `u8 part` parameter, 0..0xFF).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: player_move_start_ck: scope 0
+ *   order `i`, `slot`, `pending`, `obj`, `work` | pl_part_model_bind: scope 11 order `dst`, `src`.
  */
 
 #include "types.h"
@@ -638,11 +640,14 @@ void player_init_data_load(void) {
 #pragma optimization_level 4
 /* 0x802681EC - every live player's 11 state slots have left the "not yet started" value. */
 u32 player_move_start_ck(void) {
-    _PLWORK* work = pl_global->objects;
-    _PLOBJ* obj = pl_global->table;
-    s32 pending = 0;
     s32 i;
     s32 slot;
+    s32 pending;
+    _PLOBJ* obj;
+    _PLWORK* work;
+    work = pl_global->objects;
+    obj = pl_global->table;
+    pending = 0;
 
     for (i = 0; i < pl_global->count; i++, work++, obj++) {
         if (work->active != 0) {
@@ -937,8 +942,10 @@ void pl_part_model_bind(_PLW* plw, _PLOBJ* obj, u8 part, s32 unused) {
         obj->bound_mem[p] = pl_global->part_mem[plw->chunk_ofs][part];
         obj->bound_id[p] = obj->req_id[p];
         if (part < 7) {
-            void* src = getResMemAdrs(obj->load_mem[p]);
-            void* dst = getResMemAdrs(obj->bound_mem[p]);
+            void* dst;
+            void* src;
+            src = getResMemAdrs(obj->load_mem[p]);
+            dst = getResMemAdrs(obj->bound_mem[p]);
 
             if (dst != src) {
                 memcpy(dst, src, pl_armor_part_blocks[part] * 0x2800);

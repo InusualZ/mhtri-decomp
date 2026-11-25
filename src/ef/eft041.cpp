@@ -18,6 +18,8 @@
  * SHAPES. `created` in the model record is `void* volatile` for `eft041_model_create`: retail stores the call result
  *   and re-reads it (`stw r3,8(r28); lwz r0,8(r28)`), which no flag set reproduces.  The declarations run
  *   `data; i; name;` (with `name` first the `name`/`i` registers swap).
+ * SHAPES. Local declaration order, reordered to the registers regsim's plan gives: eft041_move: scope 0 order
+ *   `mapno`, `i`, `pos_num`, `work`, `pos_tbl`.
  */
 
 #include "types.h"
@@ -152,12 +154,14 @@ Vec eft041_place_pos_tbl[4] = {
  * and retires it after the second timer, then hands its position to `eft004_set`. */
 extern "C" void eft041_move(_EFT* self)
 {
-    Eft042Work* work = (Eft042Work*)self->work_0x38;
-    u8 mapno = get_now_mapno();
-    nw4r::math::VEC3 pos;
-    Vec* pos_tbl;
-    u32 pos_num;
+    u8 mapno;
     u32 i;
+    u32 pos_num;
+    Eft042Work* work;
+    Vec* pos_tbl;
+    work = (Eft042Work*)self->work_0x38;
+    mapno = get_now_mapno();
+    nw4r::math::VEC3 pos;
 
     pos_tbl = NULL;
     if ((mapno == 2 || mapno == 13) && self->area_0x44 == 10) {
